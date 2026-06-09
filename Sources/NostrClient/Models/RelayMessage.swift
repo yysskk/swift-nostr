@@ -77,15 +77,17 @@ public enum RelayMessage: Sendable {
         }
 
         guard let array = try JSONSerialization.jsonObject(with: data) as? [Any],
-              let type = array.first as? String else {
+            let type = array.first as? String
+        else {
             throw NostrError.invalidMessageFormat
         }
 
         switch type {
         case "EVENT":
             guard array.count >= 3,
-                  let subscriptionId = array[1] as? String,
-                  let eventDict = array[2] as? [String: Any] else {
+                let subscriptionId = array[1] as? String,
+                let eventDict = array[2] as? [String: Any]
+            else {
                 throw NostrError.invalidMessageFormat
             }
             let event = try Event.from(dictionary: eventDict)
@@ -93,38 +95,43 @@ public enum RelayMessage: Sendable {
 
         case "EOSE":
             guard array.count >= 2,
-                  let subscriptionId = array[1] as? String else {
+                let subscriptionId = array[1] as? String
+            else {
                 throw NostrError.invalidMessageFormat
             }
             return .endOfStoredEvents(subscriptionId: subscriptionId)
 
         case "NOTICE":
             guard array.count >= 2,
-                  let message = array[1] as? String else {
+                let message = array[1] as? String
+            else {
                 throw NostrError.invalidMessageFormat
             }
             return .notice(message: message)
 
         case "OK":
             guard array.count >= 4,
-                  let eventId = array[1] as? String,
-                  let accepted = array[2] as? Bool,
-                  let message = array[3] as? String else {
+                let eventId = array[1] as? String,
+                let accepted = array[2] as? Bool,
+                let message = array[3] as? String
+            else {
                 throw NostrError.invalidMessageFormat
             }
             return .ok(eventId: eventId, accepted: accepted, message: message)
 
         case "AUTH":
             guard array.count >= 2,
-                  let challenge = array[1] as? String else {
+                let challenge = array[1] as? String
+            else {
                 throw NostrError.invalidMessageFormat
             }
             return .auth(challenge: challenge)
 
         case "CLOSED":
             guard array.count >= 3,
-                  let subscriptionId = array[1] as? String,
-                  let message = array[2] as? String else {
+                let subscriptionId = array[1] as? String,
+                let message = array[2] as? String
+            else {
                 throw NostrError.invalidMessageFormat
             }
             return .closed(subscriptionId: subscriptionId, message: message)
@@ -136,8 +143,8 @@ public enum RelayMessage: Sendable {
 }
 
 // MARK: - Codable Helpers
-private extension Encodable {
-    func toDictionary() throws -> [String: Any] {
+extension Encodable {
+    fileprivate func toDictionary() throws -> [String: Any] {
         let encoder = JSONEncoder()
         encoder.keyEncodingStrategy = .convertToSnakeCase
         let data = try encoder.encode(self)
@@ -148,8 +155,8 @@ private extension Encodable {
     }
 }
 
-private extension Event {
-    static func from(dictionary: [String: Any]) throws -> Event {
+extension Event {
+    fileprivate static func from(dictionary: [String: Any]) throws -> Event {
         let data = try JSONSerialization.data(withJSONObject: dictionary)
         let decoder = JSONDecoder()
         return try decoder.decode(Event.self, from: data)

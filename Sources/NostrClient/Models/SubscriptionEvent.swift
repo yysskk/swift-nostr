@@ -21,10 +21,10 @@ public enum SubscriptionEvent: Sendable {
     public var relayURL: URL {
         switch self {
         case .event(let relayURL, _),
-             .eose(let relayURL),
-             .closed(let relayURL, _),
-             .notice(let relayURL, _),
-             .auth(let relayURL, _):
+            .eose(let relayURL),
+            .closed(let relayURL, _),
+            .notice(let relayURL, _),
+            .auth(let relayURL, _):
             relayURL
         }
     }

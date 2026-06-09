@@ -1,5 +1,6 @@
-import Testing
 import Foundation
+import Testing
+
 @testable import NostrClient
 
 @Suite("NIP-17 Private Direct Message Tests")

@@ -1,6 +1,7 @@
 import Foundation
+
 #if canImport(FoundationNetworking)
-import FoundationNetworking
+    import FoundationNetworking
 #endif
 
 /// Manages a WebSocket connection to a single Nostr relay
@@ -63,10 +64,13 @@ public actor RelayConnection {
 
     /// Connects to the relay
     public func connect() async throws {
-        guard state == .disconnected || state == .failed("") || {
-            if case .failed = state { return true }
-            return false
-        }() else { return }
+        guard
+            state == .disconnected || state == .failed("")
+                || {
+                    if case .failed = state { return true }
+                    return false
+                }()
+        else { return }
 
         updateState(.connecting)
 
@@ -337,7 +341,9 @@ public actor RelayConnection {
                                     if accepted {
                                         waiter.finish()
                                     } else {
-                                        waiter.finish(throwing: NostrError.relayError("Relay rejected event \(eventId): \(message)"))
+                                        waiter.finish(
+                                            throwing: NostrError.relayError(
+                                                "Relay rejected event \(eventId): \(message)"))
                                     }
                                 }
                             }
@@ -452,7 +458,7 @@ extension RelayConnection: Hashable {
 }
 
 // MARK: - NIP-11
-public extension RelayConnection {
+extension RelayConnection {
     /// Fetches the NIP-11 Relay Information Document for this relay.
     ///
     /// This performs an HTTP GET request to the relay's URL (with the scheme
@@ -463,7 +469,7 @@ public extension RelayConnection {
     /// - Returns: The decoded ``RelayInformation``.
     /// - Throws: ``RelayInformation/FetchError`` on URL, network, or
     ///   decoding errors.
-    nonisolated func fetchInformation(urlSession: URLSession = .shared) async throws -> RelayInformation {
+    public nonisolated func fetchInformation(urlSession: URLSession = .shared) async throws -> RelayInformation {
         try await RelayInformation.fetch(from: url, urlSession: urlSession)
     }
 }

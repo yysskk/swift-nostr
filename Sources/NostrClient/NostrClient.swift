@@ -226,10 +226,12 @@ public actor NostrClient {
         limit: Int = 100,
         handler: @escaping @Sendable (Event) -> Void
     ) async throws -> String {
-        try await subscribeToDirectMessages(limit: limit, eventHandler: { subscriptionEvent in
-            guard case .event(_, let event) = subscriptionEvent else { return }
-            handler(event)
-        })
+        try await subscribeToDirectMessages(
+            limit: limit,
+            eventHandler: { subscriptionEvent in
+                guard case .event(_, let event) = subscriptionEvent else { return }
+                handler(event)
+            })
     }
 
     /// Subscribes to private direct messages for the current user.
@@ -272,10 +274,12 @@ public actor NostrClient {
         filters: [Filter],
         handler: @escaping @Sendable (Event) -> Void
     ) async throws -> String {
-        try await subscribe(filters: filters, eventHandler: { subscriptionEvent in
-            guard case .event(_, let event) = subscriptionEvent else { return }
-            handler(event)
-        })
+        try await subscribe(
+            filters: filters,
+            eventHandler: { subscriptionEvent in
+                guard case .event(_, let event) = subscriptionEvent else { return }
+                handler(event)
+            })
     }
 
     /// Subscribes to events matching the given filters and emits relay-aware subscription events.
@@ -351,10 +355,12 @@ public actor NostrClient {
         limit: Int = 100,
         handler: @escaping @Sendable (Event) -> Void
     ) async throws -> String {
-        try await subscribeToUserTimeline(pubkey: pubkey, limit: limit, eventHandler: { subscriptionEvent in
-            guard case .event(_, let event) = subscriptionEvent else { return }
-            handler(event)
-        })
+        try await subscribeToUserTimeline(
+            pubkey: pubkey, limit: limit,
+            eventHandler: { subscriptionEvent in
+                guard case .event(_, let event) = subscriptionEvent else { return }
+                handler(event)
+            })
     }
 
     @discardableResult
@@ -373,10 +379,12 @@ public actor NostrClient {
         limit: Int = 100,
         handler: @escaping @Sendable (Event) -> Void
     ) async throws -> String {
-        try await subscribeToGlobalFeed(limit: limit, eventHandler: { subscriptionEvent in
-            guard case .event(_, let event) = subscriptionEvent else { return }
-            handler(event)
-        })
+        try await subscribeToGlobalFeed(
+            limit: limit,
+            eventHandler: { subscriptionEvent in
+                guard case .event(_, let event) = subscriptionEvent else { return }
+                handler(event)
+            })
     }
 
     @discardableResult
@@ -395,10 +403,12 @@ public actor NostrClient {
         limit: Int = 100,
         handler: @escaping @Sendable (Event) -> Void
     ) async throws -> String {
-        try await subscribeToMentions(pubkey: pubkey, limit: limit, eventHandler: { subscriptionEvent in
-            guard case .event(_, let event) = subscriptionEvent else { return }
-            handler(event)
-        })
+        try await subscribeToMentions(
+            pubkey: pubkey, limit: limit,
+            eventHandler: { subscriptionEvent in
+                guard case .event(_, let event) = subscriptionEvent else { return }
+                handler(event)
+            })
     }
 
     @discardableResult
@@ -417,10 +427,12 @@ public actor NostrClient {
         pubkeys: [String],
         handler: @escaping @Sendable (Event) -> Void
     ) async throws -> String {
-        try await subscribeToMetadata(pubkeys: pubkeys, eventHandler: { subscriptionEvent in
-            guard case .event(_, let event) = subscriptionEvent else { return }
-            handler(event)
-        })
+        try await subscribeToMetadata(
+            pubkeys: pubkeys,
+            eventHandler: { subscriptionEvent in
+                guard case .event(_, let event) = subscriptionEvent else { return }
+                handler(event)
+            })
     }
 
     @discardableResult
@@ -439,12 +451,14 @@ public actor NostrClient {
     public func fetch(filters: [Filter], timeout: TimeInterval = 10) async throws -> [Event] {
         let collectedEvents = EventCollector()
 
-        let subscriptionId = try await subscribe(filters: filters, eventHandler: { subscriptionEvent in
-            guard case .event(_, let event) = subscriptionEvent else { return }
-            Task {
-                await collectedEvents.append(event)
-            }
-        })
+        let subscriptionId = try await subscribe(
+            filters: filters,
+            eventHandler: { subscriptionEvent in
+                guard case .event(_, let event) = subscriptionEvent else { return }
+                Task {
+                    await collectedEvents.append(event)
+                }
+            })
 
         let (eoseStream, eoseContinuation) = AsyncStream.makeStream(of: Void.self)
         installEOSESignal(for: subscriptionId, continuation: eoseContinuation)

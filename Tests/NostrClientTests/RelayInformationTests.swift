@@ -1,9 +1,11 @@
-import Testing
 import Foundation
-#if canImport(FoundationNetworking)
-import FoundationNetworking
-#endif
+import Testing
+
 @testable import NostrClient
+
+#if canImport(FoundationNetworking)
+    import FoundationNetworking
+#endif
 
 @Suite("RelayInformation Tests (NIP-11)", .serialized)
 struct RelayInformationTests {
@@ -85,24 +87,25 @@ struct RelayInformationTests {
 
     @Test("Decode snake_case top-level fields")
     func decodeSnakeCaseTopLevel() throws {
-        let json = Data(#"""
-        {
-          "name": "Test Relay",
-          "description": "A test relay",
-          "pubkey": "abc123",
-          "self": "def456",
-          "contact": "mailto:admin@example.com",
-          "supported_nips": [1, 2, 11],
-          "software": "https://example.com/relay",
-          "version": "1.0.0",
-          "terms_of_service": "https://example.com/tos",
-          "relay_countries": ["US", "JP"],
-          "language_tags": ["en", "ja"],
-          "tags": ["sfw-only", "bitcoin"],
-          "posting_policy": "https://example.com/policy",
-          "payments_url": "https://example.com/pay"
-        }
-        """#.utf8)
+        let json = Data(
+            #"""
+            {
+              "name": "Test Relay",
+              "description": "A test relay",
+              "pubkey": "abc123",
+              "self": "def456",
+              "contact": "mailto:admin@example.com",
+              "supported_nips": [1, 2, 11],
+              "software": "https://example.com/relay",
+              "version": "1.0.0",
+              "terms_of_service": "https://example.com/tos",
+              "relay_countries": ["US", "JP"],
+              "language_tags": ["en", "ja"],
+              "tags": ["sfw-only", "bitcoin"],
+              "posting_policy": "https://example.com/policy",
+              "payments_url": "https://example.com/pay"
+            }
+            """#.utf8)
 
         let info = try JSONDecoder().decode(RelayInformation.self, from: json)
 
@@ -124,26 +127,27 @@ struct RelayInformationTests {
 
     @Test("Decode limitation fields")
     func decodeLimitation() throws {
-        let json = Data(#"""
-        {
-          "limitation": {
-            "max_message_length": 16384,
-            "max_subscriptions": 20,
-            "max_filters": 100,
-            "max_limit": 5000,
-            "max_subid_length": 100,
-            "max_event_tags": 100,
-            "max_content_length": 8196,
-            "min_pow_difficulty": 30,
-            "auth_required": true,
-            "payment_required": false,
-            "restricted_writes": true,
-            "created_at_lower_limit": 31536000,
-            "created_at_upper_limit": 3,
-            "default_limit": 500
-          }
-        }
-        """#.utf8)
+        let json = Data(
+            #"""
+            {
+              "limitation": {
+                "max_message_length": 16384,
+                "max_subscriptions": 20,
+                "max_filters": 100,
+                "max_limit": 5000,
+                "max_subid_length": 100,
+                "max_event_tags": 100,
+                "max_content_length": 8196,
+                "min_pow_difficulty": 30,
+                "auth_required": true,
+                "payment_required": false,
+                "restricted_writes": true,
+                "created_at_lower_limit": 31536000,
+                "created_at_upper_limit": 3,
+                "default_limit": 500
+              }
+            }
+            """#.utf8)
 
         let info = try JSONDecoder().decode(RelayInformation.self, from: json)
         let limitation = try #require(info.limitation)
@@ -159,45 +163,47 @@ struct RelayInformationTests {
         #expect(limitation.authRequired == true)
         #expect(limitation.paymentRequired == false)
         #expect(limitation.restrictedWrites == true)
-        #expect(limitation.createdAtLowerLimit == 31536000)
+        #expect(limitation.createdAtLowerLimit == 31_536_000)
         #expect(limitation.createdAtUpperLimit == 3)
         #expect(limitation.defaultLimit == 500)
     }
 
     @Test("Decode fees with all categories")
     func decodeFees() throws {
-        let json = Data(#"""
-        {
-          "fees": {
-            "admission": [{"amount": 1000000, "unit": "msats"}],
-            "subscription": [{"amount": 5000000, "unit": "msats", "period": 2592000}],
-            "publication": [{"kinds": [4], "amount": 100, "unit": "msats"}]
-          }
-        }
-        """#.utf8)
+        let json = Data(
+            #"""
+            {
+              "fees": {
+                "admission": [{"amount": 1000000, "unit": "msats"}],
+                "subscription": [{"amount": 5000000, "unit": "msats", "period": 2592000}],
+                "publication": [{"kinds": [4], "amount": 100, "unit": "msats"}]
+              }
+            }
+            """#.utf8)
 
         let info = try JSONDecoder().decode(RelayInformation.self, from: json)
         let fees = try #require(info.fees)
 
-        #expect(fees.admission?.first?.amount == 1000000)
+        #expect(fees.admission?.first?.amount == 1_000_000)
         #expect(fees.admission?.first?.unit == "msats")
-        #expect(fees.subscription?.first?.period == 2592000)
+        #expect(fees.subscription?.first?.period == 2_592_000)
         #expect(fees.publication?.first?.kinds == [4])
         #expect(fees.publication?.first?.amount == 100)
     }
 
     @Test("Decode retention with mixed kinds (single and range)")
     func decodeRetentionMixedKinds() throws {
-        let json = Data(#"""
-        {
-          "retention": [
-            {"kinds": [0, 1, [5, 7], [40, 49]], "time": 3600},
-            {"kinds": [[30000, 39999]], "time": 100},
-            {"time": 3600},
-            {"kinds": [4], "count": 1000}
-          ]
-        }
-        """#.utf8)
+        let json = Data(
+            #"""
+            {
+              "retention": [
+                {"kinds": [0, 1, [5, 7], [40, 49]], "time": 3600},
+                {"kinds": [[30000, 39999]], "time": 100},
+                {"time": 3600},
+                {"kinds": [4], "count": 1000}
+              ]
+            }
+            """#.utf8)
 
         let info = try JSONDecoder().decode(RelayInformation.self, from: json)
         let retention = try #require(info.retention)
@@ -228,35 +234,36 @@ struct RelayInformationTests {
 
     @Test("Decode full NIP-11 example document")
     func decodeFullDocument() throws {
-        let json = Data(#"""
-        {
-          "name": "Full Example Relay",
-          "description": "A fully-featured example relay",
-          "banner": "https://example.com/banner.png",
-          "icon": "https://example.com/icon.png",
-          "pubkey": "0000000000000000000000000000000000000000000000000000000000000001",
-          "contact": "admin@example.com",
-          "supported_nips": [1, 2, 9, 11, 17, 42],
-          "software": "git+https://github.com/example/relay",
-          "version": "0.1.0",
-          "limitation": {
-            "max_message_length": 16384,
-            "auth_required": false,
-            "payment_required": false
-          },
-          "relay_countries": ["*"],
-          "language_tags": ["en"],
-          "tags": ["general"],
-          "posting_policy": "https://example.com/policy",
-          "payments_url": "https://example.com/pay",
-          "fees": {
-            "admission": [{"amount": 1000, "unit": "msats"}]
-          },
-          "retention": [
-            {"kinds": [0, 3], "count": 1}
-          ]
-        }
-        """#.utf8)
+        let json = Data(
+            #"""
+            {
+              "name": "Full Example Relay",
+              "description": "A fully-featured example relay",
+              "banner": "https://example.com/banner.png",
+              "icon": "https://example.com/icon.png",
+              "pubkey": "0000000000000000000000000000000000000000000000000000000000000001",
+              "contact": "admin@example.com",
+              "supported_nips": [1, 2, 9, 11, 17, 42],
+              "software": "git+https://github.com/example/relay",
+              "version": "0.1.0",
+              "limitation": {
+                "max_message_length": 16384,
+                "auth_required": false,
+                "payment_required": false
+              },
+              "relay_countries": ["*"],
+              "language_tags": ["en"],
+              "tags": ["general"],
+              "posting_policy": "https://example.com/policy",
+              "payments_url": "https://example.com/pay",
+              "fees": {
+                "admission": [{"amount": 1000, "unit": "msats"}]
+              },
+              "retention": [
+                {"kinds": [0, 3], "count": 1}
+              ]
+            }
+            """#.utf8)
 
         let info = try JSONDecoder().decode(RelayInformation.self, from: json)
 
@@ -460,9 +467,10 @@ struct RelayInformationTests {
 
     @Test("Fetch decodes successful 200 response")
     func fetchDecodesSuccessfulResponse() async throws {
-        let body = Data(#"""
-        {"name":"Mock Relay","supported_nips":[1,11],"limitation":{"auth_required":true}}
-        """#.utf8)
+        let body = Data(
+            #"""
+            {"name":"Mock Relay","supported_nips":[1,11],"limitation":{"auth_required":true}}
+            """#.utf8)
 
         let info: RelayInformation = try await withMockURLSession(
             response: .success(status: 200, body: body)

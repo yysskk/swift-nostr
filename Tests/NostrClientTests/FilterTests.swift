@@ -1,5 +1,6 @@
-import Testing
 import Foundation
+import Testing
+
 @testable import NostrClient
 
 @Suite("Filter Tests")
@@ -118,14 +119,14 @@ struct FilterTests {
     @Test("Filter JSON decoding")
     func filterJsonDecoding() throws {
         let json = """
-        {
-            "authors": ["pubkey1"],
-            "kinds": [1, 7],
-            "#e": ["eventid1"],
-            "#p": ["pubkey2"],
-            "limit": 50
-        }
-        """
+            {
+                "authors": ["pubkey1"],
+                "kinds": [1, 7],
+                "#e": ["eventid1"],
+                "#p": ["pubkey2"],
+                "limit": 50
+            }
+            """
 
         let decoder = JSONDecoder()
         let filter = try decoder.decode(Filter.self, from: json.data(using: .utf8)!)

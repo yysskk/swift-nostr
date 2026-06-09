@@ -1,5 +1,6 @@
-import Testing
 import Foundation
+import Testing
+
 @testable import NostrClient
 
 @Suite("UserMetadata Tests")
@@ -7,18 +8,18 @@ struct UserMetadataTests {
 
     /// Realistic kind 0 content as relays deliver it (snake_case wire keys).
     private static let kind0JSON = """
-    {
-      "name": "alice",
-      "display_name": "Alice In Nostrland",
-      "about": "just here for the notes",
-      "picture": "https://example.com/a.png",
-      "banner": "https://example.com/b.png",
-      "nip05": "alice@example.com",
-      "website": "https://example.com",
-      "lud06": "lnurl1dp68...",
-      "lud16": "alice@walletofsatoshi.com"
-    }
-    """
+        {
+          "name": "alice",
+          "display_name": "Alice In Nostrland",
+          "about": "just here for the notes",
+          "picture": "https://example.com/a.png",
+          "banner": "https://example.com/b.png",
+          "nip05": "alice@example.com",
+          "website": "https://example.com",
+          "lud06": "lnurl1dp68...",
+          "lud16": "alice@walletofsatoshi.com"
+        }
+        """
 
     /// Regression guard for the fetchMetadata bug: a plain `JSONDecoder` (no
     /// `.convertFromSnakeCase`) must populate display_name, because UserMetadata
@@ -28,7 +29,7 @@ struct UserMetadataTests {
     func decodesSnakeCaseKeys() throws {
         let meta = try JSONDecoder().decode(UserMetadata.self, from: Data(Self.kind0JSON.utf8))
 
-        #expect(meta.displayName == "Alice In Nostrland") // the field that used to be dropped
+        #expect(meta.displayName == "Alice In Nostrland")  // the field that used to be dropped
         #expect(meta.name == "alice")
         #expect(meta.about == "just here for the notes")
         #expect(meta.picture == "https://example.com/a.png")

@@ -10,6 +10,18 @@ on:
   workflow_dispatch:
 
 jobs:
+  format:
+    runs-on: ubuntu-latest
+    container: swift:6.2
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Show Swift version
+        run: swift --version
+
+      - name: Lint formatting
+        run: swift format lint --strict --recursive --parallel Sources Tests Package.swift
+
   test:
     runs-on: ubuntu-latest
     container: swift:6.2
@@ -24,3 +36,43 @@ jobs:
 
       - name: Run tests
         run: swift test
+
+  test-macos:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Show Swift version
+        run: swift --version
+
+      - name: Build
+        run: swift build
+
+      - name: Run tests with code coverage
+        run: swift test --enable-code-coverage
+
+      - name: Export coverage report
+        run: |
+          BIN_PATH="$(swift build --show-bin-path)"
+          XCTEST="$(find "$BIN_PATH" -name '*.xctest' | head -1)"
+          PROF_DATA="$(find "$BIN_PATH" -name 'default.profdata' | head -1)"
+          xcrun llvm-cov export \
+            "$XCTEST/Contents/MacOS/$(basename "$XCTEST" .xctest)" \
+            --instr-profile "$PROF_DATA" \
+            --ignore-filename-regex='(Tests|\.build)/.*' \
+            --format=lcov > coverage.lcov
+          xcrun llvm-cov report \
+            "$XCTEST/Contents/MacOS/$(basename "$XCTEST" .xctest)" \
+            --instr-profile "$PROF_DATA" \
+            --ignore-filename-regex='(Tests|\.build)/.*'
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-lcov
+          path: coverage.lcov

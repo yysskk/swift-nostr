@@ -59,7 +59,7 @@ public enum Bech32 {
     // MARK: - Private Helpers
 
     private static func polymod(_ values: [UInt8]) -> UInt32 {
-        let generator: [UInt32] = [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3]
+        let generator: [UInt32] = [0x3b6a_57b2, 0x2650_8e6d, 0x1ea1_19fa, 0x3d42_33dd, 0x2a14_62b3]
         var chk: UInt32 = 1
 
         for value in values {

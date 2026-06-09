@@ -134,9 +134,9 @@ private struct DynamicCodingKeys: CodingKey {
 }
 
 // MARK: - Convenience Initializers
-public extension Filter {
+extension Filter {
     /// Create a filter for a specific user's notes
-    static func userNotes(pubkey: String, limit: Int? = nil) -> Filter {
+    public static func userNotes(pubkey: String, limit: Int? = nil) -> Filter {
         Filter(
             authors: [pubkey],
             kinds: [Event.Kind.textNote.rawValue],
@@ -145,7 +145,7 @@ public extension Filter {
     }
 
     /// Create a filter for metadata of specific users
-    static func metadata(pubkeys: [String]) -> Filter {
+    public static func metadata(pubkeys: [String]) -> Filter {
         Filter(
             authors: pubkeys,
             kinds: [Event.Kind.setMetadata.rawValue]
@@ -153,7 +153,7 @@ public extension Filter {
     }
 
     /// Create a filter for replies to a specific event
-    static func replies(to eventId: String, limit: Int? = nil) -> Filter {
+    public static func replies(to eventId: String, limit: Int? = nil) -> Filter {
         Filter(
             kinds: [Event.Kind.textNote.rawValue],
             eventReferences: [eventId],
@@ -162,7 +162,7 @@ public extension Filter {
     }
 
     /// Create a filter for mentions of a specific user
-    static func mentions(pubkey: String, limit: Int? = nil) -> Filter {
+    public static func mentions(pubkey: String, limit: Int? = nil) -> Filter {
         Filter(
             kinds: [Event.Kind.textNote.rawValue],
             pubkeyReferences: [pubkey],
@@ -171,7 +171,7 @@ public extension Filter {
     }
 
     /// Create a filter for a global feed
-    static func globalFeed(limit: Int = 100) -> Filter {
+    public static func globalFeed(limit: Int = 100) -> Filter {
         Filter(
             kinds: [Event.Kind.textNote.rawValue],
             limit: limit
@@ -179,7 +179,7 @@ public extension Filter {
     }
 
     /// Create a filter for contact lists of specific users (NIP-02)
-    static func contactList(pubkeys: [String]) -> Filter {
+    public static func contactList(pubkeys: [String]) -> Filter {
         Filter(
             authors: pubkeys,
             kinds: [Event.Kind.contacts.rawValue]
@@ -187,7 +187,7 @@ public extension Filter {
     }
 
     /// Create a filter for a specific user's contact list (NIP-02)
-    static func contactList(pubkey: String) -> Filter {
+    public static func contactList(pubkey: String) -> Filter {
         Filter(
             authors: [pubkey],
             kinds: [Event.Kind.contacts.rawValue],

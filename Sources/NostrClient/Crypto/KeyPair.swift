@@ -82,7 +82,9 @@ public struct KeyPair: Sendable {
     ///   - wordCount: Number of words in the mnemonic (12, 15, 18, 21, or 24)
     ///   - passphrase: Optional passphrase for additional security
     /// - Returns: A tuple containing the generated mnemonic and keypair
-    public static func generate(wordCount: Int = 12, passphrase: String = "") throws -> (mnemonic: Mnemonic, keyPair: KeyPair) {
+    public static func generate(
+        wordCount: Int = 12, passphrase: String = ""
+    ) throws -> (mnemonic: Mnemonic, keyPair: KeyPair) {
         let mnemonic = try Mnemonic.generate(wordCount: wordCount)
         let keyPair = try KeyPair(mnemonic: mnemonic, passphrase: passphrase)
         return (mnemonic, keyPair)

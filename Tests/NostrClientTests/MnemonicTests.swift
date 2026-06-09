@@ -1,5 +1,6 @@
-import Testing
 import Foundation
+import Testing
+
 @testable import NostrClient
 
 @Suite("NIP-06 Mnemonic Tests")
@@ -23,7 +24,8 @@ struct MnemonicTests {
     @Test("NIP-06 test vector 2 - 24 word mnemonic")
     func testVector2() throws {
         // From NIP-06 specification
-        let phrase = "what bleak badge arrange retreat wolf trade produce cricket blur garlic valid proud rude strong choose busy staff weather area salt hollow arm fade"
+        let phrase =
+            "what bleak badge arrange retreat wolf trade produce cricket blur garlic valid proud rude strong choose busy staff weather area salt hollow arm fade"
         let expectedPrivateKey = "c15d739894c81a2fcfd3a2df85a0d2c0dbc47a280d092799f144d73d7ae78add"
         let expectedPublicKey = "d41b22899549e1f3d335a31002cfd382174006e166d3e658e3a5eecdb6463573"
 

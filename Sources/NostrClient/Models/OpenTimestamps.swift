@@ -28,26 +28,27 @@ public struct OpenTimestamps: Sendable, Hashable {
 }
 
 // MARK: - Event Extension for OpenTimestamps
-public extension Event {
+extension Event {
     /// Returns the OpenTimestamps attestation if present
-    var openTimestamps: OpenTimestamps? {
+    public var openTimestamps: OpenTimestamps? {
         guard let otsTag = tags.first(where: { $0.first == "ots" }),
-              otsTag.count >= 2 else {
+            otsTag.count >= 2
+        else {
             return nil
         }
         return OpenTimestamps(base64EncodedOTS: otsTag[1])
     }
 
     /// Returns true if this event has an OpenTimestamps attestation
-    var hasOpenTimestampsAttestation: Bool {
+    public var hasOpenTimestampsAttestation: Bool {
         openTimestamps != nil
     }
 }
 
 // MARK: - UnsignedEvent Extension for OpenTimestamps
-public extension UnsignedEvent {
+extension UnsignedEvent {
     /// Creates a new unsigned event with an OpenTimestamps tag added
-    func withOpenTimestamps(_ ots: OpenTimestamps) -> UnsignedEvent {
+    public func withOpenTimestamps(_ ots: OpenTimestamps) -> UnsignedEvent {
         var newTags = tags
         // Remove existing ots tag if present
         newTags.removeAll { $0.first == "ots" }
@@ -64,9 +65,9 @@ public extension UnsignedEvent {
 }
 
 // MARK: - EventSigner Extension for OpenTimestamps
-public extension EventSigner {
+extension EventSigner {
     /// Signs an event and attaches an OpenTimestamps attestation
-    func sign(_ unsignedEvent: UnsignedEvent, withOTS ots: OpenTimestamps) throws -> Event {
+    public func sign(_ unsignedEvent: UnsignedEvent, withOTS ots: OpenTimestamps) throws -> Event {
         let eventWithOTS = unsignedEvent.withOpenTimestamps(ots)
         return try sign(eventWithOTS)
     }

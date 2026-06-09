@@ -1,5 +1,6 @@
-import Testing
 import Foundation
+import Testing
+
 @testable import NostrClient
 
 @Suite("RelayMessage Tests")
@@ -7,7 +8,8 @@ struct RelayMessageTests {
 
     @Test("Parse EVENT message")
     func parseEventMessage() throws {
-        let json = #"["EVENT","sub1",{"id":"abc123","pubkey":"def456","created_at":1234567890,"kind":1,"tags":[],"content":"Hello","sig":"sig123"}]"#
+        let json =
+            #"["EVENT","sub1",{"id":"abc123","pubkey":"def456","created_at":1234567890,"kind":1,"tags":[],"content":"Hello","sig":"sig123"}]"#
 
         let message = try RelayMessage.parse(json)
 
@@ -134,7 +136,7 @@ struct ClientMessageTests {
         let event = Event(
             id: "id123",
             pubkey: "pubkey123",
-            createdAt: 1234567890,
+            createdAt: 1_234_567_890,
             kind: 1,
             tags: [],
             content: "Hello",

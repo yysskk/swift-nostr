@@ -1,5 +1,5 @@
-import Foundation
 import Crypto
+import Foundation
 
 /// Represents a BIP-39 mnemonic seed phrase for NIP-06 key derivation
 public struct Mnemonic: Sendable {
@@ -171,7 +171,7 @@ public struct Mnemonic: Sendable {
 
     /// PBKDF2 with SHA-512 - Pure Swift implementation for cross-platform support
     private func pbkdf2SHA512(password: Data, salt: Data, iterations: Int, keyLength: Int) -> Data {
-        let hashLength = 64 // SHA-512 output size
+        let hashLength = 64  // SHA-512 output size
         let numBlocks = (keyLength + hashLength - 1) / hashLength
 
         var derivedKey = Data()
@@ -181,18 +181,20 @@ public struct Mnemonic: Sendable {
             var saltWithIndex = salt
             saltWithIndex.append(contentsOf: withUnsafeBytes(of: UInt32(blockIndex).bigEndian) { Array($0) })
 
-            var u = Data(HMAC<SHA512>.authenticationCode(
-                for: saltWithIndex,
-                using: SymmetricKey(data: password)
-            ))
+            var u = Data(
+                HMAC<SHA512>.authenticationCode(
+                    for: saltWithIndex,
+                    using: SymmetricKey(data: password)
+                ))
             var result = u
 
             // Subsequent iterations: U_n = PRF(Password, U_{n-1})
             for _ in 1..<iterations {
-                u = Data(HMAC<SHA512>.authenticationCode(
-                    for: u,
-                    using: SymmetricKey(data: password)
-                ))
+                u = Data(
+                    HMAC<SHA512>.authenticationCode(
+                        for: u,
+                        using: SymmetricKey(data: password)
+                    ))
                 // XOR with previous result
                 for i in 0..<hashLength {
                     result[i] ^= u[i]

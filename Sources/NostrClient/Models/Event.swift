@@ -54,9 +54,9 @@ public struct Event: Codable, Identifiable, Hashable, Sendable {
 }
 
 // MARK: - Event Kind Constants
-public extension Event {
+extension Event {
     /// Common event kinds defined in NIPs
-    enum Kind: Int, Sendable {
+    public enum Kind: Int, Sendable {
         case setMetadata = 0
         case textNote = 1
         case recommendRelay = 2
@@ -140,8 +140,9 @@ public struct UnsignedEvent: Sendable {
             createdAt,
             kind,
             tags,
-            content
+            content,
         ]
-        return try JSONSerialization.data(withJSONObject: serializable, options: [.sortedKeys, .withoutEscapingSlashes])
+        return try JSONSerialization.data(
+            withJSONObject: serializable, options: [.sortedKeys, .withoutEscapingSlashes])
     }
 }

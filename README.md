@@ -244,6 +244,18 @@ let isValid = try signed.verify()
 - [x] NIP-44: Versioned encryption
 - [x] NIP-59: Gift wrap
 
+## Development
+
+This project uses [swift-format](https://github.com/swiftlang/swift-format) (bundled with the Swift toolchain) for code formatting. The configuration lives in [`.swift-format`](.swift-format) and is enforced in CI.
+
+```bash
+# Format the code in place
+swift format --in-place --recursive --parallel Sources Tests Package.swift
+
+# Check formatting without modifying files (matches CI)
+swift format lint --strict --recursive --parallel Sources Tests Package.swift
+```
+
 ## License
 
 MIT License

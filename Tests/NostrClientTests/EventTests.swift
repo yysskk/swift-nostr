@@ -1,5 +1,6 @@
-import Testing
 import Foundation
+import Testing
+
 @testable import NostrClient
 
 @Suite("Event Tests")
@@ -25,7 +26,7 @@ struct EventTests {
         let pubkey = "a".padding(toLength: 64, withPad: "0", startingAt: 0)
         let unsigned = UnsignedEvent(
             pubkey: pubkey,
-            createdAt: 1234567890,
+            createdAt: 1_234_567_890,
             kind: 1,
             tags: [["p", "test"]],
             content: "test content"

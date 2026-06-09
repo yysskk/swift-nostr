@@ -1,11 +1,11 @@
-import Foundation
 import Crypto
+import Foundation
 import P256K
 
 /// Key derivation for NIP-06 using BIP-32/BIP-39
 public enum KeyDerivation {
     /// The hardened offset for BIP-32 derivation (2^31)
-    public static let hardenedOffset: UInt32 = 0x80000000
+    public static let hardenedOffset: UInt32 = 0x8000_0000
 
     /// BIP-44 purpose
     public static let bip44Purpose: UInt32 = 44

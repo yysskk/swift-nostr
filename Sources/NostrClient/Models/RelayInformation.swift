@@ -1,6 +1,7 @@
 import Foundation
+
 #if canImport(FoundationNetworking)
-import FoundationNetworking
+    import FoundationNetworking
 #endif
 
 /// Relay Information Document (NIP-11)
@@ -137,9 +138,9 @@ public struct RelayInformation: Codable, Sendable, Hashable {
 
 // MARK: - Nested Types
 
-public extension RelayInformation {
+extension RelayInformation {
     /// Protocol limitations advertised by a relay (part of NIP-11).
-    struct Limitation: Codable, Sendable, Hashable {
+    public struct Limitation: Codable, Sendable, Hashable {
         public var maxMessageLength: Int?
         public var maxSubscriptions: Int?
         public var maxFilters: Int?
@@ -206,7 +207,7 @@ public extension RelayInformation {
     }
 
     /// Fee schedules for admission, subscription, and publication.
-    struct Fees: Codable, Sendable, Hashable {
+    public struct Fees: Codable, Sendable, Hashable {
         public var admission: [FeeSchedule]?
         public var subscription: [FeeSchedule]?
         public var publication: [FeeSchedule]?
@@ -223,7 +224,7 @@ public extension RelayInformation {
     }
 
     /// A single fee entry within a fee schedule.
-    struct FeeSchedule: Codable, Sendable, Hashable {
+    public struct FeeSchedule: Codable, Sendable, Hashable {
         /// Amount of the fee (in `unit`).
         public var amount: Int?
 
@@ -250,7 +251,7 @@ public extension RelayInformation {
     }
 
     /// A retention policy entry.
-    struct Retention: Codable, Sendable, Hashable {
+    public struct Retention: Codable, Sendable, Hashable {
         /// Event kinds this retention policy applies to. Omit to apply to all kinds.
         public var kinds: [KindSpec]?
 
@@ -275,7 +276,7 @@ public extension RelayInformation {
     ///
     /// NIP-11 allows the `kinds` array in a retention entry to mix single
     /// integers and two-element arrays, e.g. `[0, 1, [5, 7]]`.
-    enum KindSpec: Codable, Sendable, Hashable {
+    public enum KindSpec: Codable, Sendable, Hashable {
         /// A single event kind.
         case single(Int)
 
@@ -312,9 +313,9 @@ public extension RelayInformation {
 
 // MARK: - Fetch Errors
 
-public extension RelayInformation {
+extension RelayInformation {
     /// Errors that can occur while fetching a NIP-11 information document.
-    enum FetchError: Error, LocalizedError, Sendable, Equatable {
+    public enum FetchError: Error, LocalizedError, Sendable, Equatable {
         /// The relay URL was malformed, or its scheme was not `ws` or `wss`.
         case invalidRelayURL(String)
 
@@ -344,7 +345,7 @@ public extension RelayInformation {
 
 // MARK: - Fetching
 
-public extension RelayInformation {
+extension RelayInformation {
     /// Converts a relay WebSocket URL to the HTTP(S) URL used for NIP-11 queries.
     ///
     /// - `wss://` becomes `https://`
@@ -352,7 +353,7 @@ public extension RelayInformation {
     /// - Any other scheme returns `nil`
     ///
     /// The host, port, path, and query are preserved.
-    static func informationURL(from relayURL: URL) -> URL? {
+    public static func informationURL(from relayURL: URL) -> URL? {
         guard var components = URLComponents(url: relayURL, resolvingAgainstBaseURL: false) else {
             return nil
         }
@@ -375,7 +376,7 @@ public extension RelayInformation {
     /// - Returns: The decoded ``RelayInformation``.
     /// - Throws: ``FetchError`` if the URL is invalid, the network request
     ///   fails, or the response cannot be decoded.
-    static func fetch(
+    public static func fetch(
         from relayURL: URL,
         urlSession: URLSession = .shared
     ) async throws -> RelayInformation {
@@ -402,7 +403,8 @@ public extension RelayInformation {
         }
 
         guard let httpResponse = urlResponse as? HTTPURLResponse,
-              (200...299).contains(httpResponse.statusCode) else {
+            (200...299).contains(httpResponse.statusCode)
+        else {
             throw FetchError.invalidResponse
         }
 
@@ -421,7 +423,7 @@ public extension RelayInformation {
     /// - Returns: The decoded ``RelayInformation``.
     /// - Throws: ``FetchError`` if the URL is invalid, the network request
     ///   fails, or the response cannot be decoded.
-    static func fetch(
+    public static func fetch(
         fromRelayURLString urlString: String,
         urlSession: URLSession = .shared
     ) async throws -> RelayInformation {

@@ -8,13 +8,13 @@ let package = Package(
         .macOS(.v14),
         .tvOS(.v17),
         .watchOS(.v10),
-        .visionOS(.v1)
+        .visionOS(.v1),
     ],
     products: [
         .library(
             name: "NostrClient",
             targets: ["NostrClient"]
-        ),
+        )
     ],
     dependencies: [
         .package(url: "https://github.com/GigaBitcoin/secp256k1.swift", from: "0.18.0"),

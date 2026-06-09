@@ -307,9 +307,9 @@ public actor RelayPool {
 }
 
 // MARK: - Convenience Methods
-public extension RelayPool {
+extension RelayPool {
     /// Adds multiple relays from URL strings
-    func addRelays(_ urlStrings: [String]) throws {
+    public func addRelays(_ urlStrings: [String]) throws {
         for urlString in urlStrings {
             _ = try addRelay(urlString: urlString)
         }

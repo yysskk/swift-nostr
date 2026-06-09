@@ -1,6 +1,7 @@
 import Foundation
+
 #if canImport(FoundationNetworking)
-import FoundationNetworking
+    import FoundationNetworking
 #endif
 
 /// Internet Identifier verification (NIP-05)
@@ -99,7 +100,8 @@ public struct InternetIdentifier: Sendable {
             let (data, urlResponse) = try await URLSession.shared.data(from: url)
 
             guard let httpResponse = urlResponse as? HTTPURLResponse,
-                  (200...299).contains(httpResponse.statusCode) else {
+                (200...299).contains(httpResponse.statusCode)
+            else {
                 throw VerificationError.invalidResponse
             }
 
@@ -167,19 +169,20 @@ private struct InternetIdentifierResponse: Codable {
 
 // MARK: - String Extension
 
-public extension String {
+extension String {
     /// Returns true if this string appears to be a valid internet identifier format
-    var isValidInternetIdentifier: Bool {
+    public var isValidInternetIdentifier: Bool {
         InternetIdentifier.parse(self) != nil
     }
 
     /// Verifies this string as an internet identifier
-    func verifyAsInternetIdentifier() async throws -> InternetIdentifier.VerificationResult {
+    public func verifyAsInternetIdentifier() async throws -> InternetIdentifier.VerificationResult {
         try await InternetIdentifier.verify(self)
     }
 
     /// Verifies this string as an internet identifier against an expected pubkey
-    func verifyAsInternetIdentifier(expectedPubkey: String) async throws -> InternetIdentifier.VerificationResult {
+    public func verifyAsInternetIdentifier(expectedPubkey: String) async throws -> InternetIdentifier.VerificationResult
+    {
         try await InternetIdentifier.verify(self, expectedPubkey: expectedPubkey)
     }
 }

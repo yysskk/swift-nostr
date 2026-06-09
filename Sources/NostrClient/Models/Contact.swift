@@ -56,10 +56,10 @@ public struct Contact: Codable, Hashable, Sendable {
 }
 
 // MARK: - Contact List Helpers
-public extension Event {
+extension Event {
     /// Extracts contacts from a kind 3 (contacts) event
     /// Returns nil if the event is not a contact list event
-    var contacts: [Contact]? {
+    public var contacts: [Contact]? {
         guard kind == Kind.contacts.rawValue else {
             return nil
         }
@@ -68,7 +68,7 @@ public extension Event {
     }
 
     /// Checks if this is a contact list event
-    var isContactList: Bool {
+    public var isContactList: Bool {
         kind == Kind.contacts.rawValue
     }
 }

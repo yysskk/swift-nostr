@@ -24,7 +24,8 @@ public struct DirectMessageParser: Sendable {
         }
 
         // Extract recipient from p tag
-        let recipientPubkey = rumor.tags
+        let recipientPubkey =
+            rumor.tags
             .first { $0.first == "p" && $0.count >= 2 }
             .map { $0[1] } ?? recipientKeyPair.publicKeyHex
 

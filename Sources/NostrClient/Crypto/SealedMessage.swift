@@ -1,5 +1,5 @@
-import Foundation
 import Crypto
+import Foundation
 import P256K
 
 /// NIP-44 Versioned Encryption
@@ -42,7 +42,8 @@ public struct SealedMessage: Sendable {
         let plaintextData = Data(message.utf8)
 
         guard plaintextData.count >= minPlaintextSize,
-              plaintextData.count <= maxPlaintextSize else {
+            plaintextData.count <= maxPlaintextSize
+        else {
             throw NostrError.encryptionFailed
         }
 
@@ -113,7 +114,8 @@ public struct SealedMessage: Sendable {
         )
 
         // 3. Derive message keys
-        let (chachaKey, chachaNonce, hmacKey) = Self.deriveMessageKeys(conversationKey: conversationKey, nonce: Data(nonce))
+        let (chachaKey, chachaNonce, hmacKey) = Self.deriveMessageKeys(
+            conversationKey: conversationKey, nonce: Data(nonce))
 
         // 4. Verify HMAC using timing-safe comparison
         let hmacInput = Data(nonce) + Data(ciphertext)
@@ -174,7 +176,9 @@ public struct SealedMessage: Sendable {
     }
 
     /// Derives message keys from conversation key and nonce using HKDF-Expand
-    private static func deriveMessageKeys(conversationKey: Data, nonce: Data) -> (chachaKey: Data, chachaNonce: Data, hmacKey: Data) {
+    private static func deriveMessageKeys(
+        conversationKey: Data, nonce: Data
+    ) -> (chachaKey: Data, chachaNonce: Data, hmacKey: Data) {
         let info = nonce
         let expanded = hkdfExpand(prk: conversationKey, info: info, length: 76)
 
@@ -242,7 +246,8 @@ public struct SealedMessage: Sendable {
     private static func pad(_ plaintext: Data) throws -> Data {
         let unpaddedLen = plaintext.count
         guard unpaddedLen >= minPlaintextSize,
-              unpaddedLen <= maxPlaintextSize else {
+            unpaddedLen <= maxPlaintextSize
+        else {
             throw NostrError.encryptionFailed
         }
 
@@ -268,8 +273,9 @@ public struct SealedMessage: Sendable {
         let unpaddedLen = (Int(padded[0]) << 8) | Int(padded[1])
 
         guard unpaddedLen >= minPlaintextSize,
-              unpaddedLen <= maxPlaintextSize,
-              unpaddedLen <= padded.count - 2 else {
+            unpaddedLen <= maxPlaintextSize,
+            unpaddedLen <= padded.count - 2
+        else {
             throw NostrError.invalidPadding
         }
 

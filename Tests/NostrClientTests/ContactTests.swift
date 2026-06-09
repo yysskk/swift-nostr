@@ -1,5 +1,6 @@
-import Testing
 import Foundation
+import Testing
+
 @testable import NostrClient
 
 @Suite("Contact Tests (NIP-02)")
@@ -128,7 +129,7 @@ struct ContactListEventTests {
         let contacts = [
             Contact(pubkey: "pubkey1", relayUrl: "wss://relay1.com", petname: "alice"),
             Contact(pubkey: "pubkey2", relayUrl: "wss://relay2.com"),
-            Contact(pubkey: "pubkey3")
+            Contact(pubkey: "pubkey3"),
         ]
 
         let event = try signer.signContactList(contacts)

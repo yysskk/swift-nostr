@@ -1,5 +1,5 @@
-import Foundation
 import Crypto
+import Foundation
 import P256K
 
 /// Handles signing and verification of Nostr events
@@ -79,7 +79,7 @@ public struct EventSigner: Sendable {
     public func signReaction(to event: Event, content: String = "+") throws -> Event {
         let tags: [[String]] = [
             ["e", event.id],
-            ["p", event.pubkey]
+            ["p", event.pubkey],
         ]
         let unsigned = UnsignedEvent(
             pubkey: publicKey,
@@ -94,7 +94,7 @@ public struct EventSigner: Sendable {
     public func signRepost(of event: Event, relayUrl: String? = nil) throws -> Event {
         var tags: [[String]] = [
             ["e", event.id],
-            ["p", event.pubkey]
+            ["p", event.pubkey],
         ]
         if let relayUrl = relayUrl {
             tags[0].append(relayUrl)
@@ -145,9 +145,9 @@ public struct EventSigner: Sendable {
 }
 
 // MARK: - Event Verification
-public extension Event {
+extension Event {
     /// Verifies the event's signature
-    func verify() throws -> Bool {
+    public func verify() throws -> Bool {
         // Reconstruct the unsigned event
         let unsigned = UnsignedEvent(
             pubkey: pubkey,
@@ -169,7 +169,8 @@ public extension Event {
 
         // Verify the signature
         guard let pubkeyData = Data(hexString: pubkey),
-              let sigData = Data(hexString: sig) else {
+            let sigData = Data(hexString: sig)
+        else {
             throw NostrError.invalidHex
         }
 
