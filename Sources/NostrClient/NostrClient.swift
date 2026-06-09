@@ -490,9 +490,7 @@ public actor NostrClient {
 
         guard let event = events.first else { return nil }
 
-        let decoder = JSONDecoder()
-        decoder.keyDecodingStrategy = .convertFromSnakeCase
-        return try? decoder.decode(UserMetadata.self, from: Data(event.content.utf8))
+        return try? JSONDecoder().decode(UserMetadata.self, from: Data(event.content.utf8))
     }
 
     // MARK: - Private Methods
