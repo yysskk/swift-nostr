@@ -11,7 +11,7 @@ A modern Swift library for the Nostr protocol, built with Swift 6 concurrency su
 - **NIP-06 Key Derivation**: Generate keys from BIP-39 mnemonic seed phrases
 - **NIP-17 Private DMs**: End-to-end encrypted direct messages with sender anonymity
 - **Cryptographic Operations**: Schnorr signatures with secp256k1
-- **Bech32 Encoding**: npub/nsec key encoding (NIP-19)
+- **NIP-19 Entities**: bech32 encoding/decoding of npub, nsec, note, nprofile, nevent, and naddr
 - **Async/Await**: Modern Swift concurrency with actors
 - **Multi-Relay Support**: Connect to multiple relays with RelayPool
 - **Type-Safe**: Full Sendable compliance for thread safety
@@ -59,6 +59,18 @@ print("Public Key: \(keyPairFromMnemonic.npub)")
 // Restore from existing mnemonic
 let restored = try KeyPair(mnemonicPhrase: "leader monkey parrot ring guide accident before fence cannon height naive bean")
 ```
+
+### NIP-19 Entities
+
+```swift
+// Decode any bech32 entity: npub, nsec, note, nprofile, nevent, naddr
+let entity = try NIP19Entity.decode("nprofile1...")
+
+// Encode a reference, optionally with relay hints
+let nprofile = try NProfile(publicKey: keyPair.publicKeyHex, relays: ["wss://relay.damus.io"]).encoded
+```
+
+`NEvent`, `NAddr`, and the full decoding API are covered in [Advanced Usage](https://yysskk.github.io/swift-nostr-client/documentation/nostrclient/advancedusage).
 
 ### Connect to Relays
 
@@ -237,9 +249,14 @@ let isValid = try signed.verify()
 - [x] NIP-03: OpenTimestamps attestations
 - [x] NIP-05: DNS-based identifiers
 - [x] NIP-06: Basic key derivation from mnemonic seed phrase
+- [x] NIP-09: Event deletion
+- [x] NIP-10: Reply threading (root/reply markers)
+- [x] NIP-11: Relay information document
 - [x] NIP-17: Private direct messages
-- [x] NIP-19: bech32-encoded entities (npub, nsec)
+- [x] NIP-18: Reposts
+- [x] NIP-19: bech32-encoded entities (npub, nsec, note, nprofile, nevent, naddr)
 - [x] NIP-20: Command Results (OK)
+- [x] NIP-25: Reactions
 - [x] NIP-42: Authentication (AUTH message parsing)
 - [x] NIP-44: Versioned encryption
 - [x] NIP-59: Gift wrap

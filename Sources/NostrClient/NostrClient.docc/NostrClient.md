@@ -41,6 +41,10 @@ let event = try await client.publishTextNote(content: "Hello, Nostr!")
 - ``SubscriptionEvent``
 - ``RelayMessage``
 - ``UserMetadata``
+- ``NIP19Entity``
+- ``NProfile``
+- ``NEvent``
+- ``NAddr``
 
 ### Cryptography
 

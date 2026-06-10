@@ -19,10 +19,14 @@ NostrClient provides a high-level actor-based API for interacting with the Nostr
 - NIP-03: OpenTimestamps attestations
 - NIP-05: DNS-based internet identifiers
 - NIP-06: BIP-39 key derivation
+- NIP-09: Event deletion
+- NIP-10: Reply threading (root/reply markers)
 - NIP-11: Relay information document
 - NIP-17: Private direct messages
-- NIP-19: bech32-encoded entities (npub, nsec)
+- NIP-18: Reposts
+- NIP-19: bech32-encoded entities (npub, nsec, note, nprofile, nevent, naddr)
 - NIP-20: Command results (OK)
+- NIP-25: Reactions
 - NIP-42: Relay authentication
 - NIP-44: Versioned encryption (v2)
 - NIP-59: Gift wrap

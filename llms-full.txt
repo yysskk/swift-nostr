@@ -666,10 +666,14 @@ Cases: `invalidPrivateKey`, `invalidPublicKey`, `invalidSignature`, `invalidEven
 - NIP-03: OpenTimestamps attestations
 - NIP-05: DNS-based internet identifiers
 - NIP-06: BIP-39 key derivation (m/44'/1237'/account'/0/0)
+- NIP-09: Event deletion
+- NIP-10: Reply threading (root/reply markers)
 - NIP-11: Relay information document
 - NIP-17: Private direct messages with gift wrap
-- NIP-19: bech32-encoded entities (npub, nsec)
+- NIP-18: Reposts
+- NIP-19: bech32-encoded entities (npub, nsec, note, nprofile, nevent, naddr)
 - NIP-20: Command results (OK messages)
+- NIP-25: Reactions
 - NIP-42: Relay authentication (AUTH message parsing)
 - NIP-44: Versioned encryption v2 (ECDH + HKDF + ChaCha20 + HMAC-SHA256)
 - NIP-59: Gift wrap (rumor > seal > gift wrap with randomized timestamps)

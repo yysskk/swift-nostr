@@ -19,6 +19,8 @@ public enum NostrError: Error, LocalizedError, Sendable, Equatable {
     case invalidHex
     case invalidBech32
     case unknownPrefix(String)
+    case invalidTLV
+    case invalidNIP19Entity
     case encryptionFailed
     case decryptionFailed
     case unsupportedEncryptionVersion(UInt8)
@@ -66,6 +68,10 @@ public enum NostrError: Error, LocalizedError, Sendable, Equatable {
             return "Invalid bech32 encoding"
         case .unknownPrefix(let prefix):
             return "Unknown bech32 prefix: \(prefix)"
+        case .invalidTLV:
+            return "Invalid TLV encoding"
+        case .invalidNIP19Entity:
+            return "Invalid NIP-19 entity"
         case .encryptionFailed:
             return "Encryption failed"
         case .decryptionFailed:

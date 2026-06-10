@@ -107,6 +107,51 @@ try await InternetIdentifier.verify(
 let pubkey = try await InternetIdentifier.lookupPubkey("alice@example.com")
 ```
 
+## NIP-19 Entities
+
+NostrClient encodes and decodes the NIP-19 bech32 entities ``NIP19Entity``,
+``NProfile``, ``NEvent``, and ``NAddr`` in addition to the plain `npub`/`nsec`
+exposed on ``KeyPair``. The TLV entities carry optional relay hints.
+
+```swift
+// Profile reference with relay hints (nprofile)
+let profile = try NProfile(
+    publicKey: "3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d",
+    relays: ["wss://relay.damus.io"]
+)
+let nprofile = profile.encoded
+
+// Event reference (nevent) built from a fetched event
+let nevent = try NEvent(event: event, relays: ["wss://relay.damus.io"]).encoded
+
+// Addressable event coordinate (naddr) for replaceable events (e.g. long-form)
+let naddr = try NAddr(
+    identifier: "my-article",
+    author: "3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d",
+    kind: 30023,
+    relays: ["wss://relay.nostr.band"]
+).encoded
+```
+
+Decode an arbitrary entity through the unified entry point, or a known type
+directly:
+
+```swift
+switch try NIP19Entity.decode(nprofile) {
+case .nprofile(let p):
+    print("pubkey: \(p.publicKey), relays: \(p.relays)")
+case .nevent(let e):
+    print("event: \(e.eventId), kind: \(String(describing: e.kind))")
+case .naddr(let a):
+    print("addr: \(a.kind):\(a.author):\(a.identifier)")
+case .npub(let hex), .nsec(let hex), .note(let hex):
+    print(hex)
+}
+
+// Typed decode (throws if the prefix does not match)
+let parsed = try NEvent(bech32String: nevent)
+```
+
 ## Contact Lists (NIP-02)
 
 ```swift
