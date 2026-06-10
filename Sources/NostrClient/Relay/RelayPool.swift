@@ -105,14 +105,15 @@ public actor RelayPool {
         }
     }
 
-    /// Publishes an event to all connected relays
-    /// Succeeds if at least one relay accepts the event
-    public func publish(_ event: Event) async throws {
+    /// Publishes an event to connected relays.
+    /// By default broadcasts to all relays; pass `relayURLs` to target a subset (NIP-65 outbox routing).
+    /// Succeeds if at least one targeted relay accepts the event.
+    public func publish(_ event: Event, to relayURLs: Set<URL>? = nil) async throws {
         var successCount = 0
         var lastError: Error?
 
         await withTaskGroup(of: Result<Void, Error>.self) { group in
-            for connection in relays.values {
+            for connection in targetConnections(relayURLs) {
                 group.addTask {
                     do {
                         try await connection.publish(event)
@@ -148,11 +149,13 @@ public actor RelayPool {
     public func subscribe(
         subscriptionId: String,
         filters: [Filter],
+        to relayURLs: Set<URL>? = nil,
         handler: @escaping @Sendable (RelayMessage) -> Void
     ) async throws -> Int {
         let successfulRelayURLs = try await subscribeWithRelayContext(
             subscriptionId: subscriptionId,
-            filters: filters
+            filters: filters,
+            to: relayURLs
         ) { relayMessage in
             handler(relayMessage.message)
         }
@@ -164,6 +167,7 @@ public actor RelayPool {
     func subscribeWithRelayContext(
         subscriptionId: String,
         filters: [Filter],
+        to relayURLs: Set<URL>? = nil,
         handler: @escaping @Sendable (RelaySubscriptionMessage) async -> Void
     ) async throws -> Set<URL> {
         subscriptionHandlers[subscriptionId] = handler
@@ -171,7 +175,7 @@ public actor RelayPool {
         // Start listening for messages BEFORE sending subscription request
         // This ensures we don't miss any events that arrive immediately after subscribing
         var tasks: [Task<Void, Never>] = []
-        for connection in relays.values {
+        for connection in targetConnections(relayURLs) {
             let task = Task {
                 for await message in await connection.messages() {
                     guard !Task.isCancelled else { break }
@@ -234,7 +238,7 @@ public actor RelayPool {
         var successfulRelayURLs: Set<URL> = []
 
         await withTaskGroup(of: URL?.self) { group in
-            for connection in relays.values {
+            for connection in targetConnections(relayURLs) {
                 group.addTask {
                     do {
                         try await connection.subscribe(subscriptionId: subscriptionId, filters: filters)
@@ -252,7 +256,7 @@ public actor RelayPool {
             }
         }
 
-        if successfulRelayURLs.isEmpty && !relays.isEmpty {
+        if successfulRelayURLs.isEmpty && !targetConnections(relayURLs).isEmpty {
             throw NostrError.relayError("Failed to subscribe on any relay")
         }
 
@@ -287,6 +291,16 @@ public actor RelayPool {
     /// Returns the relay connection for a given URL
     public func relay(for url: URL) -> RelayConnection? {
         relays[url]
+    }
+
+    /// Resolves the connections to target for a routed operation.
+    /// `nil` targets all relays in the pool (the default broadcast behavior);
+    /// a non-nil set targets only those URLs currently present in the pool.
+    func targetConnections(_ relayURLs: Set<URL>?) -> [RelayConnection] {
+        guard let relayURLs else {
+            return Array(relays.values)
+        }
+        return relayURLs.compactMap { relays[$0] }
     }
 
     /// Returns the number of relays in the pool

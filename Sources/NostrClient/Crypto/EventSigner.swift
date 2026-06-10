@@ -142,6 +142,34 @@ public struct EventSigner: Sendable {
         let contacts = pubkeys.map { Contact(pubkey: $0) }
         return try signContactList(contacts)
     }
+
+    /// Creates and signs a relay list metadata event (kind 10002, NIP-65)
+    public func signRelayListMetadata(_ relayList: RelayListMetadata) throws -> Event {
+        let unsigned = UnsignedEvent(
+            pubkey: publicKey,
+            kind: .relayListMetadata,
+            tags: relayList.toTags(),
+            content: ""
+        )
+        return try sign(unsigned)
+    }
+
+    /// Creates and signs a relay list metadata event from explicit read/write relay URLs (NIP-65).
+    /// URLs present in both lists are marked as read+write.
+    public func signRelayListMetadata(read: [String] = [], write: [String] = []) throws -> Event {
+        let both = Set(read).intersection(write)
+        var entries: [RelayListEntry] = []
+        for url in read where !both.contains(url) {
+            entries.append(RelayListEntry(url: url, usage: .read))
+        }
+        for url in write where !both.contains(url) {
+            entries.append(RelayListEntry(url: url, usage: .write))
+        }
+        for url in both {
+            entries.append(RelayListEntry(url: url, usage: .readWrite))
+        }
+        return try signRelayListMetadata(RelayListMetadata(entries: entries))
+    }
 }
 
 // MARK: - Event Verification

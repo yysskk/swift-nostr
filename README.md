@@ -12,6 +12,7 @@ A modern Swift library for the Nostr protocol, built with Swift 6 concurrency su
 - **NIP-17 Private DMs**: End-to-end encrypted direct messages with sender anonymity
 - **Cryptographic Operations**: Schnorr signatures with secp256k1
 - **NIP-19 Entities**: bech32 encoding/decoding of npub, nsec, note, nprofile, nevent, and naddr
+- **NIP-65 Outbox Model**: Per-user read/write relay lists with gossip routing for subscriptions and publishing
 - **Async/Await**: Modern Swift concurrency with actors
 - **Multi-Relay Support**: Connect to multiple relays with RelayPool
 - **Type-Safe**: Full Sendable compliance for thread safety
@@ -145,6 +146,39 @@ let metadata = try await client.fetchMetadata(pubkey: "...")
 print("Name: \(metadata?.name ?? "Unknown")")
 ```
 
+### Outbox Model (NIP-65)
+
+The outbox/gossip model routes reads and writes to each user's declared relays instead of
+broadcasting everywhere. Publish your relay list (kind 10002), then let the client resolve and
+connect the right relays automatically.
+
+```swift
+// Publish your own relay list: where you read (inbox) and write (outbox)
+try await client.publishRelayList(
+    read: ["wss://inbox.example.com"],
+    write: ["wss://relay.damus.io", "wss://nos.lol"]
+)
+
+// Fetch another user's relay list (cached for routing)
+let relayList = try await client.fetchRelayList(for: "pubkey...")
+print("Writes to: \(relayList?.writeRelays ?? [])")
+
+// Outbox read: subscribe to authors on *their* write relays,
+// resolving and connecting relays on demand
+try await client.subscribeOutbox(authors: ["pubkey1", "pubkey2"]) { event in
+    print("Note: \(event.content)")
+}
+
+// Gossip publish: route an event to the author's write relays plus the
+// inbox (read) relays of every pubkey it mentions in "p" tags
+let signer = EventSigner(keyPair: keyPair)
+let note = try signer.signTextNote(content: "gm!", tags: [["p", "alice_pubkey"]])
+try await client.publishGossip(note)
+```
+
+By default the client adds and connects resolved relays on demand (capped per resolve). Pass
+`gossipPolicy: .requirePresent` to `NostrClient(...)` to route only to relays already in the pool.
+
 ## Models
 
 ### Event
@@ -260,6 +294,7 @@ let isValid = try signed.verify()
 - [x] NIP-42: Authentication (AUTH message parsing)
 - [x] NIP-44: Versioned encryption
 - [x] NIP-59: Gift wrap
+- [x] NIP-65: Relay list metadata (outbox model)
 
 ## Development
 

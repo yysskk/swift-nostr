@@ -14,8 +14,16 @@ public actor NostrClient {
     /// Active subscriptions
     private var subscriptions: [String: Subscription] = [:]
 
-    public init(relayPoolConfig: RelayPoolConfig = .default) {
-        self.relayPool = RelayPool(config: relayPoolConfig)
+    /// Per-pubkey NIP-65 relay list cache and outbox/gossip resolver
+    private let relayListStore: RelayListStore
+
+    public init(
+        relayPoolConfig: RelayPoolConfig = .default,
+        gossipPolicy: GossipRelayPolicy = .addAndConnect
+    ) {
+        let pool = RelayPool(config: relayPoolConfig)
+        self.relayPool = pool
+        self.relayListStore = RelayListStore(pool: pool, policy: gossipPolicy)
     }
 
     /// Sets the signer for publishing events
@@ -283,9 +291,12 @@ public actor NostrClient {
     }
 
     /// Subscribes to events matching the given filters and emits relay-aware subscription events.
+    /// Pass `relayURLs` to scope the subscription to a subset of relays (NIP-65 outbox routing);
+    /// the default `nil` subscribes on all relays in the pool.
     @discardableResult
     public func subscribe(
         filters: [Filter],
+        to relayURLs: Set<URL>? = nil,
         eventHandler: @escaping @Sendable (SubscriptionEvent) -> Void
     ) async throws -> String {
         subscriptionCounter += 1
@@ -302,7 +313,8 @@ public actor NostrClient {
         do {
             let expectedRelayURLs = try await relayPool.subscribeWithRelayContext(
                 subscriptionId: subscriptionId,
-                filters: filters
+                filters: filters,
+                to: relayURLs
             ) { [weak self] relayMessage in
                 guard let self else { return }
                 await self.handleMessage(
@@ -505,6 +517,133 @@ public actor NostrClient {
         guard let event = events.first else { return nil }
 
         return try? JSONDecoder().decode(UserMetadata.self, from: Data(event.content.utf8))
+    }
+
+    // MARK: - Relay List Metadata & Outbox/Gossip (NIP-65)
+
+    /// Fetches a user's NIP-65 relay list (kind 10002), caching it (newer wins).
+    /// - Returns: The relay list, or nil if none was found.
+    public func fetchRelayList(for pubkey: String, timeout: TimeInterval = 10) async throws -> RelayListMetadata? {
+        let events = try await fetch(filters: [.relayListMetadata(pubkey: pubkey)], timeout: timeout)
+        // Replaceable event: pick the newest in case multiple relays return stale copies.
+        guard let newest = events.max(by: { $0.createdAt < $1.createdAt }),
+            let list = newest.relayListMetadata
+        else {
+            return nil
+        }
+        await relayListStore.store(list, createdAt: newest.createdAt, for: pubkey)
+        return list
+    }
+
+    /// Returns the cached relay list for a pubkey without performing a network fetch.
+    public func cachedRelayList(for pubkey: String) async -> RelayListMetadata? {
+        await relayListStore.cachedList(for: pubkey)
+    }
+
+    /// Signs and publishes the current user's relay list metadata (kind 10002, NIP-65).
+    /// The list is broadcast to all relays in the pool for discoverability.
+    @discardableResult
+    public func publishRelayList(_ relayList: RelayListMetadata) async throws -> Event {
+        guard let signer = signer else {
+            throw NostrError.signingFailed
+        }
+        let event = try signer.signRelayListMetadata(relayList)
+        try await relayPool.publish(event)
+        await relayListStore.store(relayList, createdAt: event.createdAt, for: signer.publicKey)
+        return event
+    }
+
+    /// Signs and publishes the current user's relay list metadata from read/write relay URLs (NIP-65).
+    @discardableResult
+    public func publishRelayList(read: [String] = [], write: [String] = []) async throws -> Event {
+        guard let signer = signer else {
+            throw NostrError.signingFailed
+        }
+        let event = try signer.signRelayListMetadata(read: read, write: write)
+        try await relayPool.publish(event)
+        if let list = event.relayListMetadata {
+            await relayListStore.store(list, createdAt: event.createdAt, for: signer.publicKey)
+        }
+        return event
+    }
+
+    /// Subscribes to events from multiple authors using the NIP-65 outbox model.
+    /// Convenience overload that delivers only event payloads.
+    @discardableResult
+    public func subscribeOutbox(
+        authors: [String],
+        kinds: [Int] = [Event.Kind.textNote.rawValue],
+        limit: Int? = nil,
+        handler: @escaping @Sendable (Event) -> Void
+    ) async throws -> String {
+        try await subscribeOutbox(
+            authors: authors, kinds: kinds, limit: limit,
+            eventHandler: { subscriptionEvent in
+                guard case .event(_, let event) = subscriptionEvent else { return }
+                handler(event)
+            })
+    }
+
+    /// Subscribes to events from multiple authors using the NIP-65 outbox model.
+    ///
+    /// For each author, resolves their WRITE relays (fetching the relay list if not cached),
+    /// connects them per the gossip policy, and issues a single subscription scoped to those relays.
+    /// If any author has no known relay list, the subscription falls back to the full relay pool so
+    /// no author is silently dropped.
+    @discardableResult
+    public func subscribeOutbox(
+        authors: [String],
+        kinds: [Int] = [Event.Kind.textNote.rawValue],
+        limit: Int? = nil,
+        eventHandler: @escaping @Sendable (SubscriptionEvent) -> Void
+    ) async throws -> String {
+        var targets: Set<URL> = []
+        var hasUnresolved = false
+
+        for author in authors {
+            if await relayListStore.cachedList(for: author) == nil {
+                _ = try? await fetchRelayList(for: author)
+            }
+            let writeURLs = await relayListStore.writeRelayURLs(for: author)
+            if writeURLs.isEmpty {
+                hasUnresolved = true
+            } else {
+                targets.formUnion(writeURLs)
+            }
+        }
+
+        let available = await relayListStore.ensureConnected(targets)
+        let filter = Filter(authors: authors, kinds: kinds, limit: limit)
+        // Fall back to the full pool when an author is unresolved or nothing could be connected.
+        let routeSet: Set<URL>? = (hasUnresolved || available.isEmpty) ? nil : available
+        return try await subscribe(filters: [filter], to: routeSet, eventHandler: eventHandler)
+    }
+
+    /// Publishes a signed event using the NIP-65 gossip model.
+    ///
+    /// Routes the event to the author's own WRITE relays plus the READ (inbox) relays of every
+    /// pubkey referenced in the event's "p" tags, so mentions and replies reach their recipients.
+    /// Falls back to the full relay pool if nothing resolves.
+    @discardableResult
+    public func publishGossip(_ event: Event) async throws -> Event {
+        var targets: Set<URL> = []
+
+        if await relayListStore.cachedList(for: event.pubkey) == nil {
+            _ = try? await fetchRelayList(for: event.pubkey)
+        }
+        targets.formUnion(await relayListStore.writeRelayURLs(for: event.pubkey))
+
+        let referencedPubkeys = Set(event.tags.filter { $0.count >= 2 && $0[0] == "p" }.map { $0[1] })
+        for pubkey in referencedPubkeys {
+            if await relayListStore.cachedList(for: pubkey) == nil {
+                _ = try? await fetchRelayList(for: pubkey)
+            }
+            targets.formUnion(await relayListStore.readRelayURLs(for: pubkey))
+        }
+
+        let available = await relayListStore.ensureConnected(targets)
+        try await relayPool.publish(event, to: available.isEmpty ? nil : available)
+        return event
     }
 
     // MARK: - Private Methods

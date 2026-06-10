@@ -194,4 +194,21 @@ extension Filter {
             limit: 1
         )
     }
+
+    /// Create a filter for relay list metadata of specific users (NIP-65)
+    public static func relayListMetadata(pubkeys: [String]) -> Filter {
+        Filter(
+            authors: pubkeys,
+            kinds: [Event.Kind.relayListMetadata.rawValue]
+        )
+    }
+
+    /// Create a filter for a specific user's relay list metadata (NIP-65)
+    public static func relayListMetadata(pubkey: String) -> Filter {
+        Filter(
+            authors: [pubkey],
+            kinds: [Event.Kind.relayListMetadata.rawValue],
+            limit: 1
+        )
+    }
 }
