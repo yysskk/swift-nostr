@@ -42,8 +42,10 @@ public actor RelayConnection {
     /// Continuation for connection state changes
     private var stateChangeContinuations: [UUID: AsyncStream<RelayConnectionState>.Continuation] = [:]
 
-    /// Pending continuations waiting for OK response after publish (keyed by event id)
-    private var pendingPublishWaiters: [String: AsyncThrowingStream<Void, Error>.Continuation] = [:]
+    /// Pending continuations waiting for OK response after publish,
+    /// keyed by event id and then by a per-publish token so concurrent
+    /// publishes of the same event don't clobber each other's waiters
+    private var pendingPublishWaiters: [String: [UUID: AsyncThrowingStream<Void, Error>.Continuation]] = [:]
 
     public init(url: URL, urlSession: URLSession = .shared, config: RelayConnectionConfig = .default) {
         self.url = url
@@ -140,8 +142,10 @@ public actor RelayConnection {
         webSocketTask?.cancel(with: .normalClosure, reason: nil)
         webSocketTask = nil
         subscriptions.removeAll()
-        for (_, waiter) in pendingPublishWaiters {
-            waiter.finish(throwing: NostrError.notConnected)
+        for waiters in pendingPublishWaiters.values {
+            for waiter in waiters.values {
+                waiter.finish(throwing: NostrError.notConnected)
+            }
         }
         pendingPublishWaiters.removeAll()
         updateState(.disconnected)
@@ -197,21 +201,31 @@ public actor RelayConnection {
     }
 
     /// Publishes an event to the relay and waits for OK from the relay.
+    ///
+    /// Fails fast with ``NostrError/notConnected`` when the connection is not established —
+    /// the publish path never connects inline, so a dead relay fails immediately instead of
+    /// spending up to `connectionTimeout` on a reconnect attempt. Reconnection is owned by
+    /// the background auto-reconnect with exponential backoff.
+    ///
     /// Throws if the relay responds with accepted: false or if no OK is received within the operation timeout.
     public func publish(_ event: Event) async throws {
+        guard state == .connected else {
+            throw NostrError.notConnected
+        }
+
+        let token = UUID()
         let (stream, continuation) = AsyncThrowingStream<Void, Error>.makeStream()
-        pendingPublishWaiters[event.id] = continuation
+        pendingPublishWaiters[event.id, default: [:]][token] = continuation
 
         do {
             try await send(.event(event))
         } catch {
-            pendingPublishWaiters.removeValue(forKey: event.id)
-            continuation.finish()
+            removePublishWaiter(eventId: event.id, token: token)?.finish()
             throw error
         }
 
         defer {
-            removePublishWaiter(eventId: event.id)?.finish()
+            removePublishWaiter(eventId: event.id, token: token)?.finish()
         }
 
         try await withThrowingTaskGroup(of: Void.self) { group in
@@ -231,10 +245,24 @@ public actor RelayConnection {
         }
     }
 
-    /// Removes and returns the publish waiter for the given event id (called from within the actor).
+    /// Removes and returns a single publish waiter (called from within the actor).
     @discardableResult
-    private func removePublishWaiter(eventId: String) -> AsyncThrowingStream<Void, Error>.Continuation? {
-        pendingPublishWaiters.removeValue(forKey: eventId)
+    private func removePublishWaiter(eventId: String, token: UUID) -> AsyncThrowingStream<Void, Error>.Continuation? {
+        guard var waiters = pendingPublishWaiters[eventId] else { return nil }
+        let continuation = waiters.removeValue(forKey: token)
+        if waiters.isEmpty {
+            pendingPublishWaiters.removeValue(forKey: eventId)
+        } else {
+            pendingPublishWaiters[eventId] = waiters
+        }
+        return continuation
+    }
+
+    /// Removes and returns all publish waiters for an event id —
+    /// one OK from the relay satisfies every pending publish of that event.
+    private func removeAllPublishWaiters(eventId: String) -> [AsyncThrowingStream<Void, Error>.Continuation] {
+        guard let waiters = pendingPublishWaiters.removeValue(forKey: eventId) else { return [] }
+        return Array(waiters.values)
     }
 
     /// Yields the relay message to all active message continuations (actor-isolated).
@@ -342,7 +370,7 @@ public actor RelayConnection {
                     case .string(let text):
                         if let relayMessage = try? RelayMessage.parse(text) {
                             if case .ok(let eventId, let accepted, let message) = relayMessage {
-                                if let waiter = await self.removePublishWaiter(eventId: eventId) {
+                                for waiter in await self.removeAllPublishWaiters(eventId: eventId) {
                                     if accepted {
                                         waiter.finish()
                                     } else {

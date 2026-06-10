@@ -209,6 +209,30 @@ let poolConfig = RelayPoolConfig(
 let client = NostrClient(config: poolConfig)
 ```
 
+### Publish Strategies
+
+``PublishStrategy`` controls how many relay acknowledgments a publish waits for
+before returning. The event is always sent to every targeted relay; returning
+early never cancels the in-flight sends to slower relays.
+
+```swift
+// Default: return as soon as the fastest relay acknowledges
+try await client.publish(event)
+
+// Wait until 2 relays acknowledge
+try await client.publish(event, strategy: .quorum(2))
+
+// Wait for every relay to settle (accept, reject, or time out)
+try await client.publish(event, strategy: .allSettled)
+
+// Change the pool-wide default
+let poolConfig = RelayPoolConfig(defaultPublishStrategy: .allSettled)
+```
+
+Publishing fails fast with ``NostrError/notConnected`` on relays that are not
+connected — the publish path never connects inline. Connect relays up front with
+``NostrClient/connect()`` and let auto-reconnect handle drops.
+
 ## Low-Level Relay API
 
 ### Direct Relay Connection

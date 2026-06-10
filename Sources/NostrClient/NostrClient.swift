@@ -175,9 +175,11 @@ public actor NostrClient {
         return deletion
     }
 
-    /// Publishes a raw signed event
-    public func publish(_ event: Event) async throws {
-        try await relayPool.publish(event)
+    /// Publishes a raw signed event.
+    /// - Parameter strategy: How many relay acknowledgments to wait for before returning
+    ///   (default: the pool config's ``RelayPoolConfig/defaultPublishStrategy``).
+    public func publish(_ event: Event, strategy: PublishStrategy? = nil) async throws {
+        try await relayPool.publish(event, strategy: strategy)
     }
 
     // MARK: - Private Direct Messages (NIP-17)
