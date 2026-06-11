@@ -39,6 +39,9 @@ public actor RelayConnection {
     /// Keepalive ping task; non-nil only while the connection is believed healthy
     private var keepaliveTask: Task<Void, Never>?
 
+    /// In-flight connection attempt, shared by concurrent connect() callers
+    private var connectTask: Task<Void, Error>?
+
     /// Continuations for async message receiving (supports multiple consumers)
     private var messageContinuations: [UUID: AsyncStream<RelayMessage>.Continuation] = [:]
 
@@ -67,16 +70,42 @@ public actor RelayConnection {
         self.currentReconnectDelay = config.initialReconnectDelay
     }
 
-    /// Connects to the relay
+    /// Connects to the relay.
+    ///
+    /// Concurrent callers share a single in-flight attempt: a caller arriving while
+    /// another task is still connecting awaits that attempt's real outcome instead
+    /// of returning early with the socket not yet established. Every sharer sees
+    /// the same success or failure.
     public func connect() async throws {
+        if state == .connected { return }
+
+        if let existing = connectTask {
+            try await existing.value
+            return
+        }
+
         guard
-            state == .disconnected || state == .failed("")
+            state == .disconnected
                 || {
                     if case .failed = state { return true }
                     return false
                 }()
         else { return }
 
+        // Unstructured on purpose: one caller's cancellation must not abort the
+        // attempt other callers are waiting on. The slot is cleared inside the
+        // task itself so it lives exactly as long as the attempt — clearing it
+        // from the caller would be tied to the caller's lifetime instead.
+        let task = Task {
+            defer { connectTask = nil }
+            try await performConnect()
+        }
+        connectTask = task
+        try await task.value
+    }
+
+    /// Establishes the WebSocket connection and verifies it with a ping.
+    private func performConnect() async throws {
         updateState(.connecting)
 
         var request = URLRequest(url: url)
