@@ -1,3 +1,4 @@
+import Crypto
 import Foundation
 
 /// Nostr Event (NIP-01)
@@ -144,5 +145,25 @@ public struct UnsignedEvent: Sendable {
         ]
         return try JSONSerialization.data(
             withJSONObject: serializable, options: [.sortedKeys, .withoutEscapingSlashes])
+    }
+
+    /// Returns this event as an unsigned rumor (NIP-59): the event id is computed
+    /// from the serialized form, but no signature is ever produced (`sig` is empty).
+    ///
+    /// NIP-17 requires that kind-14 rumors are never signed — a leaked signed rumor
+    /// would be cryptographic proof of authorship and destroy deniability.
+    /// https://github.com/nostr-protocol/nips/blob/master/59.md
+    public func asRumor() throws -> Event {
+        let serialized = try serializedForHashing()
+        let eventId = Data(SHA256.hash(data: serialized)).hexEncodedString()
+        return Event(
+            id: eventId,
+            pubkey: pubkey,
+            createdAt: createdAt,
+            kind: kind,
+            tags: tags,
+            content: content,
+            sig: ""
+        )
     }
 }

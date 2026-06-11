@@ -184,34 +184,49 @@ public actor NostrClient {
 
     // MARK: - Private Direct Messages (NIP-17)
 
-    /// Sends a private direct message to a recipient using NIP-17
+    /// Sends a private direct message to a recipient using NIP-17.
+    ///
+    /// One unsigned kind-14 rumor is wrapped twice: once for the recipient and once
+    /// for the sender (the NIP-17 self-copy that provides sent history and
+    /// multi-device sync). Both gift wraps are published in parallel; the message
+    /// succeeds when the recipient copy is accepted, and a failed self-copy publish
+    /// is non-fatal.
     /// - Parameters:
     ///   - content: The message content
     ///   - recipientPubkey: The recipient's public key (hex)
     ///   - subject: Optional conversation subject
     ///   - replyTo: Optional event ID to reply to
-    /// - Returns: The published gift-wrapped event
+    /// - Returns: The shared rumor and both gift wraps. The rumor's `id` is the key
+    ///   for matching the message when it echoes back from a relay.
     @discardableResult
     public func sendDirectMessage(
         _ content: String,
         to recipientPubkey: String,
         subject: String? = nil,
         replyTo: String? = nil
-    ) async throws -> Event {
+    ) async throws -> SendDirectMessageResult {
         guard let keyPair = try? getKeyPair() else {
             throw NostrError.signingFailed
         }
 
         let builder = DirectMessageBuilder(keyPair: keyPair)
-        let giftWrap = try builder.createMessage(
+        let result = try builder.createMessageWithSelfCopy(
             content: content,
             to: recipientPubkey,
             subject: subject,
             replyTo: replyTo
         )
 
-        try await relayPool.publish(giftWrap)
-        return giftWrap
+        async let selfCopyDelivery: Void = publishBestEffort(result.selfGiftWrap)
+        try await relayPool.publish(result.recipientGiftWrap)
+        await selfCopyDelivery
+
+        return result
+    }
+
+    /// Publishes an event, swallowing failures (used for non-fatal NIP-17 self-copies).
+    private func publishBestEffort(_ event: Event) async {
+        try? await relayPool.publish(event)
     }
 
     /// Parses a received gift-wrapped direct message

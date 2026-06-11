@@ -219,6 +219,103 @@ struct NIP17Tests {
         #expect(aliceMessage.content == "Hello everyone!")
     }
 
+    // MARK: - Self-Copy Tests
+
+    @Test("Self-copy shares one unsigned rumor across both gift wraps")
+    func selfCopySharesRumor() throws {
+        let alice = try KeyPair()
+        let bob = try KeyPair()
+
+        let builder = DirectMessageBuilder(keyPair: alice)
+        let result = try builder.createMessageWithSelfCopy(
+            content: "Hello Bob!",
+            to: bob.publicKeyHex,
+            subject: "Test Subject"
+        )
+
+        // The rumor is an unsigned kind 14 with a computed id
+        #expect(result.rumor.kind == Event.Kind.privateDirectMessage.rawValue)
+        #expect(result.rumor.sig.isEmpty)
+        #expect(!result.rumor.id.isEmpty)
+
+        // Each wrap is addressed to its own recipient
+        #expect(result.recipientGiftWrap.tags.first { $0.first == "p" }?[1] == bob.publicKeyHex)
+        #expect(result.selfGiftWrap.tags.first { $0.first == "p" }?[1] == alice.publicKeyHex)
+
+        // Bob unwraps the recipient copy, Alice unwraps the self-copy — same rumor
+        let bobUnwrapped = try GiftWrap.unwrap(giftWrap: result.recipientGiftWrap, recipientKeyPair: bob)
+        let aliceUnwrapped = try GiftWrap.unwrap(giftWrap: result.selfGiftWrap, recipientKeyPair: alice)
+
+        #expect(bobUnwrapped.event.id == result.rumor.id)
+        #expect(aliceUnwrapped.event.id == result.rumor.id)
+        #expect(bobUnwrapped.event.content == "Hello Bob!")
+        #expect(aliceUnwrapped.event.content == "Hello Bob!")
+        #expect(bobUnwrapped.senderPubkey == alice.publicKeyHex)
+        #expect(aliceUnwrapped.senderPubkey == alice.publicKeyHex)
+    }
+
+    @Test("Self-copy parses identically for sender and recipient")
+    func selfCopyParsesOnBothSides() throws {
+        let alice = try KeyPair()
+        let bob = try KeyPair()
+
+        let builder = DirectMessageBuilder(keyPair: alice)
+        let result = try builder.createMessageWithSelfCopy(
+            content: "Hello again",
+            to: bob.publicKeyHex,
+            subject: "Subject",
+            replyTo: String(repeating: "d", count: 64)
+        )
+
+        let bobMessage = try DirectMessageParser(keyPair: bob).parse(result.recipientGiftWrap)
+        let aliceMessage = try DirectMessageParser(keyPair: alice).parse(result.selfGiftWrap)
+
+        // The rumor id is the echo-matching key on both sides
+        #expect(bobMessage.rumorId == result.rumor.id)
+        #expect(aliceMessage.rumorId == result.rumor.id)
+        #expect(aliceMessage.content == bobMessage.content)
+        #expect(aliceMessage.subject == bobMessage.subject)
+        #expect(aliceMessage.replyTo == bobMessage.replyTo)
+        #expect(aliceMessage.senderPubkey == alice.publicKeyHex)
+        #expect(aliceMessage.recipientPubkey == bob.publicKeyHex)
+    }
+
+    @Test("Rumor id matches the id the signing path would produce")
+    func rumorIdMatchesSignedId() throws {
+        let alice = try KeyPair()
+
+        let unsigned = UnsignedEvent(
+            pubkey: alice.publicKeyHex,
+            createdAt: 1_700_000_000,
+            kind: .privateDirectMessage,
+            tags: [["p", alice.publicKeyHex]],
+            content: "id derivation check"
+        )
+
+        let rumor = try unsigned.asRumor()
+        let signed = try EventSigner(keyPair: alice).sign(unsigned)
+
+        // The id derives from the serialized content only, never the signature
+        #expect(rumor.id == signed.id)
+        #expect(rumor.sig.isEmpty)
+        #expect(!signed.sig.isEmpty)
+    }
+
+    @Test("Group message rumor is unsigned")
+    func groupMessageRumorIsUnsigned() throws {
+        let alice = try KeyPair()
+        let bob = try KeyPair()
+
+        let builder = DirectMessageBuilder(keyPair: alice)
+        let giftWraps = try builder.createGroupMessage(
+            content: "Group hello",
+            to: [bob.publicKeyHex]
+        )
+
+        let unwrapped = try GiftWrap.unwrap(giftWrap: giftWraps[0], recipientKeyPair: bob)
+        #expect(unwrapped.event.sig.isEmpty)
+    }
+
     @Test("DirectMessage properties")
     func directMessageProperties() throws {
         let alice = try KeyPair()
