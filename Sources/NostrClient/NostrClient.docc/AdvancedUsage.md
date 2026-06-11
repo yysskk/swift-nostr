@@ -47,6 +47,7 @@ and parse manually:
 let giftWraps = try await client.subscribeToDirectMessages()
 for await giftWrap in giftWraps.events {
     let dm = try await client.parseDirectMessage(giftWrap)
+    print("From: \(dm.senderPubkey): \(dm.content)")
 }
 ```
 
