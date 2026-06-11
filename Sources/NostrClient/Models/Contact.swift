@@ -60,7 +60,7 @@ extension Event {
     /// Extracts contacts from a kind 3 (contacts) event
     /// Returns nil if the event is not a contact list event
     public var contacts: [Contact]? {
-        guard kind == Kind.contacts.rawValue else {
+        guard kind == .contacts else {
             return nil
         }
 
@@ -69,6 +69,6 @@ extension Event {
 
     /// Checks if this is a contact list event
     public var isContactList: Bool {
-        kind == Kind.contacts.rawValue
+        kind == .contacts
     }
 }

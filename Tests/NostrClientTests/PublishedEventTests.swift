@@ -36,7 +36,7 @@ struct PublishedEventTests {
         let client = try await makeClient()
         let published = try await client.publishTextNote(content: "hello nostr")
 
-        #expect(published.event.kind == Event.Kind.textNote.rawValue)
+        #expect(published.event.kind == .textNote)
         #expect(published.content == "hello nostr")
         #expect(try published.event.verify())
         // Empty pool: nothing was targeted, so the result carries no statuses.
@@ -49,7 +49,7 @@ struct PublishedEventTests {
         let root = try await client.publishTextNote(content: "root note").event
         let published = try await client.publishReply(to: root, content: "a reply")
 
-        #expect(published.event.kind == Event.Kind.textNote.rawValue)
+        #expect(published.event.kind == .textNote)
         // NIP-10 positional form: ["e", <id>, <relay-url placeholder>, <marker>]
         #expect(published.event.tags.contains(["e", root.id, "", "root"]))
         #expect(published.event.tags.contains(["p", root.pubkey]))
@@ -62,11 +62,11 @@ struct PublishedEventTests {
         let note = try await client.publishTextNote(content: "note").event
 
         let reaction = try await client.publishReaction(to: note)
-        #expect(reaction.event.kind == Event.Kind.reaction.rawValue)
+        #expect(reaction.event.kind == .reaction)
         #expect(reaction.content == "+")
 
         let repost = try await client.publishRepost(of: note)
-        #expect(repost.event.kind == Event.Kind.repost.rawValue)
+        #expect(repost.event.kind == .repost)
         #expect(repost.result.statuses.isEmpty)
     }
 
@@ -75,10 +75,10 @@ struct PublishedEventTests {
         let client = try await makeClient()
 
         let metadata = try await client.publishMetadata(UserMetadata(name: "alice"))
-        #expect(metadata.event.kind == Event.Kind.setMetadata.rawValue)
+        #expect(metadata.event.kind == .setMetadata)
 
         let deletion = try await client.publishDeletion(eventIds: [metadata.id], reason: "cleanup")
-        #expect(deletion.event.kind == Event.Kind.eventDeletion.rawValue)
+        #expect(deletion.event.kind == .eventDeletion)
         #expect(deletion.event.tags.contains(["e", metadata.id]))
     }
 
@@ -90,7 +90,7 @@ struct PublishedEventTests {
             write: ["wss://write.example.com"]
         )
 
-        #expect(published.event.kind == Event.Kind.relayListMetadata.rawValue)
+        #expect(published.event.kind == .relayListMetadata)
         #expect(published.result.statuses.isEmpty)
 
         let pubkey = await client.publicKey

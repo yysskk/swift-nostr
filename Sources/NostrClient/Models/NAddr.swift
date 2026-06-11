@@ -37,7 +37,7 @@ public struct NAddr: Sendable, Hashable {
     /// Builds an `naddr` coordinate from an addressable event, extracting its `d` tag.
     public init(event: Event, relays: [String] = []) throws {
         let identifier = event.tags.first { $0.first == "d" }.flatMap { $0.count > 1 ? $0[1] : "" } ?? ""
-        try self.init(identifier: identifier, author: event.pubkey, kind: event.kind, relays: relays)
+        try self.init(identifier: identifier, author: event.pubkey, kind: event.kind.rawValue, relays: relays)
     }
 
     init(tlvData: Data) throws {

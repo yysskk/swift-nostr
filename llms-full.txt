@@ -186,7 +186,7 @@ NIP-01 Nostr Event (struct: Codable, Identifiable, Hashable, Sendable).
 - `id: String` -- 32-byte lowercase hex sha256
 - `pubkey: String` -- 32-byte hex public key
 - `createdAt: Int64` -- unix timestamp in seconds
-- `kind: Int` -- event kind integer
+- `kind: Event.Kind` -- event kind (RawRepresentable struct, encodes as bare integer)
 - `tags: [[String]]` -- array of tag arrays (raw NIP-01 wire form)
 - `content: String` -- arbitrary string content
 - `sig: String` -- 64-byte hex Schnorr signature
@@ -221,9 +221,16 @@ event.referencedEventIds        // values of "e" tags
 event.referencedPubkeys         // values of "p" tags
 ```
 
-### Event.Kind Constants
+### Event.Kind
+
+`Event.Kind` is a `RawRepresentable` struct (not an enum): Nostr kinds are open-ended,
+so any integer can be represented. It is `ExpressibleByIntegerLiteral` (`kind: 1`),
+`Comparable`, and encodes to JSON as a bare integer. Range helpers: `isReplaceable`
+(0, 3, 10000-19999), `isEphemeral` (20000-29999), `isAddressable` (30000-39999).
 
 ```swift
+Event.Kind(rawValue: 30311)      // arbitrary kind
+let k: Event.Kind = 1            // integer literal == .textNote
 Event.Kind.setMetadata           // 0
 Event.Kind.textNote              // 1
 Event.Kind.recommendRelay        // 2
@@ -267,7 +274,7 @@ NIP-01 Subscription Filter (struct: Codable, Sendable, Hashable).
 
 - `ids: [String]?` -- event IDs to match
 - `authors: [String]?` -- author pubkeys to match
-- `kinds: [Int]?` -- event kinds to match
+- `kinds: [Event.Kind]?` -- event kinds to match
 - `eventReferences: [String]?` -- #e tag references
 - `pubkeyReferences: [String]?` -- #p tag references
 - `since: Int64?` -- unix timestamp lower bound

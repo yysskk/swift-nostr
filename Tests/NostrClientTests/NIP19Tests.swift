@@ -180,7 +180,7 @@ struct NIP19Tests {
 
     // MARK: - helpers
 
-    private func makeEvent(kind: Int, tags: [[String]]) -> Event {
+    private func makeEvent(kind: Event.Kind, tags: [[String]]) -> Event {
         Event(
             id: eventIdHex,
             pubkey: pubkeyHex,

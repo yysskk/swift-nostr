@@ -10,7 +10,7 @@ public struct Filter: Codable, Sendable, Hashable {
     public var authors: [String]?
 
     /// List of event kinds
-    public var kinds: [Int]?
+    public var kinds: [Event.Kind]?
 
     /// List of event ids that are referenced in "e" tags
     public var eventReferences: [String]?
@@ -44,7 +44,7 @@ public struct Filter: Codable, Sendable, Hashable {
     public init(
         ids: [String]? = nil,
         authors: [String]? = nil,
-        kinds: [Int]? = nil,
+        kinds: [Event.Kind]? = nil,
         eventReferences: [String]? = nil,
         pubkeyReferences: [String]? = nil,
         since: Int64? = nil,
@@ -67,7 +67,7 @@ public struct Filter: Codable, Sendable, Hashable {
 
         ids = try container.decodeIfPresent([String].self, forKey: .ids)
         authors = try container.decodeIfPresent([String].self, forKey: .authors)
-        kinds = try container.decodeIfPresent([Int].self, forKey: .kinds)
+        kinds = try container.decodeIfPresent([Event.Kind].self, forKey: .kinds)
         eventReferences = try container.decodeIfPresent([String].self, forKey: .eventReferences)
         pubkeyReferences = try container.decodeIfPresent([String].self, forKey: .pubkeyReferences)
         since = try container.decodeIfPresent(Int64.self, forKey: .since)
@@ -139,7 +139,7 @@ extension Filter {
     public static func userNotes(pubkey: String, limit: Int? = nil) -> Filter {
         Filter(
             authors: [pubkey],
-            kinds: [Event.Kind.textNote.rawValue],
+            kinds: [.textNote],
             limit: limit
         )
     }
@@ -148,14 +148,14 @@ extension Filter {
     public static func metadata(pubkeys: [String]) -> Filter {
         Filter(
             authors: pubkeys,
-            kinds: [Event.Kind.setMetadata.rawValue]
+            kinds: [.setMetadata]
         )
     }
 
     /// Create a filter for replies to a specific event
     public static func replies(to eventId: String, limit: Int? = nil) -> Filter {
         Filter(
-            kinds: [Event.Kind.textNote.rawValue],
+            kinds: [.textNote],
             eventReferences: [eventId],
             limit: limit
         )
@@ -164,7 +164,7 @@ extension Filter {
     /// Create a filter for mentions of a specific user
     public static func mentions(pubkey: String, limit: Int? = nil) -> Filter {
         Filter(
-            kinds: [Event.Kind.textNote.rawValue],
+            kinds: [.textNote],
             pubkeyReferences: [pubkey],
             limit: limit
         )
@@ -173,7 +173,7 @@ extension Filter {
     /// Create a filter for a global feed
     public static func globalFeed(limit: Int = 100) -> Filter {
         Filter(
-            kinds: [Event.Kind.textNote.rawValue],
+            kinds: [.textNote],
             limit: limit
         )
     }
@@ -182,7 +182,7 @@ extension Filter {
     public static func contactList(pubkeys: [String]) -> Filter {
         Filter(
             authors: pubkeys,
-            kinds: [Event.Kind.contacts.rawValue]
+            kinds: [.contacts]
         )
     }
 
@@ -190,7 +190,7 @@ extension Filter {
     public static func contactList(pubkey: String) -> Filter {
         Filter(
             authors: [pubkey],
-            kinds: [Event.Kind.contacts.rawValue],
+            kinds: [.contacts],
             limit: 1
         )
     }
@@ -199,7 +199,7 @@ extension Filter {
     public static func relayListMetadata(pubkeys: [String]) -> Filter {
         Filter(
             authors: pubkeys,
-            kinds: [Event.Kind.relayListMetadata.rawValue]
+            kinds: [.relayListMetadata]
         )
     }
 
@@ -207,7 +207,7 @@ extension Filter {
     public static func relayListMetadata(pubkey: String) -> Filter {
         Filter(
             authors: [pubkey],
-            kinds: [Event.Kind.relayListMetadata.rawValue],
+            kinds: [.relayListMetadata],
             limit: 1
         )
     }

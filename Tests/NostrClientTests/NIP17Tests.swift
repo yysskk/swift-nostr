@@ -99,7 +99,7 @@ struct NIP17Tests {
         )
 
         // Verify it's a gift wrap event
-        #expect(wrapped.kind == Event.Kind.giftWrap.rawValue)
+        #expect(wrapped.kind == .giftWrap)
 
         // Verify the p tag points to Bob
         let pTag = wrapped.tags.first { $0.first == "p" }
@@ -145,7 +145,7 @@ struct NIP17Tests {
         ).recipientGiftWrap
 
         // Verify it's a gift wrap
-        #expect(giftWrap.kind == Event.Kind.giftWrap.rawValue)
+        #expect(giftWrap.kind == .giftWrap)
 
         // Bob parses the message
         let parser = DirectMessageParser(keyPair: bob)
@@ -250,7 +250,7 @@ struct NIP17Tests {
         )
 
         // The rumor is an unsigned kind 14 with a computed id
-        #expect(result.rumor.kind == Event.Kind.privateDirectMessage.rawValue)
+        #expect(result.rumor.kind == .privateDirectMessage)
         #expect(result.rumor.sig.isEmpty)
         #expect(!result.rumor.id.isEmpty)
 

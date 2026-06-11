@@ -28,7 +28,7 @@ public struct RelayListMetadata: Codable, Hashable, Sendable {
 
     /// Parses a relay list from a kind 10002 event. Returns nil if the event is not kind 10002.
     public init?(event: Event) {
-        guard event.kind == Event.Kind.relayListMetadata.rawValue else {
+        guard event.kind == .relayListMetadata else {
             return nil
         }
         self.init(tags: event.tags)
@@ -71,6 +71,6 @@ extension Event {
 
     /// Checks if this is a kind 10002 relay list metadata event.
     public var isRelayListMetadata: Bool {
-        kind == Kind.relayListMetadata.rawValue
+        kind == .relayListMetadata
     }
 }

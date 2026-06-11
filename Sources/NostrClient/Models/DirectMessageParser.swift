@@ -19,7 +19,7 @@ public struct DirectMessageParser: Sendable {
 
         let rumor = unwrapped.event
 
-        guard rumor.kind == Event.Kind.privateDirectMessage.rawValue else {
+        guard rumor.kind == .privateDirectMessage else {
             throw NostrError.invalidData
         }
 

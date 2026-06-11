@@ -334,7 +334,7 @@ public actor NostrClient {
             throw NostrError.signingFailed
         }
         return Filter(
-            kinds: [Event.Kind.giftWrap.rawValue],
+            kinds: [.giftWrap],
             pubkeyReferences: [publicKey],
             limit: limit
         )
@@ -765,7 +765,7 @@ public actor NostrClient {
     /// no author is silently dropped.
     public func subscribeOutbox(
         authors: [String],
-        kinds: [Int] = [Event.Kind.textNote.rawValue],
+        kinds: [Event.Kind] = [.textNote],
         limit: Int? = nil
     ) async throws -> SubscriptionSequence {
         let routeSet = await resolveOutboxRelays(authors: authors)
@@ -779,7 +779,7 @@ public actor NostrClient {
     @discardableResult
     public func subscribeOutbox(
         authors: [String],
-        kinds: [Int] = [Event.Kind.textNote.rawValue],
+        kinds: [Event.Kind] = [.textNote],
         limit: Int? = nil,
         handler: @escaping @Sendable (Event) -> Void
     ) async throws -> String {
@@ -793,7 +793,7 @@ public actor NostrClient {
     @discardableResult
     public func subscribeOutbox(
         authors: [String],
-        kinds: [Int] = [Event.Kind.textNote.rawValue],
+        kinds: [Event.Kind] = [.textNote],
         limit: Int? = nil,
         eventHandler: @escaping @Sendable (SubscriptionEvent) -> Void
     ) async throws -> String {

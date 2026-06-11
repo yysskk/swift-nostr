@@ -72,7 +72,7 @@ public struct GiftWrap: Sendable {
         giftWrap: Event,
         recipientKeyPair: KeyPair
     ) throws -> UnwrappedMessage {
-        guard giftWrap.kind == Event.Kind.giftWrap.rawValue else {
+        guard giftWrap.kind == .giftWrap else {
             throw NostrError.invalidData
         }
 
@@ -80,7 +80,7 @@ public struct GiftWrap: Sendable {
         let sealJson = try SealedMessage(payload: giftWrap.content).open(from: giftWrap.pubkey, using: recipientKeyPair)
         let seal = try decodeSeal(sealJson)
 
-        guard seal.kind == Event.Kind.seal.rawValue else {
+        guard seal.kind == .seal else {
             throw NostrError.invalidData
         }
 
@@ -171,7 +171,7 @@ private struct Rumor: Codable {
     let id: String
     let pubkey: String
     let createdAt: Int64
-    let kind: Int
+    let kind: Event.Kind
     let tags: [[String]]
     let content: String
 

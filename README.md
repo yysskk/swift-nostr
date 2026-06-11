@@ -206,7 +206,7 @@ public struct Event: Codable, Identifiable, Hashable, Sendable {
     public let id: String
     public let pubkey: String
     public let createdAt: Int64
-    public let kind: Int
+    public let kind: Kind            // RawRepresentable struct; integer literals convert
     public let tags: [[String]]
     public let content: String
     public let sig: String
@@ -219,7 +219,7 @@ public struct Event: Codable, Identifiable, Hashable, Sendable {
 public struct Filter: Codable, Sendable, Hashable {
     public var ids: [String]?
     public var authors: [String]?
-    public var kinds: [Int]?
+    public var kinds: [Event.Kind]?
     public var eventReferences: [String]?    // #e
     public var pubkeyReferences: [String]?   // #p
     public var since: Int64?
@@ -243,6 +243,14 @@ Event.Kind.privateDirectMessage // 14 (NIP-17)
 Event.Kind.giftWrap             // 1059 (NIP-59)
 Event.Kind.zapRequest           // 9734
 Event.Kind.zap                  // 9735
+
+// Kinds are open-ended: any integer works
+let custom = Event.Kind(rawValue: 30311)
+let literal: Event.Kind = 1     // == .textNote
+
+// NIP-01 range semantics
+Event.Kind.relayListMetadata.isReplaceable  // true
+custom.isAddressable                        // true (30000-39999)
 // ... and more
 ```
 
