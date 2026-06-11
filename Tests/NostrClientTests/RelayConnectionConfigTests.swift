@@ -47,10 +47,13 @@ struct RelayConnectionConfigTests {
     }
 
     @available(*, deprecated, message: "Exercises the deprecated operationTimeout API on purpose")
-    @Test("deprecated operationTimeout property reads the publish ack timeout and fans out writes")
+    @Test("deprecated operationTimeout property reads the worst case and fans out writes")
     func deprecatedPropertyAccess() {
         var config = RelayConnectionConfig(publishAckTimeout: 21)
         #expect(config.operationTimeout == 21)
+
+        config.sendTimeout = 50
+        #expect(config.operationTimeout == 50)
 
         config.operationTimeout = 7
         #expect(config.sendTimeout == 7)

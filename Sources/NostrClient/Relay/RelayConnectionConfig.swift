@@ -31,13 +31,15 @@ public struct RelayConnectionConfig: Sendable {
     /// Multiplier for exponential backoff
     public var reconnectBackoffMultiplier: Double
 
-    /// Combined send/receive operation timeout in seconds
+    /// Combined operation timeout in seconds.
+    /// Reads as the worst case of `sendTimeout` and `publishAckTimeout`;
+    /// writes fan out to `sendTimeout`, `publishAckTimeout`, and `pingInterval`.
     @available(
         *, deprecated,
         message: "Split into sendTimeout, publishAckTimeout, and pingInterval"
     )
     public var operationTimeout: TimeInterval {
-        get { publishAckTimeout }
+        get { max(sendTimeout, publishAckTimeout) }
         set {
             sendTimeout = newValue
             publishAckTimeout = newValue
