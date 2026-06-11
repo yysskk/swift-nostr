@@ -115,20 +115,23 @@ public actor RelayPool {
     /// and their pending OK-waits clean themselves up on their own timeouts.
     ///
     /// Publishing to an empty target set is a no-op.
+    /// - Returns: The per-relay outcome. Relays still in flight when the strategy
+    ///   was satisfied are reported as ``PublishRelayStatus/pending``.
     /// - Throws: The last relay error if no targeted relay accepts the event, or
     ///   ``NostrError/relayError(_:)`` if a `.quorum` strategy cannot be satisfied.
+    @discardableResult
     public func publish(
         _ event: Event,
         to relayURLs: Set<URL>? = nil,
         strategy: PublishStrategy? = nil
-    ) async throws {
+    ) async throws -> PublishResult {
         let connections = targetConnections(relayURLs)
-        guard !connections.isEmpty else { return }
+        guard !connections.isEmpty else { return PublishResult(statuses: [:]) }
 
         let strategy = strategy ?? config.defaultPublishStrategy
         let requiredAcks = strategy.requiredAcks(targetCount: connections.count)
 
-        let (results, continuation) = AsyncStream<Result<Void, Error>>.makeStream()
+        let (results, continuation) = AsyncStream<(URL, Result<Void, Error>)>.makeStream()
         defer { continuation.finish() }
 
         // Deliberately unstructured: these tasks must survive an early return so the
@@ -138,28 +141,35 @@ public actor RelayPool {
             Task {
                 do {
                     try await connection.publish(event)
-                    continuation.yield(.success(()))
+                    continuation.yield((connection.url, .success(())))
                 } catch {
-                    continuation.yield(.failure(error))
+                    continuation.yield((connection.url, .failure(error)))
                 }
             }
+        }
+
+        var statuses: [URL: PublishRelayStatus] = [:]
+        for connection in connections {
+            statuses[connection.url] = .pending
         }
 
         var successCount = 0
         var settledCount = 0
         var lastError: Error?
 
-        for await result in results {
+        for await (relayURL, result) in results {
             settledCount += 1
             switch result {
             case .success:
                 successCount += 1
+                statuses[relayURL] = .accepted
             case .failure(let error):
                 lastError = error
+                statuses[relayURL] = .failed(error)
             }
 
             if let requiredAcks, successCount >= requiredAcks {
-                return
+                return PublishResult(statuses: statuses)
             }
             if settledCount == connections.count {
                 break
@@ -177,6 +187,7 @@ public actor RelayPool {
         {
             throw error
         }
+        return PublishResult(statuses: statuses)
     }
 
     /// Decides whether a fully settled publish failed.

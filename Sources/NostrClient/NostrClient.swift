@@ -178,7 +178,9 @@ public actor NostrClient {
     /// Publishes a raw signed event.
     /// - Parameter strategy: How many relay acknowledgments to wait for before returning
     ///   (default: the pool config's ``RelayPoolConfig/defaultPublishStrategy``).
-    public func publish(_ event: Event, strategy: PublishStrategy? = nil) async throws {
+    /// - Returns: The per-relay outcome of the publish.
+    @discardableResult
+    public func publish(_ event: Event, strategy: PublishStrategy? = nil) async throws -> PublishResult {
         try await relayPool.publish(event, strategy: strategy)
     }
 
@@ -641,8 +643,9 @@ public actor NostrClient {
     /// Routes the event to the author's own WRITE relays plus the READ (inbox) relays of every
     /// pubkey referenced in the event's "p" tags, so mentions and replies reach their recipients.
     /// Falls back to the full relay pool if nothing resolves.
+    /// - Returns: The per-relay outcome of the publish.
     @discardableResult
-    public func publishGossip(_ event: Event) async throws -> Event {
+    public func publishGossip(_ event: Event) async throws -> PublishResult {
         var targets: Set<URL> = []
 
         if await relayListStore.cachedList(for: event.pubkey) == nil {
@@ -659,8 +662,7 @@ public actor NostrClient {
         }
 
         let available = await relayListStore.ensureConnected(targets)
-        try await relayPool.publish(event, to: available.isEmpty ? nil : available)
-        return event
+        return try await relayPool.publish(event, to: available.isEmpty ? nil : available)
     }
 
     // MARK: - Private Methods

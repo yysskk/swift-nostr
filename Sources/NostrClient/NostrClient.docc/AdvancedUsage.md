@@ -246,6 +246,17 @@ try await client.publish(event, strategy: .allSettled)
 let poolConfig = RelayPoolConfig(defaultPublishStrategy: .allSettled)
 ```
 
+Publishing returns a ``PublishResult`` with the per-relay outcome, enabling
+delivery indicators and selective retries. With `.firstAck`, relays that had
+not settled when the call returned are reported as pending:
+
+```swift
+let result = try await client.publish(event)
+print("accepted:", result.acceptedRelays)
+print("failed:", result.failedRelays)
+print("still in flight:", result.pendingRelays)
+```
+
 Publishing fails fast with ``NostrError/notConnected`` on relays that are not
 connected — the publish path never connects inline. Connect relays up front with
 ``NostrClient/connect()`` and let auto-reconnect handle drops.
