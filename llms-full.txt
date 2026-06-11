@@ -166,11 +166,15 @@ let metadata = try await client.fetchMetadata(pubkey: "...")
 // Send
 try await client.sendDirectMessage("Hello!", to: "recipientPubkey")
 
-// Subscribe to incoming DMs (gift wraps)
-let messages = try await client.subscribeToDirectMessages()
-for await giftWrap in messages.events {
+// Subscribe to incoming DMs, parsed automatically (unparseable wraps skipped)
+for await message in try await client.directMessages() {
+    print("From: \(message.senderPubkey), Content: \(message.content)")
+}
+
+// Or receive raw gift wraps and parse manually
+let giftWraps = try await client.subscribeToDirectMessages()
+for await giftWrap in giftWraps.events {
     let dm = try await client.parseDirectMessage(giftWrap)
-    print("From: \(dm.senderPubkey), Content: \(dm.content)")
 }
 
 // Parse a received gift wrap event

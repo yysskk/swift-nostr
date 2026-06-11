@@ -286,10 +286,25 @@ public actor NostrClient {
         return try parser.parse(giftWrap)
     }
 
+    /// Subscribes to the current user's private direct messages (NIP-17),
+    /// delivering each message already unwrapped and parsed.
+    ///
+    /// Gift wraps that fail to unwrap or parse are skipped; use
+    /// ``subscribeToDirectMessages(limit:)`` for the raw gift-wrap events.
+    /// - Parameter limit: Maximum number of messages to fetch
+    public func directMessages(limit: Int = 100) async throws -> DirectMessageSequence {
+        guard let keyPair = try? getKeyPair() else {
+            throw NostrError.signingFailed
+        }
+        let subscription = try await subscribe(filters: [directMessagesFilter(limit: limit)])
+        return DirectMessageSequence(base: subscription, parser: DirectMessageParser(keyPair: keyPair))
+    }
+
     /// Subscribes to private direct messages (gift-wrapped events) for the current user.
     /// - Parameter limit: Maximum number of messages to fetch
     /// - Returns: A subscription sequence of gift-wrapped events; parse each with
-    ///   ``parseDirectMessage(_:)``.
+    ///   ``parseDirectMessage(_:)`` — or use ``directMessages(limit:)`` to receive
+    ///   them already parsed.
     public func subscribeToDirectMessages(
         limit: Int = 100
     ) async throws -> SubscriptionSequence {
