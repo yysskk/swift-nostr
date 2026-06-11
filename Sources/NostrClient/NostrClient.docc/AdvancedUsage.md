@@ -11,11 +11,21 @@ NostrClient implements NIP-17 private direct messages using NIP-44 encryption an
 ```swift
 try await client.setNsec("nsec1...")
 
-try await client.sendDirectMessage(
+let result = try await client.sendDirectMessage(
     "Hello privately!",
     to: "recipientPubkeyHex"
 )
+
+// The same unsigned rumor is wrapped twice: once for the recipient and once
+// for the sender (the NIP-17 self-copy for sent history / multi-device sync).
+// Match relay echoes against the rumor id:
+let echoKey = result.rumor.id
 ```
+
+The rumor is never signed — not even transiently — because a leaked signed
+kind-14 would be cryptographic proof of authorship and destroy deniability.
+A failed self-copy publish is non-fatal; the send succeeds when the
+recipient copy is accepted.
 
 ### Receiving
 
