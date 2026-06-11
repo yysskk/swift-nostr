@@ -307,7 +307,7 @@ let signer = EventSigner(keyPair: try KeyPair())
 let unsigned = UnsignedEvent(
     pubkey: signer.publicKey,
     kind: .textNote,
-    tags: [["t", "test"]],
+    tags: [.hashtag("test")],
     content: "Manually signed"
 )
 

@@ -50,7 +50,8 @@ struct PublishedEventTests {
         let published = try await client.publishReply(to: root, content: "a reply")
 
         #expect(published.event.kind == Event.Kind.textNote.rawValue)
-        #expect(published.event.tags.contains(["e", root.id, "root"]))
+        // NIP-10 positional form: ["e", <id>, <relay-url placeholder>, <marker>]
+        #expect(published.event.tags.contains(["e", root.id, "", "root"]))
         #expect(published.event.tags.contains(["p", root.pubkey]))
         #expect(published.result.statuses.isEmpty)
     }

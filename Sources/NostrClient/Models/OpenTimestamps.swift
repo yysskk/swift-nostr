@@ -58,7 +58,7 @@ extension UnsignedEvent {
             pubkey: pubkey,
             createdAt: createdAt,
             kind: kind,
-            tags: newTags,
+            rawTags: newTags,
             content: content
         )
     }

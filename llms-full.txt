@@ -100,7 +100,7 @@ per-relay `result` (`PublishResult`). All accept an optional `strategy:` paramet
 wait for before returning.
 
 ```swift
-let note = try await client.publishTextNote(content: "Hello!", tags: [["t", "nostr"]])
+let note = try await client.publishTextNote(content: "Hello!", tags: [.hashtag("nostr")])
 print(note.event.id, note.result.acceptedRelays)
 try await client.publishReply(to: parentEvent, content: "Nice post!")
 try await client.publishMetadata(UserMetadata(name: "Alice", about: "Nostr user"))
@@ -187,9 +187,39 @@ NIP-01 Nostr Event (struct: Codable, Identifiable, Hashable, Sendable).
 - `pubkey: String` -- 32-byte hex public key
 - `createdAt: Int64` -- unix timestamp in seconds
 - `kind: Int` -- event kind integer
-- `tags: [[String]]` -- array of tag arrays
+- `tags: [[String]]` -- array of tag arrays (raw NIP-01 wire form)
 - `content: String` -- arbitrary string content
 - `sig: String` -- 64-byte hex Schnorr signature
+
+### Tag
+
+Typed tag value (`Event.Tag`, top-level alias `Tag`). Event-construction APIs
+(`UnsignedEvent`, `signTextNote`, `publishTextNote`) take `[Tag]`; `Event.tags`
+stays `[[String]]` (the hashed wire form). `Tag` is array-literal expressible, so
+`tags: [["t", "nostr"]]` still compiles.
+
+```swift
+Tag.event(id, relayURL: "wss://r", marker: .reply)  // ["e", id, "wss://r", "reply"]
+Tag.event(id, marker: .root)     // ["e", id, "", "root"] (placeholder padded)
+Tag.pubkey(pk, petname: "alice") // ["p", pk, "", "alice"]
+Tag.hashtag("nostr")             // ["t", "nostr"]
+Tag.identifier("my-article")     // ["d", "my-article"]
+Tag.subject("hi")                // ["subject", "hi"]
+Tag(rawArray: ["custom", "x"])   // failable, nil for []
+tag.rawArray                     // [String] wire form
+// Raw escape hatch when you hold [[String]]:
+UnsignedEvent(pubkey: pk, kind: 1, rawTags: rawArrays, content: "...")
+```
+
+Read accessors on `Event`:
+
+```swift
+event.structuredTags            // [Tag]
+event.tags(named: "e")          // [Tag]
+event.firstTagValue(named: "subject")  // String?
+event.referencedEventIds        // values of "e" tags
+event.referencedPubkeys         // values of "p" tags
+```
 
 ### Event.Kind Constants
 
@@ -223,7 +253,7 @@ Event before signing (struct: Sendable). Same fields as Event minus `id` and `si
 let unsigned = UnsignedEvent(
     pubkey: keyPair.publicKeyHex,
     kind: .textNote,
-    tags: [["t", "test"]],
+    tags: [.hashtag("test")],
     content: "Hello"
 )
 let serialized = unsigned.serializedForHashing()  // NIP-01 serialization
