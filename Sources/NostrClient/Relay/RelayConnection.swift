@@ -15,11 +15,11 @@ public actor RelayConnection {
     /// Active subscriptions (subscription ID -> filters) for resubscription after reconnect
     private var subscriptions: [String: [Filter]] = [:]
 
-    /// The WebSocket task
-    private var webSocketTask: URLSessionWebSocketTask?
+    /// The active WebSocket transport
+    private var webSocketTask: (any WebSocketSession)?
 
-    /// URL session for WebSocket connections
-    private let urlSession: URLSession
+    /// Creates the WebSocket transport for each connection attempt
+    private let webSocketFactory: any WebSocketSessionFactory
 
     /// Connection configuration
     public let config: RelayConnectionConfig
@@ -54,18 +54,29 @@ public actor RelayConnection {
     private var pendingPublishWaiters: [String: [UUID: AsyncThrowingStream<Void, Error>.Continuation]] = [:]
 
     public init(url: URL, urlSession: URLSession = .shared, config: RelayConnectionConfig = .default) {
-        self.url = url
-        self.urlSession = urlSession
-        self.config = config
-        self.currentReconnectDelay = config.initialReconnectDelay
+        self.init(
+            url: url,
+            webSocketFactory: URLSessionWebSocketFactory(urlSession: urlSession),
+            config: config
+        )
     }
 
     public init(urlString: String, config: RelayConnectionConfig = .default) throws {
         guard let url = URL(string: urlString) else {
             throw NostrError.connectionFailed("Invalid URL: \(urlString)")
         }
+        self.init(url: url, config: config)
+    }
+
+    /// Designated initializer shared by the public initializers and by tests, which inject a
+    /// fake ``WebSocketSessionFactory`` to drive the connection state machine without a network.
+    init(
+        url: URL,
+        webSocketFactory: any WebSocketSessionFactory,
+        config: RelayConnectionConfig = .default
+    ) {
         self.url = url
-        self.urlSession = .shared
+        self.webSocketFactory = webSocketFactory
         self.config = config
         self.currentReconnectDelay = config.initialReconnectDelay
     }
@@ -112,7 +123,7 @@ public actor RelayConnection {
         request.setValue("websocket", forHTTPHeaderField: "Upgrade")
         request.timeoutInterval = config.connectionTimeout
 
-        let task = urlSession.webSocketTask(with: request)
+        let task = webSocketFactory.makeWebSocket(with: request)
         webSocketTask = task
         task.resume()
 
@@ -414,7 +425,7 @@ public actor RelayConnection {
     /// ``ResumeOnceGuard`` arbitrates every resume site to fire exactly once.
     /// Cancelling the waiting task resumes immediately with `CancellationError`
     /// instead of staying suspended until the pong or the watchdog fires.
-    private static func pingSocket(_ task: URLSessionWebSocketTask, timeout: TimeInterval) async throws {
+    private static func pingSocket(_ task: any WebSocketSession, timeout: TimeInterval) async throws {
         let resumeGuard = ResumeOnceGuard()
         let cancellationBox = PingCancellationBox()
         try await withTaskCancellationHandler {
