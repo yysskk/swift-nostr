@@ -30,12 +30,24 @@ reported on the result as `recipientPublishResult` and `selfCopyPublishResult`.
 
 ### Receiving
 
+``NostrClient/directMessages(limit:)`` delivers messages already unwrapped and
+parsed (gift wraps that fail to decrypt are skipped):
+
 ```swift
-let messages = try await client.subscribeToDirectMessages()
-for await giftWrap in messages.events {
+for await message in try await client.directMessages() {
+    print("From: \(message.senderPubkey)")
+    print("Content: \(message.content)")
+}
+```
+
+For the raw gift-wrap events, use ``NostrClient/subscribeToDirectMessages(limit:)``
+and parse manually:
+
+```swift
+let giftWraps = try await client.subscribeToDirectMessages()
+for await giftWrap in giftWraps.events {
     let dm = try await client.parseDirectMessage(giftWrap)
-    print("From: \(dm.senderPubkey)")
-    print("Content: \(dm.content)")
+    print("From: \(dm.senderPubkey): \(dm.content)")
 }
 ```
 
