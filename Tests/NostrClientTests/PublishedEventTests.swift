@@ -128,4 +128,25 @@ struct PublishedEventTests {
         let published = try await client.publishTextNote(content: "note", strategy: .allSettled)
         #expect(published.result.statuses.isEmpty)
     }
+
+    @Test("publishing without a signer throws signerNotSet")
+    func publishingWithoutSignerThrowsSignerNotSet() async throws {
+        let client = NostrClient()
+
+        await #expect(throws: NostrError.signerNotSet) {
+            _ = try await client.publishTextNote(content: "no signer")
+        }
+        await #expect(throws: NostrError.signerNotSet) {
+            _ = try await client.publishMetadata(UserMetadata(name: "x"))
+        }
+        await #expect(throws: NostrError.signerNotSet) {
+            _ = try await client.sendDirectMessage("hi", to: "pk")
+        }
+        await #expect(throws: NostrError.signerNotSet) {
+            _ = try await client.directMessages()
+        }
+        await #expect(throws: NostrError.signerNotSet) {
+            _ = try await client.publishRelayList(write: ["wss://w.example.com"])
+        }
+    }
 }

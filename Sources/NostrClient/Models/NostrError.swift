@@ -7,6 +7,7 @@ public enum NostrError: Error, LocalizedError, Sendable, Equatable {
     case invalidSignature
     case invalidEventId
     case signingFailed
+    case signerNotSet
     case verificationFailed
     case serializationFailed
     case invalidData
@@ -44,6 +45,8 @@ public enum NostrError: Error, LocalizedError, Sendable, Equatable {
             return "Invalid event ID"
         case .signingFailed:
             return "Failed to sign event"
+        case .signerNotSet:
+            return "No signer is set — call setSigner(_:), setPrivateKey(_:), or setNsec(_:) first"
         case .verificationFailed:
             return "Signature verification failed"
         case .serializationFailed:

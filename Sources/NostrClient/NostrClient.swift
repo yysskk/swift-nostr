@@ -89,7 +89,7 @@ public actor NostrClient {
         strategy: PublishStrategy? = nil
     ) async throws -> PublishedEvent {
         guard let signer = signer else {
-            throw NostrError.signingFailed
+            throw NostrError.signerNotSet
         }
 
         let event = try signer.signTextNote(content: content, tags: tags)
@@ -107,7 +107,7 @@ public actor NostrClient {
         strategy: PublishStrategy? = nil
     ) async throws -> PublishedEvent {
         guard let signer = signer else {
-            throw NostrError.signingFailed
+            throw NostrError.signerNotSet
         }
 
         var tags: [Tag] = []
@@ -144,7 +144,7 @@ public actor NostrClient {
         strategy: PublishStrategy? = nil
     ) async throws -> PublishedEvent {
         guard let signer = signer else {
-            throw NostrError.signingFailed
+            throw NostrError.signerNotSet
         }
 
         let event = try signer.signMetadata(metadata)
@@ -161,7 +161,7 @@ public actor NostrClient {
         strategy: PublishStrategy? = nil
     ) async throws -> PublishedEvent {
         guard let signer = signer else {
-            throw NostrError.signingFailed
+            throw NostrError.signerNotSet
         }
 
         let reaction = try signer.signReaction(to: event, content: content)
@@ -178,7 +178,7 @@ public actor NostrClient {
         strategy: PublishStrategy? = nil
     ) async throws -> PublishedEvent {
         guard let signer = signer else {
-            throw NostrError.signingFailed
+            throw NostrError.signerNotSet
         }
 
         let repost = try signer.signRepost(of: event, relayUrl: relayUrl)
@@ -195,7 +195,7 @@ public actor NostrClient {
         strategy: PublishStrategy? = nil
     ) async throws -> PublishedEvent {
         guard let signer = signer else {
-            throw NostrError.signingFailed
+            throw NostrError.signerNotSet
         }
 
         let deletion = try signer.signDeletion(eventIds: eventIds, reason: reason)
@@ -241,9 +241,7 @@ public actor NostrClient {
         replyTo: String? = nil,
         strategy: PublishStrategy? = nil
     ) async throws -> SendDirectMessageResult {
-        guard let keyPair = try? getKeyPair() else {
-            throw NostrError.signingFailed
-        }
+        let keyPair = try getKeyPair()
 
         let builder = DirectMessageBuilder(keyPair: keyPair)
         let result = try builder.createMessageWithSelfCopy(
@@ -278,9 +276,7 @@ public actor NostrClient {
     /// - Parameter giftWrap: The gift-wrapped event
     /// - Returns: The parsed DirectMessage
     public func parseDirectMessage(_ giftWrap: Event) throws -> DirectMessage {
-        guard let keyPair = try? getKeyPair() else {
-            throw NostrError.signingFailed
-        }
+        let keyPair = try getKeyPair()
 
         let parser = DirectMessageParser(keyPair: keyPair)
         return try parser.parse(giftWrap)
@@ -293,9 +289,7 @@ public actor NostrClient {
     /// ``subscribeToDirectMessages(limit:)`` for the raw gift-wrap events.
     /// - Parameter limit: Maximum number of messages to fetch
     public func directMessages(limit: Int = 100) async throws -> DirectMessageSequence {
-        guard let keyPair = try? getKeyPair() else {
-            throw NostrError.signingFailed
-        }
+        let keyPair = try getKeyPair()
         let subscription = try await subscribe(filters: [directMessagesFilter(limit: limit)])
         return DirectMessageSequence(base: subscription, parser: DirectMessageParser(keyPair: keyPair))
     }
@@ -346,7 +340,7 @@ public actor NostrClient {
     /// Builds the gift-wrap filter for the current user's direct messages.
     private func directMessagesFilter(limit: Int) throws -> Filter {
         guard let publicKey = publicKey else {
-            throw NostrError.signingFailed
+            throw NostrError.signerNotSet
         }
         return Filter(
             kinds: [.giftWrap],
@@ -358,7 +352,7 @@ public actor NostrClient {
     /// Helper to get the keypair from the signer
     private func getKeyPair() throws -> KeyPair {
         guard let signer = signer else {
-            throw NostrError.signingFailed
+            throw NostrError.signerNotSet
         }
         return signer.keyPair
     }
@@ -745,7 +739,7 @@ public actor NostrClient {
         strategy: PublishStrategy? = nil
     ) async throws -> PublishedEvent {
         guard let signer = signer else {
-            throw NostrError.signingFailed
+            throw NostrError.signerNotSet
         }
         let event = try signer.signRelayListMetadata(relayList)
         let result = try await relayPool.publish(event, strategy: strategy)
@@ -762,7 +756,7 @@ public actor NostrClient {
         strategy: PublishStrategy? = nil
     ) async throws -> PublishedEvent {
         guard let signer = signer else {
-            throw NostrError.signingFailed
+            throw NostrError.signerNotSet
         }
         let event = try signer.signRelayListMetadata(read: read, write: write)
         let result = try await relayPool.publish(event, strategy: strategy)
