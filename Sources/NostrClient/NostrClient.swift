@@ -77,8 +77,9 @@ public actor NostrClient {
     /// ```swift
     /// try await client.connect(to: ["wss://relay.damus.io", "wss://nos.lol"])
     /// ```
-    /// - Throws: ``NostrError/connectionFailed(_:)`` only if every relay in the
-    ///   pool fails to connect; partial failures are tolerated.
+    /// - Throws: ``NostrError/connectionFailed(_:)`` if any URL string is invalid,
+    ///   or if every relay in the pool fails to connect; partial connection
+    ///   failures are tolerated.
     public func connect(to urlStrings: [String]) async throws {
         try await addRelays(urlStrings)
         try await connect()

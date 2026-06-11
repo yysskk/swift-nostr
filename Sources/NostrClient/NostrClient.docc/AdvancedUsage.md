@@ -206,6 +206,19 @@ if let ots = event.openTimestamps {
 }
 ```
 
+## Relay Information (NIP-11)
+
+Fetch a relay's information document — name, supported NIPs, limits, fees —
+over HTTP before or after connecting:
+
+```swift
+let info = try await RelayInformation.fetch(fromRelayURLString: "wss://relay.damus.io")
+print(info.name ?? "unknown")
+print(info.supportedNIPs ?? [])
+print(info.limitation?.maxSubscriptions ?? 0)
+print(info.limitation?.authRequired ?? false)
+```
+
 ## Relay Configuration
 
 ### Connection Configuration

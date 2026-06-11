@@ -162,6 +162,25 @@ let metadata = try await client.fetchMetadata(pubkey: "...")
 print("Name: \(metadata?.name ?? "Unknown")")
 ```
 
+### Private Direct Messages (NIP-17)
+
+```swift
+// Send (encrypted, gift-wrapped, with a self-copy for sent history)
+try await client.sendDirectMessage("Hello privately!", to: "recipientPubkeyHex")
+
+// Receive, already decrypted and parsed
+for await message in try await client.directMessages() {
+    print("\(message.senderPubkey): \(message.content)")
+}
+```
+
+### Relay Information (NIP-11)
+
+```swift
+let info = try await RelayInformation.fetch(fromRelayURLString: "wss://relay.damus.io")
+print(info.name ?? "unknown", info.supportedNIPs ?? [])
+```
+
 ### Outbox Model (NIP-65)
 
 The outbox/gossip model routes reads and writes to each user's declared relays instead of

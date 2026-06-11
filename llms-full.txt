@@ -257,6 +257,21 @@ Event.Kind.zap                   // 9735
 let isValid = try event.verify()  // verifies Schnorr signature
 ```
 
+## PublishedEvent
+
+Returned by the convenience publish methods: the signed `event` plus the per-relay
+`result` (`PublishResult`). `Event` properties are forwarded via dynamic member
+lookup (`published.id`, `published.content`); use `.event` where an `Event` value
+itself is required.
+
+```swift
+let published = try await client.publishTextNote(content: "hi")
+published.event          // Event
+published.result         // PublishResult
+published.id             // forwarded from Event
+published.result.acceptedRelays / .failedRelays / .pendingRelays
+```
+
 ## UnsignedEvent
 
 Event before signing (struct: Sendable). Same fields as Event minus `id` and `sig`.
@@ -318,6 +333,26 @@ High-level subscription events from NostrClient (enum: Sendable).
 - `.auth(relayURL: URL, challenge: String)` -- relay auth challenge (NIP-42)
 
 All cases expose `relayURL` property to identify the source relay.
+
+## SubscriptionSequence
+
+A live subscription as an `AsyncSequence` of `SubscriptionEvent` (struct: Sendable).
+Returned by `subscribe(filters:to:bufferingPolicy:)` and the convenience subscriptions.
+
+- `id: String` -- subscription ID (usable with `unsubscribe(subscriptionId:)`)
+- `expectedRelays: Set<URL>` -- relays that accepted the REQ
+- `close() async` -- sends CLOSE and ends iteration (idempotent)
+- `events: SubscriptionSequence.Events` -- view yielding only `Event` payloads
+
+Single-consumer. Iteration end, task cancellation, `close()`, or discarding the
+sequence automatically sends CLOSE to the relays.
+
+## DirectMessageSequence
+
+A live subscription to the current user's NIP-17 DMs, delivered already unwrapped
+and parsed as `DirectMessage` values (struct: Sendable). Returned by
+`directMessages(limit:)`. Gift wraps that fail to unwrap or parse are skipped.
+Same lifecycle surface as `SubscriptionSequence` (`id`, `expectedRelays`, `close()`).
 
 ## RelayMessage
 
@@ -441,6 +476,7 @@ let reaction = try signer.signReaction(to: event, content: "🤙")
 let repost = try signer.signRepost(of: event, relayUrl: "wss://...")
 let deletion = try signer.signDeletion(eventIds: ["id1"], reason: "mistake")
 let contacts = try signer.signContactList([Contact(pubkey: "...")])
+let relayList = try signer.signRelayListMetadata(read: ["wss://in.example"], write: ["wss://out.example"])
 ```
 
 ## Mnemonic
@@ -729,7 +765,7 @@ let (hrp, data) = try Bech32.decode("npub1...")
 
 Error types (enum: Error, LocalizedError, Sendable, Equatable).
 
-Cases: `invalidPrivateKey`, `invalidPublicKey`, `invalidSignature`, `invalidEventId`, `signingFailed`, `verificationFailed`, `serializationFailed`, `invalidData`, `invalidMessageFormat`, `connectionFailed(String)`, `notConnected`, `subscriptionNotFound(String)`, `relayError(String)`, `timeout`, `invalidHex`, `invalidBech32`, `unknownPrefix(String)`, `encryptionFailed`, `decryptionFailed`, `unsupportedEncryptionVersion(UInt8)`, `invalidPayloadFormat`, `hmacVerificationFailed`, `invalidPadding`, `invalidMnemonic`, `invalidMnemonicWord(String)`, `invalidMnemonicChecksum`, `randomGenerationFailed`.
+Cases: `invalidPrivateKey`, `invalidPublicKey`, `invalidSignature`, `invalidEventId`, `signingFailed`, `signerNotSet`, `verificationFailed`, `serializationFailed`, `invalidData`, `invalidMessageFormat`, `connectionFailed(String)`, `notConnected`, `subscriptionNotFound(String)`, `relayError(String)`, `timeout`, `invalidHex`, `invalidBech32`, `unknownPrefix(String)`, `encryptionFailed`, `decryptionFailed`, `unsupportedEncryptionVersion(UInt8)`, `invalidPayloadFormat`, `hmacVerificationFailed`, `invalidPadding`, `invalidMnemonic`, `invalidMnemonicWord(String)`, `invalidMnemonicChecksum`, `randomGenerationFailed`.
 
 ## Supported NIPs
 
