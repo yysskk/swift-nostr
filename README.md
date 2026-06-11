@@ -114,29 +114,42 @@ try await client.publishReaction(to: note.event, content: "🤙")
 
 ### Subscribe to Events
 
+Subscriptions are async sequences — iterate them with `for await`. The
+subscription is closed automatically when the loop ends or its task is
+cancelled.
+
 ```swift
 // Subscribe to a user's notes
-let subscriptionId = try await client.subscribeToUserTimeline(pubkey: "...") { event in
+let timeline = try await client.subscribeToUserTimeline(pubkey: "...")
+for await event in timeline.events {
     print("New note: \(event.content)")
 }
 
-// Subscribe to the global feed
-try await client.subscribeToGlobalFeed(limit: 50) { event in
-    print("Global: \(event.content)")
-}
-
-// Custom filter subscription
+// Custom filter subscription, events only
 let filter = Filter(
     kinds: [1],
     authors: ["pubkey1", "pubkey2"],
     limit: 100
 )
-try await client.subscribe(filters: [filter]) { event in
+for await event in try await client.events(filters: [filter]) {
     print("Received: \(event.id)")
 }
 
-// Unsubscribe
-try await client.unsubscribe(subscriptionId: subscriptionId)
+// Relay-aware subscription: EOSE, notices, and auth challenges per relay
+let subscription = try await client.subscribe(filters: [filter])
+for await item in subscription {
+    switch item {
+    case .event(let relayURL, let event):
+        print("[\(relayURL)] \(event.content)")
+    case .eose(let relayURL):
+        print("[\(relayURL)] end of stored events")
+    default:
+        break
+    }
+}
+
+// Close explicitly (or just break out of the loop / cancel the task)
+await subscription.close()
 ```
 
 ### Fetch Events
@@ -169,7 +182,8 @@ print("Writes to: \(relayList?.writeRelays ?? [])")
 
 // Outbox read: subscribe to authors on *their* write relays,
 // resolving and connecting relays on demand
-try await client.subscribeOutbox(authors: ["pubkey1", "pubkey2"]) { event in
+let outbox = try await client.subscribeOutbox(authors: ["pubkey1", "pubkey2"])
+for await event in outbox.events {
     print("Note: \(event.content)")
 }
 

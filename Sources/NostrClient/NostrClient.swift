@@ -12,7 +12,7 @@ public actor NostrClient {
     private var subscriptionCounter: Int = 0
 
     /// Active subscriptions
-    private var subscriptions: [String: Subscription] = [:]
+    private var subscriptions: [String: SubscriptionState] = [:]
 
     /// Per-pubkey NIP-65 relay list cache and outbox/gossip resolver
     private let relayListStore: RelayListStore
@@ -296,22 +296,30 @@ public actor NostrClient {
         return try parser.parse(giftWrap)
     }
 
+    /// Subscribes to private direct messages (gift-wrapped events) for the current user.
+    /// - Parameter limit: Maximum number of messages to fetch
+    /// - Returns: A subscription sequence of gift-wrapped events; parse each with
+    ///   ``parseDirectMessage(_:)``.
+    public func subscribeToDirectMessages(
+        limit: Int = 100
+    ) async throws -> SubscriptionSequence {
+        try await subscribe(filters: [directMessagesFilter(limit: limit)])
+    }
+
     /// Subscribes to private direct messages for the current user
     /// - Parameters:
     ///   - limit: Maximum number of messages to fetch
     ///   - handler: Handler called for each gift-wrapped event
     /// - Returns: The subscription ID
+    @available(*, deprecated, message: "Use subscribeToDirectMessages(limit:) and iterate the returned sequence")
     @discardableResult
     public func subscribeToDirectMessages(
         limit: Int = 100,
         handler: @escaping @Sendable (Event) -> Void
     ) async throws -> String {
-        try await subscribeToDirectMessages(
-            limit: limit,
-            eventHandler: { subscriptionEvent in
-                guard case .event(_, let event) = subscriptionEvent else { return }
-                handler(event)
-            })
+        try await openSubscription(
+            filters: [directMessagesFilter(limit: limit)], to: nil, handler: Self.eventOnly(handler)
+        ).id
     }
 
     /// Subscribes to private direct messages for the current user.
@@ -319,23 +327,27 @@ public actor NostrClient {
     ///   - limit: Maximum number of messages to fetch
     ///   - eventHandler: Handler called for each subscription event
     /// - Returns: The subscription ID
+    @available(*, deprecated, message: "Use subscribeToDirectMessages(limit:) and iterate the returned sequence")
     @discardableResult
     public func subscribeToDirectMessages(
         limit: Int = 100,
         eventHandler: @escaping @Sendable (SubscriptionEvent) -> Void
     ) async throws -> String {
+        try await openSubscription(
+            filters: [directMessagesFilter(limit: limit)], to: nil, handler: eventHandler
+        ).id
+    }
+
+    /// Builds the gift-wrap filter for the current user's direct messages.
+    private func directMessagesFilter(limit: Int) throws -> Filter {
         guard let publicKey = publicKey else {
             throw NostrError.signingFailed
         }
-
-        // Subscribe to gift-wrapped events addressed to us
-        let filter = Filter(
+        return Filter(
             kinds: [Event.Kind.giftWrap.rawValue],
             pubkeyReferences: [publicKey],
             limit: limit
         )
-
-        return try await subscribe(filters: [filter], eventHandler: eventHandler)
     }
 
     /// Helper to get the keypair from the signer
@@ -348,40 +360,122 @@ public actor NostrClient {
 
     // MARK: - Subscriptions
 
+    /// Opens a subscription and returns it as an async sequence of relay-aware events.
+    ///
+    /// Pass `relayURLs` to scope the subscription to a subset of relays (NIP-65 outbox routing);
+    /// the default `nil` subscribes on all relays in the pool.
+    ///
+    /// Iteration termination (breaking out of the loop, task cancellation, or
+    /// discarding the sequence) automatically sends CLOSE to the relays.
+    /// - Parameter bufferingPolicy: How items are buffered while the consumer is
+    ///   slower than the relays (default: `.unbounded`). Use
+    ///   `.bufferingNewest(n)` for firehose subscriptions where memory matters.
+    public func subscribe(
+        filters: [Filter],
+        to relayURLs: Set<URL>? = nil,
+        bufferingPolicy: AsyncStream<SubscriptionEvent>.Continuation.BufferingPolicy = .unbounded
+    ) async throws -> SubscriptionSequence {
+        let (stream, continuation) = AsyncStream.makeStream(
+            of: SubscriptionEvent.self,
+            bufferingPolicy: bufferingPolicy
+        )
+
+        let opened: (id: String, expectedRelays: Set<URL>)
+        do {
+            opened = try await openSubscription(filters: filters, to: relayURLs) { subscriptionEvent in
+                continuation.yield(subscriptionEvent)
+            }
+        } catch {
+            continuation.finish()
+            throw error
+        }
+
+        // The actor was free during the await above: if the subscription was
+        // already torn down (e.g. unsubscribeAll), end the stream immediately.
+        if subscriptions[opened.id] != nil {
+            subscriptions[opened.id]?.continuation = continuation
+        } else {
+            continuation.finish()
+        }
+
+        let subscriptionId = opened.id
+        continuation.onTermination = { [weak self] _ in
+            Task { await self?.unsubscribe(subscriptionId: subscriptionId) }
+        }
+
+        return SubscriptionSequence(
+            id: subscriptionId,
+            expectedRelays: opened.expectedRelays,
+            stream: stream,
+            onClose: { [weak self] in
+                await self?.unsubscribe(subscriptionId: subscriptionId)
+            }
+        )
+    }
+
+    /// Opens a subscription and returns only its event payloads as an async sequence.
+    ///
+    /// ```swift
+    /// for await event in try await client.events(filters: [filter]) {
+    ///     print(event.content)
+    /// }
+    /// ```
+    public func events(
+        filters: [Filter],
+        to relayURLs: Set<URL>? = nil,
+        bufferingPolicy: AsyncStream<SubscriptionEvent>.Continuation.BufferingPolicy = .unbounded
+    ) async throws -> SubscriptionSequence.Events {
+        try await subscribe(filters: filters, to: relayURLs, bufferingPolicy: bufferingPolicy).events
+    }
+
     /// Subscribes to events matching the given filters
+    @available(
+        *, deprecated,
+        message: "Use events(filters:to:bufferingPolicy:) and iterate the returned sequence"
+    )
     @discardableResult
     public func subscribe(
         filters: [Filter],
         handler: @escaping @Sendable (Event) -> Void
     ) async throws -> String {
-        try await subscribe(
-            filters: filters,
-            eventHandler: { subscriptionEvent in
-                guard case .event(_, let event) = subscriptionEvent else { return }
-                handler(event)
-            })
+        try await openSubscription(filters: filters, to: nil) { subscriptionEvent in
+            guard case .event(_, let event) = subscriptionEvent else { return }
+            handler(event)
+        }.id
     }
 
     /// Subscribes to events matching the given filters and emits relay-aware subscription events.
     /// Pass `relayURLs` to scope the subscription to a subset of relays (NIP-65 outbox routing);
     /// the default `nil` subscribes on all relays in the pool.
+    @available(
+        *, deprecated,
+        message: "Use subscribe(filters:to:bufferingPolicy:) and iterate the returned SubscriptionSequence"
+    )
     @discardableResult
     public func subscribe(
         filters: [Filter],
         to relayURLs: Set<URL>? = nil,
         eventHandler: @escaping @Sendable (SubscriptionEvent) -> Void
     ) async throws -> String {
+        try await openSubscription(filters: filters, to: relayURLs, handler: eventHandler).id
+    }
+
+    /// Registers a subscription with the relay pool and routes its messages to `handler`.
+    /// Shared core of the stream-based and deprecated closure-based subscribe APIs.
+    private func openSubscription(
+        filters: [Filter],
+        to relayURLs: Set<URL>?,
+        handler: @escaping @Sendable (SubscriptionEvent) -> Void
+    ) async throws -> (id: String, expectedRelays: Set<URL>) {
         subscriptionCounter += 1
         let subscriptionId = "sub_\(subscriptionCounter)"
 
-        let subscription = Subscription(
+        subscriptions[subscriptionId] = SubscriptionState(
             id: subscriptionId,
             filters: filters,
-            handler: eventHandler
+            handler: handler
         )
-        subscriptions[subscriptionId] = subscription
 
-        let capturedSubscriptionId = subscriptionId
         do {
             let expectedRelayURLs = try await relayPool.subscribeWithRelayContext(
                 subscriptionId: subscriptionId,
@@ -392,140 +486,173 @@ public actor NostrClient {
                 await self.handleMessage(
                     relayMessage.message,
                     from: relayMessage.relayURL,
-                    subscriptionId: capturedSubscriptionId
+                    subscriptionId: subscriptionId
                 )
             }
-
-            if var subscription = subscriptions[subscriptionId] {
-                if subscription.eoseTracker.setExpectedRelays(expectedRelayURLs) {
-                    subscription.eoseSignal?.finish()
-                    subscription.eoseSignal = nil
-                }
-                subscriptions[subscriptionId] = subscription
-            }
+            return (subscriptionId, expectedRelayURLs)
         } catch {
-            subscriptions[subscriptionId]?.eoseSignal?.finish()
             subscriptions.removeValue(forKey: subscriptionId)
+            // Drop the pool-side handler and message tasks registered before the failure.
+            await relayPool.unsubscribe(subscriptionId: subscriptionId)
             throw error
         }
-
-        return subscriptionId
     }
 
-    /// Unsubscribes from a subscription
+    /// Unsubscribes from a subscription.
+    /// No-op for unknown IDs, so the re-entrant call triggered by finishing the
+    /// continuation (onTermination → unsubscribe) cannot send a second CLOSE.
     public func unsubscribe(subscriptionId: String) async {
-        subscriptions[subscriptionId]?.eoseSignal?.finish()
-        subscriptions.removeValue(forKey: subscriptionId)
+        guard let subscription = subscriptions.removeValue(forKey: subscriptionId) else { return }
+        subscription.continuation?.finish()
         await relayPool.unsubscribe(subscriptionId: subscriptionId)
     }
 
     /// Unsubscribes from all subscriptions
     public func unsubscribeAll() async {
-        for (_, subscription) in subscriptions {
-            subscription.eoseSignal?.finish()
-        }
-        for subscriptionId in subscriptions.keys {
+        let active = subscriptions
+        subscriptions.removeAll()
+        for (subscriptionId, subscription) in active {
+            subscription.continuation?.finish()
             await relayPool.unsubscribe(subscriptionId: subscriptionId)
         }
-        subscriptions.removeAll()
     }
 
     // MARK: - Convenience Subscriptions
 
     /// Subscribes to a user's timeline
-    @discardableResult
     public func subscribeToUserTimeline(
         pubkey: String,
-        limit: Int = 100,
-        handler: @escaping @Sendable (Event) -> Void
-    ) async throws -> String {
-        try await subscribeToUserTimeline(
-            pubkey: pubkey, limit: limit,
-            eventHandler: { subscriptionEvent in
-                guard case .event(_, let event) = subscriptionEvent else { return }
-                handler(event)
-            })
-    }
-
-    @discardableResult
-    public func subscribeToUserTimeline(
-        pubkey: String,
-        limit: Int = 100,
-        eventHandler: @escaping @Sendable (SubscriptionEvent) -> Void
-    ) async throws -> String {
-        let filter = Filter.userNotes(pubkey: pubkey, limit: limit)
-        return try await subscribe(filters: [filter], eventHandler: eventHandler)
+        limit: Int = 100
+    ) async throws -> SubscriptionSequence {
+        try await subscribe(filters: [.userNotes(pubkey: pubkey, limit: limit)])
     }
 
     /// Subscribes to the global feed
-    @discardableResult
     public func subscribeToGlobalFeed(
-        limit: Int = 100,
-        handler: @escaping @Sendable (Event) -> Void
-    ) async throws -> String {
-        try await subscribeToGlobalFeed(
-            limit: limit,
-            eventHandler: { subscriptionEvent in
-                guard case .event(_, let event) = subscriptionEvent else { return }
-                handler(event)
-            })
-    }
-
-    @discardableResult
-    public func subscribeToGlobalFeed(
-        limit: Int = 100,
-        eventHandler: @escaping @Sendable (SubscriptionEvent) -> Void
-    ) async throws -> String {
-        let filter = Filter.globalFeed(limit: limit)
-        return try await subscribe(filters: [filter], eventHandler: eventHandler)
+        limit: Int = 100
+    ) async throws -> SubscriptionSequence {
+        try await subscribe(filters: [.globalFeed(limit: limit)])
     }
 
     /// Subscribes to mentions of a user
+    public func subscribeToMentions(
+        pubkey: String,
+        limit: Int = 100
+    ) async throws -> SubscriptionSequence {
+        try await subscribe(filters: [.mentions(pubkey: pubkey, limit: limit)])
+    }
+
+    /// Subscribes to metadata updates for a list of pubkeys
+    public func subscribeToMetadata(
+        pubkeys: [String]
+    ) async throws -> SubscriptionSequence {
+        try await subscribe(filters: [.metadata(pubkeys: pubkeys)])
+    }
+
+    // MARK: - Deprecated Closure-based Convenience Subscriptions
+
+    /// Subscribes to a user's timeline
+    @available(*, deprecated, message: "Use subscribeToUserTimeline(pubkey:limit:) and iterate the returned sequence")
+    @discardableResult
+    public func subscribeToUserTimeline(
+        pubkey: String,
+        limit: Int = 100,
+        handler: @escaping @Sendable (Event) -> Void
+    ) async throws -> String {
+        try await openSubscription(
+            filters: [.userNotes(pubkey: pubkey, limit: limit)], to: nil,
+            handler: Self.eventOnly(handler)
+        ).id
+    }
+
+    @available(*, deprecated, message: "Use subscribeToUserTimeline(pubkey:limit:) and iterate the returned sequence")
+    @discardableResult
+    public func subscribeToUserTimeline(
+        pubkey: String,
+        limit: Int = 100,
+        eventHandler: @escaping @Sendable (SubscriptionEvent) -> Void
+    ) async throws -> String {
+        try await openSubscription(
+            filters: [.userNotes(pubkey: pubkey, limit: limit)], to: nil, handler: eventHandler
+        ).id
+    }
+
+    /// Subscribes to the global feed
+    @available(*, deprecated, message: "Use subscribeToGlobalFeed(limit:) and iterate the returned sequence")
+    @discardableResult
+    public func subscribeToGlobalFeed(
+        limit: Int = 100,
+        handler: @escaping @Sendable (Event) -> Void
+    ) async throws -> String {
+        try await openSubscription(
+            filters: [.globalFeed(limit: limit)], to: nil, handler: Self.eventOnly(handler)
+        ).id
+    }
+
+    @available(*, deprecated, message: "Use subscribeToGlobalFeed(limit:) and iterate the returned sequence")
+    @discardableResult
+    public func subscribeToGlobalFeed(
+        limit: Int = 100,
+        eventHandler: @escaping @Sendable (SubscriptionEvent) -> Void
+    ) async throws -> String {
+        try await openSubscription(filters: [.globalFeed(limit: limit)], to: nil, handler: eventHandler).id
+    }
+
+    /// Subscribes to mentions of a user
+    @available(*, deprecated, message: "Use subscribeToMentions(pubkey:limit:) and iterate the returned sequence")
     @discardableResult
     public func subscribeToMentions(
         pubkey: String,
         limit: Int = 100,
         handler: @escaping @Sendable (Event) -> Void
     ) async throws -> String {
-        try await subscribeToMentions(
-            pubkey: pubkey, limit: limit,
-            eventHandler: { subscriptionEvent in
-                guard case .event(_, let event) = subscriptionEvent else { return }
-                handler(event)
-            })
+        try await openSubscription(
+            filters: [.mentions(pubkey: pubkey, limit: limit)], to: nil,
+            handler: Self.eventOnly(handler)
+        ).id
     }
 
+    @available(*, deprecated, message: "Use subscribeToMentions(pubkey:limit:) and iterate the returned sequence")
     @discardableResult
     public func subscribeToMentions(
         pubkey: String,
         limit: Int = 100,
         eventHandler: @escaping @Sendable (SubscriptionEvent) -> Void
     ) async throws -> String {
-        let filter = Filter.mentions(pubkey: pubkey, limit: limit)
-        return try await subscribe(filters: [filter], eventHandler: eventHandler)
+        try await openSubscription(
+            filters: [.mentions(pubkey: pubkey, limit: limit)], to: nil, handler: eventHandler
+        ).id
     }
 
     /// Fetches metadata for a list of pubkeys
+    @available(*, deprecated, message: "Use subscribeToMetadata(pubkeys:) and iterate the returned sequence")
     @discardableResult
     public func subscribeToMetadata(
         pubkeys: [String],
         handler: @escaping @Sendable (Event) -> Void
     ) async throws -> String {
-        try await subscribeToMetadata(
-            pubkeys: pubkeys,
-            eventHandler: { subscriptionEvent in
-                guard case .event(_, let event) = subscriptionEvent else { return }
-                handler(event)
-            })
+        try await openSubscription(
+            filters: [.metadata(pubkeys: pubkeys)], to: nil, handler: Self.eventOnly(handler)
+        ).id
     }
 
+    @available(*, deprecated, message: "Use subscribeToMetadata(pubkeys:) and iterate the returned sequence")
     @discardableResult
     public func subscribeToMetadata(
         pubkeys: [String],
         eventHandler: @escaping @Sendable (SubscriptionEvent) -> Void
     ) async throws -> String {
-        let filter = Filter.metadata(pubkeys: pubkeys)
-        return try await subscribe(filters: [filter], eventHandler: eventHandler)
+        try await openSubscription(filters: [.metadata(pubkeys: pubkeys)], to: nil, handler: eventHandler).id
+    }
+
+    /// Wraps an event-only handler as a subscription-event handler.
+    private static func eventOnly(
+        _ handler: @escaping @Sendable (Event) -> Void
+    ) -> @Sendable (SubscriptionEvent) -> Void {
+        { subscriptionEvent in
+            guard case .event(_, let event) = subscriptionEvent else { return }
+            handler(event)
+        }
     }
 
     // MARK: - One-time Fetches
@@ -533,45 +660,37 @@ public actor NostrClient {
     /// Fetches events matching the given filters (one-time)
     /// Waits for all subscribed relays to send EOSE, or until timeout (whichever comes first)
     public func fetch(filters: [Filter], timeout: TimeInterval = 10) async throws -> [Event] {
-        let collectedEvents = EventCollector()
+        let subscription = try await subscribe(filters: filters)
 
-        let subscriptionId = try await subscribe(
-            filters: filters,
-            eventHandler: { subscriptionEvent in
-                guard case .event(_, let event) = subscriptionEvent else { return }
-                Task {
-                    await collectedEvents.append(event)
-                }
-            })
-
-        let (eoseStream, eoseContinuation) = AsyncStream.makeStream(of: Void.self)
-        installEOSESignal(for: subscriptionId, continuation: eoseContinuation)
-
-        do {
-            // Race all-relay EOSE vs timeout
-            await withTaskGroup(of: Void.self) { group in
-                group.addTask {
-                    for await _ in eoseStream { break }
-                }
-
-                group.addTask {
-                    try? await Task.sleep(for: .seconds(timeout))
-                }
-
-                await group.next()
-                group.cancelAll()
+        let timeoutTask = Task {
+            do {
+                try await Task.sleep(for: .seconds(timeout))
+                await subscription.close()
+            } catch {
+                // Cancelled because fetch finished first: nothing to do.
             }
-
-            if Task.isCancelled {
-                throw CancellationError()
-            }
-
-            await unsubscribe(subscriptionId: subscriptionId)
-            return await collectedEvents.events
-        } catch {
-            await unsubscribe(subscriptionId: subscriptionId)
-            throw error
         }
+        defer { timeoutTask.cancel() }
+
+        var eoseTracker = EOSETracker()
+        eoseTracker.setExpectedRelays(subscription.expectedRelays)
+
+        var events: [Event] = []
+        for await item in subscription {
+            switch item {
+            case .event(_, let event):
+                events.append(event)
+            case .eose(let relayURL):
+                if eoseTracker.recordEOSE(from: relayURL) {
+                    await subscription.close()
+                }
+            default:
+                break
+            }
+        }
+
+        try Task.checkCancellation()
+        return events
     }
 
     /// Fetches a single event by ID
@@ -649,7 +768,24 @@ public actor NostrClient {
     }
 
     /// Subscribes to events from multiple authors using the NIP-65 outbox model.
+    ///
+    /// For each author, resolves their WRITE relays (fetching the relay list if not cached),
+    /// connects them per the gossip policy, and issues a single subscription scoped to those relays.
+    /// If any author has no known relay list, the subscription falls back to the full relay pool so
+    /// no author is silently dropped.
+    public func subscribeOutbox(
+        authors: [String],
+        kinds: [Int] = [Event.Kind.textNote.rawValue],
+        limit: Int? = nil
+    ) async throws -> SubscriptionSequence {
+        let routeSet = await resolveOutboxRelays(authors: authors)
+        let filter = Filter(authors: authors, kinds: kinds, limit: limit)
+        return try await subscribe(filters: [filter], to: routeSet)
+    }
+
+    /// Subscribes to events from multiple authors using the NIP-65 outbox model.
     /// Convenience overload that delivers only event payloads.
+    @available(*, deprecated, message: "Use subscribeOutbox(authors:kinds:limit:) and iterate the returned sequence")
     @discardableResult
     public func subscribeOutbox(
         authors: [String],
@@ -657,20 +793,13 @@ public actor NostrClient {
         limit: Int? = nil,
         handler: @escaping @Sendable (Event) -> Void
     ) async throws -> String {
-        try await subscribeOutbox(
-            authors: authors, kinds: kinds, limit: limit,
-            eventHandler: { subscriptionEvent in
-                guard case .event(_, let event) = subscriptionEvent else { return }
-                handler(event)
-            })
+        let routeSet = await resolveOutboxRelays(authors: authors)
+        let filter = Filter(authors: authors, kinds: kinds, limit: limit)
+        return try await openSubscription(filters: [filter], to: routeSet, handler: Self.eventOnly(handler)).id
     }
 
     /// Subscribes to events from multiple authors using the NIP-65 outbox model.
-    ///
-    /// For each author, resolves their WRITE relays (fetching the relay list if not cached),
-    /// connects them per the gossip policy, and issues a single subscription scoped to those relays.
-    /// If any author has no known relay list, the subscription falls back to the full relay pool so
-    /// no author is silently dropped.
+    @available(*, deprecated, message: "Use subscribeOutbox(authors:kinds:limit:) and iterate the returned sequence")
     @discardableResult
     public func subscribeOutbox(
         authors: [String],
@@ -678,6 +807,15 @@ public actor NostrClient {
         limit: Int? = nil,
         eventHandler: @escaping @Sendable (SubscriptionEvent) -> Void
     ) async throws -> String {
+        let routeSet = await resolveOutboxRelays(authors: authors)
+        let filter = Filter(authors: authors, kinds: kinds, limit: limit)
+        return try await openSubscription(filters: [filter], to: routeSet, handler: eventHandler).id
+    }
+
+    /// Resolves the WRITE relays of the given authors for outbox routing.
+    /// - Returns: The connected target set, or `nil` to fall back to the full pool
+    ///   when an author is unresolved or nothing could be connected.
+    private func resolveOutboxRelays(authors: [String]) async -> Set<URL>? {
         var targets: Set<URL> = []
         var hasUnresolved = false
 
@@ -694,10 +832,7 @@ public actor NostrClient {
         }
 
         let available = await relayListStore.ensureConnected(targets)
-        let filter = Filter(authors: authors, kinds: kinds, limit: limit)
-        // Fall back to the full pool when an author is unresolved or nothing could be connected.
-        let routeSet: Set<URL>? = (hasUnresolved || available.isEmpty) ? nil : available
-        return try await subscribe(filters: [filter], to: routeSet, eventHandler: eventHandler)
+        return (hasUnresolved || available.isEmpty) ? nil : available
     }
 
     /// Publishes a signed event using the NIP-65 gossip model.
@@ -732,7 +867,7 @@ public actor NostrClient {
     // MARK: - Private Methods
 
     private func handleMessage(_ message: RelayMessage, from relayURL: URL, subscriptionId: String) {
-        guard var subscription = subscriptions[subscriptionId] else { return }
+        guard let subscription = subscriptions[subscriptionId] else { return }
 
         switch message {
         case .event(_, let event):
@@ -741,10 +876,6 @@ public actor NostrClient {
 
         case .endOfStoredEvents:
             subscription.handler(.eose(relayURL: relayURL))
-            if subscription.eoseTracker.recordEOSE(from: relayURL) {
-                subscription.eoseSignal?.finish()
-                subscription.eoseSignal = nil
-            }
 
         case .closed(_, let message):
             subscription.handler(.closed(relayURL: relayURL, message: message))
@@ -758,26 +889,11 @@ public actor NostrClient {
         default:
             break
         }
-
-        subscriptions[subscriptionId] = subscription
     }
 
-    private func installEOSESignal(
-        for subscriptionId: String,
-        continuation: AsyncStream<Void>.Continuation
-    ) {
-        guard var subscription = subscriptions[subscriptionId] else {
-            continuation.finish()
-            return
-        }
-
-        if subscription.eoseTracker.isComplete {
-            continuation.finish()
-            return
-        }
-
-        subscription.eoseSignal = continuation
-        subscriptions[subscriptionId] = subscription
+    /// The number of currently registered subscriptions (for tests).
+    var activeSubscriptionCount: Int {
+        subscriptions.count
     }
 
     /// Clears the event deduplication cache in the relay pool
@@ -786,26 +902,19 @@ public actor NostrClient {
     }
 }
 
-// MARK: - Subscription
-private struct Subscription: Sendable {
+// MARK: - SubscriptionState
+private struct SubscriptionState: Sendable {
     let id: String
     let filters: [Filter]
     let handler: @Sendable (SubscriptionEvent) -> Void
-    var eoseTracker = EOSETracker()
-    var eoseSignal: AsyncStream<Void>.Continuation?
+
+    /// Continuation of the stream backing a ``SubscriptionSequence``;
+    /// finished on unsubscribe so iteration ends. `nil` for closure-based subscriptions.
+    var continuation: AsyncStream<SubscriptionEvent>.Continuation?
 
     init(id: String, filters: [Filter], handler: @escaping @Sendable (SubscriptionEvent) -> Void) {
         self.id = id
         self.filters = filters
         self.handler = handler
-    }
-}
-
-// MARK: - Event Collector for thread-safe event collection
-private actor EventCollector {
-    var events: [Event] = []
-
-    func append(_ event: Event) {
-        events.append(event)
     }
 }

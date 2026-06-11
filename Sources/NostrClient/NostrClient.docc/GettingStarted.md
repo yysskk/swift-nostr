@@ -72,20 +72,27 @@ try await client.publishReply(to: note.event, content: "Great post!")
 
 ## Subscribe to Events
 
+Subscriptions are async sequences. Iterate ``SubscriptionSequence/events`` for
+event payloads only, or the sequence itself for relay-aware items (EOSE,
+notices, auth challenges). Ending the loop — or cancelling its task — closes
+the subscription automatically.
+
 ```swift
 // User timeline
-let subId = try await client.subscribeToUserTimeline(pubkey: "...") { event in
+let timeline = try await client.subscribeToUserTimeline(pubkey: "...")
+for await event in timeline.events {
     print("Note: \(event.content)")
 }
 
-// Custom filter
+// Custom filter, events only
 let filter = Filter(kinds: [1], authors: ["pubkey1"], limit: 100)
-try await client.subscribe(filters: [filter]) { event in
+for await event in try await client.events(filters: [filter]) {
     print("Received: \(event.id)")
 }
 
-// Unsubscribe
-await client.unsubscribe(subscriptionId: subId)
+// Close explicitly when consuming from another task
+let subscription = try await client.subscribe(filters: [filter])
+await subscription.close()
 ```
 
 ## Fetch Events

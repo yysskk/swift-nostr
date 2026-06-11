@@ -163,13 +163,14 @@ Task {
     let note = try await client.publishTextNote(content: "Hello from playground!")
     print("Published event: \\(note.id), accepted by \\(note.result.acceptedRelays.count) relay(s)")
 
-    // Subscribe to global feed
-    let subId = try await client.subscribeToGlobalFeed(limit: 10) { event in
+    // Subscribe to global feed (async sequence)
+    let feed = try await client.subscribeToGlobalFeed(limit: 10)
+    for await event in feed.events {
         print("Received: \\(event.content)")
     }
 
-    // Later, unsubscribe
-    try await client.unsubscribe(subscriptionId: subId)
+    // Ending the loop closes the subscription; or close explicitly:
+    await feed.close()
 
     // Disconnect
     await client.disconnect()

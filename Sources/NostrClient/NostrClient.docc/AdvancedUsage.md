@@ -31,8 +31,9 @@ reported on the result as `recipientPublishResult` and `selfCopyPublishResult`.
 ### Receiving
 
 ```swift
-try await client.subscribeToDirectMessages { event in
-    let dm = try await client.parseDirectMessage(event)
+let messages = try await client.subscribeToDirectMessages()
+for await giftWrap in messages.events {
+    let dm = try await client.parseDirectMessage(giftWrap)
     print("From: \(dm.senderPubkey)")
     print("Content: \(dm.content)")
 }

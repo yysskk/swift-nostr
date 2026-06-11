@@ -46,9 +46,10 @@ try await client.connect()
 let note = try await client.publishTextNote(content: "Hello, Nostr!")
 print("Accepted by \(note.result.acceptedRelays.count) relay(s)")
 
-// Subscribe to events
-try await client.subscribeToGlobalFeed(limit: 50, eventHandler: { subscriptionEvent in
-    switch subscriptionEvent {
+// Subscribe to events (async sequence)
+let feed = try await client.subscribeToGlobalFeed(limit: 50)
+for await item in feed {
+    switch item {
     case .event(let relayURL, let event):
         print("[\(relayURL)] \(event.content)")
     case .eose(let relayURL):
@@ -60,7 +61,7 @@ try await client.subscribeToGlobalFeed(limit: 50, eventHandler: { subscriptionEv
     case .auth(let relayURL, let challenge):
         print("[\(relayURL)] Auth challenge: \(challenge)")
     }
-})
+}
 ```
 
 ## NostrClient Actor
@@ -112,23 +113,42 @@ try await client.publish(signedEvent)  // publish any pre-signed event
 
 ### Subscriptions
 
-All subscription handlers receive `SubscriptionEvent` which includes relay context:
+Subscriptions are async sequences (`SubscriptionSequence`, Element = `SubscriptionEvent`).
+Iterate the sequence itself for relay-aware items (event/eose/closed/notice/auth), or its
+`.events` view for event payloads only. Ending iteration, cancelling the consuming task,
+or calling `close()` sends CLOSE to the relays automatically.
 
 ```swift
 // Convenience subscriptions
-let subId = try await client.subscribeToUserTimeline(pubkey: "...") { event in }
-try await client.subscribeToGlobalFeed(limit: 50) { event in }
-try await client.subscribeToMentions(pubkey: "...") { event in }
-try await client.subscribeToMetadata(pubkeys: ["..."]) { event in }
+let timeline = try await client.subscribeToUserTimeline(pubkey: "...")  // SubscriptionSequence
+for await event in timeline.events { print(event.content) }
 
-// Custom filter subscription
+let feed = try await client.subscribeToGlobalFeed(limit: 50)
+let mentions = try await client.subscribeToMentions(pubkey: "...")
+let metadata = try await client.subscribeToMetadata(pubkeys: ["..."])
+
+// Custom filter subscription, events only
 let filter = Filter(kinds: [1], authors: ["pubkey1", "pubkey2"], limit: 100)
-let subId = try await client.subscribe(filters: [filter]) { event in }
+for await event in try await client.events(filters: [filter]) { print(event.id) }
 
-// Unsubscribe
-await client.unsubscribe(subscriptionId: subId)
+// Relay-aware iteration
+let subscription = try await client.subscribe(filters: [filter])
+for await item in subscription {
+    switch item {
+    case .event(let relayURL, let event): print(relayURL, event.content)
+    case .eose(let relayURL): print(relayURL, "EOSE")
+    default: break
+    }
+}
+
+// subscription.id / subscription.expectedRelays are available;
+// close explicitly with await subscription.close(), or:
+await client.unsubscribe(subscriptionId: subscription.id)
 await client.unsubscribeAll()
 ```
+
+The closure-based subscribe APIs (`subscribe(filters:handler:)`, `subscribe(filters:to:eventHandler:)`,
+and the closure convenience variants) are deprecated in favor of the async sequences above.
 
 ### One-Shot Fetches
 
@@ -146,9 +166,10 @@ let metadata = try await client.fetchMetadata(pubkey: "...")
 // Send
 try await client.sendDirectMessage("Hello!", to: "recipientPubkey")
 
-// Subscribe to incoming DMs
-try await client.subscribeToDirectMessages { event in
-    let dm = try await client.parseDirectMessage(event)
+// Subscribe to incoming DMs (gift wraps)
+let messages = try await client.subscribeToDirectMessages()
+for await giftWrap in messages.events {
+    let dm = try await client.parseDirectMessage(giftWrap)
     print("From: \(dm.senderPubkey), Content: \(dm.content)")
 }
 
