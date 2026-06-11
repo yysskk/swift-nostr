@@ -227,8 +227,7 @@ try await client.addRelay("wss://relay.damus.io", config: config)
 
 Liveness is detected with periodic WebSocket pings (`pingInterval`); an idle relay
 that simply has no messages to deliver is never torn down. The pong wait is bounded
-by `connectionTimeout`. The legacy combined `operationTimeout` is deprecated and maps
-to `sendTimeout`, `publishAckTimeout`, and `pingInterval`.
+by `connectionTimeout`.
 
 ### Pool Configuration
 

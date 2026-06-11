@@ -187,22 +187,6 @@ struct NIP17Tests {
         #expect(parsedReply.replyTo == parsedFirst.rumorId)
     }
 
-    @available(*, deprecated, message: "Exercises the deprecated createMessage API on purpose")
-    @Test("Deprecated createMessage still produces the recipient wrap")
-    func deprecatedCreateMessage() throws {
-        let alice = try KeyPair()
-        let bob = try KeyPair()
-
-        let giftWrap = try DirectMessageBuilder(keyPair: alice).createMessage(
-            content: "Legacy path",
-            to: bob.publicKeyHex
-        )
-
-        let message = try DirectMessageParser(keyPair: bob).parse(giftWrap)
-        #expect(message.content == "Legacy path")
-        #expect(message.senderPubkey == alice.publicKeyHex)
-    }
-
     @Test("Group message creates multiple gift wraps")
     func groupMessage() throws {
         let alice = try KeyPair()

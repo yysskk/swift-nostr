@@ -149,4 +149,18 @@ struct PublishedEventTests {
             _ = try await client.publishRelayList(write: ["wss://w.example.com"])
         }
     }
+
+    @Test("parseDirectMessage without a signer throws signerNotSet")
+    func parseDirectMessageWithoutSignerThrowsSignerNotSet() async throws {
+        let client = NostrClient()
+        let alice = try KeyPair()
+        let bob = try KeyPair()
+        let giftWrap = try DirectMessageBuilder(keyPair: alice)
+            .createMessageWithSelfCopy(content: "hi", to: bob.publicKeyHex)
+            .recipientGiftWrap
+
+        await #expect(throws: NostrError.signerNotSet) {
+            _ = try await client.parseDirectMessage(giftWrap)
+        }
+    }
 }

@@ -685,8 +685,10 @@ Manages WebSocket connection to a single relay (actor).
 
 ```swift
 let config = RelayConnectionConfig(
-    connectionTimeout: 10,           // seconds
-    operationTimeout: 30,            // seconds
+    connectionTimeout: 10,           // seconds (also bounds keepalive pong waits)
+    sendTimeout: 10,                 // seconds per WebSocket frame send
+    publishAckTimeout: 30,           // seconds to wait for the relay's OK
+    pingInterval: 30,                // seconds between keepalive pings
     autoReconnect: true,
     maxReconnectAttempts: 10,
     initialReconnectDelay: 1,        // seconds
