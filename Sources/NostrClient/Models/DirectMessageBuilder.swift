@@ -95,10 +95,10 @@ public struct DirectMessageBuilder: Sendable {
         subject: String? = nil
     ) throws -> [Event] {
         // Build tags with all recipients
-        var tags: [[String]] = recipientPubkeys.map { ["p", $0] }
+        var tags: [Tag] = recipientPubkeys.map { Tag.pubkey($0) }
 
         if let subject = subject {
-            tags.append(["subject", subject])
+            tags.append(.subject(subject))
         }
 
         let rumor = try makeRumor(content: content, tags: tags)
@@ -133,17 +133,17 @@ public struct DirectMessageBuilder: Sendable {
         recipientPubkey: String,
         subject: String?,
         replyTo: String?
-    ) -> [[String]] {
-        var tags: [[String]] = [
-            ["p", recipientPubkey]
+    ) -> [Tag] {
+        var tags: [Tag] = [
+            .pubkey(recipientPubkey)
         ]
 
         if let subject = subject {
-            tags.append(["subject", subject])
+            tags.append(.subject(subject))
         }
 
         if let replyTo = replyTo {
-            tags.append(["e", replyTo, "", "reply"])
+            tags.append(.event(replyTo, marker: .reply))
         }
 
         return tags
@@ -152,7 +152,7 @@ public struct DirectMessageBuilder: Sendable {
     /// Creates the unsigned kind-14 rumor with its id computed.
     /// The rumor is deliberately never signed (NIP-17: a leaked signed rumor would
     /// be cryptographic proof of authorship and destroy deniability).
-    private func makeRumor(content: String, tags: [[String]]) throws -> Event {
+    private func makeRumor(content: String, tags: [Tag]) throws -> Event {
         let unsigned = UnsignedEvent(
             pubkey: senderKeyPair.publicKeyHex,
             kind: .privateDirectMessage,

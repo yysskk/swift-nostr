@@ -85,7 +85,7 @@ public actor NostrClient {
     @discardableResult
     public func publishTextNote(
         content: String,
-        tags: [[String]] = [],
+        tags: [Tag] = [],
         strategy: PublishStrategy? = nil
     ) async throws -> PublishedEvent {
         guard let signer = signer else {
@@ -110,29 +110,19 @@ public actor NostrClient {
             throw NostrError.signingFailed
         }
 
-        var tags: [[String]] = []
+        var tags: [Tag] = []
 
         // Add root and reply markers (NIP-10)
-        if let rootTag = event.tags.first(where: { $0.first == "e" && $0.contains("root") }) {
+        if let rootTag = event.tags(named: "e").first(where: { $0.values.contains("root") }) {
             tags.append(rootTag)
-            var replyTag = ["e", event.id]
-            if let relayUrl = relayUrl {
-                replyTag.append(relayUrl)
-            }
-            replyTag.append("reply")
-            tags.append(replyTag)
+            tags.append(.event(event.id, relayURL: relayUrl, marker: .reply))
         } else {
             // This is a reply to a root event
-            var rootTag = ["e", event.id]
-            if let relayUrl = relayUrl {
-                rootTag.append(relayUrl)
-            }
-            rootTag.append("root")
-            tags.append(rootTag)
+            tags.append(.event(event.id, relayURL: relayUrl, marker: .root))
         }
 
         // Add p tag for the author we're replying to
-        tags.append(["p", event.pubkey])
+        tags.append(.pubkey(event.pubkey))
 
         let unsigned = UnsignedEvent(
             pubkey: signer.publicKey,
@@ -852,7 +842,7 @@ public actor NostrClient {
         }
         targets.formUnion(await relayListStore.writeRelayURLs(for: event.pubkey))
 
-        let referencedPubkeys = Set(event.tags.filter { $0.count >= 2 && $0[0] == "p" }.map { $0[1] })
+        let referencedPubkeys = Set(event.referencedPubkeys)
         for pubkey in referencedPubkeys {
             if await relayListStore.cachedList(for: pubkey) == nil {
                 _ = try? await fetchRelayList(for: pubkey)

@@ -102,6 +102,7 @@ public struct UnsignedEvent: Sendable {
     public let pubkey: String
     public let createdAt: Int64
     public let kind: Int
+    /// Tags in their raw NIP-01 wire form (what is hashed and signed).
     public let tags: [[String]]
     public let content: String
 
@@ -109,27 +110,36 @@ public struct UnsignedEvent: Sendable {
         pubkey: String,
         createdAt: Int64 = Int64(Date().timeIntervalSince1970),
         kind: Int,
-        tags: [[String]] = [],
+        tags: [Tag] = [],
         content: String
     ) {
-        self.pubkey = pubkey
-        self.createdAt = createdAt
-        self.kind = kind
-        self.tags = tags
-        self.content = content
+        self.init(pubkey: pubkey, createdAt: createdAt, kind: kind, rawTags: tags.map(\.rawArray), content: content)
     }
 
     public init(
         pubkey: String,
         createdAt: Int64 = Int64(Date().timeIntervalSince1970),
         kind: Event.Kind,
-        tags: [[String]] = [],
+        tags: [Tag] = [],
+        content: String
+    ) {
+        self.init(pubkey: pubkey, createdAt: createdAt, kind: kind.rawValue, tags: tags, content: content)
+    }
+
+    /// Builds an unsigned event from raw NIP-01 tag arrays, e.g. tags copied
+    /// from another event. Prefer the ``Tag``-based initializers when
+    /// constructing tags yourself.
+    public init(
+        pubkey: String,
+        createdAt: Int64 = Int64(Date().timeIntervalSince1970),
+        kind: Int,
+        rawTags: [[String]],
         content: String
     ) {
         self.pubkey = pubkey
         self.createdAt = createdAt
-        self.kind = kind.rawValue
-        self.tags = tags
+        self.kind = kind
+        self.tags = rawTags
         self.content = content
     }
 

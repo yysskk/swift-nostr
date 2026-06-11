@@ -54,7 +54,7 @@ public struct EventSigner: Sendable {
     }
 
     /// Creates and signs a text note (kind 1)
-    public func signTextNote(content: String, tags: [[String]] = []) throws -> Event {
+    public func signTextNote(content: String, tags: [Tag] = []) throws -> Event {
         let unsigned = UnsignedEvent(
             pubkey: publicKey,
             kind: .textNote,
@@ -77,9 +77,9 @@ public struct EventSigner: Sendable {
 
     /// Creates and signs a reaction event (kind 7)
     public func signReaction(to event: Event, content: String = "+") throws -> Event {
-        let tags: [[String]] = [
-            ["e", event.id],
-            ["p", event.pubkey],
+        let tags: [Tag] = [
+            .event(event.id),
+            .pubkey(event.pubkey),
         ]
         let unsigned = UnsignedEvent(
             pubkey: publicKey,
@@ -92,13 +92,10 @@ public struct EventSigner: Sendable {
 
     /// Creates and signs a repost event (kind 6)
     public func signRepost(of event: Event, relayUrl: String? = nil) throws -> Event {
-        var tags: [[String]] = [
-            ["e", event.id],
-            ["p", event.pubkey],
+        let tags: [Tag] = [
+            .event(event.id, relayURL: relayUrl),
+            .pubkey(event.pubkey),
         ]
-        if let relayUrl = relayUrl {
-            tags[0].append(relayUrl)
-        }
 
         let encoder = JSONEncoder()
         encoder.keyEncodingStrategy = .convertToSnakeCase
@@ -115,7 +112,7 @@ public struct EventSigner: Sendable {
 
     /// Creates and signs a delete event (kind 5)
     public func signDeletion(eventIds: [String], reason: String = "") throws -> Event {
-        let tags = eventIds.map { ["e", $0] }
+        let tags = eventIds.map { Tag.event($0) }
         let unsigned = UnsignedEvent(
             pubkey: publicKey,
             kind: .eventDeletion,
@@ -127,7 +124,7 @@ public struct EventSigner: Sendable {
 
     /// Creates and signs a contact list event (kind 3, NIP-02)
     public func signContactList(_ contacts: [Contact]) throws -> Event {
-        let tags = contacts.map { $0.toTag() }
+        let tags = contacts.map { Tag.pubkey($0.pubkey, relayURL: $0.relayUrl, petname: $0.petname) }
         let unsigned = UnsignedEvent(
             pubkey: publicKey,
             kind: .contacts,
@@ -147,8 +144,8 @@ public struct EventSigner: Sendable {
     public func signRelayListMetadata(_ relayList: RelayListMetadata) throws -> Event {
         let unsigned = UnsignedEvent(
             pubkey: publicKey,
-            kind: .relayListMetadata,
-            tags: relayList.toTags(),
+            kind: Event.Kind.relayListMetadata.rawValue,
+            rawTags: relayList.toTags(),
             content: ""
         )
         return try sign(unsigned)
@@ -181,7 +178,7 @@ extension Event {
             pubkey: pubkey,
             createdAt: createdAt,
             kind: kind,
-            tags: tags,
+            rawTags: tags,
             content: content
         )
 

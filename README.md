@@ -102,7 +102,7 @@ print("Accepted by \(note.result.acceptedRelays.count) relay(s)")
 // Publish with tags
 let tagged = try await client.publishTextNote(
     content: "Check out #nostr",
-    tags: [["t", "nostr"]]
+    tags: [.hashtag("nostr")]
 )
 
 // Wait for more acknowledgments before returning
@@ -190,7 +190,7 @@ for await event in outbox.events {
 // Gossip publish: route an event to the author's write relays plus the
 // inbox (read) relays of every pubkey it mentions in "p" tags
 let signer = EventSigner(keyPair: keyPair)
-let note = try signer.signTextNote(content: "gm!", tags: [["p", "alice_pubkey"]])
+let note = try signer.signTextNote(content: "gm!", tags: [.pubkey("alice_pubkey")])
 try await client.publishGossip(note)
 ```
 
@@ -284,7 +284,7 @@ let signer = EventSigner(keyPair: keyPair)
 let unsigned = UnsignedEvent(
     pubkey: keyPair.publicKeyHex,
     kind: .textNote,
-    tags: [["t", "test"]],
+    tags: [.hashtag("test")],
     content: "Manual signing example"
 )
 
