@@ -18,9 +18,26 @@ public struct SendDirectMessageResult: Sendable {
     /// The gift wrap addressed to the sender (self-copy).
     public let selfGiftWrap: Event
 
-    public init(rumor: Event, recipientGiftWrap: Event, selfGiftWrap: Event) {
+    /// Per-relay outcome of publishing the recipient gift wrap.
+    /// Always present when returned from ``NostrClient/sendDirectMessage(_:to:subject:replyTo:strategy:)``;
+    /// `nil` when the result was built without publishing (e.g. by ``DirectMessageBuilder``).
+    public let recipientPublishResult: PublishResult?
+
+    /// Per-relay outcome of the best-effort self-copy publish.
+    /// `nil` when the publish failed outright or was never attempted.
+    public let selfCopyPublishResult: PublishResult?
+
+    public init(
+        rumor: Event,
+        recipientGiftWrap: Event,
+        selfGiftWrap: Event,
+        recipientPublishResult: PublishResult? = nil,
+        selfCopyPublishResult: PublishResult? = nil
+    ) {
         self.rumor = rumor
         self.recipientGiftWrap = recipientGiftWrap
         self.selfGiftWrap = selfGiftWrap
+        self.recipientPublishResult = recipientPublishResult
+        self.selfCopyPublishResult = selfCopyPublishResult
     }
 }

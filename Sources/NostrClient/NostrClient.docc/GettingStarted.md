@@ -59,14 +59,15 @@ try await client.connect()
 ```swift
 try await client.setNsec("nsec1...")
 
-// Text note
-let event = try await client.publishTextNote(content: "Hello, Nostr!")
+// Text note — returns the signed event plus the per-relay outcome
+let note = try await client.publishTextNote(content: "Hello, Nostr!")
+print("Accepted by \(note.result.acceptedRelays.count) relay(s)")
 
 // Reaction
-try await client.publishReaction(to: event, content: "🤙")
+try await client.publishReaction(to: note.event, content: "🤙")
 
 // Reply
-try await client.publishReply(to: event, content: "Great post!")
+try await client.publishReply(to: note.event, content: "Great post!")
 ```
 
 ## Subscribe to Events

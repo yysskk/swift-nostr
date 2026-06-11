@@ -79,18 +79,33 @@ public actor NostrClient {
     // MARK: - Publishing
 
     /// Publishes a text note
-    public func publishTextNote(content: String, tags: [[String]] = []) async throws -> Event {
+    /// - Parameter strategy: How many relay acknowledgments to wait for before returning
+    ///   (default: the pool config's ``RelayPoolConfig/defaultPublishStrategy``).
+    /// - Returns: The signed event together with the per-relay publish outcome.
+    @discardableResult
+    public func publishTextNote(
+        content: String,
+        tags: [[String]] = [],
+        strategy: PublishStrategy? = nil
+    ) async throws -> PublishedEvent {
         guard let signer = signer else {
             throw NostrError.signingFailed
         }
 
         let event = try signer.signTextNote(content: content, tags: tags)
-        try await relayPool.publish(event)
-        return event
+        let result = try await relayPool.publish(event, strategy: strategy)
+        return PublishedEvent(event: event, result: result)
     }
 
     /// Publishes a reply to an event
-    public func publishReply(to event: Event, content: String, relayUrl: String? = nil) async throws -> Event {
+    /// - Returns: The signed event together with the per-relay publish outcome.
+    @discardableResult
+    public func publishReply(
+        to event: Event,
+        content: String,
+        relayUrl: String? = nil,
+        strategy: PublishStrategy? = nil
+    ) async throws -> PublishedEvent {
         guard let signer = signer else {
             throw NostrError.signingFailed
         }
@@ -127,52 +142,75 @@ public actor NostrClient {
         )
 
         let signedEvent = try signer.sign(unsigned)
-        try await relayPool.publish(signedEvent)
-        return signedEvent
+        let result = try await relayPool.publish(signedEvent, strategy: strategy)
+        return PublishedEvent(event: signedEvent, result: result)
     }
 
     /// Publishes user metadata
-    public func publishMetadata(_ metadata: UserMetadata) async throws -> Event {
+    /// - Returns: The signed event together with the per-relay publish outcome.
+    @discardableResult
+    public func publishMetadata(
+        _ metadata: UserMetadata,
+        strategy: PublishStrategy? = nil
+    ) async throws -> PublishedEvent {
         guard let signer = signer else {
             throw NostrError.signingFailed
         }
 
         let event = try signer.signMetadata(metadata)
-        try await relayPool.publish(event)
-        return event
+        let result = try await relayPool.publish(event, strategy: strategy)
+        return PublishedEvent(event: event, result: result)
     }
 
     /// Publishes a reaction to an event
-    public func publishReaction(to event: Event, content: String = "+") async throws -> Event {
+    /// - Returns: The signed event together with the per-relay publish outcome.
+    @discardableResult
+    public func publishReaction(
+        to event: Event,
+        content: String = "+",
+        strategy: PublishStrategy? = nil
+    ) async throws -> PublishedEvent {
         guard let signer = signer else {
             throw NostrError.signingFailed
         }
 
         let reaction = try signer.signReaction(to: event, content: content)
-        try await relayPool.publish(reaction)
-        return reaction
+        let result = try await relayPool.publish(reaction, strategy: strategy)
+        return PublishedEvent(event: reaction, result: result)
     }
 
     /// Publishes a repost
-    public func publishRepost(of event: Event, relayUrl: String? = nil) async throws -> Event {
+    /// - Returns: The signed event together with the per-relay publish outcome.
+    @discardableResult
+    public func publishRepost(
+        of event: Event,
+        relayUrl: String? = nil,
+        strategy: PublishStrategy? = nil
+    ) async throws -> PublishedEvent {
         guard let signer = signer else {
             throw NostrError.signingFailed
         }
 
         let repost = try signer.signRepost(of: event, relayUrl: relayUrl)
-        try await relayPool.publish(repost)
-        return repost
+        let result = try await relayPool.publish(repost, strategy: strategy)
+        return PublishedEvent(event: repost, result: result)
     }
 
     /// Publishes a deletion request
-    public func publishDeletion(eventIds: [String], reason: String = "") async throws -> Event {
+    /// - Returns: The signed event together with the per-relay publish outcome.
+    @discardableResult
+    public func publishDeletion(
+        eventIds: [String],
+        reason: String = "",
+        strategy: PublishStrategy? = nil
+    ) async throws -> PublishedEvent {
         guard let signer = signer else {
             throw NostrError.signingFailed
         }
 
         let deletion = try signer.signDeletion(eventIds: eventIds, reason: reason)
-        try await relayPool.publish(deletion)
-        return deletion
+        let result = try await relayPool.publish(deletion, strategy: strategy)
+        return PublishedEvent(event: deletion, result: result)
     }
 
     /// Publishes a raw signed event.
@@ -198,14 +236,18 @@ public actor NostrClient {
     ///   - recipientPubkey: The recipient's public key (hex)
     ///   - subject: Optional conversation subject
     ///   - replyTo: Optional event ID to reply to
-    /// - Returns: The shared rumor and both gift wraps. The rumor's `id` is the key
-    ///   for matching the message when it echoes back from a relay.
+    ///   - strategy: How many relay acknowledgments to wait for before returning
+    ///     (default: the pool config's ``RelayPoolConfig/defaultPublishStrategy``).
+    /// - Returns: The shared rumor, both gift wraps, and the per-relay publish
+    ///   outcomes. The rumor's `id` is the key for matching the message when it
+    ///   echoes back from a relay.
     @discardableResult
     public func sendDirectMessage(
         _ content: String,
         to recipientPubkey: String,
         subject: String? = nil,
-        replyTo: String? = nil
+        replyTo: String? = nil,
+        strategy: PublishStrategy? = nil
     ) async throws -> SendDirectMessageResult {
         guard let keyPair = try? getKeyPair() else {
             throw NostrError.signingFailed
@@ -219,16 +261,23 @@ public actor NostrClient {
             replyTo: replyTo
         )
 
-        async let selfCopyDelivery: Void = publishBestEffort(result.selfGiftWrap)
-        try await relayPool.publish(result.recipientGiftWrap)
-        await selfCopyDelivery
+        async let selfCopyDelivery = publishBestEffort(result.selfGiftWrap, strategy: strategy)
+        let recipientResult = try await relayPool.publish(result.recipientGiftWrap, strategy: strategy)
+        let selfCopyResult = await selfCopyDelivery
 
-        return result
+        return SendDirectMessageResult(
+            rumor: result.rumor,
+            recipientGiftWrap: result.recipientGiftWrap,
+            selfGiftWrap: result.selfGiftWrap,
+            recipientPublishResult: recipientResult,
+            selfCopyPublishResult: selfCopyResult
+        )
     }
 
     /// Publishes an event, swallowing failures (used for non-fatal NIP-17 self-copies).
-    private func publishBestEffort(_ event: Event) async {
-        try? await relayPool.publish(event)
+    /// - Returns: The per-relay outcome, or nil if the publish failed outright.
+    private func publishBestEffort(_ event: Event, strategy: PublishStrategy?) async -> PublishResult? {
+        try? await relayPool.publish(event, strategy: strategy)
     }
 
     /// Parses a received gift-wrapped direct message
@@ -561,29 +610,38 @@ public actor NostrClient {
 
     /// Signs and publishes the current user's relay list metadata (kind 10002, NIP-65).
     /// The list is broadcast to all relays in the pool for discoverability.
+    /// - Returns: The signed event together with the per-relay publish outcome.
     @discardableResult
-    public func publishRelayList(_ relayList: RelayListMetadata) async throws -> Event {
+    public func publishRelayList(
+        _ relayList: RelayListMetadata,
+        strategy: PublishStrategy? = nil
+    ) async throws -> PublishedEvent {
         guard let signer = signer else {
             throw NostrError.signingFailed
         }
         let event = try signer.signRelayListMetadata(relayList)
-        try await relayPool.publish(event)
+        let result = try await relayPool.publish(event, strategy: strategy)
         await relayListStore.store(relayList, createdAt: event.createdAt, for: signer.publicKey)
-        return event
+        return PublishedEvent(event: event, result: result)
     }
 
     /// Signs and publishes the current user's relay list metadata from read/write relay URLs (NIP-65).
+    /// - Returns: The signed event together with the per-relay publish outcome.
     @discardableResult
-    public func publishRelayList(read: [String] = [], write: [String] = []) async throws -> Event {
+    public func publishRelayList(
+        read: [String] = [],
+        write: [String] = [],
+        strategy: PublishStrategy? = nil
+    ) async throws -> PublishedEvent {
         guard let signer = signer else {
             throw NostrError.signingFailed
         }
         let event = try signer.signRelayListMetadata(read: read, write: write)
-        try await relayPool.publish(event)
+        let result = try await relayPool.publish(event, strategy: strategy)
         if let list = event.relayListMetadata {
             await relayListStore.store(list, createdAt: event.createdAt, for: signer.publicKey)
         }
-        return event
+        return PublishedEvent(event: event, result: result)
     }
 
     /// Subscribes to events from multiple authors using the NIP-65 outbox model.
@@ -643,9 +701,11 @@ public actor NostrClient {
     /// Routes the event to the author's own WRITE relays plus the READ (inbox) relays of every
     /// pubkey referenced in the event's "p" tags, so mentions and replies reach their recipients.
     /// Falls back to the full relay pool if nothing resolves.
+    /// - Parameter strategy: How many relay acknowledgments to wait for before returning
+    ///   (default: the pool config's ``RelayPoolConfig/defaultPublishStrategy``).
     /// - Returns: The per-relay outcome of the publish.
     @discardableResult
-    public func publishGossip(_ event: Event) async throws -> PublishResult {
+    public func publishGossip(_ event: Event, strategy: PublishStrategy? = nil) async throws -> PublishResult {
         var targets: Set<URL> = []
 
         if await relayListStore.cachedList(for: event.pubkey) == nil {
@@ -662,7 +722,7 @@ public actor NostrClient {
         }
 
         let available = await relayListStore.ensureConnected(targets)
-        return try await relayPool.publish(event, to: available.isEmpty ? nil : available)
+        return try await relayPool.publish(event, to: available.isEmpty ? nil : available, strategy: strategy)
     }
 
     // MARK: - Private Methods

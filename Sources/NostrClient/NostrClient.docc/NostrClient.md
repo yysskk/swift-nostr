@@ -19,7 +19,7 @@ try await client.setNsec("nsec1...")
 try await client.addRelays(["wss://relay.damus.io", "wss://nos.lol"])
 try await client.connect()
 
-let event = try await client.publishTextNote(content: "Hello, Nostr!")
+let note = try await client.publishTextNote(content: "Hello, Nostr!")
 ```
 
 ## Topics

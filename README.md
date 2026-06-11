@@ -95,8 +95,9 @@ try await client.connect()
 // Set your private key
 try await client.setNsec("nsec1...")
 
-// Publish a text note
-let event = try await client.publishTextNote(content: "Hello, Nostr!")
+// Publish a text note — returns the signed event plus the per-relay outcome
+let note = try await client.publishTextNote(content: "Hello, Nostr!")
+print("Accepted by \(note.result.acceptedRelays.count) relay(s)")
 
 // Publish with tags
 let tagged = try await client.publishTextNote(
@@ -104,8 +105,11 @@ let tagged = try await client.publishTextNote(
     tags: [["t", "nostr"]]
 )
 
+// Wait for more acknowledgments before returning
+try await client.publishTextNote(content: "Important!", strategy: .quorum(2))
+
 // React to an event
-try await client.publishReaction(to: event, content: "🤙")
+try await client.publishReaction(to: note.event, content: "🤙")
 ```
 
 ### Subscribe to Events

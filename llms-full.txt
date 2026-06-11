@@ -42,8 +42,9 @@ try await client.setNsec("nsec1...")
 try await client.addRelays(["wss://relay.damus.io", "wss://nos.lol"])
 try await client.connect()
 
-// Publish a text note
-let event = try await client.publishTextNote(content: "Hello, Nostr!")
+// Publish a text note — returns the signed event plus the per-relay outcome
+let note = try await client.publishTextNote(content: "Hello, Nostr!")
+print("Accepted by \(note.result.acceptedRelays.count) relay(s)")
 
 // Subscribe to events
 try await client.subscribeToGlobalFeed(limit: 50, eventHandler: { subscriptionEvent in
@@ -92,14 +93,20 @@ await client.disconnect()
 
 ### Publishing
 
+Convenience publish methods return a `PublishedEvent` — the signed `event` plus the
+per-relay `result` (`PublishResult`). All accept an optional `strategy:` parameter
+(`.firstAck` / `.quorum(n)` / `.allSettled`) controlling how many acknowledgments to
+wait for before returning.
+
 ```swift
-let event = try await client.publishTextNote(content: "Hello!", tags: [["t", "nostr"]])
+let note = try await client.publishTextNote(content: "Hello!", tags: [["t", "nostr"]])
+print(note.event.id, note.result.acceptedRelays)
 try await client.publishReply(to: parentEvent, content: "Nice post!")
 try await client.publishMetadata(UserMetadata(name: "Alice", about: "Nostr user"))
-try await client.publishReaction(to: event, content: "🤙")
-try await client.publishRepost(of: event, relayUrl: "wss://relay.damus.io")
+try await client.publishReaction(to: note.event, content: "🤙")
+try await client.publishRepost(of: note.event, relayUrl: "wss://relay.damus.io")
 try await client.publishDeletion(eventIds: ["eventId1"], reason: "posted by mistake")
-try await client.publishContactList([Contact(pubkey: "...", relayUrl: "wss://...")])
+try await client.publishTextNote(content: "Important!", strategy: .quorum(2))
 try await client.publish(signedEvent)  // publish any pre-signed event
 ```
 

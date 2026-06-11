@@ -25,7 +25,8 @@ let echoKey = result.rumor.id
 The rumor is never signed — not even transiently — because a leaked signed
 kind-14 would be cryptographic proof of authorship and destroy deniability.
 A failed self-copy publish is non-fatal; the send succeeds when the
-recipient copy is accepted.
+recipient copy is accepted. The per-relay outcomes of both publishes are
+reported on the result as `recipientPublishResult` and `selfCopyPublishResult`.
 
 ### Receiving
 
@@ -255,6 +256,17 @@ let result = try await client.publish(event)
 print("accepted:", result.acceptedRelays)
 print("failed:", result.failedRelays)
 print("still in flight:", result.pendingRelays)
+```
+
+The convenience publish methods (``NostrClient/publishTextNote(content:tags:strategy:)``,
+``NostrClient/publishReaction(to:content:strategy:)``, ...) accept the same `strategy:`
+parameter and return a ``PublishedEvent`` carrying both the signed event and its
+``PublishResult``:
+
+```swift
+let note = try await client.publishTextNote(content: "Hello!", strategy: .quorum(2))
+print("id:", note.id)  // Event properties are forwarded
+print("accepted:", note.result.acceptedRelays)
 ```
 
 Publishing fails fast with ``NostrError/notConnected`` on relays that are not

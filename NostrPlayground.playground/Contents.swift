@@ -159,9 +159,9 @@ Task {
     // Set your private key
     try await client.setNsec("nsec1...")
 
-    // Publish a text note
-    let event = try await client.publishTextNote(content: "Hello from playground!")
-    print("Published event: \\(event.id)")
+    // Publish a text note — returns the signed event plus the per-relay outcome
+    let note = try await client.publishTextNote(content: "Hello from playground!")
+    print("Published event: \\(note.id), accepted by \\(note.result.acceptedRelays.count) relay(s)")
 
     // Subscribe to global feed
     let subId = try await client.subscribeToGlobalFeed(limit: 10) { event in
