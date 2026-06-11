@@ -48,9 +48,9 @@ let client = NostrClient()
 
 // Add relays and connect in one step
 try await client.connect(to: [
-    "wss://relay.damus.io",
-    "wss://nos.lol",
-    "wss://relay.nostr.band"
+    "wss://relay.example.com",
+    "wss://relay2.example.com",
+    "wss://relay3.example.com"
 ])
 ```
 

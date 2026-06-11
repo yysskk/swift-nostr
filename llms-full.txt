@@ -39,7 +39,7 @@ let client = NostrClient()
 try await client.setNsec("nsec1...")
 
 // Add relays and connect in one step
-try await client.connect(to: ["wss://relay.damus.io", "wss://nos.lol"])
+try await client.connect(to: ["wss://relay.example.com", "wss://relay2.example.com"])
 
 // Publish a text note — returns the signed event plus the per-relay outcome
 let note = try await client.publishTextNote(content: "Hello, Nostr!")
@@ -84,11 +84,11 @@ try await client.setNsec("nsec1...")        // bech32 nsec
 ### Relay Management
 
 ```swift
-try await client.addRelay("wss://relay.damus.io")
-try await client.addRelay("wss://relay.damus.io", config: customConfig)
+try await client.addRelay("wss://relay.example.com")
+try await client.addRelay("wss://relay.example.com", config: customConfig)
 try await client.addRelays(["wss://relay1.example.com", "wss://relay2.example.com"])
 try await client.connect()
-try await client.connect(to: ["wss://relay.damus.io"])  // addRelays + connect in one step
+try await client.connect(to: ["wss://relay.example.com"])  // addRelays + connect in one step
 await client.disconnect()
 ```
 
@@ -105,7 +105,7 @@ print(note.event.id, note.result.acceptedRelays)
 try await client.publishReply(to: parentEvent, content: "Nice post!")
 try await client.publishMetadata(UserMetadata(name: "Alice", about: "Nostr user"))
 try await client.publishReaction(to: note.event, content: "🤙")
-try await client.publishRepost(of: note.event, relayUrl: "wss://relay.damus.io")
+try await client.publishRepost(of: note.event, relayUrl: "wss://relay.example.com")
 try await client.publishDeletion(eventIds: ["eventId1"], reason: "posted by mistake")
 try await client.publishTextNote(content: "Important!", strategy: .quorum(2))
 try await client.publish(signedEvent)  // publish any pre-signed event
@@ -649,7 +649,7 @@ NIP-11 Relay Information Document (struct: Codable, Sendable, Hashable). All fie
 
 ```swift
 // Fetch from a URL
-let info = try await RelayInformation.fetch(fromRelayURLString: "wss://relay.damus.io")
+let info = try await RelayInformation.fetch(fromRelayURLString: "wss://relay.example.com")
 print(info.name)            // String?
 print(info.supportedNIPs)   // [Int]?
 print(info.limitation?.authRequired)

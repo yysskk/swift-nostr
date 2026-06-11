@@ -75,7 +75,7 @@ public actor NostrClient {
     /// the one-step form of `addRelays` followed by `connect()`.
     ///
     /// ```swift
-    /// try await client.connect(to: ["wss://relay.damus.io", "wss://nos.lol"])
+    /// try await client.connect(to: ["wss://relay.example.com", "wss://relay2.example.com"])
     /// ```
     /// - Throws: ``NostrError/connectionFailed(_:)`` if any URL string is invalid,
     ///   or if every relay in the pool fails to connect; partial connection

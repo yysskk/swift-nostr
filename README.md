@@ -68,7 +68,7 @@ let restored = try KeyPair(mnemonicPhrase: "leader monkey parrot ring guide acci
 let entity = try NIP19Entity.decode("nprofile1...")
 
 // Encode a reference, optionally with relay hints
-let nprofile = try NProfile(publicKey: keyPair.publicKeyHex, relays: ["wss://relay.damus.io"]).encoded
+let nprofile = try NProfile(publicKey: keyPair.publicKeyHex, relays: ["wss://relay.example.com"]).encoded
 ```
 
 `NEvent`, `NAddr`, and the full decoding API are covered in [Advanced Usage](https://yysskk.github.io/swift-nostr-client/documentation/nostrclient/advancedusage).
@@ -80,9 +80,9 @@ let client = NostrClient()
 
 // Add relays and connect in one step
 try await client.connect(to: [
-    "wss://relay.damus.io",
-    "wss://nos.lol",
-    "wss://relay.nostr.band"
+    "wss://relay.example.com",
+    "wss://relay2.example.com",
+    "wss://relay3.example.com"
 ])
 
 // Or separately: addRelays(_:) then connect()
@@ -177,7 +177,7 @@ for await message in try await client.directMessages() {
 ### Relay Information (NIP-11)
 
 ```swift
-let info = try await RelayInformation.fetch(fromRelayURLString: "wss://relay.damus.io")
+let info = try await RelayInformation.fetch(fromRelayURLString: "wss://relay.example.com")
 print(info.name ?? "unknown", info.supportedNIPs ?? [])
 ```
 
@@ -191,7 +191,7 @@ connect the right relays automatically.
 // Publish your own relay list: where you read (inbox) and write (outbox)
 try await client.publishRelayList(
     read: ["wss://inbox.example.com"],
-    write: ["wss://relay.damus.io", "wss://nos.lol"]
+    write: ["wss://relay.example.com", "wss://relay2.example.com"]
 )
 
 // Fetch another user's relay list (cached for routing)
@@ -277,7 +277,7 @@ custom.isAddressable                        // true (30000-39999)
 ### Direct Relay Connection
 
 ```swift
-let connection = try RelayConnection(urlString: "wss://relay.damus.io")
+let connection = try RelayConnection(urlString: "wss://relay.example.com")
 await connection.connect()
 
 // Subscribe

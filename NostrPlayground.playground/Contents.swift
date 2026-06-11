@@ -60,7 +60,7 @@ let metadata = UserMetadata(
     about: "Nostr enthusiast",
     picture: "https://example.com/alice.png",
     nip05: "alice@example.com",
-    lud16: "alice@getalby.com"
+    lud16: "alice@example.com"
 )
 let metadataEvent = try! signer.signMetadata(metadata)
 print("Metadata Event ID: \(metadataEvent.id)")
@@ -148,9 +148,9 @@ Task {
 
     // Add relays and connect in one step
     try await client.connect(to: [
-        "wss://relay.damus.io",
-        "wss://nos.lol",
-        "wss://relay.nostr.band"
+        "wss://relay.example.com",
+        "wss://relay2.example.com",
+        "wss://relay3.example.com"
     ])
 
     // Set your private key

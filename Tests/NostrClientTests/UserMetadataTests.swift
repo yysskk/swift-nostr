@@ -17,7 +17,7 @@ struct UserMetadataTests {
           "nip05": "alice@example.com",
           "website": "https://example.com",
           "lud06": "lnurl1dp68...",
-          "lud16": "alice@walletofsatoshi.com"
+          "lud16": "alice@example.com"
         }
         """
 
@@ -37,7 +37,7 @@ struct UserMetadataTests {
         #expect(meta.nip05 == "alice@example.com")
         #expect(meta.website == "https://example.com")
         #expect(meta.lud06 == "lnurl1dp68...")
-        #expect(meta.lud16 == "alice@walletofsatoshi.com")
+        #expect(meta.lud16 == "alice@example.com")
     }
 
     @Test("display_name without name still decodes displayName")
@@ -56,7 +56,7 @@ struct UserMetadataTests {
             about: "bio",
             displayName: "Alice In Nostrland",
             website: "https://example.com",
-            lud16: "alice@walletofsatoshi.com"
+            lud16: "alice@example.com"
         )
 
         let data = try JSONEncoder().encode(original)
@@ -71,6 +71,6 @@ struct UserMetadataTests {
         #expect(decoded.name == "alice")
         #expect(decoded.about == "bio")
         #expect(decoded.website == "https://example.com")
-        #expect(decoded.lud16 == "alice@walletofsatoshi.com")
+        #expect(decoded.lud16 == "alice@example.com")
     }
 }

@@ -60,7 +60,7 @@ struct NIP19Tests {
     func neventRoundTripFull() throws {
         let event = try NEvent(
             eventId: eventIdHex,
-            relays: ["wss://relay.damus.io"],
+            relays: ["wss://relay.example.com"],
             author: pubkeyHex,
             kind: 1
         )
@@ -71,7 +71,7 @@ struct NIP19Tests {
         #expect(decoded == event)
         #expect(decoded.author == pubkeyHex)
         #expect(decoded.kind == 1)
-        #expect(decoded.relays == ["wss://relay.damus.io"])
+        #expect(decoded.relays == ["wss://relay.example.com"])
     }
 
     @Test("nevent round-trips with only the event id")
@@ -92,7 +92,7 @@ struct NIP19Tests {
             identifier: "1700847963",
             author: pubkeyHex,
             kind: 30023,
-            relays: ["wss://relay.nostr.band"]
+            relays: ["wss://relay3.example.com"]
         )
         let encoded = addr.encoded
         #expect(encoded.hasPrefix("naddr1"))
@@ -116,11 +116,11 @@ struct NIP19Tests {
     @Test("NEvent(event:) captures id, author, and kind")
     func neventFromEvent() throws {
         let event = makeEvent(kind: 1, tags: [])
-        let nevent = try NEvent(event: event, relays: ["wss://relay.damus.io"])
+        let nevent = try NEvent(event: event, relays: ["wss://relay.example.com"])
         #expect(nevent.eventId == eventIdHex)
         #expect(nevent.author == pubkeyHex)
         #expect(nevent.kind == 1)
-        #expect(nevent.relays == ["wss://relay.damus.io"])
+        #expect(nevent.relays == ["wss://relay.example.com"])
     }
 
     @Test("NAddr(event:) extracts the d tag")

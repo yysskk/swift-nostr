@@ -16,7 +16,7 @@ import NostrClient
 
 let client = NostrClient()
 try await client.setNsec("nsec1...")
-try await client.connect(to: ["wss://relay.damus.io", "wss://nos.lol"])
+try await client.connect(to: ["wss://relay.example.com", "wss://relay2.example.com"])
 
 let note = try await client.publishTextNote(content: "Hello, Nostr!")
 ```

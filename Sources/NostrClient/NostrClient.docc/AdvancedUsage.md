@@ -141,19 +141,19 @@ exposed on ``KeyPair``. The TLV entities carry optional relay hints.
 // Profile reference with relay hints (nprofile)
 let profile = try NProfile(
     publicKey: "3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d",
-    relays: ["wss://relay.damus.io"]
+    relays: ["wss://relay.example.com"]
 )
 let nprofile = profile.encoded
 
 // Event reference (nevent) built from a fetched event
-let nevent = try NEvent(event: event, relays: ["wss://relay.damus.io"]).encoded
+let nevent = try NEvent(event: event, relays: ["wss://relay.example.com"]).encoded
 
 // Addressable event coordinate (naddr) for replaceable events (e.g. long-form)
 let naddr = try NAddr(
     identifier: "my-article",
     author: "3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d",
     kind: 30023,
-    relays: ["wss://relay.nostr.band"]
+    relays: ["wss://relay3.example.com"]
 ).encoded
 ```
 
@@ -180,7 +180,7 @@ let parsed = try NEvent(bech32String: nevent)
 
 ```swift
 let contacts = [
-    Contact(pubkey: "pubkey1", relayUrl: "wss://relay.damus.io", petname: "alice"),
+    Contact(pubkey: "pubkey1", relayUrl: "wss://relay.example.com", petname: "alice"),
     Contact(pubkey: "pubkey2")
 ]
 try await client.publishContactList(contacts)
@@ -212,7 +212,7 @@ Fetch a relay's information document — name, supported NIPs, limits, fees —
 over HTTP before or after connecting:
 
 ```swift
-let info = try await RelayInformation.fetch(fromRelayURLString: "wss://relay.damus.io")
+let info = try await RelayInformation.fetch(fromRelayURLString: "wss://relay.example.com")
 print(info.name ?? "unknown")
 print(info.supportedNIPs ?? [])
 print(info.limitation?.maxSubscriptions ?? 0)
@@ -235,7 +235,7 @@ let config = RelayConnectionConfig(
     maxReconnectDelay: 60,
     reconnectBackoffMultiplier: 2
 )
-try await client.addRelay("wss://relay.damus.io", config: config)
+try await client.addRelay("wss://relay.example.com", config: config)
 ```
 
 Liveness is detected with periodic WebSocket pings (`pingInterval`); an idle relay
@@ -303,7 +303,7 @@ connected — the publish path never connects inline. Connect relays up front wi
 ### Direct Relay Connection
 
 ```swift
-let connection = try RelayConnection(urlString: "wss://relay.damus.io")
+let connection = try RelayConnection(urlString: "wss://relay.example.com")
 await connection.connect()
 
 try await connection.subscribe(
