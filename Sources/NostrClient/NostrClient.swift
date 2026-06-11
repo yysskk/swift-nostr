@@ -21,9 +21,14 @@ public actor NostrClient {
         relayPoolConfig: RelayPoolConfig = .default,
         gossipPolicy: GossipRelayPolicy = .addAndConnect
     ) {
-        let pool = RelayPool(config: relayPoolConfig)
-        self.relayPool = pool
-        self.relayListStore = RelayListStore(pool: pool, policy: gossipPolicy)
+        self.init(relayPool: RelayPool(config: relayPoolConfig), gossipPolicy: gossipPolicy)
+    }
+
+    /// Designated initializer shared by the public initializer and by tests, which inject a
+    /// ``RelayPool`` built with a fake transport so the client can be exercised without a network.
+    init(relayPool: RelayPool, gossipPolicy: GossipRelayPolicy = .addAndConnect) {
+        self.relayPool = relayPool
+        self.relayListStore = RelayListStore(pool: relayPool, policy: gossipPolicy)
     }
 
     /// Sets the signer for publishing events

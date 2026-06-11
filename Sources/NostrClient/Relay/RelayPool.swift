@@ -11,6 +11,10 @@ public actor RelayPool {
     /// Pool configuration
     public let config: RelayPoolConfig
 
+    /// Creates the WebSocket transport for each relay connection. Injected so tests can
+    /// supply a fake transport in place of `URLSession`.
+    private let webSocketFactory: any WebSocketSessionFactory
+
     /// Event deduplication cache with timestamps
     private var eventCache: [String: Date] = [:]
 
@@ -21,7 +25,14 @@ public actor RelayPool {
     private var subscriptionTasks: [String: [Task<Void, Never>]] = [:]
 
     public init(config: RelayPoolConfig = .default) {
+        self.init(config: config, webSocketFactory: URLSessionWebSocketFactory(urlSession: .shared))
+    }
+
+    /// Designated initializer shared by the public initializer and by tests, which inject a
+    /// fake ``WebSocketSessionFactory`` so the pool's relay connections never touch the network.
+    init(config: RelayPoolConfig = .default, webSocketFactory: any WebSocketSessionFactory) {
         self.config = config
+        self.webSocketFactory = webSocketFactory
     }
 
     /// Adds a relay to the pool
@@ -30,7 +41,11 @@ public actor RelayPool {
         if let existing = relays[url] {
             return existing
         }
-        let connection = RelayConnection(url: url, config: config ?? self.config.defaultRelayConfig)
+        let connection = RelayConnection(
+            url: url,
+            webSocketFactory: webSocketFactory,
+            config: config ?? self.config.defaultRelayConfig
+        )
         relays[url] = connection
         return connection
     }
