@@ -41,6 +41,22 @@ struct EventKindTests {
         #expect(Event.Kind.longFormContent.isAddressable)
         #expect(Event.Kind(rawValue: 30311).isAddressable)
         #expect(!Event.Kind.relayListMetadata.isAddressable)
+
+        // Range boundaries
+        #expect(!Event.Kind(rawValue: 9999).isReplaceable)
+        #expect(Event.Kind(rawValue: 10000).isReplaceable)
+        #expect(Event.Kind(rawValue: 19999).isReplaceable)
+        #expect(!Event.Kind(rawValue: 20000).isReplaceable)
+
+        #expect(!Event.Kind(rawValue: 19999).isEphemeral)
+        #expect(Event.Kind(rawValue: 20000).isEphemeral)
+        #expect(Event.Kind(rawValue: 29999).isEphemeral)
+        #expect(!Event.Kind(rawValue: 30000).isEphemeral)
+
+        #expect(!Event.Kind(rawValue: 29999).isAddressable)
+        #expect(Event.Kind(rawValue: 30000).isAddressable)
+        #expect(Event.Kind(rawValue: 39999).isAddressable)
+        #expect(!Event.Kind(rawValue: 40000).isAddressable)
     }
 
     @Test("Event encodes kind as a bare integer")
