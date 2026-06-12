@@ -53,6 +53,35 @@ public actor RelayConnection {
     /// publishes of the same event don't clobber each other's waiters
     private var pendingPublishWaiters: [String: [UUID: AsyncThrowingStream<Void, Error>.Continuation]] = [:]
 
+    /// The most recent challenge received in an AUTH message from the relay (NIP-42).
+    ///
+    /// `nil` until the relay sends a challenge; replaced when the relay sends a
+    /// newer one. A challenge is only valid for the WebSocket session that
+    /// delivered it, so it is cleared whenever the connection is torn down or
+    /// re-established.
+    public private(set) var authenticationChallenge: String?
+
+    /// The pubkeys this connection has successfully authenticated (NIP-42).
+    ///
+    /// A pubkey is added when the relay acknowledges its AUTH event with OK
+    /// `true`. Authentication only lasts for the current WebSocket session, so
+    /// the set is emptied whenever the connection is torn down or re-established.
+    /// Multiple pubkeys can be authenticated on one connection by calling
+    /// ``authenticate(with:)`` once per identity.
+    public private(set) var authenticatedPubkeys: Set<String> = []
+
+    /// Pubkeys of in-flight AUTH events keyed by event id, so the receive loop
+    /// can mark them authenticated the moment the relay's OK arrives. An entry
+    /// lives only as long as its ``authenticate(with:)`` call: a failed or
+    /// cancelled call removes it, so a late OK after a reported failure cannot
+    /// silently flip the connection to authenticated.
+    private var pendingAuthentications: [String: String] = [:]
+
+    /// Whether at least one pubkey is authenticated on this connection (NIP-42).
+    public var isAuthenticated: Bool {
+        !authenticatedPubkeys.isEmpty
+    }
+
     public init(url: URL, urlSession: URLSession = .shared, config: RelayConnectionConfig = .default) {
         self.init(
             url: url,
@@ -119,6 +148,10 @@ public actor RelayConnection {
     private func performConnect() async throws {
         updateState(.connecting)
 
+        // NIP-42 challenges and authentications are scoped to a WebSocket
+        // session; a fresh socket starts unauthenticated with no challenge.
+        resetAuthenticationState()
+
         var request = URLRequest(url: url)
         request.setValue("websocket", forHTTPHeaderField: "Upgrade")
         request.timeoutInterval = config.connectionTimeout
@@ -166,7 +199,17 @@ public actor RelayConnection {
             }
         }
         pendingPublishWaiters.removeAll()
+        resetAuthenticationState()
         updateState(.disconnected)
+    }
+
+    /// Clears all NIP-42 state. Challenges and authenticated pubkeys are only
+    /// valid for a single WebSocket session, so this runs on every teardown
+    /// and before every (re)connection attempt.
+    private func resetAuthenticationState() {
+        authenticationChallenge = nil
+        authenticatedPubkeys.removeAll()
+        pendingAuthentications.removeAll()
     }
 
     /// Sends a client message to the relay
@@ -231,19 +274,90 @@ public actor RelayConnection {
             throw NostrError.notConnected
         }
 
-        let token = UUID()
-        let (stream, continuation) = AsyncThrowingStream<Void, Error>.makeStream()
-        pendingPublishWaiters[event.id, default: [:]][token] = continuation
+        do {
+            try await sendAndAwaitOK(.event(event), eventId: event.id)
+        } catch let rejection as EventRejection {
+            throw NostrError.relayError("Relay rejected event \(rejection.eventId): \(rejection.message)")
+        }
+    }
+
+    /// Authenticates this connection with a pre-signed kind-22242 event and
+    /// waits for the relay's OK (NIP-42).
+    ///
+    /// Most callers should prefer ``authenticate(using:)``, which builds and
+    /// signs the event from the stored ``authenticationChallenge``. Use this
+    /// overload when the event is produced elsewhere, e.g. by a remote signer.
+    ///
+    /// On success the event's pubkey is added to ``authenticatedPubkeys`` and
+    /// the relay treats it as authenticated for the rest of the session.
+    ///
+    /// - Parameter event: A signed ``Event/Kind/clientAuthentication`` event
+    ///   carrying `relay` and `challenge` tags.
+    /// - Throws: ``NostrError/authenticationFailed(_:)`` when the event is not
+    ///   kind 22242 or the relay rejects it, ``NostrError/notConnected`` when
+    ///   the connection is not established, or ``NostrError/timeout`` when no
+    ///   OK arrives within ``RelayConnectionConfig/publishAckTimeout``.
+    public func authenticate(with event: Event) async throws {
+        guard event.kind == .clientAuthentication else {
+            throw NostrError.authenticationFailed(
+                "An authentication event must be kind \(Event.Kind.clientAuthentication), got kind \(event.kind)")
+        }
+        guard state == .connected else {
+            throw NostrError.notConnected
+        }
+
+        // Recorded before sending so the receive loop can mark the pubkey as
+        // authenticated the moment the OK arrives while this call is in flight.
+        pendingAuthentications[event.id] = event.pubkey
 
         do {
-            try await send(.event(event))
+            try await sendAndAwaitOK(.auth(event), eventId: event.id)
+        } catch let rejection as EventRejection {
+            throw NostrError.authenticationFailed(rejection.message)
         } catch {
-            removePublishWaiter(eventId: event.id, token: token)?.finish()
+            // Once a failure (timeout, send error, cancellation) is reported to
+            // the caller, a late OK must not silently flip the connection to
+            // authenticated — drop the pending entry along with the error.
+            pendingAuthentications.removeValue(forKey: event.id)
+            throw error
+        }
+    }
+
+    /// Builds, signs, and sends the answer to the relay's most recent AUTH
+    /// challenge, then waits for the relay's OK (NIP-42).
+    ///
+    /// - Parameter signer: The signer for the identity to authenticate.
+    /// - Throws: ``NostrError/authenticationFailed(_:)`` when the relay has not
+    ///   sent a challenge yet or rejects the authentication, plus everything
+    ///   ``authenticate(with:)`` throws.
+    public func authenticate(using signer: EventSigner) async throws {
+        guard let challenge = authenticationChallenge else {
+            throw NostrError.authenticationFailed("The relay has not sent an AUTH challenge")
+        }
+        let event = try signer.signClientAuthentication(relayURL: url, challenge: challenge)
+        try await authenticate(with: event)
+    }
+
+    /// Sends `message` and suspends until the relay's OK for `eventId` arrives,
+    /// bounded by ``RelayConnectionConfig/publishAckTimeout``. Shared by
+    /// ``publish(_:)`` and ``authenticate(with:)``.
+    ///
+    /// - Throws: ``EventRejection`` when the relay answers OK `false`,
+    ///   ``NostrError/timeout`` when no OK arrives in time.
+    private func sendAndAwaitOK(_ message: ClientMessage, eventId: String) async throws {
+        let token = UUID()
+        let (stream, continuation) = AsyncThrowingStream<Void, Error>.makeStream()
+        pendingPublishWaiters[eventId, default: [:]][token] = continuation
+
+        do {
+            try await send(message)
+        } catch {
+            removePublishWaiter(eventId: eventId, token: token)?.finish()
             throw error
         }
 
         defer {
-            removePublishWaiter(eventId: event.id, token: token)?.finish()
+            removePublishWaiter(eventId: eventId, token: token)?.finish()
         }
 
         try await withThrowingTaskGroup(of: Void.self) { group in
@@ -372,16 +486,28 @@ public actor RelayConnection {
                     switch message {
                     case .string(let text):
                         if let relayMessage = try? RelayMessage.parse(text) {
-                            if case .ok(let eventId, let accepted, let message) = relayMessage {
+                            switch relayMessage {
+                            case .ok(let eventId, let accepted, let message):
+                                // Settle a pending NIP-42 authentication for this event id.
+                                // Removed on both outcomes; only an accepted AUTH marks the
+                                // pubkey as authenticated.
+                                if let pubkey = pendingAuthentications.removeValue(forKey: eventId),
+                                    accepted
+                                {
+                                    authenticatedPubkeys.insert(pubkey)
+                                }
                                 for waiter in removeAllPublishWaiters(eventId: eventId) {
                                     if accepted {
                                         waiter.finish()
                                     } else {
                                         waiter.finish(
-                                            throwing: NostrError.relayError(
-                                                "Relay rejected event \(eventId): \(message)"))
+                                            throwing: EventRejection(eventId: eventId, message: message))
                                     }
                                 }
+                            case .auth(let challenge):
+                                authenticationChallenge = challenge
+                            default:
+                                break
                             }
                             yieldToMessageContinuations(relayMessage)
                         }
@@ -588,6 +714,23 @@ extension RelayConnection {
     public nonisolated func fetchInformation(urlSession: URLSession = .shared) async throws -> RelayInformation {
         try await RelayInformation.fetch(from: url, urlSession: urlSession)
     }
+}
+
+// MARK: - OK Rejection
+
+/// The relay answered an EVENT or AUTH with OK `false`.
+///
+/// Internal carrier between the receive loop and the operations awaiting the
+/// OK: ``RelayConnection/publish(_:)`` rewraps it as
+/// ``NostrError/relayError(_:)`` and ``RelayConnection/authenticate(with:)``
+/// as ``NostrError/authenticationFailed(_:)``, so each surfaces an error in
+/// its own vocabulary from the same wire response.
+struct EventRejection: Error, Sendable {
+    /// The id of the rejected event.
+    let eventId: String
+
+    /// The relay's status string, e.g. `"restricted: not allowed to write"`.
+    let message: String
 }
 
 // MARK: - Ping Cancellation Support

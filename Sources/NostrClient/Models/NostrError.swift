@@ -16,6 +16,7 @@ public enum NostrError: Error, LocalizedError, Sendable, Equatable {
     case notConnected
     case subscriptionNotFound(String)
     case relayError(String)
+    case authenticationFailed(String)
     case timeout
     case invalidHex
     case invalidBech32
@@ -63,6 +64,8 @@ public enum NostrError: Error, LocalizedError, Sendable, Equatable {
             return "Subscription not found: \(id)"
         case .relayError(let message):
             return "Relay error: \(message)"
+        case .authenticationFailed(let message):
+            return "Authentication failed: \(message)"
         case .timeout:
             return "Operation timed out"
         case .invalidHex:

@@ -122,6 +122,18 @@ extension Tag {
         Tag(name: "subject", values: [subject])
     }
 
+    /// A "relay" tag carrying the URL of the relay the client is
+    /// authenticating to (NIP-42).
+    public static func relay(_ url: String) -> Tag {
+        Tag(name: "relay", values: [url])
+    }
+
+    /// A "challenge" tag echoing the challenge string from a relay's
+    /// AUTH message (NIP-42).
+    public static func challenge(_ challenge: String) -> Tag {
+        Tag(name: "challenge", values: [challenge])
+    }
+
     /// An arbitrary raw tag. Returns nil if the array is empty.
     public static func raw(_ array: [String]) -> Tag? {
         Tag(rawArray: array)
