@@ -86,6 +86,11 @@ public actor RelayConnection {
     /// relay issues on a fresh session are answered too.
     private var authenticationResponder: AuthenticationResponder?
 
+    /// Whether a responder-driven answer is currently in flight, from invoking
+    /// the responder until its AUTH round-trip settles. Cleared by the
+    /// answering task itself, so it cannot get stuck by a session reset.
+    private var isAnsweringChallenge = false
+
     /// Subscriptions the relay closed with `auth-required:`, re-requested
     /// automatically after the next successful authentication (NIP-42).
     private var subscriptionsAwaitingAuthentication: Set<String> = []
@@ -500,6 +505,7 @@ public actor RelayConnection {
         guard let responder,
             let challenge = authenticationChallenge,
             !isAuthenticated,
+            !isAnsweringChallenge,
             pendingAuthentications.isEmpty
         else { return }
         respondToChallenge(challenge, with: responder)
@@ -508,8 +514,15 @@ public actor RelayConnection {
     /// Asks `responder` to answer `challenge` and authenticates with the result.
     /// Unstructured so the caller — typically the receive loop — never blocks
     /// on signing or on the AUTH round-trip.
+    ///
+    /// ``isAnsweringChallenge`` covers the whole task, including the responder
+    /// call that precedes the ``pendingAuthentications`` registration, so
+    /// installing a responder mid-answer cannot start a second answer for the
+    /// same challenge.
     private func respondToChallenge(_ challenge: String, with responder: @escaping AuthenticationResponder) {
+        isAnsweringChallenge = true
         Task {
+            defer { isAnsweringChallenge = false }
             guard let event = await responder(url, challenge) else { return }
             try? await authenticate(with: event)
         }

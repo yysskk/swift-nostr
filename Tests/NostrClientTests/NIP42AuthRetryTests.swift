@@ -164,6 +164,38 @@ struct NIP42AuthRetryTests {
         await connection.disconnect()
     }
 
+    // MARK: - Responder In-Flight Guard
+
+    @Test("reinstalling a responder while an answer is in flight sends no second AUTH")
+    func responderReinstallDoesNotDoubleAnswer() async throws {
+        let (connection, mock) = makeConnection()
+        let signer = EventSigner(keyPair: try KeyPair())
+        let slowResponder: RelayConnection.AuthenticationResponder = { relayURL, challenge in
+            // Slow enough that the reinstall below happens while this answer
+            // is still being produced — before authenticate(with:) registers
+            // its pending entry.
+            try? await Task.sleep(for: .milliseconds(100))
+            return try? signer.signClientAuthentication(relayURL: relayURL, challenge: challenge)
+        }
+        await connection.setAuthenticationResponder(slowResponder)
+        try await connection.connect()
+
+        mock.deliver(.string(#"["AUTH","challengestringhere"]"#))
+        try await NIP42TestSupport.pollUntil { await connection.authenticationChallenge != nil }
+
+        // The first answer is suspended inside the responder; reinstalling must
+        // not start a second one for the same challenge.
+        await connection.setAuthenticationResponder(slowResponder)
+
+        try await NIP42TestSupport.pollUntil {
+            mock.sentTextFrames.contains { $0.hasPrefix("[\"AUTH\"") }
+        }
+        // Allow a would-be duplicate answer time to land before counting.
+        try await Task.sleep(for: .milliseconds(150))
+        #expect(mock.sentTextFrames.filter { $0.hasPrefix("[\"AUTH\"") }.count == 1)
+        await connection.disconnect()
+    }
+
     // MARK: - Subscription Re-Request
 
     @Test("a subscription closed with auth-required is re-requested after authentication")
