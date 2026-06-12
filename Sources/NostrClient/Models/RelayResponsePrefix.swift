@@ -49,7 +49,9 @@ public struct RelayResponsePrefix: RawRepresentable, Sendable, Hashable, CustomS
     /// The event or request is malformed or fails validation.
     public static let invalid = RelayResponsePrefix(rawValue: "invalid")
 
-    /// The operation is not allowed for this — possibly authenticated — pubkey (NIP-42).
+    /// The operation is not allowed for this pubkey. Standardized in NIP-01;
+    /// NIP-42 uses it for operations that remain forbidden even after the
+    /// client has authenticated.
     public static let restricted = RelayResponsePrefix(rawValue: "restricted")
 
     /// The relay has muted this pubkey or content.
