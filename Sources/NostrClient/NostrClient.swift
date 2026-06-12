@@ -18,6 +18,11 @@ public actor NostrClient {
     /// The event signer (optional, required for publishing)
     private var signer: EventSigner?
 
+    /// How the client reacts to NIP-42 AUTH challenges. `internal(set)` so
+    /// ``setAuthenticationMode(_:)``, which lives in the authentication
+    /// extension file, can assign it.
+    public internal(set) var authenticationMode: AuthenticationMode = .automatic
+
     /// Subscription counter for generating unique IDs
     var subscriptionCounter: Int = 0
 
@@ -43,19 +48,29 @@ public actor NostrClient {
 
     // MARK: - Signer
 
-    /// Sets the signer for publishing events
-    public func setSigner(_ signer: EventSigner) {
+    /// Sets the signer for publishing events.
+    ///
+    /// While ``authenticationMode`` is ``AuthenticationMode/automatic`` (the
+    /// default), setting a signer also starts answering NIP-42 AUTH challenges
+    /// with it on every relay in the pool.
+    public func setSigner(_ signer: EventSigner) async {
         self.signer = signer
+        await refreshAuthenticationResponder()
     }
 
-    /// Sets the signer from a private key hex string
-    public func setPrivateKey(_ privateKeyHex: String) throws {
-        self.signer = try EventSigner(privateKeyHex: privateKeyHex)
+    /// Sets the signer from a private key hex string. See ``setSigner(_:)``.
+    public func setPrivateKey(_ privateKeyHex: String) async throws {
+        await setSigner(try EventSigner(privateKeyHex: privateKeyHex))
     }
 
-    /// Sets the signer from an nsec
-    public func setNsec(_ nsec: String) throws {
-        self.signer = try EventSigner(nsec: nsec)
+    /// Sets the signer from an nsec. See ``setSigner(_:)``.
+    public func setNsec(_ nsec: String) async throws {
+        await setSigner(try EventSigner(nsec: nsec))
+    }
+
+    /// Whether a signer is configured, without exposing it.
+    var hasSigner: Bool {
+        signer != nil
     }
 
     /// Returns the public key if a signer is set
