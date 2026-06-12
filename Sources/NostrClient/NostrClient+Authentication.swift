@@ -36,6 +36,11 @@ extension NostrClient {
     /// for you. The challenge is delivered by the relay and surfaces as
     /// ``SubscriptionEvent/auth(relayURL:challenge:)`` on active subscriptions.
     ///
+    /// In the unlikely case that the relay rotates its challenge between this
+    /// call reading it and the relay receiving the answer, the relay rejects
+    /// the stale answer and this throws ``NostrError/authenticationFailed(_:)``
+    /// — simply call it again to answer the fresh challenge.
+    ///
     /// - Parameter relayURL: The relay to authenticate to; must be in the pool.
     /// - Throws: ``NostrError/relayError(_:)`` when the relay is not in the
     ///   pool, ``NostrError/signerNotSet`` without a signer, and everything

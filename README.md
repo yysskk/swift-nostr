@@ -10,6 +10,7 @@ A modern Swift library for the Nostr protocol, built with Swift 6 concurrency su
 - **NIP-05 Verification**: DNS-based identifier verification
 - **NIP-06 Key Derivation**: Generate keys from BIP-39 mnemonic seed phrases
 - **NIP-17 Private DMs**: End-to-end encrypted direct messages with sender anonymity
+- **NIP-42 Authentication**: Relay AUTH challenges answered automatically, with auth-required retry
 - **Cryptographic Operations**: Schnorr signatures with secp256k1
 - **NIP-19 Entities**: bech32 encoding/decoding of npub, nsec, note, nprofile, nevent, and naddr
 - **NIP-65 Outbox Model**: Per-user read/write relay lists with gossip routing for subscriptions and publishing
@@ -181,6 +182,26 @@ let info = try await RelayInformation.fetch(fromRelayURLString: "wss://relay.exa
 print(info.name ?? "unknown", info.supportedNIPs ?? [])
 ```
 
+### Authentication (NIP-42)
+
+Some relays require clients to authenticate before serving DMs or accepting events. With a
+signer set, the client answers AUTH challenges automatically, retries publishes rejected with
+`auth-required:`, and re-requests subscriptions the relay closed pending authentication.
+
+```swift
+// Automatic (default): nothing else to do once a signer is set
+try await client.setNsec("nsec1...")
+
+// Prefer explicit control? Authenticating reveals your pubkey to the relay,
+// so you can opt out and answer challenges yourself:
+await client.setAuthenticationMode(.manual)
+for await event in try await client.subscribe(filters: [filter]) {
+    if case .auth(let relayURL, _) = event {
+        try await client.authenticate(relayURL: relayURL)
+    }
+}
+```
+
 ### Outbox Model (NIP-65)
 
 The outbox/gossip model routes reads and writes to each user's declared relays instead of
@@ -335,7 +356,7 @@ let isValid = try signed.verify()
 - [x] NIP-19: bech32-encoded entities (npub, nsec, note, nprofile, nevent, naddr)
 - [x] NIP-20: Command Results (OK)
 - [x] NIP-25: Reactions
-- [x] NIP-42: Authentication (AUTH message parsing)
+- [x] NIP-42: Client authentication (automatic challenge response, auth-required retry)
 - [x] NIP-44: Versioned encryption
 - [x] NIP-59: Gift wrap
 - [x] NIP-65: Relay list metadata (outbox model)

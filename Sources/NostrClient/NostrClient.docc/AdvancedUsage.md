@@ -219,6 +219,64 @@ print(info.limitation?.maxSubscriptions ?? 0)
 print(info.limitation?.authRequired ?? false)
 ```
 
+## Client Authentication (NIP-42)
+
+Relays can demand authentication before serving sensitive data (typically DMs) or accepting
+events. The relay sends an AUTH challenge; the client answers it with a signed kind-22242
+event.
+
+### Automatic Authentication
+
+With a signer set, ``NostrClient`` answers challenges automatically — including fresh
+challenges after a reconnect. Publishes rejected with `auth-required:` wait for the AUTH
+round-trip and retry once, and subscriptions the relay closed with `auth-required:` are
+re-requested after authentication succeeds:
+
+```swift
+let client = NostrClient()
+try await client.setNsec("nsec1...")  // automatic from here on
+```
+
+Automatic authentication reveals the signer's pubkey to any relay that asks. Switch to
+manual mode when that link should only be made deliberately:
+
+```swift
+await client.setAuthenticationMode(.manual)
+```
+
+### Manual Authentication
+
+In manual mode, challenges surface as ``SubscriptionEvent/auth(relayURL:challenge:)`` on
+active subscriptions; answer them explicitly:
+
+```swift
+for await event in try await client.subscribe(filters: [filter]) {
+    if case .auth(let relayURL, _) = event {
+        try await client.authenticate(relayURL: relayURL)
+    }
+}
+```
+
+### Authentication on a Direct Connection
+
+``RelayConnection`` exposes the same building blocks: the stored
+``RelayConnection/authenticationChallenge``, ``RelayConnection/authenticate(using:)`` /
+``RelayConnection/authenticate(with:)`` for signing and sending the answer, and
+``RelayConnection/authenticatedPubkeys`` for the session's authenticated identities.
+
+```swift
+let connection = try RelayConnection(urlString: "wss://relay.example.com")
+try await connection.connect()
+// ... the relay sends ["AUTH", "<challenge>"] ...
+try await connection.authenticate(using: signer)
+print(await connection.isAuthenticated)
+```
+
+A pre-signed event (e.g. from a remote signer) can be sent with
+``RelayConnection/authenticate(with:)``. Detect why a relay denied an operation with
+``RelayResponsePrefix`` — `auth-required:` means authenticate and retry, `restricted:`
+means the pubkey is not allowed even when authenticated.
+
 ## Relay Configuration
 
 ### Connection Configuration

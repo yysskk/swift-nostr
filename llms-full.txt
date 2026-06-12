@@ -81,6 +81,19 @@ try await client.setPrivateKey("hex...")    // hex private key
 try await client.setNsec("nsec1...")        // bech32 nsec
 ```
 
+Setting a signer also starts answering NIP-42 AUTH challenges automatically (see Authentication).
+
+### Authentication (NIP-42)
+
+With a signer set, AUTH challenges are answered automatically by default; publishes rejected
+with `auth-required:` retry once after the AUTH round-trip, and subscriptions closed with
+`auth-required:` are re-requested. Opt out with `.manual` and answer challenges explicitly:
+
+```swift
+await client.setAuthenticationMode(.manual)   // or .automatic (default)
+try await client.authenticate(relayURL: url)  // answer a pending challenge explicitly
+```
+
 ### Relay Management
 
 ```swift
@@ -389,6 +402,18 @@ Messages sent to relay (NIP-01) (enum: Sendable).
 let json = clientMessage.serialize()  // JSON array string
 ```
 
+## RelayResponsePrefix
+
+Machine-readable prefix of an OK or CLOSED status string (struct: RawRepresentable, Sendable).
+Standardized values as constants: `.duplicate`, `.pow`, `.blocked`, `.rateLimited`, `.invalid`,
+`.restricted`, `.mute`, `.error` (NIP-01) and `.authRequired` (NIP-42); unknown prefixes are
+preserved.
+
+```swift
+RelayResponsePrefix(message: "auth-required: do auth first")  // .authRequired, nil if no prefix
+relayMessage.responsePrefix                                   // for .ok / .closed messages
+```
+
 ## UserMetadata
 
 User profile metadata (NIP-01) (struct: Codable, Sendable).
@@ -477,6 +502,7 @@ let repost = try signer.signRepost(of: event, relayUrl: "wss://...")
 let deletion = try signer.signDeletion(eventIds: ["id1"], reason: "mistake")
 let contacts = try signer.signContactList([Contact(pubkey: "...")])
 let relayList = try signer.signRelayListMetadata(read: ["wss://in.example"], write: ["wss://out.example"])
+let auth = try signer.signClientAuthentication(relayURL: url, challenge: "challenge")  // kind 22242, NIP-42
 ```
 
 ## Mnemonic
@@ -704,6 +730,7 @@ try await pool.subscribe(subscriptionId: "sub1", filters: [filter]) { message in
 try await pool.subscribeWithRelayContext(subscriptionId: "sub1", filters: [filter]) { relayURL, message in }
 try await pool.unsubscribe(subscriptionId: "sub1")
 try await pool.publish(signedEvent)
+await pool.setAuthenticationResponder { url, challenge in /* signed kind-22242 event or nil */ }
 await pool.clearDeduplicationCache()
 ```
 
@@ -716,6 +743,8 @@ Manages WebSocket connection to a single relay (actor).
 - `url: URL` -- relay WebSocket URL
 - `state: RelayConnectionState` -- current connection state
 - `config: RelayConnectionConfig`
+- `authenticationChallenge: String?` -- latest NIP-42 AUTH challenge (session-scoped)
+- `authenticatedPubkeys: Set<String>` / `isAuthenticated: Bool` -- NIP-42 session state
 
 ### Configuration
 
@@ -741,10 +770,15 @@ await connection.disconnect()
 try await connection.subscribe(subscriptionId: "sub1", filters: [filter]) { message in }
 try await connection.unsubscribe(subscriptionId: "sub1")
 try await connection.publish(signedEvent)
+try await connection.authenticate(using: signer)      // answer the stored challenge (NIP-42)
+try await connection.authenticate(with: signedAuthEvent)  // pre-signed kind-22242 event
+await connection.setAuthenticationResponder { url, challenge in /* event or nil */ }
 for await message in await connection.messages() { }  // AsyncStream<RelayMessage>
 ```
 
-Features: automatic reconnection with exponential backoff, subscription resubscription on reconnect.
+Features: automatic reconnection with exponential backoff, subscription resubscription on
+reconnect, automatic NIP-42 authentication with auth-required publish retry and subscription
+re-request.
 
 ## RelayConnectionState
 
@@ -765,7 +799,7 @@ let (hrp, data) = try Bech32.decode("npub1...")
 
 Error types (enum: Error, LocalizedError, Sendable, Equatable).
 
-Cases: `invalidPrivateKey`, `invalidPublicKey`, `invalidSignature`, `invalidEventId`, `signingFailed`, `signerNotSet`, `verificationFailed`, `serializationFailed`, `invalidData`, `invalidMessageFormat`, `connectionFailed(String)`, `notConnected`, `subscriptionNotFound(String)`, `relayError(String)`, `timeout`, `invalidHex`, `invalidBech32`, `unknownPrefix(String)`, `encryptionFailed`, `decryptionFailed`, `unsupportedEncryptionVersion(UInt8)`, `invalidPayloadFormat`, `hmacVerificationFailed`, `invalidPadding`, `invalidMnemonic`, `invalidMnemonicWord(String)`, `invalidMnemonicChecksum`, `randomGenerationFailed`.
+Cases: `invalidPrivateKey`, `invalidPublicKey`, `invalidSignature`, `invalidEventId`, `signingFailed`, `signerNotSet`, `verificationFailed`, `serializationFailed`, `invalidData`, `invalidMessageFormat`, `connectionFailed(String)`, `notConnected`, `subscriptionNotFound(String)`, `relayError(String)`, `authenticationFailed(String)`, `timeout`, `invalidHex`, `invalidBech32`, `unknownPrefix(String)`, `encryptionFailed`, `decryptionFailed`, `unsupportedEncryptionVersion(UInt8)`, `invalidPayloadFormat`, `hmacVerificationFailed`, `invalidPadding`, `invalidMnemonic`, `invalidMnemonicWord(String)`, `invalidMnemonicChecksum`, `randomGenerationFailed`.
 
 ## Supported NIPs
 
@@ -782,7 +816,7 @@ Cases: `invalidPrivateKey`, `invalidPublicKey`, `invalidSignature`, `invalidEven
 - NIP-19: bech32-encoded entities (npub, nsec, note, nprofile, nevent, naddr)
 - NIP-20: Command results (OK messages)
 - NIP-25: Reactions
-- NIP-42: Relay authentication (AUTH message parsing)
+- NIP-42: Client authentication (automatic challenge response, auth-required retry)
 - NIP-44: Versioned encryption v2 (ECDH + HKDF + ChaCha20 + HMAC-SHA256)
 - NIP-59: Gift wrap (rumor > seal > gift wrap with randomized timestamps)
 
