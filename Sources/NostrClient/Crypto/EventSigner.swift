@@ -140,6 +140,27 @@ public struct EventSigner: Sendable {
         return try signContactList(contacts)
     }
 
+    /// Creates and signs a client authentication event (kind 22242, NIP-42)
+    /// answering a relay's AUTH challenge.
+    ///
+    /// The event carries the relay URL and the challenge as tags and an empty
+    /// content. It is ephemeral: relays validate it during the AUTH handshake
+    /// and neither store nor broadcast it.
+    /// https://github.com/nostr-protocol/nips/blob/master/42.md
+    ///
+    /// - Parameters:
+    ///   - relayURL: The URL of the relay being authenticated to, as used to connect.
+    ///   - challenge: The challenge string received in the relay's AUTH message.
+    public func signClientAuthentication(relayURL: URL, challenge: String) throws -> Event {
+        let unsigned = UnsignedEvent(
+            pubkey: publicKey,
+            kind: .clientAuthentication,
+            tags: [.relay(relayURL.absoluteString), .challenge(challenge)],
+            content: ""
+        )
+        return try sign(unsigned)
+    }
+
     /// Creates and signs a relay list metadata event (kind 10002, NIP-65)
     public func signRelayListMetadata(_ relayList: RelayListMetadata) throws -> Event {
         let unsigned = UnsignedEvent(
