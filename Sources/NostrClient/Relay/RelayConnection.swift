@@ -6,6 +6,10 @@ import Foundation
 
 /// Manages a WebSocket connection to a single Nostr relay
 public actor RelayConnection {
+    /// Produces a signed kind-22242 event answering an AUTH challenge, or
+    /// `nil` to leave the challenge unanswered (NIP-42).
+    public typealias AuthenticationResponder = @Sendable (_ relayURL: URL, _ challenge: String) async -> Event?
+
     /// The relay URL
     public let url: URL
 
@@ -76,6 +80,11 @@ public actor RelayConnection {
     /// cancelled call removes it, so a late OK after a reported failure cannot
     /// silently flip the connection to authenticated.
     private var pendingAuthentications: [String: String] = [:]
+
+    /// Answers AUTH challenges automatically when set (NIP-42). Configuration
+    /// rather than session state: it survives reconnects, so challenges the
+    /// relay issues on a fresh session are answered too.
+    private var authenticationResponder: AuthenticationResponder?
 
     /// Whether at least one pubkey is authenticated on this connection (NIP-42).
     public var isAuthenticated: Bool {
@@ -338,6 +347,37 @@ public actor RelayConnection {
         try await authenticate(with: event)
     }
 
+    /// Sets or clears the responder that answers AUTH challenges automatically (NIP-42).
+    ///
+    /// While a responder is set, every challenge the relay sends — including on
+    /// later sessions after a reconnect — is passed to it, and a returned event
+    /// is sent back through ``authenticate(with:)``. A challenge that is already
+    /// stored and still unanswered is answered immediately, so installing a
+    /// responder after the relay has demanded authentication needs no extra step.
+    ///
+    /// Automatic authentication is best-effort: outcomes are observable through
+    /// ``authenticatedPubkeys`` and the relay's OK in ``messages()``, and a
+    /// failed attempt is not retried until the relay issues another challenge.
+    public func setAuthenticationResponder(_ responder: AuthenticationResponder?) {
+        authenticationResponder = responder
+        guard let responder,
+            let challenge = authenticationChallenge,
+            !isAuthenticated,
+            pendingAuthentications.isEmpty
+        else { return }
+        respondToChallenge(challenge, with: responder)
+    }
+
+    /// Asks `responder` to answer `challenge` and authenticates with the result.
+    /// Unstructured so the caller — typically the receive loop — never blocks
+    /// on signing or on the AUTH round-trip.
+    private func respondToChallenge(_ challenge: String, with responder: @escaping AuthenticationResponder) {
+        Task {
+            guard let event = await responder(url, challenge) else { return }
+            try? await authenticate(with: event)
+        }
+    }
+
     /// Sends `message` and suspends until the relay's OK for `eventId` arrives,
     /// bounded by ``RelayConnectionConfig/publishAckTimeout``. Shared by
     /// ``publish(_:)`` and ``authenticate(with:)``.
@@ -506,6 +546,9 @@ public actor RelayConnection {
                                 }
                             case .auth(let challenge):
                                 authenticationChallenge = challenge
+                                if let responder = authenticationResponder {
+                                    respondToChallenge(challenge, with: responder)
+                                }
                             default:
                                 break
                             }

@@ -24,6 +24,9 @@ public actor RelayPool {
     /// Message listener tasks for subscriptions (keyed by subscription ID)
     private var subscriptionTasks: [String: [Task<Void, Never>]] = [:]
 
+    /// The automatic AUTH-challenge responder applied to every relay (NIP-42)
+    private var authenticationResponder: RelayConnection.AuthenticationResponder?
+
     public init(config: RelayPoolConfig = .default) {
         self.init(config: config, webSocketFactory: URLSessionWebSocketFactory(urlSession: .shared))
     }
@@ -37,7 +40,7 @@ public actor RelayPool {
 
     /// Adds a relay to the pool
     @discardableResult
-    public func addRelay(url: URL, config: RelayConnectionConfig? = nil) -> RelayConnection {
+    public func addRelay(url: URL, config: RelayConnectionConfig? = nil) async -> RelayConnection {
         if let existing = relays[url] {
             return existing
         }
@@ -47,16 +50,31 @@ public actor RelayPool {
             config: config ?? self.config.defaultRelayConfig
         )
         relays[url] = connection
+        if let authenticationResponder {
+            await connection.setAuthenticationResponder(authenticationResponder)
+        }
         return connection
     }
 
     /// Adds a relay to the pool by URL string
     @discardableResult
-    public func addRelay(urlString: String, config: RelayConnectionConfig? = nil) throws -> RelayConnection {
+    public func addRelay(urlString: String, config: RelayConnectionConfig? = nil) async throws -> RelayConnection {
         guard let url = URL(string: urlString) else {
             throw NostrError.connectionFailed("Invalid URL: \(urlString)")
         }
-        return addRelay(url: url, config: config)
+        return await addRelay(url: url, config: config)
+    }
+
+    /// Sets or clears the responder that answers AUTH challenges automatically
+    /// on every relay in the pool, both current and added later (NIP-42).
+    ///
+    /// See ``RelayConnection/setAuthenticationResponder(_:)`` for the
+    /// per-connection semantics.
+    public func setAuthenticationResponder(_ responder: RelayConnection.AuthenticationResponder?) async {
+        authenticationResponder = responder
+        for connection in relays.values {
+            await connection.setAuthenticationResponder(responder)
+        }
     }
 
     /// Removes a relay from the pool
@@ -401,9 +419,9 @@ public actor RelayPool {
 // MARK: - Convenience Methods
 extension RelayPool {
     /// Adds multiple relays from URL strings
-    public func addRelays(_ urlStrings: [String]) throws {
+    public func addRelays(_ urlStrings: [String]) async throws {
         for urlString in urlStrings {
-            _ = try addRelay(urlString: urlString)
+            _ = try await addRelay(urlString: urlString)
         }
     }
 }
