@@ -141,19 +141,34 @@ public struct RelayInformation: Codable, Sendable, Hashable {
 extension RelayInformation {
     /// Protocol limitations advertised by a relay (part of NIP-11).
     public struct Limitation: Codable, Sendable, Hashable {
+        /// Maximum length, in bytes, of any incoming JSON message the relay accepts
+        /// (REQ, EVENT, CLOSE, AUTH, COUNT — not only events).
         public var maxMessageLength: Int?
+        /// Maximum number of concurrent subscriptions allowed on one connection.
         public var maxSubscriptions: Int?
+        /// Maximum number of filters allowed in a single subscription.
         public var maxFilters: Int?
+        /// Maximum value the relay honors for a filter's `limit`.
         public var maxLimit: Int?
+        /// Maximum length of a subscription id.
         public var maxSubidLength: Int?
+        /// Maximum number of tags allowed on an event.
         public var maxEventTags: Int?
+        /// Maximum length, in bytes, of an event's `content` field.
         public var maxContentLength: Int?
+        /// Minimum NIP-13 proof-of-work difficulty the relay requires to accept an event.
         public var minPowDifficulty: Int?
+        /// Whether the relay requires NIP-42 authentication before serving requests.
         public var authRequired: Bool?
+        /// Whether the relay requires payment to use.
         public var paymentRequired: Bool?
+        /// Whether writes are restricted (e.g. to paid or allow-listed pubkeys).
         public var restrictedWrites: Bool?
+        /// Oldest `created_at` (Unix seconds) the relay accepts; events older than this are rejected.
         public var createdAtLowerLimit: Int64?
+        /// Newest `created_at` (Unix seconds) the relay accepts; events further in the future are rejected.
         public var createdAtUpperLimit: Int64?
+        /// Number of events returned when a filter omits an explicit `limit`.
         public var defaultLimit: Int?
 
         enum CodingKeys: String, CodingKey {
@@ -208,8 +223,11 @@ extension RelayInformation {
 
     /// Fee schedules for admission, subscription, and publication.
     public struct Fees: Codable, Sendable, Hashable {
+        /// One-time fees charged to be admitted to the relay.
         public var admission: [FeeSchedule]?
+        /// Recurring fees charged per subscription period.
         public var subscription: [FeeSchedule]?
+        /// Fees charged to publish events, optionally scoped to specific kinds.
         public var publication: [FeeSchedule]?
 
         public init(
