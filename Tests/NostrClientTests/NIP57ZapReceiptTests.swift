@@ -26,11 +26,14 @@ struct NIP57ZapReceiptTests {
         return try signer.sign(UnsignedEvent(pubkey: signer.publicKey, kind: .zap, rawTags: tags, content: ""))
     }
 
-    /// Builds a JSON-encoded kind-9734 zap request with the given amount.
-    private func zapRequestJSON(recipient: String, amountMillisats: Int64?) throws -> String {
+    /// Builds a JSON-encoded kind-9734 zap request with the given amount and, optionally, zapped event.
+    private func zapRequestJSON(recipient: String, amountMillisats: Int64?, eventId: String? = nil) throws
+        -> String
+    {
         let sender = EventSigner(keyPair: try KeyPair())
         let request = try sender.signZapRequest(
-            recipientPubkey: recipient, relays: ["wss://relay.example.com"], amountMillisats: amountMillisats)
+            recipientPubkey: recipient, relays: ["wss://relay.example.com"],
+            amountMillisats: amountMillisats, eventId: eventId)
         return String(decoding: try JSONEncoder().encode(request), as: UTF8.self)
     }
 
@@ -226,6 +229,68 @@ struct NIP57ZapReceiptTests {
         #expect(throws: ZapReceipt.ValidationError.amountMismatch) {
             try ZapReceipt(event: receipt)!.validate(
                 lnurlProviderPubkey: payee.publicKeyHex, expectedAmountMillisats: 1)
+        }
+    }
+
+    @Test("a receipt recipient differing from the zap request fails recipientMismatch")
+    func recipientMismatch() throws {
+        let payee = try KeyPair()
+        let requestRecipient = try KeyPair().publicKeyHex
+        let receiptRecipient = try KeyPair().publicKeyHex  // a different recipient
+        let description = try zapRequestJSON(recipient: requestRecipient, amountMillisats: coffeeAmountMillisats)
+        let receipt = try makeReceipt(
+            signedBy: payee,
+            tags: [
+                ["bolt11", coffeeInvoice],
+                ["description", description],
+                ["p", receiptRecipient],
+            ])
+
+        #expect(throws: ZapReceipt.ValidationError.recipientMismatch) {
+            try ZapReceipt(event: receipt)!.validate(lnurlProviderPubkey: payee.publicKeyHex)
+        }
+    }
+
+    @Test("a receipt zapped-event differing from the zap request fails zappedEventMismatch")
+    func zappedEventMismatch() throws {
+        let payee = try KeyPair()
+        let recipient = try KeyPair().publicKeyHex
+        let description = try zapRequestJSON(
+            recipient: recipient, amountMillisats: coffeeAmountMillisats, eventId: "eventInRequest")
+        let receipt = try makeReceipt(
+            signedBy: payee,
+            tags: [
+                ["bolt11", coffeeInvoice],
+                ["description", description],
+                ["p", recipient],
+                ["e", "aDifferentEvent"],
+            ])
+
+        #expect(throws: ZapReceipt.ValidationError.zappedEventMismatch) {
+            try ZapReceipt(event: receipt)!.validate(lnurlProviderPubkey: payee.publicKeyHex)
+        }
+    }
+
+    @Test("an invalid signature is reported even when the bolt11 is also unparseable")
+    func invalidSignatureTakesPrecedenceOverBolt11() throws {
+        let payee = try KeyPair()
+        let recipient = try KeyPair().publicKeyHex
+        let description = try zapRequestJSON(recipient: recipient, amountMillisats: coffeeAmountMillisats)
+        let receipt = try makeReceipt(
+            signedBy: payee,
+            tags: [
+                ["bolt11", "not a valid bolt11"],
+                ["description", description],
+                ["p", recipient],
+            ])
+        let replacement: Character = receipt.sig.first == "a" ? "b" : "a"
+        let badSig = String(replacement) + receipt.sig.dropFirst()
+        let tampered = Event(
+            id: receipt.id, pubkey: receipt.pubkey, createdAt: receipt.createdAt, kind: receipt.kind,
+            tags: receipt.tags, content: receipt.content, sig: badSig)
+
+        #expect(throws: ZapReceipt.ValidationError.invalidSignature) {
+            try ZapReceipt(event: tampered)!.validate(lnurlProviderPubkey: payee.publicKeyHex)
         }
     }
 
