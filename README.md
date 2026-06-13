@@ -2,6 +2,8 @@
 
 A modern Swift library for the Nostr protocol, built with Swift 6 concurrency support.
 
+📖 **[API documentation](https://yysskk.github.io/swift-nostr-client/documentation/nostrclient)** — a [Getting Started](https://yysskk.github.io/swift-nostr-client/documentation/nostrclient/gettingstarted) guide, in-depth [Advanced Usage](https://yysskk.github.io/swift-nostr-client/documentation/nostrclient/advancedusage), and reference docs for every type.
+
 ## Features
 
 - **Full NIP-01 Support**: Events, subscriptions, and relay communication
@@ -13,12 +15,13 @@ A modern Swift library for the Nostr protocol, built with Swift 6 concurrency su
 - **NIP-40 Expiration**: Disappearing messages via an expiration timestamp, including private DMs
 - **NIP-42 Authentication**: Relay AUTH challenges answered automatically, with auth-required retry
 - **NIP-57 Zaps**: Full Lightning zap flow — sign zap requests (kind 9734), resolve LNURL-pay endpoints, fetch invoices, decode bolt11, and verify kind-9735 zap receipts
-- **Cryptographic Operations**: Schnorr signatures with secp256k1
 - **NIP-19 Entities**: bech32 encoding/decoding of npub, nsec, note, nprofile, nevent, and naddr
 - **NIP-65 Outbox Model**: Per-user read/write relay lists with gossip routing for subscriptions and publishing
-- **Async/Await**: Modern Swift concurrency with actors
-- **Multi-Relay Support**: Connect to multiple relays with RelayPool
-- **Type-Safe**: Full Sendable compliance for thread safety
+- **Cryptographic Operations**: Schnorr signatures with secp256k1
+- **Async/Await**: Modern Swift concurrency, actor-isolated and fully `Sendable`
+- **Multi-Relay Support**: Connect to multiple relays with `RelayPool`
+
+See the [full list of supported NIPs](#supported-nips) below.
 
 ## Requirements
 
@@ -37,391 +40,93 @@ dependencies: [
 ]
 ```
 
-Or add via Xcode: File → Add Package Dependencies → Enter repository URL.
+Or add via Xcode: File → Add Package Dependencies → Enter the repository URL.
 
 ## Quick Start
 
-### Generate Keys
+### Generate keys
 
 ```swift
 import NostrClient
 
-// Generate a new random keypair
-let keyPair = try KeyPair()
-print("Public Key: \(keyPair.publicKeyHex)")
-print("npub: \(keyPair.npub)")
-print("nsec: \(keyPair.nsec)")
+let keyPair = try KeyPair()               // new random keypair
+print(keyPair.npub, keyPair.nsec)
 
-// Import from nsec
 let imported = try KeyPair(nsec: "nsec1...")
 
-// Generate from mnemonic (NIP-06)
-let (mnemonic, keyPairFromMnemonic) = try KeyPair.generate(wordCount: 12)
-print("Mnemonic: \(mnemonic.phrase)")
-print("Public Key: \(keyPairFromMnemonic.npub)")
-
-// Restore from existing mnemonic
-let restored = try KeyPair(mnemonicPhrase: "leader monkey parrot ring guide accident before fence cannon height naive bean")
+// From a BIP-39 mnemonic (NIP-06)
+let (mnemonic, derived) = try KeyPair.generate(wordCount: 12)
+print(mnemonic.phrase, derived.npub)
 ```
 
-### NIP-19 Entities
-
-```swift
-// Decode any bech32 entity: npub, nsec, note, nprofile, nevent, naddr
-let entity = try NIP19Entity.decode("nprofile1...")
-
-// Encode a reference, optionally with relay hints
-let nprofile = try NProfile(publicKey: keyPair.publicKeyHex, relays: ["wss://relay.example.com"]).encoded
-```
-
-`NEvent`, `NAddr`, and the full decoding API are covered in [Advanced Usage](https://yysskk.github.io/swift-nostr-client/documentation/nostrclient/advancedusage).
-
-### Connect to Relays
+### Connect and publish
 
 ```swift
 let client = NostrClient()
-
-// Add relays and connect in one step
-try await client.connect(to: [
-    "wss://relay.example.com",
-    "wss://relay2.example.com",
-    "wss://relay3.example.com"
-])
-
-// Or separately: addRelays(_:) then connect()
-```
-
-### Publish Events
-
-```swift
-// Set your private key
+try await client.connect(to: ["wss://relay.example.com", "wss://relay2.example.com"])
 try await client.setNsec("nsec1...")
 
-// Publish a text note — returns the signed event plus the per-relay outcome
+// Publish a text note — returns the signed event plus the per-relay outcome.
 let note = try await client.publishTextNote(content: "Hello, Nostr!")
 print("Accepted by \(note.result.acceptedRelays.count) relay(s)")
 
-// Publish with tags
-let tagged = try await client.publishTextNote(
-    content: "Check out #nostr",
-    tags: [.hashtag("nostr")]
-)
-
-// Wait for more acknowledgments before returning
-try await client.publishTextNote(content: "Important!", strategy: .quorum(2))
-
-// React to an event
 try await client.publishReaction(to: note.event, content: "🤙")
 ```
 
-### Subscribe to Events
+`PublishStrategy` controls how many acknowledgments a publish waits for (`.firstAck`, `.quorum(n)`, `.allSettled`); the returned `PublishResult` reports the per-relay outcome.
 
-Subscriptions are async sequences — iterate them with `for await`. The
-subscription is closed automatically when the loop ends or its task is
-cancelled.
+### Subscribe and fetch
+
+Subscriptions are async sequences — iterate them with `for await`. The subscription closes automatically when the loop ends or its task is cancelled.
 
 ```swift
-// Subscribe to a user's notes
+// Live timeline
 let timeline = try await client.subscribeToUserTimeline(pubkey: "...")
 for await event in timeline.events {
-    print("New note: \(event.content)")
+    print(event.content)
 }
 
-// Custom filter subscription, events only
-let filter = Filter(
-    kinds: [1],
-    authors: ["pubkey1", "pubkey2"],
-    limit: 100
-)
+// Custom filter
+let filter = Filter(kinds: [1], authors: ["pubkey1"], limit: 100)
 for await event in try await client.events(filters: [filter]) {
-    print("Received: \(event.id)")
+    print(event.id)
 }
 
-// Relay-aware subscription: EOSE, notices, and auth challenges per relay
-let subscription = try await client.subscribe(filters: [filter])
-for await item in subscription {
-    switch item {
-    case .event(let relayURL, let event):
-        print("[\(relayURL)] \(event.content)")
-    case .eose(let relayURL):
-        print("[\(relayURL)] end of stored events")
-    default:
-        break
-    }
-}
-
-// Close explicitly (or just break out of the loop / cancel the task)
-await subscription.close()
-```
-
-### Fetch Events
-
-```swift
-// Fetch specific event
-let event = try await client.fetchEvent(id: "eventid...")
-
-// Fetch user metadata
+// One-shot fetch
 let metadata = try await client.fetchMetadata(pubkey: "...")
-print("Name: \(metadata?.name ?? "Unknown")")
+print(metadata?.name ?? "Unknown")
 ```
 
-### Private Direct Messages (NIP-17)
+Need per-relay EOSE, notices, and auth challenges? Iterate `client.subscribe(filters:)` directly — see [Advanced Usage](https://yysskk.github.io/swift-nostr-client/documentation/nostrclient/advancedusage).
+
+### Private direct messages (NIP-17)
 
 ```swift
-// Advertise where you receive DMs (kind 10050). Keep it short — NIP-17 suggests 1–3 relays.
+// Advertise where you receive DMs (kind 10050; NIP-17 suggests 1–3 relays), then connect your inbox.
 try await client.publishDirectMessageRelayList(relays: ["wss://inbox.example.com"])
-
-// Connect your own inbox relays, then receive — already decrypted and parsed
 try await client.connectDirectMessageInboxRelays()
+
+// Receive — already decrypted and parsed.
 for await message in try await client.directMessages() {
     print("\(message.senderPubkey): \(message.content)")
 }
 
-// Send (encrypted, gift-wrapped, with a self-copy for sent history). Each gift wrap is routed
-// to its addressee's advertised DM relays — the recipient copy to the recipient's, your
-// self-copy to your own — discovered from each user's kind 10050, falling back to the relay
-// pool when a user has published no DM relay list.
+// Send (encrypted, gift-wrapped, routed to each party's DM relays).
 try await client.sendDirectMessage("Hello privately!", to: "recipientPubkeyHex")
-
-// Disappearing message (NIP-40): relays stop serving it after the expiration. The received
-// message exposes `expiresAt` so clients can hide it once it lapses.
-try await client.sendDirectMessage(
-    "This self-destructs in an hour",
-    to: "recipientPubkeyHex",
-    expiration: Date().addingTimeInterval(3600)
-)
-
-// Look up where another user receives DMs (cached for routing)
-let dmRelays = try await client.fetchDirectMessageRelayList(for: "recipientPubkeyHex")
-print("Receives DMs on: \(dmRelays?.relays ?? [])")
-
-// React to a received message (NIP-25, gift-wrapped like the message). directMessagePayloads()
-// delivers messages, reactions, and file messages (kind 15) together.
-for await payload in try await client.directMessagePayloads() {
-    switch payload {
-    case .message(let message):
-        try await client.reactToDirectMessage(message, reaction: "🤙")
-    case .reaction(let reaction):
-        print("\(reaction.senderPubkey) reacted \(reaction.content) to \(reaction.messageId)")
-    case .file(let file):
-        let blob = try await download(file.url)  // your transport
-        let data = try EncryptedFile.decrypt(blob, key: file.decryptionKey, nonce: file.decryptionNonce)
-        print("received \(file.mimeType ?? "file"), \(data.count) bytes")
-    }
-}
-
-// Send an encrypted file (kind 15): encrypt, upload the ciphertext, then send the URL + keys.
-let encrypted = try EncryptedFile.encrypt(imageData)
-let url = try await upload(encrypted.ciphertext)  // your host (Blossom, NIP-96, …)
-try await client.sendFileMessage(
-    url: url, mimeType: "image/jpeg", encryption: encrypted, to: "recipientPubkeyHex"
-)
 ```
 
-### Relay Information (NIP-11)
+Reactions (NIP-25), encrypted file messages (kind 15), and disappearing messages (NIP-40) build on the same flow — see [Advanced Usage](https://yysskk.github.io/swift-nostr-client/documentation/nostrclient/advancedusage).
 
-```swift
-let info = try await RelayInformation.fetch(fromRelayURLString: "wss://relay.example.com")
-print(info.name ?? "unknown", info.supportedNIPs ?? [])
-```
+## More
 
-### Authentication (NIP-42)
+Each of these is covered in depth, with worked examples, in the [documentation](https://yysskk.github.io/swift-nostr-client/documentation/nostrclient):
 
-Some relays require clients to authenticate before serving DMs or accepting events. With a
-signer set, the client answers AUTH challenges automatically, retries publishes rejected with
-`auth-required:`, and re-requests subscriptions the relay closed pending authentication.
-
-```swift
-// Automatic (default): nothing else to do once a signer is set
-try await client.setNsec("nsec1...")
-
-// Prefer explicit control? Authenticating reveals your pubkey to the relay,
-// so you can opt out and answer challenges yourself:
-await client.setAuthenticationMode(.manual)
-for await event in try await client.subscribe(filters: [filter]) {
-    if case .auth(let relayURL, _) = event {
-        try await client.authenticate(relayURL: relayURL)
-    }
-}
-```
-
-### Outbox Model (NIP-65)
-
-The outbox/gossip model routes reads and writes to each user's declared relays instead of
-broadcasting everywhere. Publish your relay list (kind 10002), then let the client resolve and
-connect the right relays automatically.
-
-```swift
-// Publish your own relay list: where you read (inbox) and write (outbox)
-try await client.publishRelayList(
-    read: ["wss://inbox.example.com"],
-    write: ["wss://relay.example.com", "wss://relay2.example.com"]
-)
-
-// Fetch another user's relay list (cached for routing)
-let relayList = try await client.fetchRelayList(for: "pubkey...")
-print("Writes to: \(relayList?.writeRelays ?? [])")
-
-// Outbox read: subscribe to authors on *their* write relays,
-// resolving and connecting relays on demand
-let outbox = try await client.subscribeOutbox(authors: ["pubkey1", "pubkey2"])
-for await event in outbox.events {
-    print("Note: \(event.content)")
-}
-
-// Gossip publish: route an event to the author's write relays plus the
-// inbox (read) relays of every pubkey it mentions in "p" tags
-let signer = EventSigner(keyPair: keyPair)
-let note = try signer.signTextNote(content: "gm!", tags: [.pubkey("alice_pubkey")])
-try await client.publishGossip(note)
-```
-
-By default the client adds and connects resolved relays on demand (capped per resolve). Pass
-`gossipPolicy: .requirePresent` to `NostrClient(...)` to route only to relays already in the pool.
-
-### Lightning Zaps (NIP-57)
-
-The full sender flow: resolve the recipient's LNURL-pay endpoint, sign a zap request, fetch the
-Lightning invoice, and verify the zap receipt once it arrives over relays. Paying the bolt11 invoice
-is the caller's job (use a Lightning wallet).
-
-```swift
-// 1. Resolve the recipient's LNURL-pay endpoint from their lud16 lightning address
-//    (read from their profile metadata), then GET it to read the pay parameters.
-guard let serviceURL = LNURL.payServiceURL(forLightningAddress: "alice@example.com") else { return }
-let (data, _) = try await URLSession.shared.data(from: serviceURL)
-let pay = try JSONDecoder().decode(LNURLPayResponse.self, from: data)
-guard pay.supportsZaps, let providerPubkey = pay.nostrPubkey else { return }
-
-// 2. Sign a zap request (kind 9734) — note it is NOT published to relays.
-let signer = EventSigner(keyPair: keyPair)
-let zapRequest = try signer.signZapRequest(
-    recipientPubkey: "recipientPubkeyHex",
-    relays: ["wss://relay.example.com"],     // where the recipient's wallet should publish the receipt
-    amountMillisats: 21_000,
-    lnurl: LNURL.encode(serviceURL),
-    comment: "great post!"
-)
-
-// 3. Fetch the bolt11 invoice from the callback, then pay it with a Lightning wallet.
-let bolt11 = try await pay.fetchInvoice(
-    amountMillisats: 21_000, zapRequest: zapRequest, lnurl: LNURL.encode(serviceURL))
-// …pay `bolt11` with your wallet. You can also decode it on its own:
-let invoice = Bolt11Invoice(bolt11)   // .amountMillisats, .paymentHash, .descriptionHash, .expirySeconds
-
-// 4. When the kind-9735 zap receipt arrives over relays, verify it is authentic.
-if let receipt = ZapReceipt(event: receiptEvent) {
-    try receipt.validate(lnurlProviderPubkey: providerPubkey, expectedAmountMillisats: 21_000)
-    // receipt.recipientPubkey, receipt.amountMillisats, receipt.zappedEventId, …
-}
-```
-
-## Models
-
-### Event
-
-```swift
-public struct Event: Codable, Identifiable, Hashable, Sendable {
-    public let id: String
-    public let pubkey: String
-    public let createdAt: Int64
-    public let kind: Kind            // RawRepresentable struct; integer literals convert
-    public let tags: [[String]]
-    public let content: String
-    public let sig: String
-}
-```
-
-### Filter
-
-```swift
-public struct Filter: Codable, Sendable, Hashable {
-    public var ids: [String]?
-    public var authors: [String]?
-    public var kinds: [Event.Kind]?
-    public var eventReferences: [String]?    // #e
-    public var pubkeyReferences: [String]?   // #p
-    public var since: Int64?
-    public var until: Int64?
-    public var limit: Int?
-}
-```
-
-### Event Kinds
-
-```swift
-Event.Kind.setMetadata          // 0
-Event.Kind.textNote             // 1
-Event.Kind.recommendRelay       // 2
-Event.Kind.contacts             // 3
-Event.Kind.eventDeletion        // 5
-Event.Kind.repost               // 6
-Event.Kind.reaction             // 7
-Event.Kind.seal                 // 13 (NIP-59)
-Event.Kind.privateDirectMessage // 14 (NIP-17)
-Event.Kind.giftWrap             // 1059 (NIP-59)
-Event.Kind.zapRequest           // 9734
-Event.Kind.zap                  // 9735
-Event.Kind.relayListMetadata        // 10002 (NIP-65)
-Event.Kind.directMessageRelayList   // 10050 (NIP-17)
-
-// Kinds are open-ended: any integer works
-let custom = Event.Kind(rawValue: 30311)
-let literal: Event.Kind = 1     // == .textNote
-
-// NIP-01 range semantics
-Event.Kind.relayListMetadata.isReplaceable  // true
-custom.isAddressable                        // true (30000-39999)
-// ... and more
-```
-
-## Low-Level API
-
-### Direct Relay Connection
-
-```swift
-let connection = try RelayConnection(urlString: "wss://relay.example.com")
-await connection.connect()
-
-// Subscribe
-try await connection.subscribe(
-    subscriptionId: "sub1",
-    filters: [Filter(kinds: [1], limit: 10)]
-)
-
-// Listen for messages
-for await message in await connection.messages() {
-    switch message {
-    case .event(let subId, let event):
-        print("Event: \(event.content)")
-    case .endOfStoredEvents(let subId):
-        print("EOSE for \(subId)")
-    case .notice(let msg):
-        print("Notice: \(msg)")
-    default:
-        break
-    }
-}
-```
-
-### Manual Event Signing
-
-```swift
-let keyPair = try KeyPair()
-let signer = EventSigner(keyPair: keyPair)
-
-let unsigned = UnsignedEvent(
-    pubkey: keyPair.publicKeyHex,
-    kind: .textNote,
-    tags: [.hashtag("test")],
-    content: "Manual signing example"
-)
-
-let signed = try signer.sign(unsigned)
-
-// Verify signature
-let isValid = try signed.verify()
-```
+- **Lightning Zaps (NIP-57)** — resolve an LNURL-pay endpoint, sign a zap request, fetch the bolt11 invoice, and verify the kind-9735 receipt.
+- **Outbox model (NIP-65)** — publish your read/write relay list and route reads/writes to each user's declared relays with `subscribeOutbox` / `publishGossip`.
+- **Client authentication (NIP-42)** — AUTH challenges are answered automatically once a signer is set, with auth-required publish retry; an opt-in manual mode is available.
+- **Relay information (NIP-11)** — fetch a relay's capabilities with `RelayInformation.fetch(fromRelayURLString:)`.
+- **NIP-19 entities** — encode/decode `npub`/`nsec`/`note`/`nprofile`/`nevent`/`naddr` via `NIP19Entity`, `NProfile`, `NEvent`, and `NAddr`.
+- **Low-level APIs** — drive a single `RelayConnection` directly, or sign events by hand with `EventSigner`.
 
 ## Supported NIPs
 
