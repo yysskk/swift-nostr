@@ -77,10 +77,18 @@ extension NostrClient {
     /// (``connectDirectMessageInboxRelays()``).
     /// - Returns: The connected inbox relay URLs (empty if none are known or reachable).
     func connectedDirectMessageInboxRelays(for pubkey: String) async -> Set<URL> {
-        // Discovery needs at least one connected relay to query; this also avoids a blocking
-        // fetch against a pool that cannot answer.
-        if await dmRelayListStore.cachedList(for: pubkey) == nil, await relayPool.connectedCount() > 0 {
-            _ = try? await fetchDirectMessageRelayList(for: pubkey)
+        // Fetch only once per pubkey: skip it when the list is already resolved — cached, or a
+        // prior lookup confirmed there is none — so repeated sends don't refetch. Discovery also
+        // needs at least one connected relay to query, which avoids a blocking fetch against a
+        // pool that cannot answer.
+        if await dmRelayListStore.isResolved(for: pubkey) == false, await relayPool.connectedCount() > 0 {
+            do {
+                if try await fetchDirectMessageRelayList(for: pubkey) == nil {
+                    await dmRelayListStore.markNoList(for: pubkey)
+                }
+            } catch {
+                // Transient fetch failure: leave the pubkey unresolved so a later send can retry.
+            }
         }
         let inboxURLs = await dmRelayListStore.inboxRelayURLs(for: pubkey)
         return await dmRelayListStore.ensureConnected(inboxURLs)

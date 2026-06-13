@@ -66,6 +66,20 @@ struct DirectMessageRoutingTests {
         #expect(targets.isEmpty)
     }
 
+    @Test("A recipient with an empty DM relay list resolves to no relays (pool fallback)")
+    func recipientWithEmptyListResolvesEmpty() async {
+        let client = NostrClient()
+        let recipient = "recipientpubkey"
+        // The recipient advertised a kind 10050 with no relays; routing resolves to nothing,
+        // so the caller falls back to the full pool.
+        await client.dmRelayListStore.store(
+            DirectMessageRelayList(relays: []), createdAt: 1, for: recipient
+        )
+
+        let targets = await client.connectedDirectMessageInboxRelays(for: recipient)
+        #expect(targets.isEmpty)
+    }
+
     @Test("sendDirectMessage falls back to the pool when no DM relay list is known")
     func sendFallsBackToPool() async throws {
         let client = NostrClient()

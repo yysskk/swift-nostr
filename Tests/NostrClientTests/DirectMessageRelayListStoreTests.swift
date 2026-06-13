@@ -65,6 +65,61 @@ struct DirectMessageRelayListStoreTests {
         #expect(inbox.isEmpty)
     }
 
+    @Test("An empty DM relay list resolves to an empty inbox set")
+    func emptyListResolvesEmptyInbox() async {
+        let store = makeStore()
+        let pubkey = "pubkey1"
+
+        await store.store(DirectMessageRelayList(relays: []), createdAt: 1, for: pubkey)
+
+        // A peer advertising an empty list is "resolved" but routes nowhere, so the
+        // caller falls back to the full pool rather than refetching.
+        #expect(await store.isResolved(for: pubkey) == true)
+        #expect(await store.inboxRelayURLs(for: pubkey).isEmpty)
+    }
+
+    // MARK: - Negative cache
+
+    @Test("A fresh pubkey is unresolved until looked up")
+    func freshPubkeyIsUnresolved() async {
+        let store = makeStore()
+        #expect(await store.isResolved(for: "nobody") == false)
+    }
+
+    @Test("markNoList resolves a pubkey without caching a list")
+    func markNoListResolvesWithoutCaching() async {
+        let store = makeStore()
+        let pubkey = "pubkey1"
+
+        await store.markNoList(for: pubkey)
+
+        #expect(await store.isResolved(for: pubkey) == true)
+        // The negative cache must not leak a phantom list through the read APIs.
+        #expect(await store.cachedList(for: pubkey) == nil)
+        #expect(await store.inboxRelayURLs(for: pubkey).isEmpty)
+    }
+
+    @Test("A cached list counts as resolved")
+    func cachedListIsResolved() async {
+        let store = makeStore()
+        let pubkey = "pubkey1"
+
+        await store.store(DirectMessageRelayList(relays: ["wss://a.example.com"]), createdAt: 1, for: pubkey)
+        #expect(await store.isResolved(for: pubkey) == true)
+    }
+
+    @Test("Storing a real list clears a prior no-list mark")
+    func storingClearsNoListMark() async {
+        let store = makeStore()
+        let pubkey = "pubkey1"
+
+        await store.markNoList(for: pubkey)
+        await store.store(DirectMessageRelayList(relays: ["wss://a.example.com"]), createdAt: 1, for: pubkey)
+
+        #expect(await store.cachedList(for: pubkey)?.relays == ["wss://a.example.com"])
+        #expect(await store.isResolved(for: pubkey) == true)
+    }
+
     @Test("Ingest a kind 10050 event")
     func ingestEvent() async throws {
         let store = makeStore()

@@ -17,6 +17,7 @@ public enum NostrError: Error, LocalizedError, Sendable, Equatable {
     case subscriptionNotFound(String)
     case relayError(String)
     case authenticationFailed(String)
+    case cannotPublishAuthenticationEvent
     case timeout
     case invalidHex
     case invalidBech32
@@ -66,6 +67,9 @@ public enum NostrError: Error, LocalizedError, Sendable, Equatable {
             return "Relay error: \(message)"
         case .authenticationFailed(let message):
             return "Authentication failed: \(message)"
+        case .cannotPublishAuthenticationEvent:
+            return
+                "NIP-42 authentication events (kind 22242) must not be published; they are only sent as AUTH responses"
         case .timeout:
             return "Operation timed out"
         case .invalidHex:

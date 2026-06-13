@@ -49,6 +49,35 @@ struct NIP42AuthenticationEventTests {
         let now = Int64(Date().timeIntervalSince1970)
         #expect(abs(event.createdAt - now) < 60)
     }
+
+    @Test("the relay tag echoes the connection URL verbatim")
+    func relayTagIsNotNormalized() throws {
+        let signer = EventSigner(keyPair: try KeyPair())
+
+        // NIP-42 says the relay tag is the URL "as used to connect". The URL is echoed
+        // verbatim — including a trailing slash — rather than normalized, since relays
+        // compare it against their own canonical form and lossy rewriting risks a mismatch.
+        let withSlash = try signer.signClientAuthentication(
+            relayURL: URL(string: "wss://relay.example.com/")!, challenge: "abc")
+        #expect(withSlash.firstTagValue(named: "relay") == "wss://relay.example.com/")
+
+        let withoutSlash = try signer.signClientAuthentication(
+            relayURL: URL(string: "wss://relay.example.com")!, challenge: "abc")
+        #expect(withoutSlash.firstTagValue(named: "relay") == "wss://relay.example.com")
+    }
+
+    @Test("an authentication event must not be published")
+    func authenticationEventCannotBePublished() async throws {
+        let pool = RelayPool()
+        await pool.addRelay(url: URL(string: "wss://relay.example.com")!)
+        let signer = EventSigner(keyPair: try KeyPair())
+        let authEvent = try signer.signClientAuthentication(
+            relayURL: URL(string: "wss://relay.example.com")!, challenge: "abc")
+
+        await #expect(throws: NostrError.cannotPublishAuthenticationEvent) {
+            _ = try await pool.publish(authEvent)
+        }
+    }
 }
 
 @Suite("NIP-42 Relay Connection Authentication Tests")

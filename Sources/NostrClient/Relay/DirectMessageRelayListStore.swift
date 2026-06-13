@@ -7,6 +7,9 @@ import Foundation
 /// ``RelayListStore`` via a ``RelayConnector``.
 actor DirectMessageRelayListStore {
     private var cache = ReplaceableCache<DirectMessageRelayList>()
+    /// Pubkeys a lookup confirmed have no kind 10050 event. This negative cache lets
+    /// the send path skip a repeat network fetch for every message to such a peer.
+    private var resolvedWithoutList: Set<String> = []
     private let connector: RelayConnector
 
     init(pool: RelayPool, policy: GossipRelayPolicy = .addAndConnect, maxRelaysPerResolve: Int = 8) {
@@ -18,7 +21,22 @@ actor DirectMessageRelayListStore {
     /// - Returns: The effective (possibly pre-existing) list.
     @discardableResult
     func store(_ list: DirectMessageRelayList, createdAt: Int64, for pubkey: String) -> DirectMessageRelayList {
-        cache.store(list, createdAt: createdAt, for: pubkey)
+        // A real list supersedes any earlier "no list" result for this pubkey.
+        resolvedWithoutList.remove(pubkey)
+        return cache.store(list, createdAt: createdAt, for: pubkey)
+    }
+
+    /// Records that a network lookup found no DM relay list for `pubkey`, so repeated
+    /// resolutions can skip the fetch. A later kind 10050 (via ``store(_:createdAt:for:)``
+    /// or ``ingest(_:)``) clears the mark.
+    func markNoList(for pubkey: String) {
+        resolvedWithoutList.insert(pubkey)
+    }
+
+    /// Whether this pubkey's DM relay list has already been resolved — either a list is
+    /// cached, or a lookup confirmed there is none — so another network fetch can be skipped.
+    func isResolved(for pubkey: String) -> Bool {
+        cache.value(for: pubkey) != nil || resolvedWithoutList.contains(pubkey)
     }
 
     /// Ingests a kind 10050 event into the cache.
