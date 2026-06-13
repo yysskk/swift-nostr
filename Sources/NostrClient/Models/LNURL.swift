@@ -1,5 +1,9 @@
 import Foundation
 
+#if canImport(FoundationNetworking)
+    import FoundationNetworking
+#endif
+
 /// LNURL-pay helpers for NIP-57 Lightning zaps.
 ///
 /// https://github.com/nostr-protocol/nips/blob/master/57.md
@@ -124,4 +128,129 @@ public struct LNURLPayResponse: Decodable, Sendable, Hashable {
         let allowed = CharacterSet.urlQueryAllowed.subtracting(CharacterSet(charactersIn: "+&=?#"))
         return value.addingPercentEncoding(withAllowedCharacters: allowed)
     }
+}
+
+/// The response from an LNURL-pay callback: the bolt11 invoice to pay for a zap (NIP-57).
+public struct LNURLInvoiceResponse: Decodable, Sendable, Hashable {
+    /// The bolt11 Lightning invoice to pay (the `pr`, or "payment request", field).
+    public let pr: String
+
+    public init(pr: String) {
+        self.pr = pr
+    }
+}
+
+// MARK: - Invoice Fetching
+
+extension LNURLPayResponse {
+    /// Errors that can occur while fetching a Lightning invoice from the LNURL callback.
+    public enum InvoiceError: Error, LocalizedError, Sendable, Equatable {
+        /// The amount is outside the endpoint's `minSendable...maxSendable` range (millisatoshis).
+        case amountOutOfRange(min: Int64, max: Int64)
+
+        /// The callback or zap request could not be encoded into an invoice request URL.
+        case invalidCallbackURL
+
+        /// A lower-level network error occurred.
+        case networkError(String)
+
+        /// The endpoint returned a non-2xx response, or a body that was not a valid invoice.
+        case invalidResponse
+
+        /// The endpoint returned an LNURL error response (`{"status":"ERROR","reason":...}`).
+        case lnurlError(String)
+
+        public var errorDescription: String? {
+            switch self {
+            case .amountOutOfRange(let min, let max):
+                return "Amount is outside the endpoint's range (\(min)...\(max) msats)"
+            case .invalidCallbackURL:
+                return "Could not build the invoice request URL"
+            case .networkError(let message):
+                return "Network error: \(message)"
+            case .invalidResponse:
+                return "Invalid response from the LNURL endpoint"
+            case .lnurlError(let reason):
+                return "LNURL endpoint error: \(reason)"
+            }
+        }
+    }
+
+    /// Fetches a Lightning invoice for a zap from this endpoint's callback.
+    ///
+    /// Validates that `amountMillisats` is within `minSendable...maxSendable`, builds the request
+    /// with ``invoiceRequestURL(amountMillisats:zapRequest:lnurl:)``, sends a GET, and returns the
+    /// bolt11 invoice from the `{"pr": "<bolt11>"}` response. Pay the returned invoice to complete
+    /// the zap; the recipient's wallet then publishes the kind-9735 zap receipt.
+    /// https://github.com/nostr-protocol/nips/blob/master/57.md
+    /// - Parameters:
+    ///   - amountMillisats: The amount in millisatoshis. Must be within `minSendable...maxSendable`.
+    ///   - zapRequest: The signed kind-9734 zap request.
+    ///   - lnurl: The bech32 `lnurl`, forwarded as the `lnurl` parameter when provided.
+    ///   - urlSession: The URL session to use (defaults to `.shared`).
+    /// - Returns: The bolt11 Lightning invoice to pay.
+    /// - Throws: ``InvoiceError`` if the amount is out of range, the request cannot be built, the
+    ///   network request fails, or the endpoint returns an error.
+    public func fetchInvoice(
+        amountMillisats: Int64,
+        zapRequest: Event,
+        lnurl: String? = nil,
+        urlSession: URLSession = .shared
+    ) async throws -> String {
+        // Explicit comparisons rather than `(minSendable...maxSendable).contains(_:)` — a malformed
+        // response with minSendable > maxSendable would trap when constructing the range.
+        guard amountMillisats >= minSendable, amountMillisats <= maxSendable else {
+            throw InvoiceError.amountOutOfRange(min: minSendable, max: maxSendable)
+        }
+        guard
+            let url = invoiceRequestURL(amountMillisats: amountMillisats, zapRequest: zapRequest, lnurl: lnurl)
+        else {
+            throw InvoiceError.invalidCallbackURL
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+
+        let data: Data
+        let urlResponse: URLResponse
+        do {
+            (data, urlResponse) = try await urlSession.data(for: request)
+        } catch {
+            // Surface cancellation as CancellationError; wrap everything else so no raw error leaks
+            // past the typed InvoiceError. URLSession reports task cancellation as URLError(.cancelled).
+            if error is CancellationError {
+                throw error
+            }
+            if let urlError = error as? URLError, urlError.code == .cancelled {
+                throw CancellationError()
+            }
+            throw InvoiceError.networkError(error.localizedDescription)
+        }
+
+        guard let httpResponse = urlResponse as? HTTPURLResponse,
+            (200...299).contains(httpResponse.statusCode)
+        else {
+            throw InvoiceError.invalidResponse
+        }
+
+        // An LNURL endpoint can return an error object ({"status":"ERROR","reason":...}) even with a
+        // 2xx status, so surface that before trying to decode the invoice.
+        if let status = try? JSONDecoder().decode(LNURLStatusResponse.self, from: data),
+            status.status.uppercased() == "ERROR"
+        {
+            throw InvoiceError.lnurlError(status.reason ?? "unknown error")
+        }
+
+        guard let invoice = try? JSONDecoder().decode(LNURLInvoiceResponse.self, from: data) else {
+            throw InvoiceError.invalidResponse
+        }
+        return invoice.pr
+    }
+}
+
+/// The error shape an LNURL endpoint returns: `{"status":"ERROR","reason":"..."}` (LUD-06).
+private struct LNURLStatusResponse: Decodable {
+    let status: String
+    let reason: String?
 }
