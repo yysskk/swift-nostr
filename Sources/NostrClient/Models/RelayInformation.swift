@@ -141,7 +141,8 @@ public struct RelayInformation: Codable, Sendable, Hashable {
 extension RelayInformation {
     /// Protocol limitations advertised by a relay (part of NIP-11).
     public struct Limitation: Codable, Sendable, Hashable {
-        /// Maximum length, in bytes, of a message (the serialized event) the relay accepts.
+        /// Maximum length, in bytes, of any incoming JSON message the relay accepts
+        /// (REQ, EVENT, CLOSE, AUTH, COUNT — not only events).
         public var maxMessageLength: Int?
         /// Maximum number of concurrent subscriptions allowed on one connection.
         public var maxSubscriptions: Int?
