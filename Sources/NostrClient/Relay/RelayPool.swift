@@ -158,6 +158,12 @@ public actor RelayPool {
         to relayURLs: Set<URL>? = nil,
         strategy: PublishStrategy? = nil
     ) async throws -> PublishResult {
+        // NIP-42: the authentication event is only ever sent as an AUTH response, never
+        // published as a stored event. Reject it here so a stray publish can't leak it.
+        guard event.kind != .clientAuthentication else {
+            throw NostrError.cannotPublishAuthenticationEvent
+        }
+
         let connections = targetConnections(relayURLs)
         guard !connections.isEmpty else { return PublishResult(statuses: [:]) }
 
