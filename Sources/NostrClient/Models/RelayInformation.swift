@@ -393,7 +393,9 @@ extension RelayInformation {
         do {
             (data, urlResponse) = try await urlSession.data(for: request)
         } catch {
-            if error is CancellationError || Task.isCancelled {
+            // Surface cancellation as CancellationError; wrap everything else so no raw error leaks
+            // past the typed FetchError. URLSession reports task cancellation as URLError(.cancelled).
+            if error is CancellationError {
                 throw error
             }
             if let urlError = error as? URLError, urlError.code == .cancelled {
