@@ -27,11 +27,7 @@ public struct NAddr: Sendable, Hashable {
 
     /// Decodes an `naddr` bech32 string.
     public init(bech32String: String) throws {
-        let (hrp, data) = try Bech32.decode(bech32String)
-        guard hrp == "naddr" else {
-            throw NostrError.unknownPrefix(hrp)
-        }
-        try self.init(tlvData: data)
+        try self.init(tlvData: TLV.payload(fromBech32: bech32String, prefix: "naddr"))
     }
 
     /// Builds an `naddr` coordinate from an addressable event, extracting its `d` tag.
@@ -73,11 +69,10 @@ public struct NAddr: Sendable, Hashable {
 
     /// The canonical `naddr` bech32 string.
     public var encoded: String {
-        var records = [TLV.Record(type: TLV.Kind.special.rawValue, value: Data(identifier.utf8))]
-        records += relays.map { TLV.Record(type: TLV.Kind.relay.rawValue, value: Data($0.utf8)) }
-        records.append(TLV.Record(type: TLV.Kind.author.rawValue, value: Data(hexString: author) ?? Data()))
-        records.append(TLV.Record(type: TLV.Kind.kind.rawValue, value: TLV.encodeKind(kind)))
-        let data = (try? TLV.encode(records)) ?? Data()
-        return Bech32.encode(hrp: "naddr", data: data)
+        let records =
+            [TLV.specialRecord(Data(identifier.utf8))]
+            + TLV.relayRecords(relays)
+            + [TLV.authorRecord(hex: author), TLV.kindRecord(kind)]
+        return TLV.bech32(records, prefix: "naddr")
     }
 }

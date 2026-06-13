@@ -27,11 +27,7 @@ public struct NEvent: Sendable, Hashable {
 
     /// Decodes an `nevent` bech32 string.
     public init(bech32String: String) throws {
-        let (hrp, data) = try Bech32.decode(bech32String)
-        guard hrp == "nevent" else {
-            throw NostrError.unknownPrefix(hrp)
-        }
-        try self.init(tlvData: data)
+        try self.init(tlvData: TLV.payload(fromBech32: bech32String, prefix: "nevent"))
     }
 
     /// Builds an `nevent` reference from a known event, capturing its id, author, and kind.
@@ -75,15 +71,13 @@ public struct NEvent: Sendable, Hashable {
 
     /// The canonical `nevent` bech32 string.
     public var encoded: String {
-        var records = [TLV.Record(type: TLV.Kind.special.rawValue, value: Data(hexString: eventId) ?? Data())]
-        records += relays.map { TLV.Record(type: TLV.Kind.relay.rawValue, value: Data($0.utf8)) }
+        var records = [TLV.specialRecord(hex: eventId)] + TLV.relayRecords(relays)
         if let author {
-            records.append(TLV.Record(type: TLV.Kind.author.rawValue, value: Data(hexString: author) ?? Data()))
+            records.append(TLV.authorRecord(hex: author))
         }
         if let kind {
-            records.append(TLV.Record(type: TLV.Kind.kind.rawValue, value: TLV.encodeKind(kind)))
+            records.append(TLV.kindRecord(kind))
         }
-        let data = (try? TLV.encode(records)) ?? Data()
-        return Bech32.encode(hrp: "nevent", data: data)
+        return TLV.bech32(records, prefix: "nevent")
     }
 }

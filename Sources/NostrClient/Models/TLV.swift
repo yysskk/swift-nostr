@@ -6,9 +6,14 @@ import Foundation
 /// https://github.com/nostr-protocol/nips/blob/master/19.md
 enum TLV {
     enum Kind: UInt8 {
+        /// The entity's primary value: the pubkey (`nprofile`), event id (`nevent`),
+        /// or `d`-tag identifier (`naddr`).
         case special = 0
+        /// A relay-hint URL. May appear multiple times.
         case relay = 1
+        /// The author's pubkey (32 bytes).
         case author = 2
+        /// The event kind, big-endian.
         case kind = 3
     }
 
@@ -100,5 +105,52 @@ enum TLV {
             throw NostrError.invalidNIP19Entity
         }
         return kind
+    }
+
+    // MARK: - Entity Round-Trip Helpers
+
+    /// Decodes a bech32 string into its TLV payload, verifying the human-readable prefix.
+    /// Shared by the `nprofile`/`nevent`/`naddr` `init(bech32String:)` initializers.
+    static func payload(fromBech32 string: String, prefix: String) throws -> Data {
+        let (hrp, data) = try Bech32.decode(string)
+        guard hrp == prefix else {
+            throw NostrError.unknownPrefix(hrp)
+        }
+        return data
+    }
+
+    /// Encodes records into a bech32 string with the given prefix.
+    ///
+    /// Encoding errors (a value over 255 bytes) yield an empty payload, matching the
+    /// lenient `encoded` accessors on the entity types — which only fail to round-trip
+    /// values that their throwing initializers already reject.
+    static func bech32(_ records: [Record], prefix: String) -> String {
+        Bech32.encode(hrp: prefix, data: (try? encode(records)) ?? Data())
+    }
+
+    /// A ``Kind/special`` record carrying raw bytes (used for the `naddr` identifier).
+    static func specialRecord(_ value: Data) -> Record {
+        Record(type: Kind.special.rawValue, value: value)
+    }
+
+    /// A ``Kind/special`` record carrying a value decoded from 32-byte hex
+    /// (the `nprofile` pubkey or `nevent` event id).
+    static func specialRecord(hex: String) -> Record {
+        specialRecord(Data(hexString: hex) ?? Data())
+    }
+
+    /// ``Kind/relay`` records, one per relay-hint URL.
+    static func relayRecords(_ urls: [String]) -> [Record] {
+        urls.map { Record(type: Kind.relay.rawValue, value: Data($0.utf8)) }
+    }
+
+    /// A ``Kind/author`` record carrying a pubkey decoded from 32-byte hex.
+    static func authorRecord(hex: String) -> Record {
+        Record(type: Kind.author.rawValue, value: Data(hexString: hex) ?? Data())
+    }
+
+    /// A ``Kind/kind`` record carrying a big-endian event kind.
+    static func kindRecord(_ kind: Int) -> Record {
+        Record(type: Kind.kind.rawValue, value: encodeKind(kind))
     }
 }

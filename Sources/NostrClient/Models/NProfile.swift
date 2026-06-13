@@ -18,11 +18,7 @@ public struct NProfile: Sendable, Hashable {
 
     /// Decodes an `nprofile` bech32 string.
     public init(bech32String: String) throws {
-        let (hrp, data) = try Bech32.decode(bech32String)
-        guard hrp == "nprofile" else {
-            throw NostrError.unknownPrefix(hrp)
-        }
-        try self.init(tlvData: data)
+        try self.init(tlvData: TLV.payload(fromBech32: bech32String, prefix: "nprofile"))
     }
 
     init(tlvData: Data) throws {
@@ -50,9 +46,6 @@ public struct NProfile: Sendable, Hashable {
 
     /// The canonical `nprofile` bech32 string.
     public var encoded: String {
-        var records = [TLV.Record(type: TLV.Kind.special.rawValue, value: Data(hexString: publicKey) ?? Data())]
-        records += relays.map { TLV.Record(type: TLV.Kind.relay.rawValue, value: Data($0.utf8)) }
-        let data = (try? TLV.encode(records)) ?? Data()
-        return Bech32.encode(hrp: "nprofile", data: data)
+        TLV.bech32([TLV.specialRecord(hex: publicKey)] + TLV.relayRecords(relays), prefix: "nprofile")
     }
 }
