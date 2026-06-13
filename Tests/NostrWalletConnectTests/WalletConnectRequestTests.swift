@@ -87,6 +87,23 @@ struct WalletConnectRequestTests {
         #expect(second["id"] == nil)
     }
 
+    @Test("lookup_invoice by payment hash sends only payment_hash")
+    func lookupByPaymentHash() throws {
+        let root = try wire(
+            WalletConnectRequest(method: .lookupInvoice, params: LookupInvoiceParams.paymentHash("aa")))
+        let params = try params(root)
+        #expect(params["payment_hash"] == .string("aa"))
+        #expect(params["invoice"] == nil)
+    }
+
+    @Test("list_transactions encodes the transaction type")
+    func listTransactionsType() throws {
+        let root = try wire(
+            WalletConnectRequest(method: .listTransactions, params: ListTransactionsParams(type: .incoming)))
+        let params = try params(root)
+        #expect(params["type"] == .string("incoming"))
+    }
+
     @Test("metadata keys are preserved verbatim (no snake_case mangling)")
     func metadataKeysPreserved() throws {
         let metadata: [String: JSONValue] = [

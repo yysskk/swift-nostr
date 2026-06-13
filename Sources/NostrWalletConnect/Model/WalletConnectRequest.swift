@@ -171,11 +171,14 @@ public struct MakeInvoiceParams: Codable, Sendable, Hashable {
     }
 }
 
-/// Parameters for `lookup_invoice`. Provide at least one of ``paymentHash`` or ``invoice``.
+/// Parameters for `lookup_invoice`.
+///
+/// Construct one with ``paymentHash(_:)`` or ``invoice(_:)`` — the type guarantees exactly one
+/// lookup key is set, so an invalid empty request cannot be expressed.
 public struct LookupInvoiceParams: Codable, Sendable, Hashable {
-    /// The payment hash to look up.
+    /// The payment hash to look up, if looking up by payment hash.
     public let paymentHash: String?
-    /// The BOLT-11 invoice to look up.
+    /// The BOLT-11 invoice to look up, if looking up by invoice.
     public let invoice: String?
 
     enum CodingKeys: String, CodingKey {
@@ -183,10 +186,26 @@ public struct LookupInvoiceParams: Codable, Sendable, Hashable {
         case invoice
     }
 
-    public init(paymentHash: String? = nil, invoice: String? = nil) {
+    private init(paymentHash: String?, invoice: String?) {
         self.paymentHash = paymentHash
         self.invoice = invoice
     }
+
+    /// Looks up an invoice by its payment hash.
+    public static func paymentHash(_ paymentHash: String) -> LookupInvoiceParams {
+        LookupInvoiceParams(paymentHash: paymentHash, invoice: nil)
+    }
+
+    /// Looks up an invoice by its BOLT-11 string.
+    public static func invoice(_ invoice: String) -> LookupInvoiceParams {
+        LookupInvoiceParams(paymentHash: nil, invoice: invoice)
+    }
+}
+
+/// A NIP-47 transaction direction.
+public enum TransactionType: String, Codable, Sendable, Hashable {
+    case incoming
+    case outgoing
 }
 
 /// Parameters for `list_transactions`.
@@ -201,12 +220,12 @@ public struct ListTransactionsParams: Codable, Sendable, Hashable {
     public let offset: Int?
     /// Whether to include unpaid transactions.
     public let unpaid: Bool?
-    /// Filter by transaction type (`"incoming"` or `"outgoing"`).
-    public let type: String?
+    /// Filter by transaction direction.
+    public let type: TransactionType?
 
     public init(
         from: Int64? = nil, until: Int64? = nil, limit: Int? = nil, offset: Int? = nil,
-        unpaid: Bool? = nil, type: String? = nil
+        unpaid: Bool? = nil, type: TransactionType? = nil
     ) {
         self.from = from
         self.until = until

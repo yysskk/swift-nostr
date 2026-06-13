@@ -45,6 +45,15 @@ struct WalletConnectResponseTests {
         #expect(tx.metadata?["k"] == .string("v"))
     }
 
+    @Test("get_info defaults methods to empty when the field is omitted")
+    func decodeGetInfoMissingMethods() throws {
+        let json = #"{"result_type":"get_info","result":{"alias":"X"}}"#
+        let response = try decode(json, as: GetInfoResult.self)
+        let result = try #require(response.result)
+        #expect(result.methods == [])
+        #expect(result.notifications == nil)
+    }
+
     @Test("decodes a pay_invoice result")
     func decodePayInvoice() throws {
         let json = #"{"result_type":"pay_invoice","result":{"preimage":"0011","fees_paid":100}}"#

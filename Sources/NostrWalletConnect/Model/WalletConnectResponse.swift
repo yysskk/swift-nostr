@@ -114,6 +114,19 @@ public struct GetInfoResult: Codable, Sendable, Hashable {
         self.methods = methods
         self.notifications = notifications
     }
+
+    // Custom decoding so `methods` defaults to empty rather than throwing for wallets that omit it.
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        alias = try container.decodeIfPresent(String.self, forKey: .alias)
+        color = try container.decodeIfPresent(String.self, forKey: .color)
+        pubkey = try container.decodeIfPresent(String.self, forKey: .pubkey)
+        network = try container.decodeIfPresent(String.self, forKey: .network)
+        blockHeight = try container.decodeIfPresent(Int64.self, forKey: .blockHeight)
+        blockHash = try container.decodeIfPresent(String.self, forKey: .blockHash)
+        methods = try container.decodeIfPresent([String].self, forKey: .methods) ?? []
+        notifications = try container.decodeIfPresent([String].self, forKey: .notifications)
+    }
 }
 
 /// The result of `list_transactions`.
@@ -125,3 +138,15 @@ public struct ListTransactionsResult: Codable, Sendable, Hashable {
         self.transactions = transactions
     }
 }
+
+/// The result of `make_invoice`: a freshly created invoice transaction.
+public typealias MakeInvoiceResult = WalletConnectTransaction
+
+/// The result of `lookup_invoice`: the matching invoice transaction.
+public typealias LookupInvoiceResult = WalletConnectTransaction
+
+/// The per-invoice result of `multi_pay_invoice` (one response event per invoice).
+public typealias MultiPayInvoiceItemResult = PayInvoiceResult
+
+/// The per-keysend result of `multi_pay_keysend` (one response event per keysend).
+public typealias MultiPayKeysendItemResult = PayKeysendResult

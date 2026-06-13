@@ -46,9 +46,12 @@ public enum WalletConnectError: Error, LocalizedError, Sendable, Equatable {
 /// A NIP-47 error code.
 ///
 /// The standard codes are modeled as cases; any code a wallet sends that is not in the spec is
-/// preserved verbatim as ``unknown(_:)``.
+/// preserved verbatim as ``unknown(_:)``. The non-failable `init(rawValue:)` (unknown codes fall
+/// back to ``unknown(_:)``) satisfies `RawRepresentable`'s failable requirement.
 /// https://github.com/nostr-protocol/nips/blob/master/47.md
-public enum WalletConnectErrorCode: Sendable, Equatable {
+public enum WalletConnectErrorCode: RawRepresentable, Sendable, Equatable {
+    public typealias RawValue = String
+
     case rateLimited
     case notImplemented
     case insufficientBalance
