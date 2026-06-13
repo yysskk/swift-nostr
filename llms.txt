@@ -8,7 +8,8 @@ NostrClient provides a high-level actor-based API for interacting with the Nostr
 - `KeyPair` / `PublicKey` / `EventSigner`: key generation, import (hex/nsec/mnemonic), event signing
 - `Event` / `Filter` / `SubscriptionEvent`: NIP-01 data models
 - `RelayPool` / `RelayConnection`: multi-relay WebSocket management with auto-reconnect
-- `DirectMessage` / `DirectMessageReaction` / `DirectMessagePayload` / `DirectMessageBuilder` / `DirectMessageParser`: NIP-17 private DMs and NIP-25 DM reactions
+- `DirectMessage` / `DirectMessageReaction` / `DirectMessageFile` / `DirectMessagePayload` / `DirectMessageBuilder` / `DirectMessageParser`: NIP-17 private DMs, NIP-25 reactions, and kind 15 file messages
+- `EncryptedFile`: AES-256-GCM encryption for NIP-17 file messages
 - `SealedMessage` / `GiftWrap`: NIP-44 encryption and NIP-59 gift wrap
 - `Mnemonic` / `KeyDerivation`: BIP-39 seed phrase and BIP-32 key derivation (NIP-06)
 
@@ -22,7 +23,7 @@ NostrClient provides a high-level actor-based API for interacting with the Nostr
 - NIP-09: Event deletion
 - NIP-10: Reply threading (root/reply markers)
 - NIP-11: Relay information document
-- NIP-17: Private direct messages
+- NIP-17: Private direct messages (kind 10050 DM relay lists, kind 15 encrypted file messages)
 - NIP-18: Reposts
 - NIP-19: bech32-encoded entities (npub, nsec, note, nprofile, nevent, naddr)
 - NIP-20: Command results (OK)

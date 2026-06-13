@@ -88,9 +88,58 @@ extension NostrClient {
         )
     }
 
+    /// Sends a NIP-17 kind-15 file message, gift-wrapped and routed like a text message.
+    ///
+    /// Encrypt the file with ``EncryptedFile/encrypt(_:)`` and upload the resulting
+    /// ``EncryptedFile/ciphertext`` to your host first, then pass the URL and the `EncryptedFile`
+    /// here. The message carries the URL plus the key, nonce, and hashes the recipient needs to
+    /// download and decrypt it.
+    /// - Parameters:
+    ///   - url: The URL of the uploaded encrypted file.
+    ///   - mimeType: The file's MIME type before encryption (e.g. "image/jpeg").
+    ///   - encryption: The encryption result from ``EncryptedFile/encrypt(_:)``.
+    ///   - size: Optional size of the encrypted file in bytes.
+    ///   - dimensions: Optional pixel dimensions as "<width>x<height>".
+    ///   - blurhash: Optional blurhash placeholder for progressive display.
+    ///   - recipientPubkey: The recipient's public key (hex).
+    ///   - expiration: Optional NIP-40 expiration applied to both gift wraps.
+    ///   - strategy: How many relay acknowledgments to wait for on the recipient gift wrap before
+    ///     returning (default: the pool config's ``RelayPoolConfig/defaultPublishStrategy``).
+    /// - Returns: The shared rumor, both gift wraps, and the per-relay publish outcomes.
+    @discardableResult
+    public func sendFileMessage(
+        url: String,
+        mimeType: String,
+        encryption: EncryptedFile,
+        size: Int? = nil,
+        dimensions: String? = nil,
+        blurhash: String? = nil,
+        to recipientPubkey: String,
+        expiration: Date? = nil,
+        strategy: PublishStrategy? = nil
+    ) async throws -> SendDirectMessageResult {
+        let keyPair = try getKeyPair()
+
+        let builder = DirectMessageBuilder(keyPair: keyPair)
+        let result = try builder.createFileMessageWithSelfCopy(
+            url: url,
+            mimeType: mimeType,
+            encryption: encryption,
+            size: size,
+            dimensions: dimensions,
+            blurhash: blurhash,
+            to: recipientPubkey,
+            expiration: expiration
+        )
+
+        return try await deliverDirectMessage(
+            result, to: recipientPubkey, senderPubkey: keyPair.publicKeyHex, strategy: strategy
+        )
+    }
+
     /// Routes a built result's gift wraps to the recipient's and sender's kind-10050 DM relays and
-    /// publishes them, returning the result enriched with per-relay outcomes. Shared by the message
-    /// and reaction send paths.
+    /// publishes them, returning the result enriched with per-relay outcomes. Shared by the message,
+    /// reaction, and file send paths.
     ///
     /// A nil target means the addressee advertised no DM relay list (or none could be connected), so
     /// the copy falls back to the full pool rather than being dropped. The recipient and sender
@@ -158,7 +207,15 @@ extension NostrClient {
         return try DirectMessageParser(keyPair: keyPair).parseReaction(giftWrap)
     }
 
-    /// Parses a received gift wrap into a ``DirectMessagePayload`` — a message or a reaction.
+    /// Parses a received gift-wrapped NIP-17 kind-15 file message.
+    /// - Parameter giftWrap: The gift-wrapped event
+    /// - Returns: The parsed file message
+    public func parseDirectMessageFile(_ giftWrap: Event) throws -> DirectMessageFile {
+        let keyPair = try getKeyPair()
+        return try DirectMessageParser(keyPair: keyPair).parseFileMessage(giftWrap)
+    }
+
+    /// Parses a received gift wrap into a ``DirectMessagePayload`` — a message, a reaction, or a file.
     /// - Parameter giftWrap: The gift-wrapped event
     /// - Returns: The decrypted payload
     public func parseDirectMessagePayload(_ giftWrap: Event) throws -> DirectMessagePayload {

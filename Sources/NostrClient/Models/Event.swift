@@ -116,6 +116,7 @@ extension Event {
         public static let badgeAward = Kind(rawValue: 8)
         public static let seal = Kind(rawValue: 13)
         public static let privateDirectMessage = Kind(rawValue: 14)
+        public static let fileMessage = Kind(rawValue: 15)
         public static let channelCreation = Kind(rawValue: 40)
         public static let channelMetadata = Kind(rawValue: 41)
         public static let channelMessage = Kind(rawValue: 42)

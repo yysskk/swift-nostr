@@ -96,6 +96,55 @@ public struct DirectMessageBuilder: Sendable {
         )
     }
 
+    /// Creates a gift-wrapped NIP-17 kind-15 file message, plus the sender's self-copy.
+    ///
+    /// The file must already be encrypted (see ``EncryptedFile/encrypt(_:)``) and uploaded; pass
+    /// the resulting URL and ``EncryptedFile``. The message carries the URL as its content and the
+    /// key, nonce, and hashes as tags, wrapped exactly like a text message so it stays private.
+    /// - Parameters:
+    ///   - url: The URL of the uploaded encrypted file.
+    ///   - mimeType: The file's MIME type before encryption (the `file-type` tag).
+    ///   - encryption: The encryption result whose key, nonce, and hashes describe the file.
+    ///   - size: Optional size of the encrypted file in bytes (the `size` tag).
+    ///   - dimensions: Optional pixel dimensions as "<width>x<height>" (the `dim` tag).
+    ///   - blurhash: Optional blurhash placeholder (the `blurhash` tag).
+    ///   - recipientPubkey: The recipient's public key (hex).
+    ///   - expiration: Optional NIP-40 expiration applied to both gift wraps.
+    /// - Returns: The shared rumor and both gift wraps.
+    public func createFileMessageWithSelfCopy(
+        url: String,
+        mimeType: String,
+        encryption: EncryptedFile,
+        size: Int? = nil,
+        dimensions: String? = nil,
+        blurhash: String? = nil,
+        to recipientPubkey: String,
+        expiration: Date? = nil
+    ) throws -> SendDirectMessageResult {
+        let rumor = try makeFileRumor(
+            url: url, mimeType: mimeType, encryption: encryption, recipientPubkey: recipientPubkey,
+            size: size, dimensions: dimensions, blurhash: blurhash)
+
+        let recipientGiftWrap = try GiftWrap.wrap(
+            event: rumor,
+            senderKeyPair: senderKeyPair,
+            recipientPubkey: recipientPubkey,
+            expiration: expiration
+        )
+        let selfGiftWrap = try GiftWrap.wrap(
+            event: rumor,
+            senderKeyPair: senderKeyPair,
+            recipientPubkey: senderKeyPair.publicKeyHex,
+            expiration: expiration
+        )
+
+        return SendDirectMessageResult(
+            rumor: rumor,
+            recipientGiftWrap: recipientGiftWrap,
+            selfGiftWrap: selfGiftWrap
+        )
+    }
+
     /// Creates gift-wrapped events for a group message (sends to multiple recipients)
     /// Each recipient gets their own gift-wrapped copy
     /// - Parameters:
@@ -188,6 +237,45 @@ public struct DirectMessageBuilder: Sendable {
             kind: .reaction,
             tags: tags,
             content: reaction
+        )
+        return try unsigned.asRumor()
+    }
+
+    /// Creates the unsigned kind-15 file-message rumor. Like the message rumor it is never signed.
+    /// The content is the file URL; the key, nonce, and hashes are carried as tags.
+    private func makeFileRumor(
+        url: String,
+        mimeType: String,
+        encryption: EncryptedFile,
+        recipientPubkey: String,
+        size: Int?,
+        dimensions: String?,
+        blurhash: String?
+    ) throws -> Event {
+        var tags: [Tag] = [
+            .pubkey(recipientPubkey),
+            Tag(name: "file-type", values: [mimeType]),
+            Tag(name: "encryption-algorithm", values: ["aes-gcm"]),
+            Tag(name: "decryption-key", values: [encryption.key.base64EncodedString()]),
+            Tag(name: "decryption-nonce", values: [encryption.nonce.base64EncodedString()]),
+            Tag(name: "x", values: [encryption.encryptedSHA256]),
+            Tag(name: "ox", values: [encryption.originalSHA256]),
+        ]
+        if let size {
+            tags.append(Tag(name: "size", values: [String(size)]))
+        }
+        if let dimensions {
+            tags.append(Tag(name: "dim", values: [dimensions]))
+        }
+        if let blurhash {
+            tags.append(Tag(name: "blurhash", values: [blurhash]))
+        }
+
+        let unsigned = UnsignedEvent(
+            pubkey: senderKeyPair.publicKeyHex,
+            kind: .fileMessage,
+            tags: tags,
+            content: url
         )
         return try unsigned.asRumor()
     }

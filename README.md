@@ -9,7 +9,7 @@ A modern Swift library for the Nostr protocol, built with Swift 6 concurrency su
 - **NIP-03 OpenTimestamps**: Attach OTS attestations to events
 - **NIP-05 Verification**: DNS-based identifier verification
 - **NIP-06 Key Derivation**: Generate keys from BIP-39 mnemonic seed phrases
-- **NIP-17 Private DMs**: End-to-end encrypted direct messages with sender anonymity and kind 10050 DM relay routing
+- **NIP-17 Private DMs**: End-to-end encrypted direct messages with sender anonymity, kind 10050 DM relay routing, reactions, and encrypted file messages
 - **NIP-40 Expiration**: Disappearing messages via an expiration timestamp, including private DMs
 - **NIP-42 Authentication**: Relay AUTH challenges answered automatically, with auth-required retry
 - **Cryptographic Operations**: Schnorr signatures with secp256k1
@@ -194,16 +194,27 @@ try await client.sendDirectMessage(
 let dmRelays = try await client.fetchDirectMessageRelayList(for: "recipientPubkeyHex")
 print("Receives DMs on: \(dmRelays?.relays ?? [])")
 
-// React to a received message (NIP-25, gift-wrapped like the message). Receive messages and
-// reactions together via directMessagePayloads().
+// React to a received message (NIP-25, gift-wrapped like the message). directMessagePayloads()
+// delivers messages, reactions, and file messages (kind 15) together.
 for await payload in try await client.directMessagePayloads() {
     switch payload {
     case .message(let message):
         try await client.reactToDirectMessage(message, reaction: "🤙")
     case .reaction(let reaction):
         print("\(reaction.senderPubkey) reacted \(reaction.content) to \(reaction.messageId)")
+    case .file(let file):
+        let blob = try await download(file.url)  // your transport
+        let data = try EncryptedFile.decrypt(blob, key: file.decryptionKey, nonce: file.decryptionNonce)
+        print("received \(file.mimeType ?? "file"), \(data.count) bytes")
     }
 }
+
+// Send an encrypted file (kind 15): encrypt, upload the ciphertext, then send the URL + keys.
+let encrypted = try EncryptedFile.encrypt(imageData)
+let url = try await upload(encrypted.ciphertext)  // your host (Blossom, NIP-96, …)
+try await client.sendFileMessage(
+    url: url, mimeType: "image/jpeg", encryption: encrypted, to: "recipientPubkeyHex"
+)
 ```
 
 ### Relay Information (NIP-11)
@@ -384,7 +395,7 @@ let isValid = try signed.verify()
 - [x] NIP-09: Event deletion
 - [x] NIP-10: Reply threading (root/reply markers)
 - [x] NIP-11: Relay information document
-- [x] NIP-17: Private direct messages (with kind 10050 DM relay lists)
+- [x] NIP-17: Private direct messages (kind 10050 DM relay lists, encrypted kind 15 file messages)
 - [x] NIP-18: Reposts
 - [x] NIP-19: bech32-encoded entities (npub, nsec, note, nprofile, nevent, naddr)
 - [x] NIP-20: Command Results (OK)

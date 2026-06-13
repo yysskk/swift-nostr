@@ -33,7 +33,21 @@ public struct DirectMessageParser: Sendable {
         return try makeReaction(from: unwrapped, giftWrap: giftWrap)
     }
 
-    /// Unwraps a gift wrap and classifies it as a message (kind 14) or a reaction (kind 7).
+    /// Parses a gift-wrapped event into a DirectMessageFile (NIP-17 kind 15).
+    /// - Parameter giftWrap: The gift-wrapped event
+    /// - Returns: The parsed file message
+    /// - Throws: ``NostrError/invalidData`` if the inner rumor is not a kind-15 file message or
+    ///   is missing a valid decryption key/nonce.
+    public func parseFileMessage(_ giftWrap: Event) throws -> DirectMessageFile {
+        let unwrapped = try GiftWrap.unwrap(giftWrap: giftWrap, recipientKeyPair: recipientKeyPair)
+        guard unwrapped.event.kind == .fileMessage else {
+            throw NostrError.invalidData
+        }
+        return try makeFile(from: unwrapped, giftWrap: giftWrap)
+    }
+
+    /// Unwraps a gift wrap and classifies it as a message (kind 14), reaction (kind 7), or file
+    /// message (kind 15).
     /// - Parameter giftWrap: The gift-wrapped event
     /// - Returns: The decrypted payload
     /// - Throws: ``NostrError/invalidData`` for any other inner kind.
@@ -44,6 +58,8 @@ public struct DirectMessageParser: Sendable {
             return .message(makeMessage(from: unwrapped, giftWrap: giftWrap))
         case .reaction:
             return .reaction(try makeReaction(from: unwrapped, giftWrap: giftWrap))
+        case .fileMessage:
+            return .file(try makeFile(from: unwrapped, giftWrap: giftWrap))
         default:
             throw NostrError.invalidData
         }
@@ -107,6 +123,45 @@ public struct DirectMessageParser: Sendable {
             messageId: messageId,
             messageAuthorPubkey: author,
             content: rumor.content,
+            createdAt: Date(timeIntervalSince1970: TimeInterval(rumor.createdAt)),
+            expiresAt: giftWrap.expiration
+        )
+    }
+
+    private func makeFile(
+        from unwrapped: GiftWrap.UnwrappedMessage, giftWrap: Event
+    ) throws -> DirectMessageFile {
+        let rumor = unwrapped.event
+
+        // A file message must carry a non-empty URL plus a decodable AES-256 key (32 bytes) and
+        // GCM nonce (12 bytes); reject malformed events here rather than failing later at decrypt.
+        guard
+            !rumor.content.isEmpty,
+            let keyBase64 = rumor.firstTagValue(named: "decryption-key"),
+            let key = Data(base64Encoded: keyBase64),
+            key.count == 32,
+            let nonceBase64 = rumor.firstTagValue(named: "decryption-nonce"),
+            let nonce = Data(base64Encoded: nonceBase64),
+            nonce.count == 12
+        else {
+            throw NostrError.invalidData
+        }
+
+        let recipientPubkey = rumor.firstTagValue(named: "p") ?? recipientKeyPair.publicKeyHex
+
+        return DirectMessageFile(
+            rumorId: rumor.id,
+            senderPubkey: unwrapped.senderPubkey,
+            recipientPubkey: recipientPubkey,
+            url: rumor.content,
+            mimeType: rumor.firstTagValue(named: "file-type"),
+            decryptionKey: key,
+            decryptionNonce: nonce,
+            encryptedSHA256: rumor.firstTagValue(named: "x"),
+            originalSHA256: rumor.firstTagValue(named: "ox"),
+            size: rumor.firstTagValue(named: "size").flatMap(Int.init),
+            dimensions: rumor.firstTagValue(named: "dim"),
+            blurhash: rumor.firstTagValue(named: "blurhash"),
             createdAt: Date(timeIntervalSince1970: TimeInterval(rumor.createdAt)),
             expiresAt: giftWrap.expiration
         )
