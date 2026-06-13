@@ -1,6 +1,6 @@
-# NostrClient
+# Nostr Client
 
-A modern Swift library for the Nostr protocol, built with Swift 6 concurrency support.
+Swift library for Nostr protocol
 
 📖 **[API documentation](https://yysskk.github.io/swift-nostr-client/documentation/nostrclient)** — a [Getting Started](https://yysskk.github.io/swift-nostr-client/documentation/nostrclient/gettingstarted) guide, in-depth [Advanced Usage](https://yysskk.github.io/swift-nostr-client/documentation/nostrclient/advancedusage), and reference docs for every type.
 
