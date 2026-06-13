@@ -28,6 +28,10 @@ public struct Bolt11Invoice: Sendable, Hashable {
     public let expirySeconds: Int64?
 
     /// Parses a BOLT-11 invoice string (e.g. `lnbc2500u1...`).
+    ///
+    /// An optional field that is present but malformed (e.g. a payment or description hash whose
+    /// length is not exactly 32 bytes) is silently skipped per BOLT-11, so a nil property means
+    /// "absent or invalid", not strictly "absent".
     /// - Returns: nil if the string is not a valid BOLT-11 invoice — a bad checksum, malformed
     ///   structure, or an out-of-range amount.
     public init?(_ invoice: String) {

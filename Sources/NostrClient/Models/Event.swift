@@ -159,11 +159,15 @@ extension Event.Kind: Codable {
 // MARK: - Unsigned Event
 /// An event before it has been signed
 public struct UnsignedEvent: Sendable {
+    /// The creator's public key (32-byte lowercase hex).
     public let pubkey: String
+    /// Creation time as a Unix timestamp in seconds.
     public let createdAt: Int64
+    /// The event kind (NIP-01).
     public let kind: Event.Kind
     /// Tags in their raw NIP-01 wire form (what is hashed and signed).
     public let tags: [[String]]
+    /// The event's content; its meaning depends on ``kind``.
     public let content: String
 
     public init(

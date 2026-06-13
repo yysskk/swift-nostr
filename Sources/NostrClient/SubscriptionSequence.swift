@@ -44,6 +44,7 @@ public struct SubscriptionSequence: AsyncSequence, Sendable {
         await onClose()
     }
 
+    /// Creates an iterator over the relay-aware subscription items.
     public func makeAsyncIterator() -> AsyncIterator {
         AsyncIterator(base: stream.makeAsyncIterator())
     }
@@ -79,6 +80,7 @@ public struct SubscriptionSequence: AsyncSequence, Sendable {
             await base.close()
         }
 
+        /// Creates an iterator that yields only event payloads.
         public func makeAsyncIterator() -> AsyncIterator {
             AsyncIterator(base: base.makeAsyncIterator())
         }
