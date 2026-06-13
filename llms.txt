@@ -11,6 +11,7 @@ NostrClient provides a high-level actor-based API for interacting with the Nostr
 - `DirectMessage` / `DirectMessageReaction` / `DirectMessageFile` / `DirectMessagePayload` / `DirectMessageBuilder` / `DirectMessageParser`: NIP-17 private DMs, NIP-25 reactions, and kind 15 file messages
 - `EncryptedFile`: AES-256-GCM encryption for NIP-17 file messages
 - `SealedMessage` / `GiftWrap`: NIP-44 encryption and NIP-59 gift wrap
+- `LNURL` / `LNURLPayResponse`: NIP-57 zap LNURL-pay resolution and invoice-request URLs
 - `Mnemonic` / `KeyDerivation`: BIP-39 seed phrase and BIP-32 key derivation (NIP-06)
 
 ## Supported NIPs
@@ -31,6 +32,7 @@ NostrClient provides a high-level actor-based API for interacting with the Nostr
 - NIP-40: Expiration timestamp (disappearing messages)
 - NIP-42: Client authentication (automatic challenge response, auth-required retry)
 - NIP-44: Versioned encryption (v2)
+- NIP-57: Lightning Zaps (zap request kind 9734 + LNURL helpers; receipt validation in progress)
 - NIP-59: Gift wrap
 
 ## Requirements

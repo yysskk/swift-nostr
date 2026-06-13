@@ -208,6 +208,62 @@ public struct EventSigner: Sendable {
     public func signDirectMessageRelayList(relays: [String]) throws -> Event {
         try signDirectMessageRelayList(DirectMessageRelayList(relays: relays))
     }
+
+    /// Creates and signs a zap request event (kind 9734, NIP-57).
+    ///
+    /// A zap request is **not** published to relays — it is sent to the recipient's LNURL-pay
+    /// callback (see ``LNURLPayResponse/invoiceRequestURL(amountMillisats:zapRequest:lnurl:)``),
+    /// which returns a Lightning invoice and later publishes the matching kind-9735 zap receipt.
+    /// https://github.com/nostr-protocol/nips/blob/master/57.md
+    /// - Parameters:
+    ///   - recipientPubkey: The hex-encoded pubkey being zapped (the `p` tag, required).
+    ///   - relays: Relays the recipient's wallet should publish the zap receipt to (the `relays`
+    ///     tag, required — must contain at least one relay).
+    ///   - amountMillisats: The amount in millisatoshis (the `amount` tag). Recommended.
+    ///   - lnurl: The recipient's lnurl-pay URL, bech32-encoded with the `lnurl` prefix. Recommended.
+    ///   - eventId: The hex event id when zapping an event rather than a person (the `e` tag).
+    ///   - eventCoordinate: An event coordinate when zapping an addressable event (the `a` tag).
+    ///   - comment: An optional message sent with the payment (the event content).
+    public func signZapRequest(
+        recipientPubkey: String,
+        relays: [String],
+        amountMillisats: Int64? = nil,
+        lnurl: String? = nil,
+        eventId: String? = nil,
+        eventCoordinate: String? = nil,
+        comment: String = ""
+    ) throws -> Event {
+        // NIP-57 requires at least one relay so the recipient's wallet knows where to publish the
+        // kind-9735 zap receipt; an empty list would otherwise yield a useless ["relays"] tag.
+        guard !relays.isEmpty else {
+            throw NostrError.invalidData
+        }
+
+        var tags: [Tag] = [
+            Tag(name: "relays", values: relays),
+            .pubkey(recipientPubkey),
+        ]
+        if let amountMillisats {
+            tags.append(Tag(name: "amount", values: [String(amountMillisats)]))
+        }
+        if let lnurl {
+            tags.append(Tag(name: "lnurl", values: [lnurl]))
+        }
+        if let eventId {
+            tags.append(.event(eventId))
+        }
+        if let eventCoordinate {
+            tags.append(Tag(name: "a", values: [eventCoordinate]))
+        }
+
+        let unsigned = UnsignedEvent(
+            pubkey: publicKey,
+            kind: .zapRequest,
+            tags: tags,
+            content: comment
+        )
+        return try sign(unsigned)
+    }
 }
 
 // MARK: - Event Verification
