@@ -76,3 +76,14 @@ jobs:
         with:
           name: coverage-lcov
           path: coverage.lcov
+
+  build-android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Build for Android
+        uses: skiptools/swift-android-action@2044b79660f201ccef8cbce62877e4ec5409f9c8 # v2.9.5
+        with:
+          swift-version: "6.3"
+          run-tests: false
