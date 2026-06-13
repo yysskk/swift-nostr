@@ -26,53 +26,95 @@ let note = try await client.publishTextNote(content: "Hello, Nostr!")
 ### Essentials
 
 - <doc:GettingStarted>
+- <doc:AdvancedUsage>
 - ``NostrClient/NostrClient``
 
-### Advanced
-
-- <doc:AdvancedUsage>
-
-### Models
+### Events and Filters
 
 - ``Event``
 - ``UnsignedEvent``
+- ``Tag``
 - ``Filter``
-- ``SubscriptionEvent``
-- ``RelayMessage``
 - ``UserMetadata``
-- ``NIP19Entity``
-- ``NProfile``
-- ``NEvent``
-- ``NAddr``
+- ``Contact``
 
-### Cryptography
+### Subscriptions
+
+- ``SubscriptionSequence``
+- ``SubscriptionEvent``
+
+### Publishing
+
+- ``PublishStrategy``
+- ``PublishResult``
+- ``PublishedEvent``
+- ``PublishRelayStatus``
+
+### Cryptography and Keys
 
 - ``KeyPair``
 - ``PublicKey``
 - ``EventSigner``
 - ``Mnemonic``
-- ``SealedMessage``
-- ``GiftWrap``
+- ``KeyDerivation``
+- ``BIP39WordList``
+- ``Bech32``
 
-### Direct Messages
+### Encrypted Messaging (NIP-17)
 
 - ``DirectMessage``
+- ``DirectMessageReaction``
+- ``DirectMessageFile``
+- ``DirectMessagePayload``
+- ``DirectMessageSequence``
+- ``DirectMessagePayloadSequence``
 - ``DirectMessageBuilder``
 - ``DirectMessageParser``
+- ``SendDirectMessageResult``
+- ``EncryptedFile``
+- ``SealedMessage``
+- ``GiftWrap``
+- ``DirectMessageRelayList``
 
-### Relay Management
+### NIP-19 Entities
+
+- ``NIP19Entity``
+- ``NProfile``
+- ``NEvent``
+- ``NAddr``
+
+### Relay Connections
 
 - ``RelayPool``
 - ``RelayConnection``
 - ``RelayConnectionConfig``
 - ``RelayPoolConfig``
 - ``RelayConnectionState``
-
-### Supporting Types
-
-- ``Contact``
-- ``InternetIdentifier``
+- ``RelayMessage``
+- ``ClientMessage``
+- ``RelayResponsePrefix``
 - ``RelayInformation``
+- ``AuthenticationMode``
+
+### Outbox Model (NIP-65)
+
+- ``RelayListMetadata``
+- ``RelayListEntry``
+- ``RelayUsage``
+- ``GossipRelayPolicy``
+
+### Lightning Zaps (NIP-57)
+
+- ``ZapReceipt``
+- ``Bolt11Invoice``
+- ``LNURL``
+- ``LNURLPayResponse``
+
+### Verification and Attestation
+
+- ``InternetIdentifier``
 - ``OpenTimestamps``
+
+### Errors
+
 - ``NostrError``
-- ``Bech32``

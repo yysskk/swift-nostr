@@ -58,6 +58,92 @@ let dm = try await client.parseDirectMessage(giftWrapEvent)
 print("Message: \(dm.content)")
 ```
 
+### Reactions (NIP-25)
+
+React to a received message with ``NostrClient/reactToDirectMessage(_:reaction:expiration:strategy:)``.
+The reaction is gift-wrapped exactly like a message, so it stays private and sender-anonymous:
+
+```swift
+try await client.reactToDirectMessage(message, reaction: "🤙")
+```
+
+### Encrypted File Messages (NIP-17 kind 15)
+
+A file message carries an *encrypted* file's URL together with the keys needed to decrypt it. Encrypt
+the bytes with ``EncryptedFile/encrypt(_:)``, upload the ciphertext to any host (Blossom, NIP-96, …),
+then send the URL and keys with
+``NostrClient/sendFileMessage(url:mimeType:encryption:size:dimensions:blurhash:to:expiration:strategy:)``:
+
+```swift
+let encrypted = try EncryptedFile.encrypt(imageData)
+let url = try await upload(encrypted.ciphertext)  // your transport
+try await client.sendFileMessage(
+    url: url, mimeType: "image/jpeg", encryption: encrypted, to: "recipientPubkeyHex"
+)
+```
+
+On receipt, download the ciphertext and decrypt it with the file's keys using
+``EncryptedFile/decrypt(_:key:nonce:)``:
+
+```swift
+let blob = try await download(file.url)  // your transport
+let data = try EncryptedFile.decrypt(blob, key: file.decryptionKey, nonce: file.decryptionNonce)
+```
+
+### Disappearing Messages (NIP-40)
+
+Pass an `expiration` to attach a NIP-40 expiration timestamp to a message's gift wraps. Relays stop
+serving the event after that time, and the received ``DirectMessage`` exposes ``DirectMessage/expiresAt``
+so clients can hide it once it lapses.
+
+```swift
+try await client.sendDirectMessage(
+    "This self-destructs in an hour",
+    to: "recipientPubkeyHex",
+    expiration: Date().addingTimeInterval(3600)
+)
+```
+
+### Receiving Mixed Payloads
+
+``NostrClient/directMessagePayloads(limit:)`` delivers messages, reactions, and file messages
+together as a ``DirectMessagePayload``, so one loop can handle every kind:
+
+```swift
+for await payload in try await client.directMessagePayloads() {
+    switch payload {
+    case .message(let message):
+        print("\(message.senderPubkey): \(message.content)")
+    case .reaction(let reaction):
+        print("\(reaction.senderPubkey) reacted \(reaction.content) to \(reaction.messageId)")
+    case .file(let file):
+        let blob = try await download(file.url)  // your transport
+        let data = try EncryptedFile.decrypt(blob, key: file.decryptionKey, nonce: file.decryptionNonce)
+        print("received \(file.mimeType ?? "file"), \(data.count) bytes")
+    }
+}
+```
+
+### DM Relay Lists (NIP-17 kind 10050)
+
+NIP-17 routes each gift wrap to its addressee's advertised DM relays. Advertise where you receive
+DMs with ``NostrClient/publishDirectMessageRelayList(relays:strategy:)`` (NIP-17 suggests 1–3
+relays), connect your own inbox relays before receiving with
+``NostrClient/connectDirectMessageInboxRelays()``, and look up another user's DM relays with
+``NostrClient/fetchDirectMessageRelayList(for:timeout:)``:
+
+```swift
+try await client.publishDirectMessageRelayList(relays: ["wss://inbox.example.com"])
+try await client.connectDirectMessageInboxRelays()
+
+let dmRelays = try await client.fetchDirectMessageRelayList(for: "recipientPubkeyHex")
+print("Receives DMs on: \(dmRelays?.relays ?? [])")
+```
+
+When sending, each gift wrap is routed to its addressee's advertised DM relays — the recipient copy
+to the recipient's, the sender's self-copy to the sender's own — discovered from each user's kind
+10050, falling back to the relay pool when a user has published no DM relay list.
+
 ## NIP-44 Encryption and NIP-59 Gift Wrap
 
 For lower-level access to encryption primitives:
@@ -276,6 +362,92 @@ A pre-signed event (e.g. from a remote signer) can be sent with
 ``RelayConnection/authenticate(with:)``. Detect why a relay denied an operation with
 ``RelayResponsePrefix`` — `auth-required:` means authenticate and retry, `restricted:`
 means the pubkey is not allowed even when authenticated.
+
+## Outbox Model (NIP-65)
+
+The outbox (gossip) model routes reads and writes to each user's declared relays instead of
+broadcasting everywhere. Publish your relay list (kind 10002) with
+``NostrClient/publishRelayList(read:write:strategy:)``, then let the client resolve and connect the
+right relays automatically.
+
+```swift
+// Publish your own relay list: where you read (inbox) and write (outbox)
+try await client.publishRelayList(
+    read: ["wss://inbox.example.com"],
+    write: ["wss://relay.example.com", "wss://relay2.example.com"]
+)
+
+// Fetch another user's relay list (cached for routing)
+let relayList = try await client.fetchRelayList(for: "pubkey...")
+print("Writes to: \(relayList?.writeRelays ?? [])")
+```
+
+An **outbox read** subscribes to each author on *their* write relays, resolving and connecting
+relays on demand with ``NostrClient/subscribeOutbox(authors:kinds:limit:)``:
+
+```swift
+let outbox = try await client.subscribeOutbox(authors: ["pubkey1", "pubkey2"])
+for await event in outbox.events {
+    print("Note: \(event.content)")
+}
+```
+
+A **gossip publish** routes an event to the author's write relays plus the inbox (read) relays of
+every pubkey it mentions in `p` tags, with ``NostrClient/publishGossip(_:strategy:)``:
+
+```swift
+let signer = EventSigner(keyPair: keyPair)
+let note = try signer.signTextNote(content: "gm!", tags: [.pubkey("alice_pubkey")])
+try await client.publishGossip(note)
+```
+
+By default the client adds and connects resolved relays on demand (capped per resolve). Pass
+`gossipPolicy: .requirePresent` (a ``GossipRelayPolicy``) to `NostrClient(...)` to route only to
+relays already in the pool.
+
+## Lightning Zaps (NIP-57)
+
+The full sender flow: resolve the recipient's LNURL-pay endpoint, sign a zap request, fetch the
+Lightning invoice, and verify the zap receipt once it arrives over relays. Paying the bolt11 invoice
+is the caller's job (use a Lightning wallet).
+
+```swift
+// 1. Resolve the recipient's LNURL-pay endpoint from their lud16 lightning address (read from
+//    their profile metadata), then GET it to read the pay parameters.
+guard let serviceURL = LNURL.payServiceURL(forLightningAddress: "alice@example.com") else { return }
+let (data, _) = try await URLSession.shared.data(from: serviceURL)
+let pay = try JSONDecoder().decode(LNURLPayResponse.self, from: data)
+guard pay.supportsZaps, let providerPubkey = pay.nostrPubkey else { return }
+
+// 2. Sign a zap request (kind 9734) — note it is NOT published to relays.
+let signer = EventSigner(keyPair: keyPair)
+let zapRequest = try signer.signZapRequest(
+    recipientPubkey: "recipientPubkeyHex",
+    relays: ["wss://relay.example.com"],     // where the recipient's wallet should publish the receipt
+    amountMillisats: 21_000,
+    lnurl: LNURL.encode(serviceURL),
+    comment: "great post!"
+)
+
+// 3. Fetch the bolt11 invoice from the callback, then pay it with a Lightning wallet.
+let bolt11 = try await pay.fetchInvoice(
+    amountMillisats: 21_000, zapRequest: zapRequest, lnurl: LNURL.encode(serviceURL))
+// …pay `bolt11` with your wallet. You can also decode it on its own (the initializer is failable):
+if let invoice = Bolt11Invoice(bolt11) {
+    // invoice.amountMillisats, .paymentHash, .descriptionHash, .expirySeconds
+}
+
+// 4. When the kind-9735 zap receipt arrives over relays, verify it is authentic.
+if let receipt = ZapReceipt(event: receiptEvent) {
+    try receipt.validate(lnurlProviderPubkey: providerPubkey, expectedAmountMillisats: 21_000)
+    // receipt.recipientPubkey, receipt.amountMillisats, receipt.zappedEventId, …
+}
+```
+
+The ``EventSigner/signZapRequest(recipientPubkey:relays:amountMillisats:lnurl:eventId:eventCoordinate:comment:)``,
+``LNURLPayResponse/fetchInvoice(amountMillisats:zapRequest:lnurl:urlSession:)``, ``Bolt11Invoice``,
+and ``ZapReceipt/validate(lnurlProviderPubkey:expectedAmountMillisats:)`` APIs each work standalone,
+so you can adopt only the parts of the flow you need.
 
 ## Relay Configuration
 
