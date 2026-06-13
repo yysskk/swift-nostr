@@ -53,85 +53,61 @@ public struct EventSigner: Sendable {
         )
     }
 
+    /// Builds an unsigned event for this signer's public key and signs it.
+    ///
+    /// The convenience signers below differ only in their `kind`, `tags`, and
+    /// `content`; this overload keeps the shared `UnsignedEvent` construction in
+    /// one place.
+    private func sign(kind: Event.Kind, tags: [Tag] = [], content: String = "") throws -> Event {
+        try sign(UnsignedEvent(pubkey: publicKey, kind: kind, tags: tags, content: content))
+    }
+
+    /// Builds an unsigned event from raw NIP-01 tag arrays and signs it.
+    ///
+    /// Used by signers whose tags are produced as wire-form arrays (e.g. relay
+    /// lists) rather than ``Tag`` values.
+    private func sign(kind: Event.Kind, rawTags: [[String]], content: String = "") throws -> Event {
+        try sign(UnsignedEvent(pubkey: publicKey, kind: kind, rawTags: rawTags, content: content))
+    }
+
     /// Creates and signs a text note (kind 1)
     public func signTextNote(content: String, tags: [Tag] = []) throws -> Event {
-        let unsigned = UnsignedEvent(
-            pubkey: publicKey,
-            kind: .textNote,
-            tags: tags,
-            content: content
-        )
-        return try sign(unsigned)
+        try sign(kind: .textNote, tags: tags, content: content)
     }
 
     /// Creates and signs a metadata event (kind 0)
     public func signMetadata(_ metadata: UserMetadata) throws -> Event {
         let content = try JSONEncoder().encode(metadata)
-        let unsigned = UnsignedEvent(
-            pubkey: publicKey,
-            kind: .setMetadata,
-            content: String(data: content, encoding: .utf8) ?? ""
-        )
-        return try sign(unsigned)
+        return try sign(kind: .setMetadata, content: String(data: content, encoding: .utf8) ?? "")
     }
 
     /// Creates and signs a reaction event (kind 7)
     public func signReaction(to event: Event, content: String = "+") throws -> Event {
-        let tags: [Tag] = [
-            .event(event.id),
-            .pubkey(event.pubkey),
-        ]
-        let unsigned = UnsignedEvent(
-            pubkey: publicKey,
-            kind: .reaction,
-            tags: tags,
-            content: content
-        )
-        return try sign(unsigned)
+        try sign(kind: .reaction, tags: [.event(event.id), .pubkey(event.pubkey)], content: content)
     }
 
     /// Creates and signs a repost event (kind 6)
     public func signRepost(of event: Event, relayUrl: String? = nil) throws -> Event {
-        let tags: [Tag] = [
-            .event(event.id, relayURL: relayUrl),
-            .pubkey(event.pubkey),
-        ]
-
         let encoder = JSONEncoder()
         encoder.keyEncodingStrategy = .convertToSnakeCase
         let eventJson = try encoder.encode(event)
 
-        let unsigned = UnsignedEvent(
-            pubkey: publicKey,
+        return try sign(
             kind: .repost,
-            tags: tags,
+            tags: [.event(event.id, relayURL: relayUrl), .pubkey(event.pubkey)],
             content: String(data: eventJson, encoding: .utf8) ?? ""
         )
-        return try sign(unsigned)
     }
 
     /// Creates and signs a delete event (kind 5)
     public func signDeletion(eventIds: [String], reason: String = "") throws -> Event {
-        let tags = eventIds.map { Tag.event($0) }
-        let unsigned = UnsignedEvent(
-            pubkey: publicKey,
-            kind: .eventDeletion,
-            tags: tags,
-            content: reason
-        )
-        return try sign(unsigned)
+        try sign(kind: .eventDeletion, tags: eventIds.map { Tag.event($0) }, content: reason)
     }
 
     /// Creates and signs a contact list event (kind 3, NIP-02)
     public func signContactList(_ contacts: [Contact]) throws -> Event {
         let tags = contacts.map { Tag.pubkey($0.pubkey, relayURL: $0.relayUrl, petname: $0.petname) }
-        let unsigned = UnsignedEvent(
-            pubkey: publicKey,
-            kind: .contacts,
-            tags: tags,
-            content: ""
-        )
-        return try sign(unsigned)
+        return try sign(kind: .contacts, tags: tags, content: "")
     }
 
     /// Creates and signs a contact list event from pubkeys
@@ -152,24 +128,16 @@ public struct EventSigner: Sendable {
     ///   - relayURL: The URL of the relay being authenticated to, as used to connect.
     ///   - challenge: The challenge string received in the relay's AUTH message.
     public func signClientAuthentication(relayURL: URL, challenge: String) throws -> Event {
-        let unsigned = UnsignedEvent(
-            pubkey: publicKey,
+        try sign(
             kind: .clientAuthentication,
             tags: [.relay(relayURL.absoluteString), .challenge(challenge)],
             content: ""
         )
-        return try sign(unsigned)
     }
 
     /// Creates and signs a relay list metadata event (kind 10002, NIP-65)
     public func signRelayListMetadata(_ relayList: RelayListMetadata) throws -> Event {
-        let unsigned = UnsignedEvent(
-            pubkey: publicKey,
-            kind: .relayListMetadata,
-            rawTags: relayList.toTags(),
-            content: ""
-        )
-        return try sign(unsigned)
+        try sign(kind: .relayListMetadata, rawTags: relayList.toTags(), content: "")
     }
 
     /// Creates and signs a relay list metadata event from explicit read/write relay URLs (NIP-65).
@@ -195,13 +163,7 @@ public struct EventSigner: Sendable {
     /// private direct messages. Its content is empty; the relays are carried as
     /// `relay` tags.
     public func signDirectMessageRelayList(_ relayList: DirectMessageRelayList) throws -> Event {
-        let unsigned = UnsignedEvent(
-            pubkey: publicKey,
-            kind: .directMessageRelayList,
-            rawTags: relayList.toTags(),
-            content: ""
-        )
-        return try sign(unsigned)
+        try sign(kind: .directMessageRelayList, rawTags: relayList.toTags(), content: "")
     }
 
     /// Creates and signs a DM relay list event from relay URLs (kind 10050, NIP-17).
@@ -256,13 +218,7 @@ public struct EventSigner: Sendable {
             tags.append(Tag(name: "a", values: [eventCoordinate]))
         }
 
-        let unsigned = UnsignedEvent(
-            pubkey: publicKey,
-            kind: .zapRequest,
-            tags: tags,
-            content: comment
-        )
-        return try sign(unsigned)
+        return try sign(kind: .zapRequest, tags: tags, content: comment)
     }
 }
 
@@ -300,53 +256,5 @@ extension Event {
         let signature = try P256K.Schnorr.SchnorrSignature(dataRepresentation: sigData)
 
         return xonlyKey.isValidSignature(signature, for: hash)
-    }
-}
-
-// MARK: - User Metadata
-/// User profile metadata (NIP-01)
-public struct UserMetadata: Codable, Sendable {
-    public var name: String?
-    public var about: String?
-    public var picture: String?
-    public var nip05: String?
-    public var banner: String?
-    public var displayName: String?
-    public var website: String?
-    public var lud06: String?
-    public var lud16: String?
-
-    enum CodingKeys: String, CodingKey {
-        case name
-        case about
-        case picture
-        case nip05
-        case banner
-        case displayName = "display_name"
-        case website
-        case lud06
-        case lud16
-    }
-
-    public init(
-        name: String? = nil,
-        about: String? = nil,
-        picture: String? = nil,
-        nip05: String? = nil,
-        banner: String? = nil,
-        displayName: String? = nil,
-        website: String? = nil,
-        lud06: String? = nil,
-        lud16: String? = nil
-    ) {
-        self.name = name
-        self.about = about
-        self.picture = picture
-        self.nip05 = nip05
-        self.banner = banner
-        self.displayName = displayName
-        self.website = website
-        self.lud06 = lud06
-        self.lud16 = lud16
     }
 }
