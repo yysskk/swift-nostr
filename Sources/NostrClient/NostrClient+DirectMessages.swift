@@ -48,12 +48,62 @@ extension NostrClient {
             expiration: expiration
         )
 
-        // NIP-17 routing: deliver each gift wrap to its addressee's kind-10050 DM inbox relays.
-        // A nil target means the addressee advertised no DM relay list (or none could be
-        // connected), so fall back to the full pool rather than dropping the message.
-        // Resolve both addressees in parallel — each may trigger an independent relay-list fetch.
+        return try await deliverDirectMessage(
+            result, to: recipientPubkey, senderPubkey: keyPair.publicKeyHex, strategy: strategy
+        )
+    }
+
+    /// Sends a NIP-25 reaction to a received direct message, gift-wrapped like the message itself.
+    ///
+    /// The reaction (an unsigned kind-7 rumor) references the message's rumor id and author, and is
+    /// delivered to the message author's NIP-17 DM relays plus the sender's own self-copy — the same
+    /// routing as ``sendDirectMessage(_:to:subject:replyTo:expiration:strategy:)``.
+    /// - Parameters:
+    ///   - message: The message being reacted to. Its author receives the reaction.
+    ///   - reaction: The reaction content (default "+", a NIP-25 like). Use "-" or an emoji.
+    ///   - expiration: Optional NIP-40 expiration applied to both gift wraps.
+    ///   - strategy: How many relay acknowledgments to wait for on the recipient gift wrap before
+    ///     returning (default: the pool config's ``RelayPoolConfig/defaultPublishStrategy``).
+    /// - Returns: The shared rumor, both gift wraps, and the per-relay publish outcomes.
+    @discardableResult
+    public func reactToDirectMessage(
+        _ message: DirectMessage,
+        reaction: String = "+",
+        expiration: Date? = nil,
+        strategy: PublishStrategy? = nil
+    ) async throws -> SendDirectMessageResult {
+        let keyPair = try getKeyPair()
+
+        let builder = DirectMessageBuilder(keyPair: keyPair)
+        let result = try builder.createReactionWithSelfCopy(
+            reaction: reaction,
+            to: message.rumorId,
+            author: message.senderPubkey,
+            recipientPubkey: message.senderPubkey,
+            expiration: expiration
+        )
+
+        return try await deliverDirectMessage(
+            result, to: message.senderPubkey, senderPubkey: keyPair.publicKeyHex, strategy: strategy
+        )
+    }
+
+    /// Routes a built result's gift wraps to the recipient's and sender's kind-10050 DM relays and
+    /// publishes them, returning the result enriched with per-relay outcomes. Shared by the message
+    /// and reaction send paths.
+    ///
+    /// A nil target means the addressee advertised no DM relay list (or none could be connected), so
+    /// the copy falls back to the full pool rather than being dropped. The recipient and sender
+    /// addressees are resolved in parallel — each may trigger an independent relay-list fetch — and
+    /// the best-effort self-copy never blocks or fails the primary send.
+    private func deliverDirectMessage(
+        _ result: SendDirectMessageResult,
+        to recipientPubkey: String,
+        senderPubkey: String,
+        strategy: PublishStrategy?
+    ) async throws -> SendDirectMessageResult {
         async let recipientTargetsTask = directMessageInboxTargets(for: recipientPubkey)
-        async let senderTargetsTask = directMessageInboxTargets(for: keyPair.publicKeyHex)
+        async let senderTargetsTask = directMessageInboxTargets(for: senderPubkey)
         let recipientTargets = await recipientTargetsTask
         let senderTargets = await senderTargetsTask
 
@@ -100,6 +150,22 @@ extension NostrClient {
         return try parser.parse(giftWrap)
     }
 
+    /// Parses a received gift-wrapped NIP-25 reaction to a direct message.
+    /// - Parameter giftWrap: The gift-wrapped event
+    /// - Returns: The parsed reaction
+    public func parseDirectMessageReaction(_ giftWrap: Event) throws -> DirectMessageReaction {
+        let keyPair = try getKeyPair()
+        return try DirectMessageParser(keyPair: keyPair).parseReaction(giftWrap)
+    }
+
+    /// Parses a received gift wrap into a ``DirectMessagePayload`` — a message or a reaction.
+    /// - Parameter giftWrap: The gift-wrapped event
+    /// - Returns: The decrypted payload
+    public func parseDirectMessagePayload(_ giftWrap: Event) throws -> DirectMessagePayload {
+        let keyPair = try getKeyPair()
+        return try DirectMessageParser(keyPair: keyPair).parsePayload(giftWrap)
+    }
+
     /// Subscribes to the current user's private direct messages (NIP-17),
     /// delivering each message already unwrapped and parsed.
     ///
@@ -110,6 +176,19 @@ extension NostrClient {
         let keyPair = try getKeyPair()
         let subscription = try await subscribe(filters: [directMessagesFilter(limit: limit)])
         return DirectMessageSequence(base: subscription, parser: DirectMessageParser(keyPair: keyPair))
+    }
+
+    /// Subscribes to the current user's direct messages **and** reactions (NIP-17 + NIP-25),
+    /// delivering each gift wrap already unwrapped and classified as a ``DirectMessagePayload``.
+    ///
+    /// Use this instead of ``directMessages(limit:)`` when you also want reactions; messages and
+    /// reactions share the same kind-1059 gift-wrap stream. Gift wraps that fail to unwrap or parse
+    /// are skipped.
+    /// - Parameter limit: Maximum number of gift wraps to fetch
+    public func directMessagePayloads(limit: Int = 100) async throws -> DirectMessagePayloadSequence {
+        let keyPair = try getKeyPair()
+        let subscription = try await subscribe(filters: [directMessagesFilter(limit: limit)])
+        return DirectMessagePayloadSequence(base: subscription, parser: DirectMessageParser(keyPair: keyPair))
     }
 
     /// Subscribes to private direct messages (gift-wrapped events) for the current user.

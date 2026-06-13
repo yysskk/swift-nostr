@@ -143,6 +143,12 @@ extension Tag {
         Tag(name: "expiration", values: [String(Int64(date.timeIntervalSince1970))])
     }
 
+    /// A "k" tag denoting the kind of a referenced event, e.g. on a NIP-25 reaction
+    /// to record what kind of event was reacted to. The value is the integer kind.
+    public static func kind(_ kind: Event.Kind) -> Tag {
+        Tag(name: "k", values: [String(kind.rawValue)])
+    }
+
     /// An arbitrary raw tag. Returns nil if the array is empty.
     public static func raw(_ array: [String]) -> Tag? {
         Tag(rawArray: array)

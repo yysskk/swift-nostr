@@ -193,6 +193,17 @@ try await client.sendDirectMessage(
 // Look up where another user receives DMs (cached for routing)
 let dmRelays = try await client.fetchDirectMessageRelayList(for: "recipientPubkeyHex")
 print("Receives DMs on: \(dmRelays?.relays ?? [])")
+
+// React to a received message (NIP-25, gift-wrapped like the message). Receive messages and
+// reactions together via directMessagePayloads().
+for await payload in try await client.directMessagePayloads() {
+    switch payload {
+    case .message(let message):
+        try await client.reactToDirectMessage(message, reaction: "🤙")
+    case .reaction(let reaction):
+        print("\(reaction.senderPubkey) reacted \(reaction.content) to \(reaction.messageId)")
+    }
+}
 ```
 
 ### Relay Information (NIP-11)
@@ -377,7 +388,7 @@ let isValid = try signed.verify()
 - [x] NIP-18: Reposts
 - [x] NIP-19: bech32-encoded entities (npub, nsec, note, nprofile, nevent, naddr)
 - [x] NIP-20: Command Results (OK)
-- [x] NIP-25: Reactions
+- [x] NIP-25: Reactions (incl. gift-wrapped private DM reactions)
 - [x] NIP-40: Expiration timestamp (disappearing messages)
 - [x] NIP-42: Client authentication (automatic challenge response, auth-required retry)
 - [x] NIP-44: Versioned encryption

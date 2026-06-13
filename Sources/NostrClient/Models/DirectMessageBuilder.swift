@@ -54,6 +54,48 @@ public struct DirectMessageBuilder: Sendable {
         )
     }
 
+    /// Creates a gift-wrapped NIP-25 reaction to a direct message, plus the sender's self-copy.
+    ///
+    /// The reaction is an unsigned kind-7 rumor referencing the target message's rumor id and
+    /// author. Like a message it is wrapped twice — for the recipient and for the sender — so it
+    /// stays private and sender-anonymous, and both wraps carry the identical rumor.
+    /// - Parameters:
+    ///   - reaction: The reaction content. NIP-25 uses "+" for a like, "-" for a dislike, or an
+    ///     emoji such as "🤙".
+    ///   - messageId: The rumor id of the message being reacted to (the reaction's "e" tag).
+    ///   - author: The reacted-to message's author public key (the reaction's "p" tag).
+    ///   - recipientPubkey: Who receives the reaction gift wrap (typically the message author).
+    ///   - expiration: Optional NIP-40 expiration applied to both gift wraps.
+    /// - Returns: The shared rumor and both gift wraps.
+    public func createReactionWithSelfCopy(
+        reaction: String = "+",
+        to messageId: String,
+        author: String,
+        recipientPubkey: String,
+        expiration: Date? = nil
+    ) throws -> SendDirectMessageResult {
+        let rumor = try makeReactionRumor(reaction: reaction, messageId: messageId, author: author)
+
+        let recipientGiftWrap = try GiftWrap.wrap(
+            event: rumor,
+            senderKeyPair: senderKeyPair,
+            recipientPubkey: recipientPubkey,
+            expiration: expiration
+        )
+        let selfGiftWrap = try GiftWrap.wrap(
+            event: rumor,
+            senderKeyPair: senderKeyPair,
+            recipientPubkey: senderKeyPair.publicKeyHex,
+            expiration: expiration
+        )
+
+        return SendDirectMessageResult(
+            rumor: rumor,
+            recipientGiftWrap: recipientGiftWrap,
+            selfGiftWrap: selfGiftWrap
+        )
+    }
+
     /// Creates gift-wrapped events for a group message (sends to multiple recipients)
     /// Each recipient gets their own gift-wrapped copy
     /// - Parameters:
@@ -130,6 +172,22 @@ public struct DirectMessageBuilder: Sendable {
             kind: .privateDirectMessage,
             tags: tags,
             content: content
+        )
+        return try unsigned.asRumor()
+    }
+
+    /// Creates the unsigned kind-7 reaction rumor. Like the message rumor it is never signed.
+    private func makeReactionRumor(reaction: String, messageId: String, author: String) throws -> Event {
+        let tags: [Tag] = [
+            .event(messageId),
+            .pubkey(author),
+            .kind(.privateDirectMessage),
+        ]
+        let unsigned = UnsignedEvent(
+            pubkey: senderKeyPair.publicKeyHex,
+            kind: .reaction,
+            tags: tags,
+            content: reaction
         )
         return try unsigned.asRumor()
     }

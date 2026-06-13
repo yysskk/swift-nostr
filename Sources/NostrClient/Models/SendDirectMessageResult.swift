@@ -1,15 +1,16 @@
 import Foundation
 
-/// Result of sending a NIP-17 private direct message.
+/// Result of sending a gift-wrapped NIP-17 payload — a private direct message or a NIP-25
+/// reaction to one.
 ///
-/// NIP-17 sends the same message twice: one gift wrap addressed to the recipient
+/// NIP-17 sends the same payload twice: one gift wrap addressed to the recipient
 /// and one addressed to the sender (the self-copy that provides sent history and
-/// multi-device sync). Both wraps carry the identical unsigned kind-14 rumor.
+/// multi-device sync). Both wraps carry the identical unsigned rumor.
 /// https://github.com/nostr-protocol/nips/blob/master/17.md
 public struct SendDirectMessageResult: Sendable {
-    /// The unsigned kind-14 rumor shared by both gift wraps (`sig` is empty —
-    /// NIP-17 rumors must never be signed). Its `id` is the stable key for
-    /// matching the message when it echoes back from a relay.
+    /// The unsigned rumor shared by both gift wraps — kind 14 for a message, kind 7 for a
+    /// reaction (`sig` is empty; NIP-17 rumors must never be signed). Its `id` is the stable
+    /// key for matching the payload when it echoes back from a relay.
     public let rumor: Event
 
     /// The gift wrap addressed to the recipient.
@@ -19,7 +20,8 @@ public struct SendDirectMessageResult: Sendable {
     public let selfGiftWrap: Event
 
     /// Per-relay outcome of publishing the recipient gift wrap.
-    /// Always present when returned from ``NostrClient/sendDirectMessage(_:to:subject:replyTo:strategy:)``;
+    /// Always present when returned from a send such as
+    /// ``NostrClient/sendDirectMessage(_:to:subject:replyTo:expiration:strategy:)``;
     /// `nil` when the result was built without publishing (e.g. by ``DirectMessageBuilder``).
     public let recipientPublishResult: PublishResult?
 
