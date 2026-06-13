@@ -14,4 +14,10 @@ enum RelayURL {
         }
         return normalized
     }
+
+    /// Parses relay URL strings into a de-duplicated `Set<URL>`, normalizing each
+    /// (see ``normalize(_:)``) and dropping any that don't parse as a URL.
+    static func urlSet(_ strings: [String]) -> Set<URL> {
+        Set(strings.compactMap { URL(string: normalize($0)) })
+    }
 }

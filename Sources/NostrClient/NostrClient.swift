@@ -32,6 +32,9 @@ public actor NostrClient {
     /// Per-pubkey NIP-65 relay list cache and outbox/gossip resolver
     let relayListStore: RelayListStore
 
+    /// Per-pubkey NIP-17 DM relay list (kind 10050) cache and inbox resolver
+    let dmRelayListStore: DirectMessageRelayListStore
+
     public init(
         relayPoolConfig: RelayPoolConfig = .default,
         gossipPolicy: GossipRelayPolicy = .addAndConnect
@@ -44,6 +47,7 @@ public actor NostrClient {
     init(relayPool: RelayPool, gossipPolicy: GossipRelayPolicy = .addAndConnect) {
         self.relayPool = relayPool
         self.relayListStore = RelayListStore(pool: relayPool, policy: gossipPolicy)
+        self.dmRelayListStore = DirectMessageRelayListStore(pool: relayPool, policy: gossipPolicy)
     }
 
     // MARK: - Signer
