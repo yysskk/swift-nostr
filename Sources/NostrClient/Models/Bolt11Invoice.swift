@@ -70,20 +70,26 @@ public struct Bolt11Invoice: Sendable, Hashable {
             }
             let field = words[dataStart..<dataEnd]
 
+            // Per BOLT-11, when a field type repeats the first occurrence wins, so each case only
+            // assigns while still unset.
             switch type {
             case FieldType.paymentHash:
                 // Readers MUST skip a p/h field whose length is not exactly 52 words (256 bits).
-                if length == Self.hashWordCount {
+                if paymentHash == nil, length == Self.hashWordCount {
                     paymentHash = Data(Bech32.wordsToBytes(Array(field)))
                 }
             case FieldType.descriptionHash:
-                if length == Self.hashWordCount {
+                if descriptionHash == nil, length == Self.hashWordCount {
                     descriptionHash = Data(Bech32.wordsToBytes(Array(field)))
                 }
             case FieldType.description:
-                description = String(data: Data(Bech32.wordsToBytes(Array(field))), encoding: .utf8)
+                if description == nil {
+                    description = String(data: Data(Bech32.wordsToBytes(Array(field))), encoding: .utf8)
+                }
             case FieldType.expiry:
-                expirySeconds = Int64(exactly: Self.integer(from: field))
+                if expirySeconds == nil {
+                    expirySeconds = Int64(exactly: Self.integer(from: field))
+                }
             default:
                 break  // A field this parser does not need.
             }
