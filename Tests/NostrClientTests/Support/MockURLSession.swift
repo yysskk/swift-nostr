@@ -25,11 +25,33 @@ struct MockInvocation<Value> {
 /// `URLRequest` and the closure's return value.
 ///
 /// The session intercepts every request and serves `response`, so tests exercise networking code
-/// (status handling, decoding, cancellation) without making real network calls. Each call registers
-/// its own handler and routes requests to it via a per-session header, so concurrent calls (Swift
-/// Testing runs tests in parallel) never interfere.
+/// (status handling, decoding, cancellation) without making real network calls.
+///
+/// Mock sessions are serialized by ``MockURLSessionLock`` so only one is ever active at a time.
+/// `URLProtocol` has no per-request routing hook that works on every platform — a session's
+/// `httpAdditionalHeaders` are not delivered to `URLProtocol` on swift-corelibs-foundation (Linux) —
+/// so routing concurrent sessions to their handlers is not portable. Serializing instead keeps
+/// `MockURLProtocol`'s single active handler unambiguous on every platform. The network tests are
+/// few and fast, so the lost parallelism is negligible.
 @discardableResult
 func withMockURLSession<Value>(
+    response: MockResponse,
+    body: (URLSession) async throws -> Value
+) async throws -> MockInvocation<Value> {
+    await MockURLSessionLock.shared.lock()
+    do {
+        let invocation = try await serveMockURLSession(response: response, body: body)
+        await MockURLSessionLock.shared.unlock()
+        return invocation
+    } catch {
+        await MockURLSessionLock.shared.unlock()
+        throw error
+    }
+}
+
+/// Registers `response`, runs `body` against a session wired to ``MockURLProtocol``, and returns the
+/// captured request. Must be called while holding ``MockURLSessionLock`` so only one handler is active.
+private func serveMockURLSession<Value>(
     response: MockResponse,
     body: (URLSession) async throws -> Value
 ) async throws -> MockInvocation<Value> {
@@ -38,10 +60,6 @@ func withMockURLSession<Value>(
 
     let config = URLSessionConfiguration.ephemeral
     config.protocolClasses = [MockURLProtocol.self]
-    // Tag every request from this session with its handler ID so MockURLProtocol can look up the
-    // right handler without any shared mutable "current handler" pointer that concurrent sessions
-    // would race on.
-    config.httpAdditionalHeaders = [MockURLProtocol.handlerIDHeader: handlerID.uuidString]
     let session = URLSession(configuration: config)
     defer { session.invalidateAndCancel() }
 
@@ -50,19 +68,46 @@ func withMockURLSession<Value>(
     return MockInvocation(request: captured, returnValue: value)
 }
 
-/// Thread-safe storage for ``MockURLProtocol`` handlers, keyed by ID.
+/// An async lock that serializes ``withMockURLSession(response:body:)`` calls so only one mock
+/// session is active at a time (see that function for why routing concurrent sessions is not portable).
+actor MockURLSessionLock {
+    static let shared = MockURLSessionLock()
+
+    private var isLocked = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    func lock() async {
+        guard isLocked else {
+            isLocked = true
+            return
+        }
+        await withCheckedContinuation { waiters.append($0) }
+    }
+
+    func unlock() {
+        if waiters.isEmpty {
+            isLocked = false
+        } else {
+            waiters.removeFirst().resume()
+        }
+    }
+}
+
+/// Thread-safe storage for the active ``MockURLProtocol`` handler and the request it captured.
 final class MockURLProtocolRegistry: @unchecked Sendable {
     static let shared = MockURLProtocolRegistry()
 
     private let lock = NSLock()
     private var handlers: [UUID: MockResponse] = [:]
     private var captured: [UUID: URLRequest] = [:]
+    private var currentID: UUID?
 
     func register(_ response: MockResponse) -> UUID {
         lock.lock()
         defer { lock.unlock() }
         let id = UUID()
         handlers[id] = response
+        currentID = id
         return id
     }
 
@@ -71,12 +116,14 @@ final class MockURLProtocolRegistry: @unchecked Sendable {
         defer { lock.unlock() }
         handlers.removeValue(forKey: id)
         captured.removeValue(forKey: id)
+        if currentID == id { currentID = nil }
     }
 
-    func handler(for id: UUID) -> MockResponse? {
+    func currentHandler() -> (UUID, MockResponse)? {
         lock.lock()
         defer { lock.unlock() }
-        return handlers[id]
+        guard let id = currentID, let handler = handlers[id] else { return nil }
+        return (id, handler)
     }
 
     func recordRequest(_ request: URLRequest, for id: UUID) {
@@ -93,12 +140,9 @@ final class MockURLProtocolRegistry: @unchecked Sendable {
 }
 
 /// A `URLProtocol` that serves the response registered by ``withMockURLSession(response:body:)`` and
-/// records the request it received. The handler to use is identified by the ``handlerIDHeader`` that
-/// `withMockURLSession` stamps on every request, keeping concurrent sessions fully isolated.
+/// records the request it received. Only one handler is active at a time (calls are serialized by
+/// ``MockURLSessionLock``), so the active handler is looked up directly.
 final class MockURLProtocol: URLProtocol {
-    /// The request header carrying the registered handler's ID.
-    static let handlerIDHeader = "X-Mock-Handler-ID"
-
     static func register(response: MockResponse) -> UUID {
         MockURLProtocolRegistry.shared.register(response)
     }
@@ -115,10 +159,7 @@ final class MockURLProtocol: URLProtocol {
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
 
     override func startLoading() {
-        guard let idString = request.value(forHTTPHeaderField: Self.handlerIDHeader),
-            let id = UUID(uuidString: idString),
-            let response = MockURLProtocolRegistry.shared.handler(for: id)
-        else {
+        guard let (id, response) = MockURLProtocolRegistry.shared.currentHandler() else {
             client?.urlProtocol(self, didFailWithError: URLError(.resourceUnavailable))
             return
         }
