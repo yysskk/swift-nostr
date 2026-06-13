@@ -16,8 +16,11 @@ public struct DirectMessageRelayList: Codable, Hashable, Sendable {
     /// The relay URLs where the author receives direct messages, in document order.
     public let relays: [String]
 
+    /// Creates a list from relay URLs. Duplicate URLs are removed (first wins),
+    /// matching how a list parsed from an event is normalized — so a list always
+    /// round-trips identically through ``toTags()`` and back.
     public init(relays: [String]) {
-        self.relays = relays
+        self.relays = Self.deduplicated(relays)
     }
 
     /// Converts to the full tag array for a kind 10050 event.
@@ -35,19 +38,24 @@ public struct DirectMessageRelayList: Codable, Hashable, Sendable {
 
     /// Parses a DM relay list from raw tags (kind-agnostic). Duplicate relay URLs are removed (first wins).
     public init(tags: [[String]]) {
+        let urls = tags.compactMap { tag -> String? in
+            guard tag.count >= 2, tag[0] == "relay", !tag[1].isEmpty else {
+                return nil
+            }
+            return tag[1]
+        }
+        self.relays = Self.deduplicated(urls)
+    }
+
+    /// De-duplicates relay URLs on a normalized key (first wins), preserving the
+    /// original URL strings so tags round-trip exactly.
+    private static func deduplicated(_ urls: [String]) -> [String] {
         var seen = Set<String>()
         var result: [String] = []
-        for tag in tags {
-            guard tag.count >= 2, tag[0] == "relay", !tag[1].isEmpty else {
-                continue
-            }
-            let url = tag[1]
-            // De-duplicate on a normalized key, but keep the original URL so tags round-trip exactly.
-            if seen.insert(RelayURL.normalize(url)).inserted {
-                result.append(url)
-            }
+        for url in urls where seen.insert(RelayURL.normalize(url)).inserted {
+            result.append(url)
         }
-        self.relays = result
+        return result
     }
 }
 

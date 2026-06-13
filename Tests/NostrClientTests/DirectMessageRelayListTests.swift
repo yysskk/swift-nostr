@@ -75,6 +75,30 @@ struct DirectMessageRelayListTests {
         #expect(list.relays == ["wss://a.example.com"])
     }
 
+    @Test("init(relays:) de-duplicates like parsing")
+    func initRelaysDeduplicates() {
+        let list = DirectMessageRelayList(relays: [
+            "wss://a.example.com",
+            "wss://A.example.com/",
+            "wss://b.example.com",
+        ])
+        #expect(list.relays == ["wss://a.example.com", "wss://b.example.com"])
+    }
+
+    @Test("Signing a list with duplicates round-trips through the event")
+    func signedListRoundTripsWithDuplicates() throws {
+        let keyPair = try KeyPair()
+        let signer = EventSigner(keyPair: keyPair)
+
+        let event = try signer.signDirectMessageRelayList(relays: [
+            "wss://a.example.com",
+            "wss://a.example.com/",
+        ])
+        // The signed event's tags and the re-parsed list agree — no dangling duplicate tags.
+        #expect(event.tags == [["relay", "wss://a.example.com"]])
+        #expect(event.directMessageRelayList?.relays == ["wss://a.example.com"])
+    }
+
     @Test("Stored url is not mutated by normalization")
     func storedURLNotMutated() {
         // A mixed-case host with a trailing slash must round-trip exactly through toTags().
