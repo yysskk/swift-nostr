@@ -23,6 +23,16 @@ public enum Bech32 {
 
     /// Decodes a bech32 string, returning the prefix and data
     public static func decode(_ str: String) throws -> (hrp: String, data: Data) {
+        let (hrp, words) = try decodeToWords(str)
+        return (hrp, Data(wordsToBytes(words)))
+    }
+
+    /// Decodes a bech32 string to its 5-bit data words, with the checksum verified and removed but
+    /// without regrouping into bytes.
+    ///
+    /// Useful for formats whose data is not byte-aligned and so cannot survive the 5→8 bit
+    /// conversion, such as BOLT-11 Lightning invoices.
+    static func decodeToWords(_ str: String) throws -> (hrp: String, words: [UInt8]) {
         let lowercased = str.lowercased()
 
         guard let separatorIndex = lowercased.lastIndex(of: "1") else {
@@ -49,11 +59,13 @@ public enum Bech32 {
             throw NostrError.invalidBech32
         }
 
-        // Remove checksum (last 6 characters)
-        let dataValues = Array(values.dropLast(6))
-        let decoded = convertBits(from: 5, to: 8, data: dataValues, pad: false)
+        // Remove the checksum (the last 6 words).
+        return (hrp, Array(values.dropLast(6)))
+    }
 
-        return (hrp, Data(decoded))
+    /// Regroups 5-bit bech32 words into 8-bit bytes, dropping any partial trailing bits.
+    static func wordsToBytes(_ words: [UInt8]) -> [UInt8] {
+        convertBits(from: 5, to: 8, data: words, pad: false)
     }
 
     // MARK: - Private Helpers
