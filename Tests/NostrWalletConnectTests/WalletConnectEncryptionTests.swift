@@ -15,7 +15,7 @@ struct WalletConnectEncryptionTests {
         #expect(WalletConnectEncryption(rawValue: "aes") == nil)
     }
 
-    @Test("NIP-44 round-trips through the cipher", arguments: [WalletConnectEncryption.nip44, .nip04])
+    @Test("round-trips through the cipher for each scheme", arguments: [WalletConnectEncryption.nip44, .nip04])
     func roundTrip(scheme: WalletConnectEncryption) throws {
         let client = try KeyPair()
         let wallet = try KeyPair()
@@ -58,11 +58,15 @@ struct WalletConnectEncryptionTests {
         }
     }
 
-    @Test("an invalid recipient public key is rejected")
-    func invalidPubkey() throws {
+    @Test(
+        "an invalid recipient public key is rejected for each scheme",
+        arguments: [WalletConnectEncryption.nip44, .nip04]
+    )
+    func invalidPubkey(scheme: WalletConnectEncryption) throws {
         let client = try KeyPair()
+        // Not valid hex, so both the NIP-04 length guard and SealedMessage's hex check reject it.
         #expect(throws: NostrError.invalidPublicKey) {
-            try WalletConnectCipher(.nip04).encrypt("hi", recipientPubkey: "deadbeef", sender: client)
+            try WalletConnectCipher(scheme).encrypt("hi", recipientPubkey: "zz", sender: client)
         }
     }
 }
