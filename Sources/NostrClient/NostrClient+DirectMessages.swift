@@ -19,6 +19,8 @@ extension NostrClient {
     ///   - recipientPubkey: The recipient's public key (hex)
     ///   - subject: Optional conversation subject
     ///   - replyTo: Optional event ID to reply to
+    ///   - expiration: Optional NIP-40 expiration for a disappearing message. Set on both gift
+    ///     wraps (the stored kind-1059 events) so relays stop serving the message after this time.
     ///   - strategy: How many relay acknowledgments to wait for on the recipient
     ///     gift wrap before returning (default: the pool config's
     ///     ``RelayPoolConfig/defaultPublishStrategy``). The best-effort self-copy
@@ -32,6 +34,7 @@ extension NostrClient {
         to recipientPubkey: String,
         subject: String? = nil,
         replyTo: String? = nil,
+        expiration: Date? = nil,
         strategy: PublishStrategy? = nil
     ) async throws -> SendDirectMessageResult {
         let keyPair = try getKeyPair()
@@ -41,7 +44,8 @@ extension NostrClient {
             content: content,
             to: recipientPubkey,
             subject: subject,
-            replyTo: replyTo
+            replyTo: replyTo,
+            expiration: expiration
         )
 
         // NIP-17 routing: deliver each gift wrap to its addressee's kind-10050 DM inbox relays.

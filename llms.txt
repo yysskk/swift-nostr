@@ -27,6 +27,7 @@ NostrClient provides a high-level actor-based API for interacting with the Nostr
 - NIP-19: bech32-encoded entities (npub, nsec, note, nprofile, nevent, naddr)
 - NIP-20: Command results (OK)
 - NIP-25: Reactions
+- NIP-40: Expiration timestamp (disappearing messages)
 - NIP-42: Client authentication (automatic challenge response, auth-required retry)
 - NIP-44: Versioned encryption (v2)
 - NIP-59: Gift wrap

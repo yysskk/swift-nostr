@@ -134,6 +134,15 @@ extension Tag {
         Tag(name: "challenge", values: [challenge])
     }
 
+    /// An "expiration" tag marking when relays should stop serving the event (NIP-40).
+    ///
+    /// The value is the Unix timestamp in whole seconds; sub-second precision is dropped.
+    /// After this moment a relay should no longer return the event and may delete it.
+    /// https://github.com/nostr-protocol/nips/blob/master/40.md
+    public static func expiration(_ date: Date) -> Tag {
+        Tag(name: "expiration", values: [String(Int64(date.timeIntervalSince1970))])
+    }
+
     /// An arbitrary raw tag. Returns nil if the array is empty.
     public static func raw(_ array: [String]) -> Tag? {
         Tag(rawArray: array)
@@ -197,5 +206,24 @@ extension Event {
     /// The pubkeys referenced by "p" tags.
     public var referencedPubkeys: [String] {
         tags.filter { $0.count >= 2 && $0[0] == "p" }.map { $0[1] }
+    }
+
+    /// The event's NIP-40 expiration time, if it carries a valid `expiration` tag.
+    ///
+    /// After this time, relays should stop serving the event and may delete it.
+    /// Returns nil when there is no `expiration` tag or its value is not an integer.
+    public var expiration: Date? {
+        guard let value = firstTagValue(named: "expiration"), let seconds = Int64(value) else {
+            return nil
+        }
+        return Date(timeIntervalSince1970: TimeInterval(seconds))
+    }
+
+    /// Whether the event has a NIP-40 ``expiration`` at or before `date` (default: now).
+    ///
+    /// An event without an `expiration` tag never expires, so this returns false.
+    public func isExpired(asOf date: Date = Date()) -> Bool {
+        guard let expiration else { return false }
+        return expiration <= date
     }
 }

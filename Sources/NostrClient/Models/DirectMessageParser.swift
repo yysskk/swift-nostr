@@ -46,7 +46,9 @@ public struct DirectMessageParser: Sendable {
             content: rumor.content,
             createdAt: Date(timeIntervalSince1970: TimeInterval(rumor.createdAt)),
             subject: subject,
-            replyTo: replyTo
+            replyTo: replyTo,
+            // NIP-40 expiration lives on the public gift wrap, not the encrypted rumor.
+            expiresAt: giftWrap.expiration
         )
     }
 }

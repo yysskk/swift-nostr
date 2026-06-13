@@ -19,12 +19,15 @@ public struct DirectMessageBuilder: Sendable {
     ///   - recipientPubkey: The recipient's public key (hex)
     ///   - subject: Optional conversation subject
     ///   - replyTo: Optional event ID to reply to
+    ///   - expiration: Optional NIP-40 expiration for a disappearing message. Applied to both
+    ///     gift wraps so the recipient and self copies expire together.
     /// - Returns: The shared rumor and both gift wraps
     public func createMessageWithSelfCopy(
         content: String,
         to recipientPubkey: String,
         subject: String? = nil,
-        replyTo: String? = nil
+        replyTo: String? = nil,
+        expiration: Date? = nil
     ) throws -> SendDirectMessageResult {
         let rumor = try makeRumor(
             content: content,
@@ -34,12 +37,14 @@ public struct DirectMessageBuilder: Sendable {
         let recipientGiftWrap = try GiftWrap.wrap(
             event: rumor,
             senderKeyPair: senderKeyPair,
-            recipientPubkey: recipientPubkey
+            recipientPubkey: recipientPubkey,
+            expiration: expiration
         )
         let selfGiftWrap = try GiftWrap.wrap(
             event: rumor,
             senderKeyPair: senderKeyPair,
-            recipientPubkey: senderKeyPair.publicKeyHex
+            recipientPubkey: senderKeyPair.publicKeyHex,
+            expiration: expiration
         )
 
         return SendDirectMessageResult(

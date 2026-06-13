@@ -22,11 +22,15 @@ public struct GiftWrap: Sendable {
     ///   - event: The event to wrap (will be converted to rumor if signed)
     ///   - senderKeyPair: The sender's keypair
     ///   - recipientPubkey: The recipient's public key (hex)
+    ///   - expiration: Optional NIP-40 expiration. Applied to the outer gift wrap (the stored
+    ///     kind-1059 event relays act on) so the message disappears after the given time. The
+    ///     inner rumor is unaffected, keeping the plaintext content private until then.
     /// - Returns: The gift-wrapped event ready for publishing
     public static func wrap(
         event: Event,
         senderKeyPair: KeyPair,
-        recipientPubkey: String
+        recipientPubkey: String,
+        expiration: Date? = nil
     ) throws -> Event {
         // 1. Create rumor (unsigned event JSON)
         let rumor = createRumor(from: event)
@@ -51,11 +55,16 @@ public struct GiftWrap: Sendable {
         let ephemeralKeyPair = try KeyPair()
         let sealedMessage = try SealedMessage.seal(sealJson, for: recipientPubkey, using: ephemeralKeyPair)
 
+        var wrapTags: [Tag] = [.pubkey(recipientPubkey)]
+        if let expiration {
+            wrapTags.append(.expiration(expiration))
+        }
+
         let wrapUnsigned = UnsignedEvent(
             pubkey: ephemeralKeyPair.publicKeyHex,
             createdAt: randomizedTimestamp(),
             kind: .giftWrap,
-            tags: [["p", recipientPubkey]],
+            tags: wrapTags,
             content: sealedMessage.payload
         )
 

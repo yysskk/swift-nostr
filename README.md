@@ -10,6 +10,7 @@ A modern Swift library for the Nostr protocol, built with Swift 6 concurrency su
 - **NIP-05 Verification**: DNS-based identifier verification
 - **NIP-06 Key Derivation**: Generate keys from BIP-39 mnemonic seed phrases
 - **NIP-17 Private DMs**: End-to-end encrypted direct messages with sender anonymity and kind 10050 DM relay routing
+- **NIP-40 Expiration**: Disappearing messages via an expiration timestamp, including private DMs
 - **NIP-42 Authentication**: Relay AUTH challenges answered automatically, with auth-required retry
 - **Cryptographic Operations**: Schnorr signatures with secp256k1
 - **NIP-19 Entities**: bech32 encoding/decoding of npub, nsec, note, nprofile, nevent, and naddr
@@ -180,6 +181,14 @@ for await message in try await client.directMessages() {
 // self-copy to your own — discovered from each user's kind 10050, falling back to the relay
 // pool when a user has published no DM relay list.
 try await client.sendDirectMessage("Hello privately!", to: "recipientPubkeyHex")
+
+// Disappearing message (NIP-40): relays stop serving it after the expiration. The received
+// message exposes `expiresAt` so clients can hide it once it lapses.
+try await client.sendDirectMessage(
+    "This self-destructs in an hour",
+    to: "recipientPubkeyHex",
+    expiration: Date().addingTimeInterval(3600)
+)
 
 // Look up where another user receives DMs (cached for routing)
 let dmRelays = try await client.fetchDirectMessageRelayList(for: "recipientPubkeyHex")
@@ -369,6 +378,7 @@ let isValid = try signed.verify()
 - [x] NIP-19: bech32-encoded entities (npub, nsec, note, nprofile, nevent, naddr)
 - [x] NIP-20: Command Results (OK)
 - [x] NIP-25: Reactions
+- [x] NIP-40: Expiration timestamp (disappearing messages)
 - [x] NIP-42: Client authentication (automatic challenge response, auth-required retry)
 - [x] NIP-44: Versioned encryption
 - [x] NIP-59: Gift wrap
