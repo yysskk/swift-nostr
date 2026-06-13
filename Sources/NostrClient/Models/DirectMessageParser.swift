@@ -70,21 +70,14 @@ public struct DirectMessageParser: Sendable {
     private func makeMessage(from unwrapped: GiftWrap.UnwrappedMessage, giftWrap: Event) -> DirectMessage {
         let rumor = unwrapped.event
 
-        // Extract recipient from p tag
-        let recipientPubkey =
-            rumor.tags
-            .first { $0.first == "p" && $0.count >= 2 }
-            .map { $0[1] } ?? recipientKeyPair.publicKeyHex
+        let recipientPubkey = rumor.firstTagValue(named: "p") ?? recipientKeyPair.publicKeyHex
+        let subject = rumor.firstTagValue(named: "subject")
 
-        // Extract optional subject
-        let subject = rumor.tags
-            .first { $0.first == "subject" && $0.count >= 2 }
-            .map { $0[1] }
-
-        // Extract optional reply reference
-        let replyTo = rumor.tags
-            .first { $0.first == "e" && $0.count >= 4 && $0[3] == "reply" }
-            .map { $0[1] }
+        // A reply is an "e" tag carrying the NIP-10 "reply" marker at its marker position
+        // (["e", id, relay, "reply"]); its primary value is the referenced event id.
+        let replyTo = rumor.tags(named: "e")
+            .first { $0.values.count >= 3 && $0.values[2] == Tag.EventMarker.reply.rawValue }?
+            .primaryValue
 
         return DirectMessage(
             rumorId: rumor.id,
@@ -107,12 +100,8 @@ public struct DirectMessageParser: Sendable {
         // A reaction must reference both the message ("e") and its author ("p"). Treat either
         // missing as a parse failure rather than surfacing an empty pubkey callers can't detect.
         guard
-            let messageId = rumor.tags
-                .first(where: { $0.first == "e" && $0.count >= 2 })
-                .map({ $0[1] }),
-            let author = rumor.tags
-                .first(where: { $0.first == "p" && $0.count >= 2 })
-                .map({ $0[1] })
+            let messageId = rumor.firstTagValue(named: "e"),
+            let author = rumor.firstTagValue(named: "p")
         else {
             throw NostrError.invalidData
         }

@@ -33,25 +33,7 @@ public struct DirectMessageBuilder: Sendable {
             content: content,
             tags: directMessageTags(recipientPubkey: recipientPubkey, subject: subject, replyTo: replyTo)
         )
-
-        let recipientGiftWrap = try GiftWrap.wrap(
-            event: rumor,
-            senderKeyPair: senderKeyPair,
-            recipientPubkey: recipientPubkey,
-            expiration: expiration
-        )
-        let selfGiftWrap = try GiftWrap.wrap(
-            event: rumor,
-            senderKeyPair: senderKeyPair,
-            recipientPubkey: senderKeyPair.publicKeyHex,
-            expiration: expiration
-        )
-
-        return SendDirectMessageResult(
-            rumor: rumor,
-            recipientGiftWrap: recipientGiftWrap,
-            selfGiftWrap: selfGiftWrap
-        )
+        return try wrapWithSelfCopy(rumor: rumor, to: recipientPubkey, expiration: expiration)
     }
 
     /// Creates a gift-wrapped NIP-25 reaction to a direct message, plus the sender's self-copy.
@@ -75,25 +57,7 @@ public struct DirectMessageBuilder: Sendable {
         expiration: Date? = nil
     ) throws -> SendDirectMessageResult {
         let rumor = try makeReactionRumor(reaction: reaction, messageId: messageId, author: author)
-
-        let recipientGiftWrap = try GiftWrap.wrap(
-            event: rumor,
-            senderKeyPair: senderKeyPair,
-            recipientPubkey: recipientPubkey,
-            expiration: expiration
-        )
-        let selfGiftWrap = try GiftWrap.wrap(
-            event: rumor,
-            senderKeyPair: senderKeyPair,
-            recipientPubkey: senderKeyPair.publicKeyHex,
-            expiration: expiration
-        )
-
-        return SendDirectMessageResult(
-            rumor: rumor,
-            recipientGiftWrap: recipientGiftWrap,
-            selfGiftWrap: selfGiftWrap
-        )
+        return try wrapWithSelfCopy(rumor: rumor, to: recipientPubkey, expiration: expiration)
     }
 
     /// Creates a gift-wrapped NIP-17 kind-15 file message, plus the sender's self-copy.
@@ -124,25 +88,7 @@ public struct DirectMessageBuilder: Sendable {
         let rumor = try makeFileRumor(
             url: url, mimeType: mimeType, encryption: encryption, recipientPubkey: recipientPubkey,
             size: size, dimensions: dimensions, blurhash: blurhash)
-
-        let recipientGiftWrap = try GiftWrap.wrap(
-            event: rumor,
-            senderKeyPair: senderKeyPair,
-            recipientPubkey: recipientPubkey,
-            expiration: expiration
-        )
-        let selfGiftWrap = try GiftWrap.wrap(
-            event: rumor,
-            senderKeyPair: senderKeyPair,
-            recipientPubkey: senderKeyPair.publicKeyHex,
-            expiration: expiration
-        )
-
-        return SendDirectMessageResult(
-            rumor: rumor,
-            recipientGiftWrap: recipientGiftWrap,
-            selfGiftWrap: selfGiftWrap
-        )
+        return try wrapWithSelfCopy(rumor: rumor, to: recipientPubkey, expiration: expiration)
     }
 
     /// Creates gift-wrapped events for a group message (sends to multiple recipients)
@@ -190,6 +136,37 @@ public struct DirectMessageBuilder: Sendable {
     }
 
     // MARK: - Private Helpers
+
+    /// Wraps a shared rumor twice — once for the recipient and once for the sender's self-copy —
+    /// and packages both with the rumor.
+    ///
+    /// NIP-17 delivers every message to both parties so the sender's other devices can reconstruct
+    /// the conversation; both wraps carry the identical rumor, whose `id` keys the two copies
+    /// together. Any NIP-40 `expiration` is applied to both wraps so the copies expire in lockstep.
+    private func wrapWithSelfCopy(
+        rumor: Event,
+        to recipientPubkey: String,
+        expiration: Date?
+    ) throws -> SendDirectMessageResult {
+        let recipientGiftWrap = try GiftWrap.wrap(
+            event: rumor,
+            senderKeyPair: senderKeyPair,
+            recipientPubkey: recipientPubkey,
+            expiration: expiration
+        )
+        let selfGiftWrap = try GiftWrap.wrap(
+            event: rumor,
+            senderKeyPair: senderKeyPair,
+            recipientPubkey: senderKeyPair.publicKeyHex,
+            expiration: expiration
+        )
+
+        return SendDirectMessageResult(
+            rumor: rumor,
+            recipientGiftWrap: recipientGiftWrap,
+            selfGiftWrap: selfGiftWrap
+        )
+    }
 
     /// Builds the NIP-17 tag list for a 1-to-1 direct message
     private func directMessageTags(
