@@ -57,6 +57,14 @@ struct WalletInfoTests {
         #expect(info.negotiatedEncryption == .nip44)
     }
 
+    @Test("falls back to NIP-04 when only unrecognized schemes are advertised")
+    func unknownSchemesFallBack() throws {
+        let event = infoEvent(content: "pay_invoice", tags: [["encryption", "nip44_v99"]])
+        let info = try #require(WalletInfo(infoEvent: event))
+        #expect(info.encryptions == [.nip04])
+        #expect(info.negotiatedEncryption == .nip04)
+    }
+
     @Test("parses the notifications tag")
     func parsesNotifications() throws {
         let event = infoEvent(content: "pay_invoice", tags: [["notifications", "payment_received payment_sent"]])

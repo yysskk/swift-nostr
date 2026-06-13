@@ -37,9 +37,12 @@ public struct WalletInfo: Sendable, Hashable {
         self.methods = methods
         self.unknownMethods = unknownMethods
 
-        // A missing encryption tag means NIP-04 only (the spec's backward-compatible default).
+        // A missing encryption tag — or a tag listing only unrecognized schemes (e.g. a future
+        // nip44_v3) — means NIP-04 only (the spec's backward-compatible default), keeping
+        // `encryptions` non-empty.
         if let value = infoEvent.firstTagValue(named: "encryption") {
-            self.encryptions = Self.parseEncryptions(value)
+            let parsed = Self.parseEncryptions(value)
+            self.encryptions = parsed.isEmpty ? [.nip04] : parsed
         } else {
             self.encryptions = [.nip04]
         }
