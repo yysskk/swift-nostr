@@ -2,6 +2,10 @@ import Foundation
 
 public import NostrClient
 
+#if canImport(FoundationNetworking)
+    import FoundationNetworking
+#endif
+
 /// The default ``WalletConnectTransport``, backed by one or more `NostrClient` `RelayConnection`s.
 ///
 /// A wallet connection usually targets a single relay, but a connection URI may list several; this
