@@ -31,9 +31,12 @@ public actor RelayPool {
         self.init(config: config, webSocketFactory: URLSessionWebSocketFactory(urlSession: .shared))
     }
 
-    /// Designated initializer shared by the public initializer and by tests, which inject a
-    /// fake ``WebSocketSessionFactory`` so the pool's relay connections never touch the network.
-    init(config: RelayPoolConfig = .default, webSocketFactory: any WebSocketSessionFactory) {
+    /// Creates a pool whose relay connections use the given WebSocket transport.
+    ///
+    /// Supply a custom ``WebSocketSessionFactory`` to run on a platform without
+    /// `URLSession` WebSocket support (for example an OkHttp-backed factory on Android),
+    /// or to inject a fake transport in tests so connections never touch the network.
+    public init(config: RelayPoolConfig = .default, webSocketFactory: any WebSocketSessionFactory) {
         self.config = config
         self.webSocketFactory = webSocketFactory
     }

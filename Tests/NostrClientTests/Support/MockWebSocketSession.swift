@@ -10,9 +10,9 @@ import Foundation
 /// machine — connect, send, receive, publish-ack — without a live network relay.
 final class MockWebSocketSession: WebSocketSession, @unchecked Sendable {
     private let lock = NSLock()
-    private var queued: [Result<URLSessionWebSocketTask.Message, Error>] = []
-    private var receiveWaiters: [CheckedContinuation<URLSessionWebSocketTask.Message, Error>] = []
-    private var sent: [URLSessionWebSocketTask.Message] = []
+    private var queued: [Result<WebSocketMessage, Error>] = []
+    private var receiveWaiters: [CheckedContinuation<WebSocketMessage, Error>] = []
+    private var sent: [WebSocketMessage] = []
     private var resumed = false
     private let pingError: Error?
 
@@ -28,7 +28,7 @@ final class MockWebSocketSession: WebSocketSession, @unchecked Sendable {
         lock.unlock()
     }
 
-    func cancel(with closeCode: URLSessionWebSocketTask.CloseCode, reason: Data?) {
+    func cancel(with closeCode: WebSocketCloseCode, reason: Data?) {
         lock.lock()
         let waiters = receiveWaiters
         receiveWaiters.removeAll()
@@ -39,14 +39,14 @@ final class MockWebSocketSession: WebSocketSession, @unchecked Sendable {
         }
     }
 
-    func send(_ message: URLSessionWebSocketTask.Message) async throws {
+    func send(_ message: WebSocketMessage) async throws {
         // `withLock` is the async-safe scoped form; the lock is never held across a suspension.
         lock.withLock {
             sent.append(message)
         }
     }
 
-    func receive() async throws -> URLSessionWebSocketTask.Message {
+    func receive() async throws -> WebSocketMessage {
         try await withCheckedThrowingContinuation { continuation in
             lock.lock()
             if queued.isEmpty {
@@ -67,7 +67,7 @@ final class MockWebSocketSession: WebSocketSession, @unchecked Sendable {
     // MARK: - Test driving
 
     /// Delivers a frame to the next `receive()` call (or buffers it for a future one).
-    func deliver(_ message: URLSessionWebSocketTask.Message) {
+    func deliver(_ message: WebSocketMessage) {
         lock.lock()
         if receiveWaiters.isEmpty {
             queued.append(.success(message))
