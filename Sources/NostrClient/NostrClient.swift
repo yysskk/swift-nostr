@@ -42,6 +42,23 @@ public actor NostrClient {
         self.init(relayPool: RelayPool(config: relayPoolConfig), gossipPolicy: gossipPolicy)
     }
 
+    /// Creates a client whose relays use the given WebSocket transport.
+    ///
+    /// Supply a custom ``WebSocketSessionFactory`` to run on a platform without
+    /// `URLSession` WebSocket support — for example an OkHttp-backed factory on Android.
+    /// On Apple platforms the default ``init(relayPoolConfig:gossipPolicy:)`` already uses
+    /// `URLSession`, so this initializer is only needed when overriding the transport.
+    public init(
+        relayPoolConfig: RelayPoolConfig = .default,
+        gossipPolicy: GossipRelayPolicy = .addAndConnect,
+        webSocketFactory: any WebSocketSessionFactory
+    ) {
+        self.init(
+            relayPool: RelayPool(config: relayPoolConfig, webSocketFactory: webSocketFactory),
+            gossipPolicy: gossipPolicy
+        )
+    }
+
     /// Designated initializer shared by the public initializer and by tests, which inject a
     /// ``RelayPool`` built with a fake transport so the client can be exercised without a network.
     init(relayPool: RelayPool, gossipPolicy: GossipRelayPolicy = .addAndConnect) {

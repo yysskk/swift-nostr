@@ -52,9 +52,6 @@ extension RelayConnection {
                     case .data:
                         // Binary data not expected from Nostr relays
                         break
-
-                    @unknown default:
-                        break
                     }
                 } catch {
                     // The keepalive has no work to do once the receive loop is gone.
