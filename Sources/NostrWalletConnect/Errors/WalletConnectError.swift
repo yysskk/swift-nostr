@@ -17,6 +17,9 @@ public enum WalletConnectError: Error, LocalizedError, Sendable, Equatable {
     /// The wallet did not respond before the configured timeout elapsed.
     case timedOut
 
+    /// A pending operation was superseded by a newer one (e.g. a concurrent `fetchInfo()`).
+    case superseded
+
     /// The wallet response carried neither a `result` nor an `error`.
     case missingResult
 
@@ -35,6 +38,8 @@ public enum WalletConnectError: Error, LocalizedError, Sendable, Equatable {
             return "Failed to decode the wallet response"
         case .timedOut:
             return "The wallet did not respond in time"
+        case .superseded:
+            return "The operation was superseded by a newer one"
         case .missingResult:
             return "The wallet response contained neither a result nor an error"
         case .walletError(let code, let message):

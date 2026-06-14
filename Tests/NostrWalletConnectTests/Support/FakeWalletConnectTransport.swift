@@ -9,6 +9,7 @@ import NostrClient
 /// events into the ``events()`` stream via ``emit(_:)`` — no relay or network required.
 actor FakeWalletConnectTransport: WalletConnectTransport {
     private(set) var isConnected = false
+    private(set) var connectCount = 0
     private(set) var sentEvents: [Event] = []
     private(set) var subscriptions: [String: [Filter]] = [:]
     private var continuation: AsyncStream<Event>.Continuation?
@@ -17,6 +18,7 @@ actor FakeWalletConnectTransport: WalletConnectTransport {
 
     func connect() async throws {
         isConnected = true
+        connectCount += 1
     }
 
     func subscribe(id: String, filters: [Filter]) async throws {
