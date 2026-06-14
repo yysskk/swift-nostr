@@ -176,7 +176,11 @@ public actor WalletConnection {
     // MARK: - Notifications
 
     /// A stream of wallet notifications (kinds 23196 / 23197), decrypted and parsed.
-    public func notifications() -> AsyncStream<WalletConnectNotification> {
+    ///
+    /// Starts the connection if it isn't already, so a caller can subscribe to notifications without
+    /// first issuing a command or calling ``connect()``.
+    public func notifications() async throws -> AsyncStream<WalletConnectNotification> {
+        try await ensureStarted()
         let id = UUID()
         let (stream, continuation) = AsyncStream<WalletConnectNotification>.makeStream()
         notificationStreams[id] = continuation

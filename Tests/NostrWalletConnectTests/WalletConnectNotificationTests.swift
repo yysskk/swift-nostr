@@ -14,8 +14,8 @@ struct WalletConnectNotificationTests {
         let connection = WalletConnection(
             uri: try NWCFixtures.uri(wallet: wallet, client: client), transport: transport)
 
-        try await connection.connect()
-        var iterator = await connection.notifications().makeAsyncIterator()
+        // notifications() auto-connects — no explicit connect() needed.
+        var iterator = try await connection.notifications().makeAsyncIterator()
 
         await transport.emit(
             try NWCFixtures.notification(
