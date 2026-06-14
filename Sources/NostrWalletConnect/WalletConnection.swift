@@ -150,6 +150,9 @@ public actor WalletConnection {
         let timeout = config.requestTimeout
         let timeoutTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(timeout))
+            // If this call was superseded/finished, its timeout was cancelled — don't end the
+            // continuation that now belongs to a concurrent fetchInfo().
+            guard !Task.isCancelled else { return }
             await self?.failPendingInfo()
         }
         defer { timeoutTask.cancel() }
