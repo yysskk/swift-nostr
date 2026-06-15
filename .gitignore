@@ -58,10 +58,6 @@ iOSInjectionProject/
 *.dSYM.zip
 *.dSYM
 
-# Playground
-timeline.xctimeline
-playground.xcworkspace
-
 # Environment
 .env
 .env.*
