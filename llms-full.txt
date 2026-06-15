@@ -1,6 +1,6 @@
 # swift-nostr-client: Complete Documentation
 
-> swift-nostr-client is a modern Swift library for the Nostr protocol. It provides an actor-based, type-safe API for relay connections, event signing, subscriptions, encrypted direct messages, and BIP-39 key derivation. All types are Sendable for Swift concurrency. MIT licensed.
+> swift-nostr-client is a modern Swift toolkit for Nostr protocol. It vends three libraries: `NostrCore` (protocol primitives, signing, NIP-44 encryption, NIP-19 encoding, and relay transport), the high-level `NostrClient` (multi-relay pools, NIP-65 outbox routing, and NIP-17 private direct messages), and `NostrWalletConnect` (NIP-47 wallet payments). All types are `Sendable` for Swift concurrency. MIT licensed.
 
 ## Installation
 
@@ -12,12 +12,12 @@ dependencies: [
 ]
 ```
 
-Add `NostrClient` to your target:
+Add the products you need. `NostrClient` builds on `NostrCore` but does not re-export it, so add both (add `NostrWalletConnect` too if you handle payments):
 
 ```swift
 .target(
     name: "YourTarget",
-    dependencies: ["NostrClient"]
+    dependencies: ["NostrClient", "NostrCore"]
 )
 ```
 
@@ -32,6 +32,7 @@ Or add via Xcode: File > Add Package Dependencies > Enter the repository URL.
 
 ```swift
 import NostrClient
+import NostrCore
 
 let client = NostrClient()
 
