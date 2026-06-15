@@ -1,4 +1,5 @@
 import Foundation
+import NostrCore
 
 /// Main entry point for the Nostr client library.
 ///

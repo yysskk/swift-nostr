@@ -1,4 +1,5 @@
 import Foundation
+import NostrCore
 
 /// Parser for received NIP-17 direct messages and NIP-25 reactions to them.
 public struct DirectMessageParser: Sendable {

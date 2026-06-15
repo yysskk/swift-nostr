@@ -1,4 +1,5 @@
 import Foundation
+import NostrCore
 
 /// OpenTimestamps attestation support (NIP-03)
 /// https://github.com/nostr-protocol/nips/blob/master/03.md

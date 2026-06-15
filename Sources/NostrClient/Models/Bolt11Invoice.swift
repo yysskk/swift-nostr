@@ -1,4 +1,5 @@
 import Foundation
+import NostrCore
 
 /// A decoded BOLT-11 Lightning invoice, exposing the fields NIP-57 zap validation relies on.
 ///

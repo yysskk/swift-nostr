@@ -1,4 +1,5 @@
 import NostrClient
+import NostrCore
 
 /// A NIP-47 content-encryption scheme.
 ///

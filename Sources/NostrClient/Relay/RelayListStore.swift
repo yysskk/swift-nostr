@@ -1,4 +1,5 @@
 import Foundation
+import NostrCore
 
 /// Policy controlling how the router brings relays into the pool when routing to a
 /// user's declared relays — NIP-65 read/write relays or NIP-17 DM inbox relays.

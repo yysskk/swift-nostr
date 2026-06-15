@@ -1,7 +1,6 @@
 import Foundation
+import NostrCore
 import Testing
-
-@testable import NostrClient
 
 @Suite("Filter Tests")
 struct FilterTests {

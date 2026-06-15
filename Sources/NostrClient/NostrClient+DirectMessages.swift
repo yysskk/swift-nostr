@@ -1,4 +1,5 @@
 import Foundation
+import NostrCore
 
 // MARK: - Private Direct Messages (NIP-17)
 extension NostrClient {

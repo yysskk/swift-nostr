@@ -1,4 +1,5 @@
 import Foundation
+import NostrCore
 
 /// NIP-59 Gift Wrap
 /// https://github.com/nostr-protocol/nips/blob/master/59.md

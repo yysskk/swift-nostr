@@ -1,4 +1,5 @@
 import Foundation
+import NostrCore
 
 // MARK: - One-time Fetches
 extension NostrClient {

@@ -1,4 +1,5 @@
 import Foundation
+import NostrCore
 
 /// Manages connections to multiple Nostr relays
 public actor RelayPool {

@@ -1,5 +1,6 @@
 import Crypto
 import Foundation
+import NostrCore
 
 /// AES-256-GCM file encryption for NIP-17 kind-15 file messages.
 ///

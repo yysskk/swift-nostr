@@ -1,4 +1,5 @@
 import Foundation
+import NostrCore
 
 // MARK: - Direct Message Relay List (NIP-17, kind 10050)
 extension NostrClient {

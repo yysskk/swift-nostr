@@ -1,4 +1,5 @@
 import Foundation
+import NostrCore
 
 // MARK: - Subscriptions
 extension NostrClient {

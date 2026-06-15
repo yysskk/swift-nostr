@@ -1,4 +1,5 @@
 import Foundation
+import NostrCore
 import P256K
 
 /// Represents a Nostr keypair (private and public keys)
@@ -140,33 +141,5 @@ public struct PublicKey: Sendable, Hashable {
     /// Returns the public key as npub (bech32 encoded)
     public var npub: String {
         Bech32.encode(hrp: "npub", data: data)
-    }
-}
-
-// MARK: - Data Extensions
-extension Data {
-    /// Creates Data from a hex string
-    init?(hexString: String) {
-        let hex = hexString.lowercased()
-        guard hex.count % 2 == 0 else { return nil }
-
-        var data = Data(capacity: hex.count / 2)
-        var index = hex.startIndex
-
-        while index < hex.endIndex {
-            let nextIndex = hex.index(index, offsetBy: 2)
-            guard let byte = UInt8(hex[index..<nextIndex], radix: 16) else {
-                return nil
-            }
-            data.append(byte)
-            index = nextIndex
-        }
-
-        self = data
-    }
-
-    /// Returns a hex-encoded string representation
-    func hexEncodedString() -> String {
-        map { String(format: "%02x", $0) }.joined()
     }
 }

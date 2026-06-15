@@ -1,4 +1,5 @@
 import Foundation
+import NostrCore
 
 /// Type-Length-Value records and field validation shared by the NIP-19
 /// `nprofile`, `nevent`, and `naddr` entities.

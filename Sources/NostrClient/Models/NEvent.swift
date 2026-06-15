@@ -1,4 +1,5 @@
 import Foundation
+import NostrCore
 
 /// A NIP-19 `nevent` entity: an event id with optional relay hints, author, and kind.
 ///

@@ -1,4 +1,5 @@
 import Foundation
+import NostrCore
 
 /// A NIP-19 bech32-encoded entity.
 ///

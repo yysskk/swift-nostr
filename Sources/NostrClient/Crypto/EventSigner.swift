@@ -1,5 +1,6 @@
 import Crypto
 import Foundation
+import NostrCore
 import P256K
 
 /// Handles signing and verification of Nostr events

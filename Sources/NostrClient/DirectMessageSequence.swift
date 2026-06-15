@@ -1,4 +1,5 @@
 import Foundation
+import NostrCore
 
 /// A live subscription to the current user's NIP-17 direct messages,
 /// delivered already unwrapped and parsed.

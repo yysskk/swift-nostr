@@ -1,6 +1,7 @@
 import Foundation
 
-public import NostrClient
+import NostrClient
+public import NostrCore
 
 #if canImport(FoundationNetworking)
     import FoundationNetworking

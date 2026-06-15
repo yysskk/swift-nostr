@@ -1,4 +1,5 @@
 import Foundation
+import NostrCore
 
 /// NIP-17 Direct Message Relay List (kind 10050).
 ///

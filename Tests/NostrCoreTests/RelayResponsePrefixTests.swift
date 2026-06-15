@@ -1,7 +1,6 @@
 import Foundation
+import NostrCore
 import Testing
-
-@testable import NostrClient
 
 @Suite("RelayResponsePrefix Tests")
 struct RelayResponsePrefixTests {

@@ -1,4 +1,4 @@
-public import NostrClient
+public import NostrCore
 
 /// The capabilities a wallet service advertises in its NIP-47 info event (kind 13194).
 ///

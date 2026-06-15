@@ -1,4 +1,5 @@
 import Foundation
+import NostrCore
 
 /// Builder for creating NIP-17 direct message events
 public struct DirectMessageBuilder: Sendable {

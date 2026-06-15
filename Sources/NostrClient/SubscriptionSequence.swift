@@ -1,4 +1,5 @@
 import Foundation
+import NostrCore
 
 /// A live relay subscription delivered as an async sequence of relay-aware events.
 ///

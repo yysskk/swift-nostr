@@ -1,4 +1,5 @@
 import Foundation
+import NostrCore
 
 /// Result of sending a gift-wrapped NIP-17 payload — a private direct message or a NIP-25
 /// reaction to one.

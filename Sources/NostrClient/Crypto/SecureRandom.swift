@@ -1,4 +1,5 @@
 import Foundation
+import NostrCore
 
 #if canImport(Security)
     import Security

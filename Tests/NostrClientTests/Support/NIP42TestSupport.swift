@@ -1,4 +1,5 @@
 import Foundation
+import NostrCore
 
 @testable import NostrClient
 

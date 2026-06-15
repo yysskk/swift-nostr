@@ -1,4 +1,5 @@
 import Foundation
+import NostrCore
 
 /// Caches per-pubkey NIP-17 DM relay lists (kind 10050) and resolves the inbox relay set where a
 /// user's gift-wrapped direct messages should be delivered.

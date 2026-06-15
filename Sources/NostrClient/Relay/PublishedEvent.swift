@@ -1,4 +1,5 @@
 import Foundation
+import NostrCore
 
 /// A signed event together with the per-relay outcome of its publish.
 ///

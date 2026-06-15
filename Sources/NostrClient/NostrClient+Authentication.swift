@@ -1,4 +1,5 @@
 import Foundation
+import NostrCore
 
 /// How ``NostrClient`` reacts to NIP-42 AUTH challenges from relays.
 /// https://github.com/nostr-protocol/nips/blob/master/42.md

@@ -1,4 +1,4 @@
-public import NostrClient
+public import NostrCore
 
 extension Event.Kind {
     /// NIP-47 wallet info event (kind 13194), published by the wallet service to advertise its

@@ -1,5 +1,6 @@
 import Crypto
 import Foundation
+import NostrCore
 
 /// A NIP-57 zap receipt (kind 9735): the event a recipient's LNURL provider publishes once a zap
 /// invoice has been paid, attesting to the payment.

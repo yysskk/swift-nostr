@@ -1,4 +1,5 @@
 import Foundation
+import NostrCore
 
 /// NIP-65 Relay List Metadata (kind 10002).
 /// A replaceable event where an author advertises the relays they read from and write to.

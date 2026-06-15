@@ -1,4 +1,5 @@
 import Foundation
+import NostrCore
 
 // MARK: - Relay List Metadata & Outbox/Gossip (NIP-65)
 extension NostrClient {

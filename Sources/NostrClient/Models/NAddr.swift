@@ -1,4 +1,5 @@
 import Foundation
+import NostrCore
 
 /// A NIP-19 `naddr` entity: a coordinate to an addressable (parameterized replaceable) event.
 ///

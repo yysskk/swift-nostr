@@ -1,5 +1,6 @@
 import Foundation
 import NostrClient
+import NostrCore
 
 @testable import NostrWalletConnect
 

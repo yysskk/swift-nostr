@@ -1,4 +1,5 @@
 import Foundation
+import NostrCore
 
 /// Contact information for NIP-02 Contact List
 /// https://github.com/nostr-protocol/nips/blob/master/02.md

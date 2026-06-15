@@ -1,5 +1,6 @@
 import Crypto
 import Foundation
+import NostrCore
 import P256K
 
 /// Key derivation for NIP-06 using BIP-32/BIP-39

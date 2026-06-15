@@ -1,4 +1,5 @@
 import Foundation
+import NostrCore
 
 /// A NIP-19 `nprofile` entity: a public key with optional relay hints.
 ///

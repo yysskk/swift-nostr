@@ -1,4 +1,5 @@
 import Foundation
+import NostrCore
 
 /// High-level subscription events emitted by `NostrClient`.
 public enum SubscriptionEvent: Sendable {

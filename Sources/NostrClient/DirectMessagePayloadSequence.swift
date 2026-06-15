@@ -1,4 +1,5 @@
 import Foundation
+import NostrCore
 
 /// A live subscription to the current user's NIP-17 gift-wrap stream, delivering each gift
 /// wrap already unwrapped and classified as a ``DirectMessagePayload`` — a message or a
