@@ -1,5 +1,4 @@
 import Foundation
-import NostrCore
 
 // MARK: - Message Receiving
 extension RelayConnection {

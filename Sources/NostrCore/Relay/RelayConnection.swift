@@ -1,5 +1,4 @@
 import Foundation
-import NostrCore
 
 #if canImport(FoundationNetworking)
     import FoundationNetworking
@@ -11,8 +10,12 @@ public actor RelayConnection {
     /// `nil` to leave the challenge unanswered (NIP-42).
     public typealias AuthenticationResponder = @Sendable (_ relayURL: URL, _ challenge: String) async -> Event?
 
-    /// The relay URL
-    public let url: URL
+    /// The relay URL.
+    ///
+    /// `nonisolated` because it is an immutable `Sendable` value fixed at init:
+    /// callers (e.g. the relay pool, now in a separate module) read it
+    /// synchronously without hopping onto the actor.
+    public nonisolated let url: URL
 
     /// Current connection state
     public private(set) var state: RelayConnectionState = .disconnected
@@ -139,7 +142,10 @@ public actor RelayConnection {
 
     /// Designated initializer shared by the public initializers and by tests, which inject a
     /// fake ``WebSocketSessionFactory`` to drive the connection state machine without a network.
-    init(
+    ///
+    /// `package` so the relay pool (in a separate module within this package) and tests can inject
+    /// a transport, without exposing factory injection as public API.
+    package init(
         url: URL,
         webSocketFactory: any WebSocketSessionFactory,
         config: RelayConnectionConfig = .default

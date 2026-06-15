@@ -1,4 +1,5 @@
 import Foundation
+import NostrCore
 
 /// Configuration for relay pool behavior
 public struct RelayPoolConfig: Sendable {

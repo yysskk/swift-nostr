@@ -1,7 +1,6 @@
 import Foundation
+import NostrCore
 import Testing
-
-@testable import NostrClient
 
 @Suite("Relay Connection Config Tests")
 struct RelayConnectionConfigTests {

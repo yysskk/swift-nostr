@@ -1,8 +1,8 @@
 import Foundation
-import NostrCore
 import Testing
 
 @testable import NostrClient
+@testable import NostrCore
 
 #if canImport(FoundationNetworking)
     import FoundationNetworking

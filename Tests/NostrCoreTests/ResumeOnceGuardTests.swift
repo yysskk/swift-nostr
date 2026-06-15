@@ -1,7 +1,7 @@
 import Foundation
 import Testing
 
-@testable import NostrClient
+@testable import NostrCore
 
 @Suite("ResumeOnceGuard Tests")
 struct ResumeOnceGuardTests {

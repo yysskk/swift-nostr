@@ -1,4 +1,5 @@
 import Foundation
+import NostrCore
 
 // MARK: - Relay Management
 extension NostrClient {
