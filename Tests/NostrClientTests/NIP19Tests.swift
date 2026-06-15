@@ -150,8 +150,8 @@ struct NIP19Tests {
     @Test("the maximum 32-bit kind is valid and larger kinds throw")
     func validatedKindUpperBound() throws {
         // Values above Int32.max only fit in `Int` on 64-bit platforms; on 32-bit
-        // targets such as watchOS the argument cannot exceed `UInt32.max`, so this
-        // boundary is unreachable there.
+        // targets (e.g. watchOS), `Int.max` == `Int32.max` < `UInt32.max`, so
+        // `Int(UInt32.max)` would overflow and this boundary is unreachable there.
         guard Int.bitWidth >= 64 else { return }
         let maxKind = Int(UInt32.max)
         #expect(try TLV.validatedKind(maxKind) == maxKind)
