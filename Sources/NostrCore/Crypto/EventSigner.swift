@@ -93,7 +93,7 @@ public struct EventSigner: Sendable {
         return try sign(
             kind: .repost,
             tags: [.event(event.id, relayURL: relayUrl), .pubkey(event.pubkey)],
-            content: String(data: eventJson, encoding: .utf8) ?? ""
+            content: String(decoding: eventJson, as: UTF8.self)
         )
     }
 

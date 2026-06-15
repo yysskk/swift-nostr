@@ -13,7 +13,7 @@ extension EventSigner {
             UnsignedEvent(
                 pubkey: publicKey,
                 kind: .setMetadata,
-                content: String(data: content, encoding: .utf8) ?? ""
+                content: String(decoding: content, as: UTF8.self)
             )
         )
     }
