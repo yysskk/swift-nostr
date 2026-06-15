@@ -6,6 +6,8 @@ A modern Swift library for the Nostr protocol with full concurrency support.
 
 NostrClient provides a type-safe, actor-based API for interacting with the Nostr network. It handles relay connections, event signing, subscriptions, and encrypted direct messages out of the box.
 
+The lower-level primitives it builds on — the event model, keys and signing, NIP-44 encryption, NIP-19 encoding, the relay protocol messages, and a single `RelayConnection` — live in `NostrCore` and must be imported from there (`import NostrCore`).
+
 - Actor-based concurrency with full `Sendable` compliance.
 - Multi-relay management with automatic reconnection.
 - NIP-44 encryption and NIP-59 gift wrap for private messaging.
@@ -29,12 +31,12 @@ let note = try await client.publishTextNote(content: "Hello, Nostr!")
 - <doc:AdvancedUsage>
 - ``NostrClient/NostrClient``
 
-### Events and Filters
+> The event model, keys, signing, encryption, encoding, relay protocol messages, and a single
+> `RelayConnection` are defined in `NostrCore`. See its documentation for `Event`, `KeyPair`,
+> `EventSigner`, `Filter`, `Bech32`, and the rest.
 
-- ``Event``
-- ``UnsignedEvent``
-- ``Tag``
-- ``Filter``
+### Profiles and Contacts
+
 - ``UserMetadata``
 - ``Contact``
 
@@ -50,16 +52,6 @@ let note = try await client.publishTextNote(content: "Hello, Nostr!")
 - ``PublishedEvent``
 - ``PublishRelayStatus``
 
-### Cryptography and Keys
-
-- ``KeyPair``
-- ``PublicKey``
-- ``EventSigner``
-- ``Mnemonic``
-- ``KeyDerivation``
-- ``BIP39WordList``
-- ``Bech32``
-
 ### Encrypted Messaging (NIP-17)
 
 - ``DirectMessage``
@@ -72,7 +64,6 @@ let note = try await client.publishTextNote(content: "Hello, Nostr!")
 - ``DirectMessageParser``
 - ``SendDirectMessageResult``
 - ``EncryptedFile``
-- ``SealedMessage``
 - ``GiftWrap``
 - ``DirectMessageRelayList``
 
@@ -83,17 +74,10 @@ let note = try await client.publishTextNote(content: "Hello, Nostr!")
 - ``NEvent``
 - ``NAddr``
 
-### Relay Connections
+### Relay Pool
 
 - ``RelayPool``
-- ``RelayConnection``
-- ``RelayConnectionConfig``
 - ``RelayPoolConfig``
-- ``RelayConnectionState``
-- ``RelayMessage``
-- ``ClientMessage``
-- ``RelayResponsePrefix``
-- ``RelayInformation``
 - ``AuthenticationMode``
 
 ### Outbox Model (NIP-65)
@@ -107,14 +91,8 @@ let note = try await client.publishTextNote(content: "Hello, Nostr!")
 
 - ``ZapReceipt``
 - ``Bolt11Invoice``
-- ``LNURL``
-- ``LNURLPayResponse``
 
 ### Verification and Attestation
 
 - ``InternetIdentifier``
 - ``OpenTimestamps``
-
-### Errors
-
-- ``NostrError``

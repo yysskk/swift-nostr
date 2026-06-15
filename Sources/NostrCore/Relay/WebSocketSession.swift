@@ -20,7 +20,7 @@ public enum WebSocketMessage: Sendable, Equatable {
 ///
 /// Raw values are the on-the-wire status codes, so a transport can map to and from its
 /// platform's native close-code type (`URLSessionWebSocketTask.CloseCode`, OkHttp's
-/// integer codes, …) via ``RawRepresentable``.
+/// integer codes, …) via `RawRepresentable`.
 public enum WebSocketCloseCode: Int, Sendable {
     case normalClosure = 1000
     case goingAway = 1001

@@ -2,7 +2,7 @@
 
 Swift library for Nostr protocol
 
-📖 **[API documentation](https://yysskk.github.io/swift-nostr-client/documentation/)** — a combined index for both libraries, with a [Getting Started](https://yysskk.github.io/swift-nostr-client/documentation/nostrclient/gettingstarted) guide, in-depth [Advanced Usage](https://yysskk.github.io/swift-nostr-client/documentation/nostrclient/advancedusage), and reference docs for every type.
+📖 **[API documentation](https://yysskk.github.io/swift-nostr-client/documentation/)** — a combined index for all three libraries, with a [Getting Started](https://yysskk.github.io/swift-nostr-client/documentation/nostrclient/gettingstarted) guide, in-depth [Advanced Usage](https://yysskk.github.io/swift-nostr-client/documentation/nostrclient/advancedusage), and reference docs for every type.
 
 ## Features
 
@@ -43,12 +43,23 @@ dependencies: [
 
 Or add via Xcode: File → Add Package Dependencies → Enter the repository URL.
 
+### Library structure
+
+The package vends three libraries:
+
+- **`NostrCore`** — the shared protocol primitives, cryptography, NIP-19 encoding, and a single-relay WebSocket transport: `Event`, `KeyPair`, `EventSigner`, `Filter`, `Bech32`, `SealedMessage`, `RelayConnection`, and the relay messages. Depend on it directly if that is all you need.
+- **`NostrClient`** — the high-level, actor-based client (multi-relay pool, NIP-65 outbox/gossip, NIP-17 direct messages, fetches, NIP-19 entities, zap receipts). It is built on `NostrCore`; import both.
+- **`NostrWalletConnect`** — NIP-47 wallet payments. It re-exports `NostrCore`, so a single `import NostrWalletConnect` brings the primitives too.
+
+> **Migrating from an earlier release:** the protocol primitives moved out of `NostrClient` into the new `NostrCore` module. Add `import NostrCore` alongside `import NostrClient` wherever you reference `Event`, `KeyPair`, `EventSigner`, `Filter`, `RelayConnection`, `Bech32`, `NostrError`, and the other primitives — the higher-level `NostrClient` API (the `NostrClient` actor, `RelayPool`, direct messages, outbox) is unchanged.
+
 ## Quick Start
 
 ### Generate keys
 
 ```swift
-import NostrClient
+import NostrClient  // the high-level client
+import NostrCore    // primitives: KeyPair, Event, Filter, EventSigner, …
 
 let keyPair = try KeyPair()               // new random keypair
 print(keyPair.npub, keyPair.nsec)

@@ -26,7 +26,7 @@ OUTPUT_DIR="${1:-./docs}"
 HOSTING_BASE_PATH="${2:-}"
 
 # Library targets whose documentation is combined, in display order.
-TARGETS=(NostrClient NostrWalletConnect)
+TARGETS=(NostrCore NostrClient NostrWalletConnect)
 
 # Display name of the synthesized landing page that links to every library.
 LANDING_PAGE_NAME="swift-nostr-client"
