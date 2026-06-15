@@ -21,13 +21,13 @@ If you need the higher-level client (relay pool, gossip routing, direct messages
 import NostrCore
 
 let keyPair = try KeyPair()                  // new random keypair
-print(keyPair.npub, keyPair.nsec)
+print(try keyPair.npub, try keyPair.nsec)
 
 let imported = try KeyPair(nsec: "nsec1...")
 
 // From a BIP-39 mnemonic (NIP-06)
 let (mnemonic, derived) = try KeyPair.generate(wordCount: 12)
-print(mnemonic.phrase, derived.npub)
+print(mnemonic.phrase, try derived.npub)
 ```
 
 ## Sign and Verify
