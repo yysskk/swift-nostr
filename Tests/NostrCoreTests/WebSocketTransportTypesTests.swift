@@ -1,7 +1,6 @@
 import Foundation
-
 // Non-@testable import: also asserts these transport types are part of the public API.
-import NostrClient
+import NostrCore
 import Testing
 
 /// Locks in the public contract of the transport value types that a host transport

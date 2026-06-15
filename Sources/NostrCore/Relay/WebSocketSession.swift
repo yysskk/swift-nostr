@@ -1,5 +1,4 @@
 import Foundation
-import NostrCore
 
 #if canImport(FoundationNetworking)
     import FoundationNetworking
@@ -37,16 +36,15 @@ public enum WebSocketCloseCode: Int, Sendable {
     case tlsHandshakeFailure = 1015
 }
 
-/// A WebSocket transport used by ``RelayConnection``.
+/// A WebSocket transport for a relay connection.
 ///
-/// Abstracting the socket behind this protocol lets the connection's state machine —
+/// Abstracting the socket behind this protocol lets a relay connection's state machine —
 /// connect, receive, keepalive, and reconnect — run on any transport:
 ///
 /// - the default `URLSession`-backed ``URLSessionWebSocketFactory`` on Apple platforms,
 /// - an in-memory fake in tests, so the logic can be exercised without a live relay, or
-/// - a host-supplied native socket (for example OkHttp on Android) injected via
-///   ``RelayPool/init(config:webSocketFactory:)`` or
-///   ``NostrClient/init(relayPoolConfig:gossipPolicy:webSocketFactory:)``.
+/// - a host-supplied native socket (for example OkHttp on Android) injected through the
+///   ``WebSocketSessionFactory``.
 ///
 /// The protocol deliberately avoids `URLSessionWebSocketTask` types (``WebSocketMessage``
 /// and ``WebSocketCloseCode`` stand in for them) so it compiles on platforms whose
@@ -70,9 +68,9 @@ public protocol WebSocketSession: Sendable {
 
 /// Creates a ``WebSocketSession`` for a request.
 ///
-/// Injected into ``RelayConnection``, ``RelayPool``, and ``NostrClient`` so a host can
-/// supply a platform-native transport (or a test can supply a fake) in place of
-/// `URLSession`. The default implementation is ``URLSessionWebSocketFactory``.
+/// Injected wherever a relay connection is created so a host can supply a platform-native
+/// transport (or a test can supply a fake) in place of `URLSession`. The default
+/// implementation is ``URLSessionWebSocketFactory``.
 public protocol WebSocketSessionFactory: Sendable {
     /// Creates a new, unstarted transport for `request`.
     func makeWebSocket(with request: URLRequest) -> any WebSocketSession
