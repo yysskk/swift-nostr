@@ -1,6 +1,6 @@
 # ``NostrClient``
 
-A modern Swift library for the Nostr protocol with full concurrency support.
+The high-level, multi-relay Nostr client built on `NostrCore`.
 
 ## Overview
 

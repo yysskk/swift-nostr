@@ -1,8 +1,8 @@
 # swift-nostr-client
 
-> A modern Swift library for the Nostr protocol. Actor-based concurrency, multi-relay support, NIP-44 encryption, NIP-59 gift wrap, and BIP-39 key derivation. MIT licensed, requires Swift 6.2+.
+> A modern Swift toolkit for the Nostr protocol: the shared `NostrCore` primitives, the high-level multi-relay `NostrClient`, and `NostrWalletConnect` for NIP-47 payments. Actor-based concurrency, NIP-44 encryption, NIP-59 gift wrap, and BIP-39 key derivation. MIT licensed, requires Swift 6.2+.
 
-NostrClient provides a high-level actor-based API for interacting with the Nostr network:
+The high-level `NostrClient` library provides an actor-based API for the Nostr network, built on the `NostrCore` primitives (import both):
 
 - `NostrClient` actor: relay management, event publishing, subscriptions, fetches, direct messages
 - `KeyPair` / `PublicKey` / `EventSigner`: key generation, import (hex/nsec/mnemonic), event signing
