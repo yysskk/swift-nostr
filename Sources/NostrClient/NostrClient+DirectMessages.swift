@@ -259,38 +259,6 @@ extension NostrClient {
         try await subscribe(filters: [directMessagesFilter(limit: limit)])
     }
 
-    /// Subscribes to private direct messages for the current user
-    /// - Parameters:
-    ///   - limit: Maximum number of messages to fetch
-    ///   - handler: Handler called for each gift-wrapped event
-    /// - Returns: The subscription ID
-    @available(*, deprecated, message: "Use subscribeToDirectMessages(limit:) and iterate the returned sequence")
-    @discardableResult
-    public func subscribeToDirectMessages(
-        limit: Int = 100,
-        handler: @escaping @Sendable (Event) -> Void
-    ) async throws -> String {
-        try await openSubscription(
-            filters: [directMessagesFilter(limit: limit)], to: nil, handler: Self.eventOnly(handler)
-        ).id
-    }
-
-    /// Subscribes to private direct messages for the current user.
-    /// - Parameters:
-    ///   - limit: Maximum number of messages to fetch
-    ///   - eventHandler: Handler called for each subscription event
-    /// - Returns: The subscription ID
-    @available(*, deprecated, message: "Use subscribeToDirectMessages(limit:) and iterate the returned sequence")
-    @discardableResult
-    public func subscribeToDirectMessages(
-        limit: Int = 100,
-        eventHandler: @escaping @Sendable (SubscriptionEvent) -> Void
-    ) async throws -> String {
-        try await openSubscription(
-            filters: [directMessagesFilter(limit: limit)], to: nil, handler: eventHandler
-        ).id
-    }
-
     /// Builds the gift-wrap filter for the current user's direct messages.
     private func directMessagesFilter(limit: Int) throws -> Filter {
         guard let publicKey = publicKey else {
