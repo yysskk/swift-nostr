@@ -47,6 +47,12 @@ public enum Bech32 {
             throw NostrError.invalidBech32
         }
 
+        // The HRP must be ASCII: `hrpExpand` (used by the checksum) reads each
+        // character's `asciiValue`, so a non-ASCII HRP would otherwise trap.
+        guard hrp.allSatisfy(\.isASCII) else {
+            throw NostrError.invalidBech32
+        }
+
         var values = [UInt8]()
         for char in dataPart {
             guard let value = charsetMap[char] else {

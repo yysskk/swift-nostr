@@ -33,8 +33,7 @@ let package = Package(
         .target(
             name: "NostrCore",
             dependencies: [
-                .product(name: "P256K", package: "swift-secp256k1"),
-                .product(name: "Crypto", package: "swift-crypto"),
+                .product(name: "Crypto", package: "swift-crypto")
             ]
         ),
         .target(
