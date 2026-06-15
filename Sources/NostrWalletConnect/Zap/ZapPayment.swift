@@ -28,7 +28,7 @@ extension WalletConnection {
     ///
     /// This closes the gap the `NostrClient` zap flow leaves open. Build and sign the zap request
     /// (kind 9734) with `EventSigner.signZapRequest(...)` and resolve the recipient's
-    /// ``LNURLPayResponse`` first, then call this to fetch and pay the invoice in one step.
+    /// `LNURLPayResponse` first, then call this to fetch and pay the invoice in one step.
     ///
     /// To confirm the recipient's LNURL provider published a matching kind-9735 zap receipt,
     /// subscribe to the zap request's relays with `NostrClient` and validate it with
@@ -44,7 +44,7 @@ extension WalletConnection {
     ///   - lnurl: The recipient's bech32 `lnurl`, forwarded to the callback when provided.
     ///   - urlSession: The URL session for the LNURL request (defaults to `.shared`).
     /// - Returns: The paid invoice, its preimage, and the fees paid.
-    /// - Throws: ``LNURLPayResponse/InvoiceError`` if the invoice can't be fetched (e.g. the amount
+    /// - Throws: `LNURLPayResponse.InvoiceError` if the invoice can't be fetched (e.g. the amount
     ///   is out of range — surfaced before any wallet request is sent), or ``WalletConnectError`` if
     ///   the payment fails.
     public func payZap(

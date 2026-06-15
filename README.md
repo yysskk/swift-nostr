@@ -120,7 +120,7 @@ Reactions (NIP-25), encrypted file messages (kind 15), and disappearing messages
 
 ### Pay a zap through a remote wallet (NIP-47)
 
-The `NostrWalletConnect` library pays Lightning invoices through a remote wallet, completing the zap flow that `NostrClient` can only prepare. See its [API documentation](https://yysskk.github.io/swift-nostr-client/documentation/nostrwalletconnect) and [Getting Started](https://yysskk.github.io/swift-nostr-client/documentation/nostrwalletconnect/gettingstarted) guide.
+The `NostrWalletConnect` library pays Lightning invoices through a remote wallet, completing the zap flow that `NostrClient` can only prepare. See its [API documentation](https://yysskk.github.io/swift-nostr-client/documentation/nostrwalletconnect) — a [Getting Started](https://yysskk.github.io/swift-nostr-client/documentation/nostrwalletconnect/gettingstarted) guide and in-depth [Advanced Usage](https://yysskk.github.io/swift-nostr-client/documentation/nostrwalletconnect/advancedusage).
 
 ```swift
 import NostrWalletConnect

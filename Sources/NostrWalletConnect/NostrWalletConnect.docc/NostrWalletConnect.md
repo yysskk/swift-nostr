@@ -36,6 +36,7 @@ print(payment.preimage)
 ### Essentials
 
 - <doc:GettingStarted>
+- <doc:AdvancedUsage>
 - ``WalletConnection``
 - ``WalletConnectURI``
 
