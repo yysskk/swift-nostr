@@ -71,44 +71,6 @@ extension NostrClient {
         return try await subscribe(filters: [filter], to: routeSet)
     }
 
-    /// Subscribes to events from multiple authors using the NIP-65 outbox model.
-    /// Convenience overload that delivers only event payloads.
-    @available(*, deprecated, message: "Use subscribeOutbox(authors:kinds:limit:) and iterate the returned sequence")
-    @discardableResult
-    public func subscribeOutbox(
-        authors: [String],
-        kinds: [Event.Kind] = [.textNote],
-        limit: Int? = nil,
-        handler: @escaping @Sendable (Event) -> Void
-    ) async throws -> String {
-        try await openOutboxSubscription(authors: authors, kinds: kinds, limit: limit, handler: Self.eventOnly(handler))
-    }
-
-    /// Subscribes to events from multiple authors using the NIP-65 outbox model.
-    @available(*, deprecated, message: "Use subscribeOutbox(authors:kinds:limit:) and iterate the returned sequence")
-    @discardableResult
-    public func subscribeOutbox(
-        authors: [String],
-        kinds: [Event.Kind] = [.textNote],
-        limit: Int? = nil,
-        eventHandler: @escaping @Sendable (SubscriptionEvent) -> Void
-    ) async throws -> String {
-        try await openOutboxSubscription(authors: authors, kinds: kinds, limit: limit, handler: eventHandler)
-    }
-
-    /// Shared implementation for the deprecated handler-based outbox overloads: resolves outbox
-    /// routing for the authors and opens a subscription delivering items to `handler`.
-    private func openOutboxSubscription(
-        authors: [String],
-        kinds: [Event.Kind],
-        limit: Int?,
-        handler: @escaping @Sendable (SubscriptionEvent) -> Void
-    ) async throws -> String {
-        let routeSet = await resolveOutboxRelays(authors: authors)
-        let filter = Filter(authors: authors, kinds: kinds, limit: limit)
-        return try await openSubscription(filters: [filter], to: routeSet, handler: handler).id
-    }
-
     /// Resolves the WRITE relays of the given authors for outbox routing.
     /// - Returns: The connected target set, or `nil` to fall back to the full pool
     ///   when an author is unresolved or nothing could be connected.
