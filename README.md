@@ -2,7 +2,7 @@
 
 Swift library for Nostr protocol
 
-📖 **[API documentation](https://yysskk.github.io/swift-nostr-client/documentation/nostrclient)** — a [Getting Started](https://yysskk.github.io/swift-nostr-client/documentation/nostrclient/gettingstarted) guide, in-depth [Advanced Usage](https://yysskk.github.io/swift-nostr-client/documentation/nostrclient/advancedusage), and reference docs for every type.
+📖 **[API documentation](https://yysskk.github.io/swift-nostr-client/documentation/)** — a combined index for both libraries, with a [Getting Started](https://yysskk.github.io/swift-nostr-client/documentation/nostrclient/gettingstarted) guide, in-depth [Advanced Usage](https://yysskk.github.io/swift-nostr-client/documentation/nostrclient/advancedusage), and reference docs for every type.
 
 ## Features
 
