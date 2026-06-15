@@ -70,40 +70,8 @@ extension NostrClient {
         try await subscribe(filters: filters, to: relayURLs, bufferingPolicy: bufferingPolicy).events
     }
 
-    /// Subscribes to events matching the given filters
-    @available(
-        *, deprecated,
-        message: "Use events(filters:to:bufferingPolicy:) and iterate the returned sequence"
-    )
-    @discardableResult
-    public func subscribe(
-        filters: [Filter],
-        handler: @escaping @Sendable (Event) -> Void
-    ) async throws -> String {
-        try await openSubscription(filters: filters, to: nil) { subscriptionEvent in
-            guard case .event(_, let event) = subscriptionEvent else { return }
-            handler(event)
-        }.id
-    }
-
-    /// Subscribes to events matching the given filters and emits relay-aware subscription events.
-    /// Pass `relayURLs` to scope the subscription to a subset of relays (NIP-65 outbox routing);
-    /// the default `nil` subscribes on all relays in the pool.
-    @available(
-        *, deprecated,
-        message: "Use subscribe(filters:to:bufferingPolicy:) and iterate the returned SubscriptionSequence"
-    )
-    @discardableResult
-    public func subscribe(
-        filters: [Filter],
-        to relayURLs: Set<URL>? = nil,
-        eventHandler: @escaping @Sendable (SubscriptionEvent) -> Void
-    ) async throws -> String {
-        try await openSubscription(filters: filters, to: relayURLs, handler: eventHandler).id
-    }
-
     /// Registers a subscription with the relay pool and routes its messages to `handler`.
-    /// Shared core of the stream-based and deprecated closure-based subscribe APIs.
+    /// Backs the stream-based ``subscribe(filters:to:bufferingPolicy:)``.
     func openSubscription(
         filters: [Filter],
         to relayURLs: Set<URL>?,
@@ -191,112 +159,6 @@ extension NostrClient {
         try await subscribe(filters: [.metadata(pubkeys: pubkeys)])
     }
 
-    // MARK: - Deprecated Closure-based Convenience Subscriptions
-
-    /// Subscribes to a user's timeline
-    @available(*, deprecated, message: "Use subscribeToUserTimeline(pubkey:limit:) and iterate the returned sequence")
-    @discardableResult
-    public func subscribeToUserTimeline(
-        pubkey: String,
-        limit: Int = 100,
-        handler: @escaping @Sendable (Event) -> Void
-    ) async throws -> String {
-        try await openSubscription(
-            filters: [.userNotes(pubkey: pubkey, limit: limit)], to: nil,
-            handler: Self.eventOnly(handler)
-        ).id
-    }
-
-    @available(*, deprecated, message: "Use subscribeToUserTimeline(pubkey:limit:) and iterate the returned sequence")
-    @discardableResult
-    public func subscribeToUserTimeline(
-        pubkey: String,
-        limit: Int = 100,
-        eventHandler: @escaping @Sendable (SubscriptionEvent) -> Void
-    ) async throws -> String {
-        try await openSubscription(
-            filters: [.userNotes(pubkey: pubkey, limit: limit)], to: nil, handler: eventHandler
-        ).id
-    }
-
-    /// Subscribes to the global feed
-    @available(*, deprecated, message: "Use subscribeToGlobalFeed(limit:) and iterate the returned sequence")
-    @discardableResult
-    public func subscribeToGlobalFeed(
-        limit: Int = 100,
-        handler: @escaping @Sendable (Event) -> Void
-    ) async throws -> String {
-        try await openSubscription(
-            filters: [.globalFeed(limit: limit)], to: nil, handler: Self.eventOnly(handler)
-        ).id
-    }
-
-    @available(*, deprecated, message: "Use subscribeToGlobalFeed(limit:) and iterate the returned sequence")
-    @discardableResult
-    public func subscribeToGlobalFeed(
-        limit: Int = 100,
-        eventHandler: @escaping @Sendable (SubscriptionEvent) -> Void
-    ) async throws -> String {
-        try await openSubscription(filters: [.globalFeed(limit: limit)], to: nil, handler: eventHandler).id
-    }
-
-    /// Subscribes to mentions of a user
-    @available(*, deprecated, message: "Use subscribeToMentions(pubkey:limit:) and iterate the returned sequence")
-    @discardableResult
-    public func subscribeToMentions(
-        pubkey: String,
-        limit: Int = 100,
-        handler: @escaping @Sendable (Event) -> Void
-    ) async throws -> String {
-        try await openSubscription(
-            filters: [.mentions(pubkey: pubkey, limit: limit)], to: nil,
-            handler: Self.eventOnly(handler)
-        ).id
-    }
-
-    @available(*, deprecated, message: "Use subscribeToMentions(pubkey:limit:) and iterate the returned sequence")
-    @discardableResult
-    public func subscribeToMentions(
-        pubkey: String,
-        limit: Int = 100,
-        eventHandler: @escaping @Sendable (SubscriptionEvent) -> Void
-    ) async throws -> String {
-        try await openSubscription(
-            filters: [.mentions(pubkey: pubkey, limit: limit)], to: nil, handler: eventHandler
-        ).id
-    }
-
-    /// Fetches metadata for a list of pubkeys
-    @available(*, deprecated, message: "Use subscribeToMetadata(pubkeys:) and iterate the returned sequence")
-    @discardableResult
-    public func subscribeToMetadata(
-        pubkeys: [String],
-        handler: @escaping @Sendable (Event) -> Void
-    ) async throws -> String {
-        try await openSubscription(
-            filters: [.metadata(pubkeys: pubkeys)], to: nil, handler: Self.eventOnly(handler)
-        ).id
-    }
-
-    @available(*, deprecated, message: "Use subscribeToMetadata(pubkeys:) and iterate the returned sequence")
-    @discardableResult
-    public func subscribeToMetadata(
-        pubkeys: [String],
-        eventHandler: @escaping @Sendable (SubscriptionEvent) -> Void
-    ) async throws -> String {
-        try await openSubscription(filters: [.metadata(pubkeys: pubkeys)], to: nil, handler: eventHandler).id
-    }
-
-    /// Wraps an event-only handler as a subscription-event handler.
-    static func eventOnly(
-        _ handler: @escaping @Sendable (Event) -> Void
-    ) -> @Sendable (SubscriptionEvent) -> Void {
-        { subscriptionEvent in
-            guard case .event(_, let event) = subscriptionEvent else { return }
-            handler(event)
-        }
-    }
-
     private func handleMessage(_ message: RelayMessage, from relayURL: URL, subscriptionId: String) {
         guard let subscription = subscriptions[subscriptionId] else { return }
 
@@ -342,7 +204,8 @@ struct SubscriptionState: Sendable {
     let handler: @Sendable (SubscriptionEvent) -> Void
 
     /// Continuation of the stream backing a ``SubscriptionSequence``;
-    /// finished on unsubscribe so iteration ends. `nil` for closure-based subscriptions.
+    /// finished on unsubscribe so iteration ends. Briefly `nil` between the subscription being
+    /// registered and the stream being wired up.
     fileprivate(set) var continuation: AsyncStream<SubscriptionEvent>.Continuation?
 
     init(id: String, filters: [Filter], handler: @escaping @Sendable (SubscriptionEvent) -> Void) {
