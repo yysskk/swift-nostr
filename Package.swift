@@ -12,6 +12,10 @@ let package = Package(
     ],
     products: [
         .library(
+            name: "NostrCore",
+            targets: ["NostrCore"]
+        ),
+        .library(
             name: "NostrClient",
             targets: ["NostrClient"]
         ),
@@ -27,8 +31,16 @@ let package = Package(
     ],
     targets: [
         .target(
+            name: "NostrCore",
+            dependencies: [
+                .product(name: "P256K", package: "swift-secp256k1"),
+                .product(name: "Crypto", package: "swift-crypto"),
+            ]
+        ),
+        .target(
             name: "NostrClient",
             dependencies: [
+                "NostrCore",
                 .product(name: "P256K", package: "swift-secp256k1"),
                 .product(name: "Crypto", package: "swift-crypto"),
             ]
@@ -41,6 +53,10 @@ let package = Package(
                 .product(name: "Crypto", package: "swift-crypto"),
                 .product(name: "_CryptoExtras", package: "swift-crypto"),
             ]
+        ),
+        .testTarget(
+            name: "NostrCoreTests",
+            dependencies: ["NostrCore"]
         ),
         .testTarget(
             name: "NostrClientTests",
