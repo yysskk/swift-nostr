@@ -63,6 +63,7 @@ public struct MultiPayInvoiceParams: Codable, Sendable, Hashable {
         }
     }
 
+    /// The invoices to pay.
     public let invoices: [Invoice]
 
     public init(invoices: [Invoice]) {
@@ -131,6 +132,7 @@ public struct MultiPayKeysendParams: Codable, Sendable, Hashable {
         }
     }
 
+    /// The keysend payments to send.
     public let keysends: [Keysend]
 
     public init(keysends: [Keysend]) {

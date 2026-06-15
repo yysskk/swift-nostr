@@ -25,7 +25,10 @@ jobs:
       - name: Build documentation
         run: |
           swift package --allow-writing-to-directory ./docs \
-            generate-documentation --target NostrClient \
+            generate-documentation \
+            --enable-experimental-combined-documentation \
+            --target NostrClient \
+            --target NostrWalletConnect \
             --disable-indexing \
             --transform-for-static-hosting \
             --hosting-base-path swift-nostr-client \
