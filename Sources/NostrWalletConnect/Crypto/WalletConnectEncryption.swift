@@ -1,4 +1,4 @@
-import NostrClient
+import Foundation
 import NostrCore
 
 /// A NIP-47 content-encryption scheme.
@@ -17,7 +17,7 @@ public enum WalletConnectEncryption: String, Sendable, Hashable, CaseIterable {
 
 /// Encrypts and decrypts NIP-47 payloads with a chosen ``WalletConnectEncryption`` scheme.
 ///
-/// NIP-44 reuses `NostrClient`'s `SealedMessage`; NIP-04 uses this module's ``NIP04``.
+/// NIP-44 reuses `NostrCore`'s `SealedMessage`; NIP-04 uses this module's ``NIP04``.
 struct WalletConnectCipher: Sendable {
     /// The scheme this cipher applies.
     let scheme: WalletConnectEncryption

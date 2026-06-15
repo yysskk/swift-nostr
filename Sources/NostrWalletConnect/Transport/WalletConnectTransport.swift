@@ -1,4 +1,3 @@
-public import NostrClient
 public import NostrCore
 
 /// The relay transport a ``WalletConnection`` uses to talk to a wallet service.

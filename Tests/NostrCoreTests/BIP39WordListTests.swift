@@ -1,7 +1,6 @@
 import Foundation
+import NostrCore
 import Testing
-
-@testable import NostrClient
 
 @Suite("BIP-39 WordList Tests")
 struct BIP39WordListTests {

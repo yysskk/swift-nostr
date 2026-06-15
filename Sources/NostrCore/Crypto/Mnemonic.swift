@@ -1,6 +1,5 @@
 import Crypto
 import Foundation
-import NostrCore
 
 /// Represents a BIP-39 mnemonic seed phrase for NIP-06 key derivation
 public struct Mnemonic: Sendable {

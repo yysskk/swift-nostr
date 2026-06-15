@@ -1,6 +1,7 @@
 import Crypto
 import Foundation
 import NostrClient
+import NostrCore
 import Testing
 
 @testable import NostrWalletConnect

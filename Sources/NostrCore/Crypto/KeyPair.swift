@@ -1,5 +1,4 @@
 import Foundation
-import NostrCore
 import P256K
 
 /// Represents a Nostr keypair (private and public keys)

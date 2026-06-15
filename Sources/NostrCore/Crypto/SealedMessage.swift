@@ -1,6 +1,5 @@
 import Crypto
 import Foundation
-import NostrCore
 import P256K
 
 /// NIP-44 Versioned Encryption

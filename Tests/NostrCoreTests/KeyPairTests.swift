@@ -2,8 +2,6 @@ import Foundation
 import NostrCore
 import Testing
 
-@testable import NostrClient
-
 @Suite("KeyPair Tests")
 struct KeyPairTests {
 
