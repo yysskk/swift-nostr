@@ -60,7 +60,7 @@ struct WalletConnectCipher: Sendable {
 
     /// Decodes a 32-byte x-only public key from hex, or throws ``NostrError/invalidPublicKey``.
     private func xOnlyKey(_ hex: String) throws -> Data {
-        guard let data = NWCHex.data(from: hex), data.count == 32 else {
+        guard let data = Data(hexString: hex), data.count == 32 else {
             throw NostrError.invalidPublicKey
         }
         return data

@@ -1,5 +1,4 @@
 import Foundation
-import NostrClient
 import NostrCore
 import Testing
 
@@ -20,7 +19,7 @@ struct WalletConnectURITests {
         let uri = try WalletConnectURI(string: canonical)
         #expect(uri.walletPubkey == walletPubkey)
         #expect(uri.relays == [URL(string: "wss://relay.damus.io")!])
-        #expect(NWCHex.string(from: uri.secret) == secretHex)
+        #expect(uri.secret.hexEncodedString() == secretHex)
         #expect(uri.lud16 == nil)
     }
 

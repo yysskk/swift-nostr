@@ -1,6 +1,5 @@
 import Crypto
 import Foundation
-import NostrClient
 import NostrCore
 import Testing
 
@@ -13,7 +12,7 @@ struct NIP04Tests {
     let recipientSecretHex = "96f6fa197aa07477ab88f6981118466ae3a982faab8ad5db9d5426870c73d220"
 
     private func bytes(_ hex: String) throws -> Data {
-        try #require(NWCHex.data(from: hex))
+        try #require(Data(hexString: hex))
     }
 
     private func keyData(_ key: SymmetricKey) -> Data {
