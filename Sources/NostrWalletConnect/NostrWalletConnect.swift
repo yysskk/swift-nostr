@@ -9,6 +9,6 @@
 // Wallet Connect connection closes that gap by asking a remote wallet to pay the invoice and return
 // the payment preimage.
 //
-// This module builds on top of NostrCore (which it re-exports through `public import`), reusing its
-// event, signing, encryption, and relay primitives. Start from a wallet's connection string with
-// `WalletConnectURI`.
+// This module builds on top of NostrCore, reusing its event, signing, encryption, and relay
+// primitives. Callers that work with those core types `import NostrCore` directly (it is not
+// re-exported). Start from a wallet's connection string with `WalletConnectURI`.

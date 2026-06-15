@@ -48,10 +48,10 @@ Or add via Xcode: File → Add Package Dependencies → Enter the repository URL
 The package vends three libraries:
 
 - **`NostrCore`** — the shared protocol primitives, cryptography, NIP-19 encoding, and a single-relay WebSocket transport: `Event`, `KeyPair`, `EventSigner`, `Filter`, `Bech32`, `SealedMessage`, `RelayConnection`, and the relay messages. Depend on it directly if that is all you need.
-- **`NostrClient`** — the high-level, actor-based client (multi-relay pool, NIP-65 outbox/gossip, NIP-17 direct messages, fetches, NIP-19 entities, zap receipts). It is built on `NostrCore`; import both.
-- **`NostrWalletConnect`** — NIP-47 wallet payments. It re-exports `NostrCore`, so a single `import NostrWalletConnect` brings the primitives too.
+- **`NostrClient`** — the high-level, actor-based client (multi-relay pool, NIP-65 outbox/gossip, NIP-17 direct messages, fetches, NIP-19 entities, zap receipts). It is built on `NostrCore` but does not re-export it; add the `NostrCore` product too and import both.
+- **`NostrWalletConnect`** — NIP-47 wallet payments, built on `NostrCore`. Its API surfaces core types (`LNURLPayResponse`, `Event`, …), so add the `NostrCore` product and `import NostrCore` alongside it.
 
-> **Migrating from an earlier release:** the protocol primitives moved out of `NostrClient` into the new `NostrCore` module. Add `import NostrCore` alongside `import NostrClient` wherever you reference `Event`, `KeyPair`, `EventSigner`, `Filter`, `RelayConnection`, `Bech32`, `NostrError`, and the other primitives — the higher-level `NostrClient` API (the `NostrClient` actor, `RelayPool`, direct messages, outbox) is unchanged.
+> **Migrating from an earlier release:** the protocol primitives moved out of `NostrClient` into the new `NostrCore` module. Add the `NostrCore` product to your target and `import NostrCore` alongside `import NostrClient` wherever you reference `Event`, `KeyPair`, `EventSigner`, `Filter`, `RelayConnection`, `Bech32`, `NostrError`, and the other primitives — the higher-level `NostrClient` API (the `NostrClient` actor, `RelayPool`, direct messages, outbox) is unchanged.
 
 ## Quick Start
 

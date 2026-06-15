@@ -6,8 +6,9 @@ Control a remote Lightning wallet over Nostr with NIP-47 Nostr Wallet Connect.
 
 NostrWalletConnect is a Swift implementation of [NIP-47 Nostr Wallet
 Connect](https://github.com/nostr-protocol/nips/blob/master/47.md): a protocol that lets an
-application drive a remote Lightning wallet over Nostr relays. It builds on `NostrCore` — which it
-re-exports — and reuses its event, signing, encryption, and relay primitives.
+application drive a remote Lightning wallet over Nostr relays. It builds on `NostrCore`, reusing its
+event, signing, encryption, and relay primitives; add the `NostrCore` product and `import NostrCore`
+to work with those types directly.
 
 The headline use case is **completing a zap payment**. `NostrCore` can sign a zap request and fetch
 a BOLT-11 invoice from a recipient's LNURL endpoint, but it cannot pay that invoice. A wallet
