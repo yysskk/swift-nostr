@@ -152,11 +152,11 @@ keys exactly as they appear on the wire.
 ## Lightning Zap Capstone (NIP-57)
 
 ``WalletConnection/payZap(lnurlPay:amountMillisats:zapRequest:lnurl:urlSession:)`` completes a zap
-that `NostrClient` can only prepare: it fetches the BOLT-11 invoice from the recipient's LNURL
-endpoint and pays it through the wallet in one step. Build the inputs with `NostrClient`:
+that `NostrCore` can only prepare: it fetches the BOLT-11 invoice from the recipient's LNURL
+endpoint and pays it through the wallet in one step. Build the inputs with `NostrCore`:
 
 ```swift
-// Resolve the recipient's LNURL-pay endpoint and sign the zap request (NostrClient).
+// Resolve the recipient's LNURL-pay endpoint and sign the zap request (NostrCore).
 guard let serviceURL = LNURL.payServiceURL(forLightningAddress: "alice@example.com") else { return }
 let (data, _) = try await URLSession.shared.data(from: serviceURL)
 let lnurlPay = try JSONDecoder().decode(LNURLPayResponse.self, from: data)
@@ -184,7 +184,7 @@ confirm it with `NostrClient` (subscribe to those relays and validate with
 ## Custom Transport
 
 ``WalletConnection`` talks to relays through the ``WalletConnectTransport`` protocol. The default,
-``RelayConnectionTransport``, drives `NostrClient`'s relay connections over the URI's relays.
+``RelayConnectionTransport``, drives `NostrCore`'s relay connections over the URI's relays.
 Inject your own transport to run on a different relay stack or to test without a live relay:
 
 ```swift
@@ -203,7 +203,7 @@ let connection = WalletConnection(uri: uri, transport: InMemoryTransport())
 NIP-47 request events are ephemeral, so ``WalletConnectTransport/send(_:)`` is fire-and-forget: the
 matching response delivered through ``WalletConnectTransport/events()`` is the completion signal, not
 a relay `OK`. Because the seam is platform-independent, a wallet connection runs anywhere
-`NostrClient` does, including non-Apple platforms.
+`NostrCore` does, including non-Apple platforms.
 
 ## Error Handling
 
@@ -236,7 +236,7 @@ encryption/encoding failures, malformed responses, and a `fetchInfo()` supersede
 
 ## Event Kinds
 
-For low-level work, the module adds the NIP-47 kinds to `NostrClient`'s `Event.Kind`:
+For low-level work, the module adds the NIP-47 kinds to `NostrCore`'s `Event.Kind`:
 `walletConnectInfo` (13194), `walletConnectRequest` (23194), `walletConnectResponse` (23195),
 `walletConnectNotificationLegacy` (23196, NIP-04), and `walletConnectNotification` (23197, NIP-44).
 ``WalletConnection`` handles these for you; reach for them only when building filters or events by

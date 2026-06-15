@@ -13,8 +13,9 @@ dependencies: [
 ]
 ```
 
-Then add the `NostrWalletConnect` product to your target (it re-exports `NostrClient`, so a single
-`import NostrWalletConnect` is enough):
+Then add the `NostrWalletConnect` product to your target. It re-exports `NostrCore`, so a single
+`import NostrWalletConnect` covers the wallet API together with the core Nostr primitives (events,
+keys, signing, encryption, relay connections):
 
 ```swift
 .target(
@@ -22,6 +23,9 @@ Then add the `NostrWalletConnect` product to your target (it re-exports `NostrCl
     dependencies: ["NostrWalletConnect"]
 )
 ```
+
+If you also need the higher-level `NostrClient` features (the `NostrClient` actor, direct messages,
+zap receipts, NIP-19 entities), add the `NostrClient` product as a separate dependency.
 
 Or add via Xcode: File → Add Package Dependencies → Enter the repository URL.
 
@@ -57,10 +61,11 @@ print("Fees paid: \(payment.feesPaid ?? 0) msat")
 
 The headline use case: hand the connection a recipient's resolved LNURL-pay response and a signed
 zap request, and ``WalletConnection/payZap(lnurlPay:amountMillisats:zapRequest:lnurl:urlSession:)``
-fetches the invoice and pays it in one step. Build the zap request with `NostrClient`:
+fetches the invoice and pays it in one step. Build the zap request with `NostrCore` (re-exported, so
+`import NostrWalletConnect` already provides `LNURL`, `KeyPair`, and `EventSigner`):
 
 ```swift
-// Resolve the recipient's LNURL-pay endpoint (NostrClient).
+// Resolve the recipient's LNURL-pay endpoint (NostrCore).
 guard let serviceURL = LNURL.payServiceURL(forLightningAddress: "alice@example.com") else { return }
 let (data, _) = try await URLSession.shared.data(from: serviceURL)
 let lnurlPay = try JSONDecoder().decode(LNURLPayResponse.self, from: data)

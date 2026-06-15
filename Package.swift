@@ -48,7 +48,6 @@ let package = Package(
         .target(
             name: "NostrWalletConnect",
             dependencies: [
-                "NostrClient",
                 "NostrCore",
                 .product(name: "P256K", package: "swift-secp256k1"),
                 .product(name: "Crypto", package: "swift-crypto"),

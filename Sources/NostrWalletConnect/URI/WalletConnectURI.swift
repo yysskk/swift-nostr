@@ -50,7 +50,7 @@ public struct WalletConnectURI: Sendable, Hashable {
     /// - Throws: ``WalletConnectError/invalidURI(reason:)`` if any field fails validation.
     public init(walletPubkey: String, relays: [URL], secret: Data, lud16: String? = nil) throws {
         let normalizedPubkey = walletPubkey.lowercased()
-        guard NWCHex.isValid(normalizedPubkey, byteCount: 32) else {
+        guard Data(hexString: normalizedPubkey)?.count == 32 else {
             throw WalletConnectError.invalidURI(reason: "wallet pubkey must be 32-byte hex")
         }
         guard !relays.isEmpty else {
@@ -97,7 +97,7 @@ public struct WalletConnectURI: Sendable, Hashable {
         }
 
         guard let secretHex = queryItems.first(where: { $0.name == "secret" })?.value,
-            let secret = NWCHex.data(from: secretHex)
+            let secret = Data(hexString: secretHex)
         else {
             throw WalletConnectError.invalidURI(reason: "missing or malformed secret")
         }
@@ -114,7 +114,7 @@ public struct WalletConnectURI: Sendable, Hashable {
         components.host = walletPubkey
 
         var items = relays.map { URLQueryItem(name: "relay", value: $0.absoluteString) }
-        items.append(URLQueryItem(name: "secret", value: NWCHex.string(from: secret)))
+        items.append(URLQueryItem(name: "secret", value: secret.hexEncodedString()))
         if let lud16 {
             items.append(URLQueryItem(name: "lud16", value: lud16))
         }
