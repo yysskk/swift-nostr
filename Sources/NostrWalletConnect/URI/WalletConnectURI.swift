@@ -1,6 +1,5 @@
 import Foundation
 
-public import NostrClient
 public import NostrCore
 
 /// A parsed NIP-47 `nostr+walletconnect://` connection string.

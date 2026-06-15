@@ -1,5 +1,4 @@
 import Foundation
-import NostrClient
 import NostrCore
 
 /// A connection to a remote Lightning wallet over NIP-47 Nostr Wallet Connect.
