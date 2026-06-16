@@ -4,7 +4,7 @@ Generate keys, sign an event, and talk to a single relay with the core primitive
 
 ## Installation
 
-NostrCore is a product of the swift-nostr-client package. Add the package, then the `NostrCore` product to your target:
+NostrCore is a product of the swift-nostr package. Add the package, then the `NostrCore` product to your target:
 
 ```swift
 .target(

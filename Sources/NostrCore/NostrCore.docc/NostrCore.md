@@ -4,7 +4,7 @@ The shared Nostr protocol primitives, cryptography, and relay transport that bot
 
 ## Overview
 
-NostrCore is the foundation layer of swift-nostr-client. It holds the pieces that are not specific to any one higher-level library: the event model, key handling and signing, NIP-44 encryption, NIP-19 bech32 encoding, the NIP-01 relay protocol messages, and a single-relay connection behind a platform-independent WebSocket transport seam.
+NostrCore is the foundation layer of swift-nostr. It holds the pieces that are not specific to any one higher-level library: the event model, key handling and signing, NIP-44 encryption, NIP-19 bech32 encoding, the NIP-01 relay protocol messages, and a single-relay connection behind a platform-independent WebSocket transport seam.
 
 Depend on NostrCore directly when you only need these primitives — for example to sign an event, derive a key, or drive one relay connection — without the higher-level relay pool, gossip routing, and direct-messaging features that live in `NostrClient`.
 

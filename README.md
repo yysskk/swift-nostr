@@ -2,7 +2,7 @@
 
 Swift library for Nostr protocol
 
-📖 **[API documentation](https://yysskk.github.io/swift-nostr-client/documentation/)** — a combined index for all three libraries, with a [Getting Started](https://yysskk.github.io/swift-nostr-client/documentation/nostrclient/gettingstarted) guide, in-depth [Advanced Usage](https://yysskk.github.io/swift-nostr-client/documentation/nostrclient/advancedusage), and reference docs for every type.
+📖 **[API documentation](https://yysskk.github.io/swift-nostr/documentation/)** — a combined index for all three libraries, with a [Getting Started](https://yysskk.github.io/swift-nostr/documentation/nostrclient/gettingstarted) guide, in-depth [Advanced Usage](https://yysskk.github.io/swift-nostr/documentation/nostrclient/advancedusage), and reference docs for every type.
 
 ## Features
 
@@ -37,7 +37,7 @@ Add to your `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/yysskk/swift-nostr-client", from: "1.0.0")
+    .package(url: "https://github.com/yysskk/swift-nostr", from: "1.0.0")
 ]
 ```
 
@@ -109,7 +109,7 @@ let metadata = try await client.fetchMetadata(pubkey: "...")
 print(metadata?.name ?? "Unknown")
 ```
 
-Need per-relay EOSE, notices, and auth challenges? Iterate `client.subscribe(filters:)` directly — see [Advanced Usage](https://yysskk.github.io/swift-nostr-client/documentation/nostrclient/advancedusage).
+Need per-relay EOSE, notices, and auth challenges? Iterate `client.subscribe(filters:)` directly — see [Advanced Usage](https://yysskk.github.io/swift-nostr/documentation/nostrclient/advancedusage).
 
 ### Private direct messages (NIP-17)
 
@@ -127,11 +127,11 @@ for await message in try await client.directMessages() {
 try await client.sendDirectMessage("Hello privately!", to: "recipientPubkeyHex")
 ```
 
-Reactions (NIP-25), encrypted file messages (kind 15), and disappearing messages (NIP-40) build on the same flow — see [Advanced Usage](https://yysskk.github.io/swift-nostr-client/documentation/nostrclient/advancedusage).
+Reactions (NIP-25), encrypted file messages (kind 15), and disappearing messages (NIP-40) build on the same flow — see [Advanced Usage](https://yysskk.github.io/swift-nostr/documentation/nostrclient/advancedusage).
 
 ### Pay a zap through a remote wallet (NIP-47)
 
-The `NostrWalletConnect` library pays Lightning invoices through a remote wallet, completing the zap flow that `NostrClient` can only prepare. See its [API documentation](https://yysskk.github.io/swift-nostr-client/documentation/nostrwalletconnect) — a [Getting Started](https://yysskk.github.io/swift-nostr-client/documentation/nostrwalletconnect/gettingstarted) guide and in-depth [Advanced Usage](https://yysskk.github.io/swift-nostr-client/documentation/nostrwalletconnect/advancedusage).
+The `NostrWalletConnect` library pays Lightning invoices through a remote wallet, completing the zap flow that `NostrClient` can only prepare. See its [API documentation](https://yysskk.github.io/swift-nostr/documentation/nostrwalletconnect) — a [Getting Started](https://yysskk.github.io/swift-nostr/documentation/nostrwalletconnect/gettingstarted) guide and in-depth [Advanced Usage](https://yysskk.github.io/swift-nostr/documentation/nostrwalletconnect/advancedusage).
 
 ```swift
 import NostrWalletConnect
@@ -155,7 +155,7 @@ print(zap.preimage)
 
 ## More
 
-Each of these is covered in depth, with worked examples, in the [documentation](https://yysskk.github.io/swift-nostr-client/documentation/nostrclient):
+Each of these is covered in depth, with worked examples, in the [documentation](https://yysskk.github.io/swift-nostr/documentation/nostrclient):
 
 - **Lightning Zaps (NIP-57)** — resolve an LNURL-pay endpoint, sign a zap request, fetch the bolt11 invoice, and verify the kind-9735 receipt.
 - **Outbox model (NIP-65)** — publish your read/write relay list and route reads/writes to each user's declared relays with `subscribeOutbox` / `publishGossip`.
