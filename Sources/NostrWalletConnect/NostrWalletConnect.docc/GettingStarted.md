@@ -9,7 +9,7 @@ NostrWalletConnect ships in the same package as `NostrClient`. Add the package d
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/yysskk/swift-nostr-client", from: "1.0.0")
+    .package(url: "https://github.com/yysskk/swift-nostr", from: "1.0.0")
 ]
 ```
 

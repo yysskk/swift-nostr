@@ -8,7 +8,7 @@ Add the package dependency in `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/yysskk/swift-nostr-client", from: "1.0.0")
+    .package(url: "https://github.com/yysskk/swift-nostr", from: "1.0.0")
 ]
 ```
 
