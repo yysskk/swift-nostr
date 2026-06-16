@@ -1,4 +1,4 @@
-# Nostr Client
+# Swift Nostr
 
 Swift library for Nostr protocol
 
