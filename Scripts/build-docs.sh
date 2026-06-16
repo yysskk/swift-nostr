@@ -12,13 +12,13 @@
 #   Scripts/build-docs.sh [OUTPUT_DIR] [HOSTING_BASE_PATH]
 #
 #   OUTPUT_DIR         Directory to write the static site to. Default: ./docs
-#   HOSTING_BASE_PATH  Base path the site is hosted under, e.g. "swift-nostr-client"
-#                      for https://<owner>.github.io/swift-nostr-client/. Omit (or
+#   HOSTING_BASE_PATH  Base path the site is hosted under, e.g. "swift-nostr"
+#                      for https://<owner>.github.io/swift-nostr/. Omit (or
 #                      pass "") to build a root-relative site for local preview.
 #
 # Examples:
 #   Scripts/build-docs.sh                            # ./docs, root-relative (local)
-#   Scripts/build-docs.sh ./docs swift-nostr-client  # GitHub Pages layout (CI)
+#   Scripts/build-docs.sh ./docs swift-nostr         # GitHub Pages layout (CI)
 
 set -euo pipefail
 
@@ -29,7 +29,7 @@ HOSTING_BASE_PATH="${2:-}"
 TARGETS=(NostrCore NostrClient NostrWalletConnect)
 
 # Display name of the synthesized landing page that links to every library.
-LANDING_PAGE_NAME="swift-nostr-client"
+LANDING_PAGE_NAME="swift-nostr"
 
 # Resolve the DocC executable: `xcrun docc` on macOS, `docc` on Linux toolchains.
 if command -v xcrun >/dev/null 2>&1; then
