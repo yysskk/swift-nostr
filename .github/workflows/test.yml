@@ -108,7 +108,7 @@ jobs:
       - name: Build for ${{ matrix.platform }}
         run: |
           xcodebuild build \
-            -scheme swift-nostr-client-Package \
+            -scheme swift-nostr-Package \
             -destination 'generic/platform=${{ matrix.platform }}' \
             -skipMacroValidation \
             -skipPackagePluginValidation \
