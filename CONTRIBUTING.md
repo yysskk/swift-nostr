@@ -5,7 +5,7 @@ improvements, and pull requests are all welcome.
 
 ## Getting started
 
-You need Swift 6.2 or later (bundled with a recent Xcode on Apple platforms, or the
+You need Swift 6.3 or later (bundled with a recent Xcode on Apple platforms, or the
 [swift.org](https://www.swift.org/install/) toolchain on Linux).
 
 ```bash
