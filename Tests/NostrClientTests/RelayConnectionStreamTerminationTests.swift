@@ -73,6 +73,7 @@ struct RelayConnectionStreamTerminationTests {
     private func makeConnection(
         dispenser: SocketDispenser,
         maxReconnectAttempts: Int,
+        autoReconnect: Bool = true,
         initialReconnectDelay: TimeInterval = 0.001
     ) -> RelayConnection {
         RelayConnection(
@@ -81,7 +82,7 @@ struct RelayConnectionStreamTerminationTests {
             config: RelayConnectionConfig(
                 connectionTimeout: 1,
                 pingInterval: 60,
-                autoReconnect: true,
+                autoReconnect: autoReconnect,
                 maxReconnectAttempts: maxReconnectAttempts,
                 initialReconnectDelay: initialReconnectDelay
             )
@@ -112,6 +113,22 @@ struct RelayConnectionStreamTerminationTests {
         let finished = consume(await connection.messages())
 
         // Drop the connection; the single allowed reconnect attempt fails.
+        dispenser.socket(at: 0)?.deliver(error: URLError(.networkConnectionLost))
+
+        try await NIP42TestSupport.pollUntil { finished.isSet }
+    }
+
+    @Test("messages() finishes when the connection drops with auto-reconnect disabled")
+    func streamFinishesOnDropWithoutAutoReconnect() async throws {
+        let dispenser = SocketDispenser { _ in MockWebSocketSession() }
+        let connection = makeConnection(
+            dispenser: dispenser, maxReconnectAttempts: 0, autoReconnect: false)
+        try await connection.connect()
+
+        let finished = consume(await connection.messages())
+
+        // With auto-reconnect off, a dropped socket is terminal: the receive
+        // loop exits with isReconnecting false and finishes the streams.
         dispenser.socket(at: 0)?.deliver(error: URLError(.networkConnectionLost))
 
         try await NIP42TestSupport.pollUntil { finished.isSet }
