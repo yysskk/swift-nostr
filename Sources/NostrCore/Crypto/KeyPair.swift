@@ -105,6 +105,22 @@ public struct KeyPair: Sendable {
     }
 }
 
+// MARK: - Equatable & Hashable
+extension KeyPair: Equatable, Hashable {
+    /// Two keypairs are equal when they represent the same Nostr identity — the same
+    /// x-only public key. The public key is derived deterministically from the private
+    /// key, so comparing public keys compares identities while keeping private-key
+    /// bytes out of equality checks.
+    public static func == (lhs: KeyPair, rhs: KeyPair) -> Bool {
+        lhs.publicKey == rhs.publicKey
+    }
+
+    /// Hashes the public key only, keeping private-key bytes out of hash values.
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(publicKey)
+    }
+}
+
 // MARK: - Public Key Only
 /// Represents a Nostr public key (without private key)
 public struct PublicKey: Sendable, Hashable {

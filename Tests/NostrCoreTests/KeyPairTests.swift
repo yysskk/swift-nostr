@@ -62,6 +62,27 @@ struct KeyPairTests {
             _ = try KeyPair(privateKeyHex: "not-a-hex-string")
         }
     }
+
+    @Test("Keypairs for the same identity are equal")
+    func equalityForSameIdentity() throws {
+        let keyPair = try KeyPair()
+        let same = try KeyPair(privateKey: keyPair.privateKey)
+        let other = try KeyPair()
+
+        #expect(keyPair == same)
+        #expect(keyPair != other)
+    }
+
+    @Test("Keypairs hash by identity and work in a Set")
+    func hashingByIdentity() throws {
+        let keyPair = try KeyPair()
+        let same = try KeyPair(privateKey: keyPair.privateKey)
+        let other = try KeyPair()
+
+        let identities: Set<KeyPair> = [keyPair, same, other]
+        #expect(identities.count == 2)
+        #expect(identities.contains(same))
+    }
 }
 
 @Suite("PublicKey Tests")

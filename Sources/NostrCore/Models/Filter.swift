@@ -110,10 +110,19 @@ public struct Filter: Codable, Sendable, Hashable {
         tagQueries[key] = values
     }
 
-    /// Get tag query values
-    public func getTagQuery(_ tag: String) -> [String]? {
+    /// Returns the values of a generic tag query (e.g. `#t` for hashtags).
+    ///
+    /// The leading `#` may be omitted: `tagQuery("t")` and `tagQuery("#t")` look up
+    /// the same query.
+    public func tagQuery(_ tag: String) -> [String]? {
         let key = tag.hasPrefix("#") ? tag : "#\(tag)"
         return tagQueries[key]
+    }
+
+    /// Returns the values of a generic tag query.
+    @available(*, deprecated, renamed: "tagQuery(_:)")
+    public func getTagQuery(_ tag: String) -> [String]? {
+        tagQuery(tag)
     }
 }
 
