@@ -26,7 +26,7 @@ See the [full list of supported NIPs](#supported-nips) below.
 
 ## Requirements
 
-- Swift 6.2+
+- Swift 6.3+
 - iOS 17.0+ / macOS 14.0+ / tvOS 17.0+ / watchOS 10.0+ / visionOS 1.0+
 
 ## Installation
