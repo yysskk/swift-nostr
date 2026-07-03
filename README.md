@@ -199,6 +199,12 @@ swift format --in-place --recursive --parallel Sources Tests Package.swift
 swift format lint --strict --recursive --parallel Sources Tests Package.swift
 ```
 
+## Contributing
+
+Contributions are welcome! See the [contributing guide](CONTRIBUTING.md) for how to build,
+test, and submit changes, and the [security policy](SECURITY.md) for how to report
+vulnerabilities.
+
 ## License
 
 MIT License
