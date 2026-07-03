@@ -65,12 +65,12 @@ extension RelayConnection {
                 }
             }
 
-            // Don't finish continuations if we're reconnecting
+            // Streams survive an in-flight auto-reconnect and resume on the
+            // new session; otherwise this exit is terminal for them. After an
+            // explicit disconnect() this is a no-op — disconnect already
+            // finished them.
             if !isReconnecting {
-                for continuation in messageContinuations.values {
-                    continuation.finish()
-                }
-                messageContinuations.removeAll()
+                finishMessageStreams()
             }
         }
     }
