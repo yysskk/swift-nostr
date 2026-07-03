@@ -221,7 +221,12 @@ public actor RelayConnection {
         }
     }
 
-    /// Disconnects from the relay
+    /// Disconnects from the relay.
+    ///
+    /// Terminal for ``messages()`` streams: every open stream finishes so
+    /// `for await` consumers end. ``stateChanges()`` streams stay open — they
+    /// observe the transition to ``RelayConnectionState/disconnected`` and any
+    /// later ``connect()``.
     public func disconnect() {
         // Cancel any pending reconnection
         reconnectTask?.cancel()
@@ -229,6 +234,12 @@ public actor RelayConnection {
         isReconnecting = false
         keepaliveTask?.cancel()
         keepaliveTask = nil
+
+        // Terminal for message streams regardless of the current state: a
+        // consumer's `for await` must end even when the receive loop already
+        // exited with a reconnect pending, or when the connection was never
+        // established at all.
+        finishMessageStreams()
 
         guard state == .connected || state == .connecting else {
             updateState(.disconnected)
@@ -621,8 +632,17 @@ public actor RelayConnection {
         try await send(.close(subscriptionId: subscriptionId))
     }
 
-    /// Returns an async stream of messages from this relay
-    /// Each call creates a new stream that receives all future messages
+    /// Returns an async stream of messages from this relay.
+    /// Each call creates a new stream that receives all future messages.
+    ///
+    /// The stream survives automatic reconnections and keeps delivering
+    /// messages from the new session. It finishes when the connection is torn
+    /// down for good: on ``disconnect()``, when auto-reconnect gives up after
+    /// ``RelayConnectionConfig/maxReconnectAttempts`` failed attempts, or when
+    /// the connection drops with ``RelayConnectionConfig/autoReconnect``
+    /// disabled. With the default configuration (unlimited reconnect attempts)
+    /// only an explicit ``disconnect()`` finishes it. After reconnecting
+    /// manually, call ``messages()`` again for a fresh stream.
     public func messages() -> AsyncStream<RelayMessage> {
         let id = UUID()
         return AsyncStream { continuation in
@@ -635,7 +655,12 @@ public actor RelayConnection {
         }
     }
 
-    /// Returns an async stream of connection state changes
+    /// Returns an async stream of connection state changes.
+    ///
+    /// Unlike ``messages()`` streams, state streams are not finished by
+    /// ``disconnect()``: they yield the final `.disconnected` and remain open
+    /// to observe a later ``connect()``. A stream ends when its consumer stops
+    /// iterating.
     public func stateChanges() -> AsyncStream<RelayConnectionState> {
         let id = UUID()
         return AsyncStream { continuation in
@@ -653,6 +678,22 @@ public actor RelayConnection {
     /// Removes a message continuation by ID
     private func removeMessageContinuation(id: UUID) {
         messageContinuations.removeValue(forKey: id)
+    }
+
+    /// Finishes and removes every active ``messages()`` stream.
+    ///
+    /// Called on terminal teardown — an explicit ``disconnect()``, automatic
+    /// reconnection giving up, or the receive loop exiting with no reconnect
+    /// pending — so `for await` consumers end instead of waiting forever.
+    /// Idempotent: finishing an already-finished continuation is a no-op. The
+    /// dictionary is emptied before finishing so the `onTermination` cleanup
+    /// tasks the finishes trigger find nothing left to remove.
+    func finishMessageStreams() {
+        let continuations = messageContinuations.values
+        messageContinuations.removeAll()
+        for continuation in continuations {
+            continuation.finish()
+        }
     }
 
     /// Removes a state continuation by ID

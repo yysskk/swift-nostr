@@ -16,6 +16,10 @@ extension RelayConnection {
 
         // Check if we've exceeded max attempts
         if config.maxReconnectAttempts > 0 && reconnectAttempts >= config.maxReconnectAttempts {
+            // Terminal give-up: the receive loop kept the message streams
+            // alive for this reconnect cycle, and no further attempt will be
+            // scheduled, so nothing else can end them.
+            finishMessageStreams()
             return
         }
 
@@ -59,7 +63,11 @@ extension RelayConnection {
         }
     }
 
-    /// Manually trigger a reconnection attempt
+    /// Manually trigger a reconnection attempt.
+    ///
+    /// Goes through ``RelayConnection/disconnect()``, so existing
+    /// ``RelayConnection/messages()`` streams finish — obtain a new stream
+    /// after reconnecting.
     public func reconnect() async throws {
         disconnect()
         resetReconnectState()

@@ -80,6 +80,20 @@ final class MockWebSocketSession: WebSocketSession, @unchecked Sendable {
         }
     }
 
+    /// Fails the next `receive()` call (or buffers the failure), simulating the
+    /// transport erroring out — e.g. a dropped connection.
+    func deliver(error: Error) {
+        lock.lock()
+        if receiveWaiters.isEmpty {
+            queued.append(.failure(error))
+            lock.unlock()
+        } else {
+            let waiter = receiveWaiters.removeFirst()
+            lock.unlock()
+            waiter.resume(throwing: error)
+        }
+    }
+
     /// Text frames captured from `send(_:)`.
     var sentTextFrames: [String] {
         lock.lock()

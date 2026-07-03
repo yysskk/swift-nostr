@@ -69,4 +69,8 @@ for await message in await relay.messages() {
 await relay.disconnect()
 ```
 
+The message stream survives automatic reconnections; the `for await` loop ends when the
+connection is torn down for good — on ``RelayConnection/disconnect()`` or once auto-reconnect
+gives up after ``RelayConnectionConfig/maxReconnectAttempts`` failed attempts.
+
 The transport is injectable through ``WebSocketSessionFactory``: the default ``URLSessionWebSocketFactory`` backs it with `URLSession`, while a host can supply a native socket (for example OkHttp on Android) or a test can supply an in-memory fake — so the connection logic runs on platforms whose Foundation lacks WebSocket support.
