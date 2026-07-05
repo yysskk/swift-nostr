@@ -798,6 +798,20 @@ let encoded = try Bech32.encode(hrp: "npub", data: pubkeyData)
 let (hrp, data) = try Bech32.decode("npub1...")
 ```
 
+## NIP19Entity
+
+A NIP-19 bech32-encoded entity (enum: Sendable, Hashable). Cases: `npub(String)`, `nsec(String)`, `note(String)`, `nprofile(NProfile)`, `nevent(NEvent)`, `naddr(NAddr)`.
+
+- `static func decode(_ bech32String: String) throws -> NIP19Entity` -- decode any bech32 entity
+- `var encoded: String { get throws }` -- canonical bech32 string
+- `init(nostrURI: String) throws` -- decode a NIP-21 `nostr:` URI (case-insensitive scheme, tolerates `nostr://`, rejects `nsec`)
+- `var nostrURI: String { get throws }` -- canonical `nostr:` URI (no `//`, throws for `nsec`)
+
+```swift
+let entity = try NIP19Entity(nostrURI: "nostr:npub1...")
+let uri = try entity.nostrURI  // "nostr:npub1..."
+```
+
 ## NostrError
 
 Error types (enum: Error, LocalizedError, Sendable, Equatable).
@@ -818,6 +832,7 @@ Cases: `invalidPrivateKey`, `invalidPublicKey`, `invalidSignature`, `invalidEven
 - NIP-18: Reposts
 - NIP-19: bech32-encoded entities (npub, nsec, note, nprofile, nevent, naddr)
 - NIP-20: Command results (OK messages)
+- NIP-21: nostr: URI scheme
 - NIP-25: Reactions
 - NIP-40: Expiration timestamp (disappearing messages)
 - NIP-42: Client authentication (automatic challenge response, auth-required retry)

@@ -178,6 +178,7 @@ Each of these is covered in depth, with worked examples, in the [documentation](
 - [x] NIP-18: Reposts
 - [x] NIP-19: bech32-encoded entities (npub, nsec, note, nprofile, nevent, naddr)
 - [x] NIP-20: Command Results (OK)
+- [x] NIP-21: nostr: URI scheme
 - [x] NIP-25: Reactions (incl. gift-wrapped private DM reactions)
 - [x] NIP-40: Expiration timestamp (disappearing messages)
 - [x] NIP-42: Client authentication (automatic challenge response, auth-required retry)
