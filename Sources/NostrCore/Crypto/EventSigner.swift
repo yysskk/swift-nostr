@@ -174,6 +174,23 @@ public struct EventSigner: Sendable {
     }
 }
 
+// MARK: - Proof of Work
+extension EventSigner {
+    /// Mines `unsignedEvent` to the given NIP-13 difficulty (leading zero bits), then signs it.
+    ///
+    /// Mining is cooperative and cancellable — see ``ProofOfWork/mine(event:difficulty:)``.
+    /// https://github.com/nostr-protocol/nips/blob/master/13.md
+    /// - Parameters:
+    ///   - unsignedEvent: The event to mine and sign. Any existing `nonce` tags are replaced.
+    ///   - difficulty: The target number of leading zero bits, in `0...256`.
+    /// - Throws: `CancellationError` if cancelled; ``NostrError/invalidData`` if `difficulty` is
+    ///   outside `0...256`.
+    public func sign(_ unsignedEvent: UnsignedEvent, proofOfWork difficulty: Int) async throws -> Event {
+        let mined = try await ProofOfWork.mine(event: unsignedEvent, difficulty: difficulty)
+        return try sign(mined)
+    }
+}
+
 // MARK: - Event Verification
 extension Event {
     /// Verifies the event's signature

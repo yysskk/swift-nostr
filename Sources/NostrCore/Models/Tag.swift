@@ -149,6 +149,16 @@ extension Tag {
         Tag(name: "k", values: [String(kind.rawValue)])
     }
 
+    /// A "nonce" tag carrying a NIP-13 proof-of-work attempt and its committed target difficulty:
+    /// `["nonce", nonce, target]`.
+    ///
+    /// The target is the difficulty (in leading zero bits) the miner is committing to, letting
+    /// validators reject a merely lucky id whose commitment falls short.
+    /// https://github.com/nostr-protocol/nips/blob/master/13.md
+    public static func nonce(_ nonce: String, target: Int) -> Tag {
+        Tag(name: "nonce", values: [nonce, String(target)])
+    }
+
     /// An arbitrary raw tag. Returns nil if the array is empty.
     public static func raw(_ array: [String]) -> Tag? {
         Tag(rawArray: array)

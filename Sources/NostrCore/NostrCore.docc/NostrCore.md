@@ -40,6 +40,7 @@ let isValid = try event.verify()
 ### Signing and Encryption
 
 - ``EventSigner``
+- ``ProofOfWork``
 - ``SealedMessage``
 
 ### Encoding
