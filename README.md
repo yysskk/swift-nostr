@@ -2,7 +2,13 @@
 
 Swift library for Nostr protocol
 
-📖 **[API documentation](https://yysskk.github.io/swift-nostr/documentation/)** — a combined index for all three libraries, with a [Getting Started](https://yysskk.github.io/swift-nostr/documentation/nostrclient/gettingstarted) guide, in-depth [Advanced Usage](https://yysskk.github.io/swift-nostr/documentation/nostrclient/advancedusage), and reference docs for every type.
+[![CI](https://github.com/yysskk/swift-nostr/actions/workflows/test.yml/badge.svg)](https://github.com/yysskk/swift-nostr/actions/workflows/test.yml)
+[![Release](https://img.shields.io/github/v/release/yysskk/swift-nostr?sort=semver)](https://github.com/yysskk/swift-nostr/releases)
+[![Swift 6.3](https://img.shields.io/badge/Swift-6.3-F05138.svg)](https://swift.org)
+[![Platforms](https://img.shields.io/badge/Platforms-iOS%20|%20macOS%20|%20tvOS%20|%20watchOS%20|%20visionOS-blue.svg)](https://github.com/yysskk/swift-nostr)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+📖 **[API documentation](https://yysskk.github.io/swift-nostr/documentation/)** — a combined index for all four libraries, with a [Getting Started](https://yysskk.github.io/swift-nostr/documentation/nostrclient/gettingstarted) guide, in-depth [Advanced Usage](https://yysskk.github.io/swift-nostr/documentation/nostrclient/advancedusage), and reference docs for every type.
 
 ## Features
 
