@@ -574,10 +574,14 @@ public actor RelayConnection {
             guard let event = await responder(url, challenge) else { return }
             do {
                 try await authenticate(with: event)
-            } catch let error as NostrError {
-                lastAuthenticationError = error
             } catch {
-                lastAuthenticationError = .authenticationFailed(error.localizedDescription)
+                // Only record the failure while still on the same challenge. If the
+                // session was torn down (``resetAuthenticationState()`` cleared the
+                // challenge) or the relay issued a new one while this attempt was
+                // suspended, a late failure must not resurrect a stale error — the
+                // field is scoped to the current session.
+                guard authenticationChallenge == challenge else { return }
+                lastAuthenticationError = (error as? NostrError) ?? .authenticationFailed(error.localizedDescription)
             }
         }
     }

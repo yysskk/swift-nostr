@@ -237,6 +237,29 @@ struct NIP42AutomaticAuthenticationTests {
         #expect(await connection.lastAuthenticationError == nil)
     }
 
+    @Test("disconnecting mid-authentication does not resurrect a stale error")
+    func disconnectDuringAuthenticationLeavesNoError() async throws {
+        let (connection, mock) = makeConnection()
+        let signer = EventSigner(keyPair: try KeyPair())
+        await connection.setAuthenticationResponder { relayURL, challenge in
+            try? signer.signClientAuthentication(relayURL: relayURL, challenge: challenge)
+        }
+        try await connection.connect()
+
+        // Deliver the challenge and wait until the AUTH event is on the wire, so the
+        // automatic authenticate(with:) call is suspended waiting for an OK that never
+        // comes. Tearing down now fails that waiter with .notConnected after the
+        // session — and its challenge — have already been cleared.
+        mock.deliver(.string(#"["AUTH","challengestringhere"]"#))
+        try await pollUntil { mock.sentTextFrames.contains { $0.hasPrefix("[\"AUTH\"") } }
+
+        await connection.disconnect()
+
+        // Give the in-flight authentication task time to resume and run its catch.
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(await connection.lastAuthenticationError == nil)
+    }
+
     @Test("a responder returning nil records no authentication error")
     func responderDeclineRecordsNoError() async throws {
         let (connection, mock) = makeConnection()
