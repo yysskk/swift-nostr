@@ -49,7 +49,8 @@ public actor RemoteSigner {
 
     private let signerPubkey: String
 
-    private var isStarted = false
+    private var startTask: Task<Void, Error>?
+    private var isStarted: Bool { startTask != nil }
     private var didConnect = false
     private var readerTask: Task<Void, Never>?
 
@@ -127,7 +128,8 @@ public actor RemoteSigner {
     public func disconnect() async {
         readerTask?.cancel()
         readerTask = nil
-        isStarted = false
+        startTask?.cancel()
+        startTask = nil
         didConnect = false
 
         for request in pending.values {
@@ -145,24 +147,39 @@ public actor RemoteSigner {
     }
 
     private func ensureStarted() async throws {
-        guard !isStarted else { return }
-        // Set before the first await so a concurrent caller can't race through this setup a second
-        // time (actor reentrancy). Reset on failure so a later attempt can retry.
-        isStarted = true
+        // Track the in-flight setup as a shared task so a concurrent caller on first use awaits the
+        // same connect/subscribe work, rather than racing past a bool guard and sending before the
+        // transport is connected and the response subscription/reader task exist.
+        if let startTask {
+            try await startTask.value
+            return
+        }
+        let task = Task { [weak self] in
+            guard let self else { return }
+            try await self.performStart()
+        }
+        startTask = task
         do {
-            try await transport.connect()
-            // Subscribe before sending anything so a response delivered during the subscribe
-            // round-trip is not missed.
-            try await transport.subscribe(id: Self.responseSubscriptionID, filters: [responseFilter])
-            let events = await transport.events()
-            readerTask = Task { [weak self] in
-                for await event in events {
-                    await self?.handle(event: event)
-                }
-            }
+            try await task.value
         } catch {
-            isStarted = false
+            // Clear on failure so a later attempt can retry the setup.
+            startTask = nil
             throw error
+        }
+    }
+
+    /// Connects the transport, subscribes for responses, and starts the reader task. Runs once per
+    /// session via the shared ``startTask``.
+    private func performStart() async throws {
+        try await transport.connect()
+        // Subscribe before sending anything so a response delivered during the subscribe
+        // round-trip is not missed.
+        try await transport.subscribe(id: Self.responseSubscriptionID, filters: [responseFilter])
+        let events = await transport.events()
+        readerTask = Task { [weak self] in
+            for await event in events {
+                await self?.handle(event: event)
+            }
         }
     }
 

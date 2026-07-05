@@ -19,9 +19,11 @@ extension RemoteSigner {
     /// Signs `event` remotely (`sign_event`).
     ///
     /// The signer returns a complete signed event; this validates the returned event's id and
-    /// signature and confirms its `kind`, `content`, `tags`, and `created_at` match the request, so
-    /// a signer cannot substitute a different event.
-    /// - Parameter event: The unsigned event to sign.
+    /// signature and confirms its `pubkey`, `kind`, `content`, `tags`, and `created_at` match the
+    /// request, so a signer cannot substitute a different event or sign under a different key.
+    /// - Parameter event: The unsigned event to sign. Its `pubkey` must be the user's public key
+    ///   (from ``userPublicKey()``); the returned event is rejected unless the signer authored it
+    ///   under that key.
     /// - Returns: The signed ``Event``.
     /// - Throws: ``RemoteSignerError/responseValidationFailed`` if the returned event fails to
     ///   verify or does not match the request.
@@ -32,7 +34,12 @@ extension RemoteSigner {
         guard let signed = try? JSONDecoder().decode(Event.self, from: Data(result.utf8)) else {
             throw RemoteSignerError.responseDecodingFailed
         }
+        // verify() only proves the returned event is self-consistent (its id/sig match its own
+        // pubkey), not that it was signed by the expected key. Require the signer to have authored
+        // it under the pubkey the caller asked for, so a validly-signed event from a different key
+        // cannot be substituted.
         guard (try? signed.verify()) == true,
+            signed.pubkey == event.pubkey,
             signed.kind == event.kind,
             signed.content == event.content,
             signed.tags == event.tags,

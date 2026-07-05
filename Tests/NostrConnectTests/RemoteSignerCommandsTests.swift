@@ -129,6 +129,29 @@ struct RemoteSignerCommandsTests {
         await #expect(throws: RemoteSignerError.responseValidationFailed) { try await signed.value }
     }
 
+    @Test("sign rejects an event signed by a different key than requested")
+    func signRejectsWrongPubkey() async throws {
+        let (remote, transport) = try await connected()
+        let unsigned = UnsignedEvent(
+            pubkey: signer.publicKeyHex, createdAt: 1000, kind: .textNote, content: "requested")
+
+        let signed = Task { try await remote.sign(unsigned) }
+        let request = try await nextRequest(transport)
+
+        // A hostile signer returns a self-consistent event with matching kind/content/tags/created_at
+        // but authored under a *different* key. verify() alone would accept it, so the pubkey check
+        // must reject it.
+        let attacker = try KeyPair()
+        let forged = UnsignedEvent(
+            pubkey: attacker.publicKeyHex, createdAt: 1000, kind: .textNote, content: "requested")
+        let json = try RemoteSignerFixtures.signedEventJSON(forged, signer: attacker)
+        try await transport.deliver(
+            RemoteSignerFixtures.response(
+                requestID: request.id, result: json, client: client, signer: signer))
+
+        await #expect(throws: RemoteSignerError.responseValidationFailed) { try await signed.value }
+    }
+
     // MARK: - ping
 
     @Test("ping succeeds on pong")
