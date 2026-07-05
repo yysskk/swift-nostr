@@ -530,6 +530,28 @@ let deletion = try signer.signDeletion(eventIds: ["id1"], reason: "mistake")
 let contacts = try signer.signContactList([Contact(pubkey: "...")])
 let relayList = try signer.signRelayListMetadata(read: ["wss://in.example"], write: ["wss://out.example"])
 let auth = try signer.signClientAuthentication(relayURL: url, challenge: "challenge")  // kind 22242, NIP-42
+let pow = try await signer.sign(unsignedEvent, proofOfWork: 20)  // mine to 20 leading zero bits, then sign (NIP-13)
+```
+
+## ProofOfWork
+
+NIP-13 proof of work: leading-zero-bit difficulty over event ids, with mining and validation (enum).
+
+```swift
+// Leading zero bits of a hex event id (each leading "0" nibble is 4 bits).
+let bits = ProofOfWork.difficulty(ofHexId: event.id)
+
+// Mine an unsigned event to a target difficulty, then sign it. Mining holds createdAt fixed
+// (deterministic) and is cooperative — it checks cancellation and yields, so it can be cancelled.
+let mined = try await ProofOfWork.mine(event: unsignedEvent, difficulty: 20)  // throws NostrError.invalidData outside 0...256
+let signed = try signer.sign(mined)
+
+// Validate: the id must clear minimumDifficulty AND the nonce tag must commit to a target >= it.
+// A merely lucky id with no/short commitment is rejected for minimumDifficulty > 0.
+let ok = ProofOfWork.validate(event: signed, minimumDifficulty: 20)
+
+// Build a nonce tag directly: ["nonce", nonce, target].
+let tag = Tag.nonce("776797", target: 20)
 ```
 
 ## Mnemonic
@@ -854,6 +876,7 @@ Cases: `invalidPrivateKey`, `invalidPublicKey`, `invalidSignature`, `invalidEven
 - NIP-09: Event deletion
 - NIP-10: Reply threading (root/reply markers)
 - NIP-11: Relay information document
+- NIP-13: Proof of work (leading-zero-bit difficulty, cooperative mining, validation with committed target)
 - NIP-17: Private direct messages with gift wrap
 - NIP-18: Reposts
 - NIP-19: bech32-encoded entities (npub, nsec, note, nprofile, nevent, naddr)

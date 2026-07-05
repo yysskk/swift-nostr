@@ -211,6 +211,17 @@ public struct UnsignedEvent: Sendable {
             withJSONObject: serializable, options: [.sortedKeys, .withoutEscapingSlashes])
     }
 
+    /// The NIP-01 event id: the lowercase hex SHA-256 of ``serializedForHashing()``.
+    ///
+    /// This is the single source of truth for deriving an event id from its
+    /// unsigned form; signing, rumor construction, and proof-of-work mining all
+    /// go through it.
+    public var computedId: String {
+        get throws {
+            try Data(SHA256.hash(data: serializedForHashing())).hexEncodedString()
+        }
+    }
+
     /// Returns this event as an unsigned rumor (NIP-59): the event id is computed
     /// from the serialized form, but no signature is ever produced (`sig` is empty).
     ///
@@ -218,10 +229,8 @@ public struct UnsignedEvent: Sendable {
     /// would be cryptographic proof of authorship and destroy deniability.
     /// https://github.com/nostr-protocol/nips/blob/master/59.md
     public func asRumor() throws -> Event {
-        let serialized = try serializedForHashing()
-        let eventId = Data(SHA256.hash(data: serialized)).hexEncodedString()
-        return Event(
-            id: eventId,
+        Event(
+            id: try computedId,
             pubkey: pubkey,
             createdAt: createdAt,
             kind: kind,

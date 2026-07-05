@@ -174,6 +174,7 @@ Each of these is covered in depth, with worked examples, in the [documentation](
 - [x] NIP-09: Event deletion
 - [x] NIP-10: Reply threading (root/reply markers)
 - [x] NIP-11: Relay information document
+- [x] NIP-13: Proof of Work
 - [x] NIP-17: Private direct messages (kind 10050 DM relay lists, encrypted kind 15 file messages)
 - [x] NIP-18: Reposts
 - [x] NIP-19: bech32-encoded entities (npub, nsec, note, nprofile, nevent, naddr)
