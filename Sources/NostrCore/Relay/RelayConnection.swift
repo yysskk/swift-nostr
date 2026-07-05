@@ -83,6 +83,16 @@ public actor RelayConnection {
     /// ``authenticate(with:)`` once per identity.
     public private(set) var authenticatedPubkeys: Set<String> = []
 
+    /// The error from the most recent automatic NIP-42 authentication attempt driven
+    /// by the ``AuthenticationResponder``, or nil when none has failed.
+    ///
+    /// Cleared when an authentication later succeeds and whenever the session is torn
+    /// down or re-established (challenges are per-session). A responder that returns
+    /// nil declines the challenge and is not recorded as an error. Manual
+    /// ``authenticate(with:)`` callers observe failures as thrown errors instead and
+    /// are not recorded here.
+    public private(set) var lastAuthenticationError: NostrError?
+
     /// Pubkeys of in-flight AUTH events keyed by event id, so the receive loop
     /// can mark them authenticated the moment the relay's OK arrives. An entry
     /// lives only as long as its ``authenticate(with:)`` call: a failed or
@@ -268,6 +278,7 @@ public actor RelayConnection {
     private func resetAuthenticationState() {
         authenticationChallenge = nil
         authenticatedPubkeys.removeAll()
+        lastAuthenticationError = nil
         pendingAuthentications.removeAll()
         subscriptionsAwaitingAuthentication.removeAll()
         let waiters = authenticationWaiters.values
@@ -293,6 +304,7 @@ public actor RelayConnection {
         }
 
         authenticatedPubkeys.insert(pubkey)
+        lastAuthenticationError = nil
         for waiter in waiters {
             waiter.finish()
         }
@@ -533,8 +545,9 @@ public actor RelayConnection {
     /// responder after the relay has demanded authentication needs no extra step.
     ///
     /// Automatic authentication is best-effort: outcomes are observable through
-    /// ``authenticatedPubkeys`` and the relay's OK in ``messages()``, and a
-    /// failed attempt is not retried until the relay issues another challenge.
+    /// ``authenticatedPubkeys``, ``lastAuthenticationError``, and the relay's OK
+    /// in ``messages()``, and a failed attempt is not retried until the relay
+    /// issues another challenge.
     public func setAuthenticationResponder(_ responder: AuthenticationResponder?) {
         authenticationResponder = responder
         guard let responder,
@@ -559,7 +572,17 @@ public actor RelayConnection {
         Task {
             defer { isAnsweringChallenge = false }
             guard let event = await responder(url, challenge) else { return }
-            try? await authenticate(with: event)
+            do {
+                try await authenticate(with: event)
+            } catch {
+                // Only record the failure while still on the same challenge. If the
+                // session was torn down (``resetAuthenticationState()`` cleared the
+                // challenge) or the relay issued a new one while this attempt was
+                // suspended, a late failure must not resurrect a stale error — the
+                // field is scoped to the current session.
+                guard authenticationChallenge == challenge else { return }
+                lastAuthenticationError = (error as? NostrError) ?? .authenticationFailed(error.localizedDescription)
+            }
         }
     }
 

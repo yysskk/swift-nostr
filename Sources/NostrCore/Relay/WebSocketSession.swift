@@ -105,11 +105,10 @@ final class URLSessionWebSocket: WebSocketSession, @unchecked Sendable {
     }
 
     func cancel(with closeCode: WebSocketCloseCode, reason: Data?) {
-        // Every WebSocketCloseCode raw value is a valid URLSession close code; fail
-        // loudly rather than send a wrong code if that invariant is ever broken.
-        guard let nativeCode = URLSessionWebSocketTask.CloseCode(rawValue: closeCode.rawValue) else {
-            preconditionFailure("WebSocketCloseCode \(closeCode.rawValue) has no URLSession equivalent")
-        }
+        // Every current WebSocketCloseCode raw value is a valid URLSession close code;
+        // if that invariant is ever broken, close without a status code (.invalid is
+        // URLSession's "no close code") rather than crash mid-teardown.
+        let nativeCode = URLSessionWebSocketTask.CloseCode(rawValue: closeCode.rawValue) ?? .invalid
         task.cancel(with: nativeCode, reason: reason)
     }
 
