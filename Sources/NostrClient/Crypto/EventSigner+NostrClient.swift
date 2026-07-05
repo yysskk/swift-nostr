@@ -90,4 +90,25 @@ extension EventSigner {
             UnsignedEvent(pubkey: publicKey, kind: .report, rawTags: tags.map(\.rawArray), content: reason)
         )
     }
+
+    /// Creates and signs a NIP-51 list event, encrypting private items to the signer's own key
+    /// (NIP-44). Content is empty when there are no private items.
+    public func signList(_ list: NostrList) throws -> Event {
+        let content = try ListItemCipher.encrypt(list.privateItems, using: keyPair)
+        let unsigned = UnsignedEvent(
+            pubkey: publicKey,
+            kind: list.kind,
+            rawTags: list.publicItems.map(\.rawArray),
+            content: content
+        )
+        return try sign(unsigned)
+    }
+
+    /// Reads a NIP-51 list authored by this signer, decrypting its private items.
+    /// - Throws: when the content cannot be decrypted with this key.
+    public func openList(_ event: Event) throws -> NostrList {
+        var list = NostrList(event: event)
+        list.privateItems = try ListItemCipher.decrypt(event.content, using: keyPair)
+        return list
+    }
 }

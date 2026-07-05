@@ -131,10 +131,13 @@ extension Event {
         public static let muteList = Kind(rawValue: 10000)
         public static let pinList = Kind(rawValue: 10001)
         public static let relayListMetadata = Kind(rawValue: 10002)
+        /// A NIP-51 bookmark list (public/private bookmarked events, articles, hashtags, URLs).
+        public static let bookmarkList = Kind(rawValue: 10003)
         public static let directMessageRelayList = Kind(rawValue: 10050)
         public static let clientAuthentication = Kind(rawValue: 22242)
         public static let nostrConnect = Kind(rawValue: 24133)
         public static let categorizedPeopleList = Kind(rawValue: 30000)
+        /// The legacy NIP-51 categorized bookmarks kind, superseded by bookmark sets (30003).
         public static let categorizedBookmarkList = Kind(rawValue: 30001)
         public static let profileBadges = Kind(rawValue: 30008)
         public static let badgeDefinition = Kind(rawValue: 30009)

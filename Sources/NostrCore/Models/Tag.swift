@@ -159,6 +159,31 @@ extension Tag {
         Tag(name: "nonce", values: [nonce, String(target)])
     }
 
+    /// A "word" tag carrying a lowercased muted word (NIP-51 mute lists).
+    public static func word(_ word: String) -> Tag {
+        Tag(name: "word", values: [word])
+    }
+
+    /// An "a" tag referencing an addressable event coordinate (NIP-01/NIP-51):
+    /// `["a", "kind:pubkey:identifier", relay?]`.
+    public static func address(
+        kind: Event.Kind,
+        pubkey: String,
+        identifier: String,
+        relayURL: String? = nil
+    ) -> Tag {
+        var values = ["\(kind.rawValue):\(pubkey):\(identifier)"]
+        if let relayURL {
+            values.append(relayURL)
+        }
+        return Tag(name: "a", values: values)
+    }
+
+    /// An "r" tag carrying a URL reference.
+    public static func reference(_ url: String) -> Tag {
+        Tag(name: "r", values: [url])
+    }
+
     /// An arbitrary raw tag. Returns nil if the array is empty.
     public static func raw(_ array: [String]) -> Tag? {
         Tag(rawArray: array)
