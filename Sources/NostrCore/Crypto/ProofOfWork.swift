@@ -1,4 +1,3 @@
-import Crypto
 import Foundation
 
 /// NIP-13 proof of work: leading-zero-bit difficulty over event ids, with mining and validation.
@@ -78,7 +77,7 @@ public enum ProofOfWork {
                 rawTags: strippedTags + [["nonce", String(nonce), target]],
                 content: event.content
             )
-            let id = Data(SHA256.hash(data: try candidate.serializedForHashing())).hexEncodedString()
+            let id = try candidate.computedId
             // `Self.` disambiguates from the `difficulty` parameter that shadows the method here.
             if Self.difficulty(ofHexId: id) >= difficulty {
                 return candidate
