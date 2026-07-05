@@ -14,6 +14,10 @@ public enum ClientMessage: Sendable {
     /// Used for authentication (NIP-42)
     case auth(Event)
 
+    /// Used to request the number of events matching the filters (NIP-45).
+    /// https://github.com/nostr-protocol/nips/blob/master/45.md
+    case count(subscriptionId: String, filters: [Filter])
+
     /// Serializes the message to JSON array format
     public func serialize() throws -> String {
         let array: [Any]
@@ -37,6 +41,14 @@ public enum ClientMessage: Sendable {
         case .auth(let event):
             let eventDict = try event.toDictionary()
             array = ["AUTH", eventDict]
+
+        case .count(let subscriptionId, let filters):
+            var arr: [Any] = ["COUNT", subscriptionId]
+            for filter in filters {
+                let filterDict = try filter.toDictionary()
+                arr.append(filterDict)
+            }
+            array = arr
         }
 
         let data = try JSONSerialization.data(withJSONObject: array, options: [.withoutEscapingSlashes])
@@ -66,6 +78,10 @@ public enum RelayMessage: Sendable {
 
     /// Closed subscription notice
     case closed(subscriptionId: String, message: String)
+
+    /// Count of events matching the requested filters (NIP-45).
+    /// https://github.com/nostr-protocol/nips/blob/master/45.md
+    case count(subscriptionId: String, count: Int, approximate: Bool?)
 
     /// Unknown message type
     case unknown(type: String, rawData: String)
@@ -135,6 +151,19 @@ public enum RelayMessage: Sendable {
                 throw NostrError.invalidMessageFormat
             }
             return .closed(subscriptionId: subscriptionId, message: message)
+
+        case "COUNT":
+            // The payload carries `count` and an optional `approximate` flag; any
+            // other keys (e.g. the NIP-45 `hll` HyperLogLog value) are ignored.
+            guard array.count >= 3,
+                let subscriptionId = array[1] as? String,
+                let payload = array[2] as? [String: Any],
+                let count = payload["count"] as? Int
+            else {
+                throw NostrError.invalidMessageFormat
+            }
+            let approximate = payload["approximate"] as? Bool
+            return .count(subscriptionId: subscriptionId, count: count, approximate: approximate)
 
         default:
             return .unknown(type: type, rawData: text)

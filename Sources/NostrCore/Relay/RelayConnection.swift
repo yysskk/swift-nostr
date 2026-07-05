@@ -66,6 +66,12 @@ public actor RelayConnection {
     /// publishes of the same event don't clobber each other's waiters
     private var pendingPublishWaiters: [String: [UUID: AsyncThrowingStream<Void, Error>.Continuation]] = [:]
 
+    /// Continuations waiting for a NIP-45 COUNT response, keyed by the generated
+    /// COUNT subscription id. One waiter per subid: the ids are unique per
+    /// request, so a reply correlates to exactly one in-flight ``count(filters:timeout:)``.
+    /// `internal` (not `private`) because the receive loop in `+Receiving` settles them.
+    var pendingCountWaiters: [String: AsyncThrowingStream<EventCount, Error>.Continuation] = [:]
+
     /// The most recent challenge received in an AUTH message from the relay (NIP-42).
     ///
     /// `nil` until the relay sends a challenge; replaced when the relay sends a
@@ -266,6 +272,10 @@ public actor RelayConnection {
             }
         }
         pendingPublishWaiters.removeAll()
+        for waiter in pendingCountWaiters.values {
+            waiter.finish(throwing: NostrError.notConnected)
+        }
+        pendingCountWaiters.removeAll()
         resetAuthenticationState()
         updateState(.disconnected)
     }
@@ -366,7 +376,9 @@ public actor RelayConnection {
             }
         }
 
-        // Track subscription state
+        // Track subscription state. A `.count` message is intentionally not
+        // tracked: it is a one-shot request that must never be replayed on
+        // reconnect.
         switch message {
         case .request(let subscriptionId, let filters):
             subscriptions[subscriptionId] = filters
@@ -643,6 +655,55 @@ public actor RelayConnection {
     func removeAllPublishWaiters(eventId: String) -> [AsyncThrowingStream<Void, Error>.Continuation] {
         guard let waiters = pendingPublishWaiters.removeValue(forKey: eventId) else { return [] }
         return Array(waiters.values)
+    }
+
+    /// Requests the number of events matching `filters` (NIP-45 COUNT) and waits for
+    /// the relay's response.
+    ///
+    /// Relays that do not implement NIP-45 usually never reply; the call then fails with
+    /// ``NostrError/timeout`` after `timeout`. A CLOSED for the COUNT subscription fails
+    /// fast with ``NostrError/relayError(_:)``.
+    /// - Throws: ``NostrError/notConnected`` when not connected or torn down while waiting.
+    /// https://github.com/nostr-protocol/nips/blob/master/45.md
+    public func count(filters: [Filter], timeout: TimeInterval = 10) async throws -> EventCount {
+        guard state == .connected else {
+            throw NostrError.notConnected
+        }
+
+        let subscriptionId = "count-" + String(UUID().uuidString.prefix(12))
+        let (stream, continuation) = AsyncThrowingStream<EventCount, Error>.makeStream()
+        pendingCountWaiters[subscriptionId] = continuation
+
+        do {
+            try await send(.count(subscriptionId: subscriptionId, filters: filters))
+        } catch {
+            pendingCountWaiters.removeValue(forKey: subscriptionId)?.finish()
+            throw error
+        }
+
+        defer {
+            pendingCountWaiters.removeValue(forKey: subscriptionId)?.finish()
+        }
+
+        return try await withThrowingTaskGroup(of: EventCount.self) { group in
+            group.addTask {
+                for try await count in stream {
+                    return count
+                }
+                throw NostrError.notConnected
+            }
+
+            group.addTask {
+                try await Task.sleep(for: .seconds(timeout))
+                throw NostrError.timeout
+            }
+
+            guard let result = try await group.next() else {
+                throw NostrError.notConnected
+            }
+            group.cancelAll()
+            return result
+        }
     }
 
     /// Subscribes to events matching the given filters

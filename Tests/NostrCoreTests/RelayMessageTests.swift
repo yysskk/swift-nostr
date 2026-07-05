@@ -105,6 +105,52 @@ struct RelayMessageTests {
         }
     }
 
+    @Test("Parse COUNT message (NIP-45)")
+    func parseCountMessage() throws {
+        let json = #"["COUNT","sub1",{"count":238}]"#
+
+        let message = try RelayMessage.parse(json)
+
+        if case .count(let subscriptionId, let count, let approximate) = message {
+            #expect(subscriptionId == "sub1")
+            #expect(count == 238)
+            #expect(approximate == nil)
+        } else {
+            Issue.record("Expected COUNT message")
+        }
+    }
+
+    @Test("Parse COUNT message with approximate flag (NIP-45)")
+    func parseCountMessageApproximate() throws {
+        let json = #"["COUNT","sub1",{"count":93,"approximate":true}]"#
+
+        let message = try RelayMessage.parse(json)
+
+        if case .count(let subscriptionId, let count, let approximate) = message {
+            #expect(subscriptionId == "sub1")
+            #expect(count == 93)
+            #expect(approximate == true)
+        } else {
+            Issue.record("Expected COUNT message")
+        }
+    }
+
+    @Test("Malformed COUNT message throws invalidMessageFormat")
+    func parseMalformedCountMessage() {
+        // Missing the `count` key in the payload.
+        #expect(throws: NostrError.invalidMessageFormat) {
+            _ = try RelayMessage.parse(#"["COUNT","sub1",{"approximate":true}]"#)
+        }
+        // Payload is not a dictionary.
+        #expect(throws: NostrError.invalidMessageFormat) {
+            _ = try RelayMessage.parse(#"["COUNT","sub1",238]"#)
+        }
+        // Too short — no payload element.
+        #expect(throws: NostrError.invalidMessageFormat) {
+            _ = try RelayMessage.parse(#"["COUNT","sub1"]"#)
+        }
+    }
+
     @Test("Parse unknown message type")
     func parseUnknownMessage() throws {
         let json = #"["UNKNOWN","data1","data2"]"#
@@ -178,5 +224,15 @@ struct ClientMessageTests {
         let serialized = try message.serialize()
 
         #expect(serialized == #"["CLOSE","sub1"]"#)
+    }
+
+    @Test("Serialize COUNT message (NIP-45)")
+    func serializeCountMessage() throws {
+        let filter = Filter(kinds: [.textNote])
+        let message = ClientMessage.count(subscriptionId: "sub1", filters: [filter])
+        let serialized = try message.serialize()
+
+        #expect(serialized.hasPrefix(#"["COUNT","sub1",{"#))
+        #expect(serialized.contains("kinds"))
     }
 }

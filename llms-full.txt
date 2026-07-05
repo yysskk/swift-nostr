@@ -174,6 +174,19 @@ let event = try await client.fetchEvent(id: "eventId...")
 let metadata = try await client.fetchMetadata(pubkey: "...")
 ```
 
+### Event Counts (NIP-45)
+
+COUNT queries every relay and reports how many events match the filters. Relays without
+NIP-45 usually never reply and are dropped after `timeout` (default 10s); a CLOSED for the
+count fails fast.
+
+```swift
+// Max count across relays (each relay's count is a lower bound):
+let total = try await client.count(filters: [filter])
+// Per-relay counts:
+let byRelay = try await client.relayPool.count(filters: [filter])  // [URL: EventCount]
+```
+
 ### Direct Messages (NIP-17)
 
 ```swift
@@ -382,6 +395,7 @@ Messages received from relay (NIP-01) (enum: Sendable).
 - `.ok(eventId: String, accepted: Bool, message: String)` -- NIP-20
 - `.auth(challenge: String)` -- NIP-42
 - `.closed(subscriptionId: String, message: String)`
+- `.count(subscriptionId: String, count: Int, approximate: Bool?)` -- NIP-45
 - `.unknown(type: String, rawData: String)`
 
 ### Parsing
@@ -400,10 +414,20 @@ Messages sent to relay (NIP-01) (enum: Sendable).
 - `.request(subscriptionId: String, filters: [Filter])` -- subscribe
 - `.close(subscriptionId: String)` -- unsubscribe
 - `.auth(Event)` -- authentication (NIP-42)
+- `.count(subscriptionId: String, filters: [Filter])` -- event count request (NIP-45)
 
 ```swift
 let json = clientMessage.serialize()  // JSON array string
 ```
+
+## EventCount
+
+Result of a NIP-45 COUNT request from one relay (struct: Sendable, Hashable).
+
+### Properties
+
+- `value: Int` -- number of events the relay reports matching the filters
+- `isApproximate: Bool` -- whether the relay flagged the count as approximate
 
 ## RelayResponsePrefix
 
@@ -733,6 +757,7 @@ try await pool.subscribe(subscriptionId: "sub1", filters: [filter]) { message in
 try await pool.subscribeWithRelayContext(subscriptionId: "sub1", filters: [filter]) { relayURL, message in }
 try await pool.unsubscribe(subscriptionId: "sub1")
 try await pool.publish(signedEvent)
+try await pool.count(filters: [filter])   // [URL: EventCount], per relay (NIP-45)
 await pool.setAuthenticationResponder { url, challenge in /* signed kind-22242 event or nil */ }
 await pool.clearDeduplicationCache()
 ```
@@ -773,6 +798,7 @@ await connection.disconnect()
 try await connection.subscribe(subscriptionId: "sub1", filters: [filter]) { message in }
 try await connection.unsubscribe(subscriptionId: "sub1")
 try await connection.publish(signedEvent)
+try await connection.count(filters: [filter])         // EventCount from this relay (NIP-45)
 try await connection.authenticate(using: signer)      // answer the stored challenge (NIP-42)
 try await connection.authenticate(with: signedAuthEvent)  // pre-signed kind-22242 event
 await connection.setAuthenticationResponder { url, challenge in /* event or nil */ }
