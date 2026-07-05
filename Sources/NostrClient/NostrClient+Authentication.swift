@@ -53,9 +53,7 @@ extension NostrClient {
         guard let challenge = await connection.authenticationChallenge else {
             throw NostrError.authenticationFailed("The relay has not sent an AUTH challenge")
         }
-        let event = try withSigner {
-            try $0.signClientAuthentication(relayURL: connection.url, challenge: challenge)
-        }
+        let event = try await clientAuthenticationEvent(relayURL: connection.url, challenge: challenge)
         try await connection.authenticate(with: event)
     }
 
@@ -77,13 +75,21 @@ extension NostrClient {
     /// Signing goes through ``activeSign(_:)`` so a remote NIP-46 signer can answer challenges
     /// too, resolving its signature via a relay round-trip.
     private func signAuthenticationResponse(relayURL: URL, challenge: String) async -> Event? {
-        guard authenticationMode == .automatic, let cachedPublicKey = publicKey else { return nil }
+        guard authenticationMode == .automatic else { return nil }
+        return try? await clientAuthenticationEvent(relayURL: relayURL, challenge: challenge)
+    }
+
+    /// Builds and signs a kind-22242 client-authentication event (NIP-42) via the active signer, so
+    /// both the automatic responder and the manual ``authenticate(relayURL:)`` support a local or a
+    /// remote signer. Throws ``NostrError/signerNotSet`` when no signer is configured.
+    private func clientAuthenticationEvent(relayURL: URL, challenge: String) async throws -> Event {
+        guard let cachedPublicKey = publicKey else { throw NostrError.signerNotSet }
         let unsigned = UnsignedEvent(
             pubkey: cachedPublicKey,
             kind: .clientAuthentication,
             tags: [.relay(relayURL.absoluteString), .challenge(challenge)],
             content: ""
         )
-        return try? await activeSign(unsigned)
+        return try await activeSign(unsigned)
     }
 }

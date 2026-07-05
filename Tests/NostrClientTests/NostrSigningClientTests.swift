@@ -179,4 +179,31 @@ struct NostrSigningClientTests {
         try await pollUntil { await connection.isAuthenticated }
         await client.disconnect()
     }
+
+    @Test("manual authenticate(relayURL:) works with a remote signer")
+    func remoteSignerManualAuthenticate() async throws {
+        let (client, mock) = makeClient()
+        let keyPair = try KeyPair()
+        await client.setAuthenticationMode(.manual)
+        try await client.setSigner(MockRemoteSigner(keyPair: keyPair) as any NostrSigning)
+        try await client.connect(to: [relayURL.absoluteString])
+
+        mock.deliver(.string(#"["AUTH","manual-challenge"]"#))
+        let connection = try #require(await client.relayPool.relay(for: relayURL))
+        try await pollUntil { await connection.authenticationChallenge != nil }
+
+        // Manual mode: the remote signer must still be able to answer via activeSign.
+        // authenticate(relayURL:) awaits the relay's OK, so drive it concurrently and settle it.
+        let authTask = Task { try await client.authenticate(relayURL: relayURL) }
+        try await pollUntil { mock.sentTextFrames.contains { $0.hasPrefix("[\"AUTH\"") } }
+        let sent = try NIP42TestSupport.sentAuthEvent(in: mock)
+        #expect(sent.kind == .clientAuthentication)
+        #expect(sent.pubkey == keyPair.publicKeyHex)
+        #expect(sent.firstTagValue(named: "challenge") == "manual-challenge")
+        #expect(try sent.verify())
+
+        mock.deliver(.string("[\"OK\",\"\(sent.id)\",true,\"\"]"))
+        try await authTask.value
+        await client.disconnect()
+    }
 }
