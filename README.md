@@ -192,6 +192,16 @@ let remotePubkey = try await signer.awaitConnection()   // resolves once the sig
 
 `ping`, NIP-44/NIP-04 encrypt and decrypt, `switch_relays`, and `logout` are available too, along with an `authChallenges()` stream for `auth_url` approvals.
 
+A `RemoteSigner` can also drive a `NostrClient`: `NostrClient.setSigner(_:)` accepts any `NostrSigning`, so a remote signer works for `sign(_:)`, `publish(_:)`, and NIP-42 authentication. The convenience `publish*` and direct-message helpers still require a local key and throw `NostrError.localSignerRequired` for a remote signer.
+
+```swift
+try await client.setSigner(signer)   // any NostrSigning — a RemoteSigner or a local EventSigner
+guard let userPubkey = await client.publicKey else { return }
+let signed = try await client.sign(
+    UnsignedEvent(pubkey: userPubkey, kind: .textNote, content: "Signed by my bunker"))
+try await client.publish(signed)
+```
+
 ## More
 
 Each of these is covered in depth, with worked examples, in the [documentation](https://yysskk.github.io/swift-nostr/documentation/nostrclient):

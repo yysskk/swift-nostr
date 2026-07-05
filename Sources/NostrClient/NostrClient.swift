@@ -16,8 +16,18 @@ public actor NostrClient {
     /// The relay pool managing all connections
     public let relayPool: RelayPool
 
-    /// The event signer (optional, required for publishing)
-    private var signer: EventSigner?
+    /// The configured signer — a local key or a remote NIP-46 signer.
+    private enum ActiveSigner {
+        case local(EventSigner)
+        case remote(any NostrSigning)
+    }
+
+    /// The event signer (optional, required for signing). A local ``EventSigner`` signs
+    /// synchronously; a remote NIP-46 signer signs via a relay round-trip.
+    private var activeSigner: ActiveSigner?
+
+    /// The signer's public key, cached at set-time (a remote signer's `publicKey` is async).
+    private var cachedPublicKey: String?
 
     /// How the client reacts to NIP-42 AUTH challenges. `internal(set)` so
     /// ``setAuthenticationMode(_:)``, which lives in the authentication
@@ -70,51 +80,97 @@ public actor NostrClient {
 
     // MARK: - Signer
 
-    /// Sets the signer for publishing events.
+    /// Sets the signer for signing events.
     ///
     /// While ``authenticationMode`` is ``AuthenticationMode/automatic`` (the
     /// default), setting a signer also starts answering NIP-42 AUTH challenges
     /// with it on every relay in the pool.
     public func setSigner(_ signer: EventSigner) async {
-        self.signer = signer
+        activeSigner = .local(signer)
+        cachedPublicKey = signer.publicKey
         await refreshAuthenticationResponder()
     }
 
-    /// Sets the signer from a private key hex string. See ``setSigner(_:)``.
+    /// Sets a local or remote signer for signing events.
+    ///
+    /// Accepts any ``NostrSigning`` — a local ``EventSigner`` or a remote NIP-46 signer (a
+    /// "bunker"). The signer's ``NostrSigning/publicKey`` is resolved once here and cached, so
+    /// ``publicKey`` and ``npub`` stay synchronous even for a remote signer. A remote signer can
+    /// ``sign(_:)``, ``publish(_:strategy:)`` its signed events, and answer NIP-42 AUTH challenges;
+    /// the convenience `publish*` and direct-message helpers still require a local key.
+    ///
+    /// While ``authenticationMode`` is ``AuthenticationMode/automatic`` (the default), setting a
+    /// signer also starts answering NIP-42 AUTH challenges with it on every relay in the pool.
+    public func setSigner(_ signer: any NostrSigning) async throws {
+        cachedPublicKey = try await signer.publicKey
+        activeSigner = (signer as? EventSigner).map(ActiveSigner.local) ?? .remote(signer)
+        await refreshAuthenticationResponder()
+    }
+
+    /// Sets the signer from a private key hex string. See ``setSigner(_:)-(EventSigner)``.
     public func setPrivateKey(_ privateKeyHex: String) async throws {
         await setSigner(try EventSigner(privateKeyHex: privateKeyHex))
     }
 
-    /// Sets the signer from an nsec. See ``setSigner(_:)``.
+    /// Sets the signer from an nsec. See ``setSigner(_:)-(EventSigner)``.
     public func setNsec(_ nsec: String) async throws {
         await setSigner(try EventSigner(nsec: nsec))
     }
 
     /// Whether a signer is configured, without exposing it.
     var hasSigner: Bool {
-        signer != nil
+        activeSigner != nil
     }
 
     /// Returns the public key if a signer is set
     public var publicKey: String? {
-        signer?.publicKey
+        cachedPublicKey
     }
 
     /// Returns the npub if a signer is set
     public var npub: String? {
         get throws {
-            try signer?.npub
+            guard let cachedPublicKey else { return nil }
+            return try PublicKey(hex: cachedPublicKey).npub
         }
     }
 
-    /// Runs `body` with the configured signer, throwing ``NostrError/signerNotSet`` if none is set.
+    /// Signs `unsignedEvent` with the active signer (local synchronously, remote via relay
+    /// round-trip), throwing ``NostrError/signerNotSet`` if none is set.
+    func activeSign(_ unsignedEvent: UnsignedEvent) async throws -> Event {
+        switch activeSigner {
+        case .local(let signer): return try signer.sign(unsignedEvent)
+        case .remote(let signer): return try await signer.sign(unsignedEvent)
+        case nil: throw NostrError.signerNotSet
+        }
+    }
+
+    /// Signs an event with the configured signer, local or remote.
+    ///
+    /// Build an ``UnsignedEvent`` with ``publicKey`` as its pubkey; combine with
+    /// ``publish(_:strategy:)`` to author and publish an event with a remote NIP-46 signer.
+    /// - Parameter unsignedEvent: The event to sign; its `pubkey` should be ``publicKey``.
+    /// - Returns: The signed ``Event``.
+    /// - Throws: ``NostrError/signerNotSet`` if no signer is set, plus anything the signer throws.
+    public func sign(_ unsignedEvent: UnsignedEvent) async throws -> Event {
+        try await activeSign(unsignedEvent)
+    }
+
+    /// Runs `body` with the configured local signer.
     ///
     /// Keeps the `EventSigner` — and the private key it holds — from escaping into the feature
     /// extensions, which would otherwise be able to read it directly now that the type is split
-    /// across files. Signing is synchronous, so callers extract the signed event inside the
+    /// across files. Local signing is synchronous, so callers extract the signed event inside the
     /// closure and perform the network publish afterwards.
+    ///
+    /// - Throws: ``NostrError/signerNotSet`` when no signer is set, and
+    ///   ``NostrError/localSignerRequired`` when a remote signer is set — the convenience `publish*`
+    ///   and direct-message helpers that call this need a local key and cannot use a remote signer.
     func withSigner<T>(_ body: (EventSigner) throws -> T) throws -> T {
-        guard let signer else { throw NostrError.signerNotSet }
-        return try body(signer)
+        switch activeSigner {
+        case .local(let signer): return try body(signer)
+        case .remote: throw NostrError.localSignerRequired
+        case nil: throw NostrError.signerNotSet
+        }
     }
 }

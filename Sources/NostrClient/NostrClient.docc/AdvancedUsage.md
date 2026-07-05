@@ -363,6 +363,35 @@ A pre-signed event (e.g. from a remote signer) can be sent with
 ``RelayResponsePrefix`` — `auth-required:` means authenticate and retry, `restricted:`
 means the pubkey is not allowed even when authenticated.
 
+## Remote Signing (NIP-46)
+
+``NostrClient/setSigner(_:)-(NostrSigning)`` accepts any ``NostrCore/NostrSigning`` — a local
+``NostrCore/EventSigner`` or a remote NIP-46 signer (a `RemoteSigner` from the `NostrConnect`
+library), so the private key can live in a separate "bunker" the app never touches. The signer's
+public key is resolved once and cached, so ``NostrClient/publicKey`` and ``NostrClient/npub`` stay
+synchronous.
+
+A remote signer drives the generic paths — ``NostrClient/sign(_:)``,
+``NostrClient/publish(_:strategy:)``, and NIP-42 authentication. Build an
+``NostrCore/UnsignedEvent`` under ``NostrClient/publicKey``, sign it, and publish it:
+
+```swift
+import NostrConnect
+
+let signer = try RemoteSigner(bunker: try BunkerURI(string: "bunker://..."))
+try await client.setSigner(signer)   // any NostrSigning
+
+guard let pubkey = await client.publicKey else { return }
+let signed = try await client.sign(
+    UnsignedEvent(pubkey: pubkey, kind: .textNote, content: "Signed by my bunker"))
+try await client.publish(signed)
+```
+
+The convenience helpers (``NostrClient/publishTextNote(content:tags:strategy:)``, the other
+`publish*` methods, and the direct-message helpers) require a local key and throw
+``NostrCore/NostrError/localSignerRequired`` for a remote signer — a deliberate boundary, since
+they build and sign events internally rather than accepting a pre-signed one.
+
 ## Outbox Model (NIP-65)
 
 The outbox (gossip) model routes reads and writes to each user's declared relays instead of
