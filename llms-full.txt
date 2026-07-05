@@ -507,6 +507,42 @@ let pk = try PublicKey(npub: "npub1...")
 let pk = try PublicKey(data: data)
 ```
 
+## EncryptedPrivateKey
+
+NIP-49 password-encrypted private key (`ncryptsec1...`), protected with scrypt and XChaCha20-Poly1305 (struct: Sendable, Hashable).
+
+### Properties
+
+- `ncryptsec: String` -- the bech32 `ncryptsec` string
+- `logN: UInt8` -- scrypt cost exponent recorded in the payload (N = 2^logN)
+- `keySecurity: KeySecurity` -- `.insecure` (0x00), `.secure` (0x01), or `.unknown` (0x02)
+
+### Encrypt and Decrypt
+
+Passwords are NFKC-normalized before key derivation. `logN` must be in `1...22` (default 16); a larger value throws `NostrError.unsupportedScryptCost`. A wrong password throws `NostrError.decryptionFailed`.
+
+```swift
+// Encrypt raw private-key bytes.
+let encrypted = try EncryptedPrivateKey.encrypt(
+    privateKey: keyPair.privateKey,
+    password: "hunter2",
+    logN: 16,                 // optional, default 16
+    keySecurity: .unknown     // optional, default .unknown
+)
+let ncryptsec = encrypted.ncryptsec
+
+// Parse and decrypt (decrypt returns the raw 32 bytes without validating the scalar).
+let parsed = try EncryptedPrivateKey(ncryptsec: ncryptsec)
+let privateKey = try parsed.decrypt(password: "hunter2")
+```
+
+### KeyPair Convenience
+
+```swift
+let encrypted = try keyPair.encryptedPrivateKey(password: "hunter2")
+let keyPair = try KeyPair(ncryptsec: "ncryptsec1...", password: "hunter2")  // validates the key
+```
+
 ## EventSigner
 
 Handles signing and verification of Nostr events (struct: Sendable).
