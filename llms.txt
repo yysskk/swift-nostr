@@ -6,6 +6,7 @@ The high-level `NostrClient` library provides an actor-based API for the Nostr n
 
 - `NostrClient` actor: relay management, event publishing, subscriptions, fetches, direct messages
 - `KeyPair` / `PublicKey` / `EventSigner`: key generation, import (hex/nsec/mnemonic), event signing
+- `NostrSigning`: signer abstraction over `EventSigner` (local key) and `RemoteSigner` (NIP-46) for signing + NIP-44
 - `EncryptedPrivateKey`: NIP-49 password-encrypted private keys (`ncryptsec`), scrypt + XChaCha20-Poly1305
 - `Event` / `Filter` / `SubscriptionEvent`: NIP-01 data models
 - `RelayPool` / `RelayConnection`: multi-relay WebSocket management with auto-reconnect

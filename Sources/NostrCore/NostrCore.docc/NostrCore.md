@@ -39,6 +39,7 @@ let isValid = try event.verify()
 
 ### Signing and Encryption
 
+- ``NostrSigning``
 - ``EventSigner``
 - ``ProofOfWork``
 - ``SealedMessage``

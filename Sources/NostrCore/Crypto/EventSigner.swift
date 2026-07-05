@@ -59,6 +59,24 @@ public struct EventSigner: Sendable {
         )
     }
 
+    /// Encrypts `plaintext` to `recipientPubkey` with NIP-44 v2, as this signer's identity.
+    /// - Parameters:
+    ///   - plaintext: The message to encrypt.
+    ///   - recipientPubkey: The recipient's public key (hex).
+    /// - Returns: The base64-encoded NIP-44 payload.
+    public func nip44Encrypt(_ plaintext: String, to recipientPubkey: String) throws -> String {
+        try SealedMessage.seal(plaintext, for: recipientPubkey, using: keyPair).payload
+    }
+
+    /// Decrypts a NIP-44 v2 payload from `senderPubkey` addressed to this signer's identity.
+    /// - Parameters:
+    ///   - ciphertext: The base64-encoded NIP-44 payload.
+    ///   - senderPubkey: The sender's public key (hex).
+    /// - Returns: The decrypted plaintext.
+    public func nip44Decrypt(_ ciphertext: String, from senderPubkey: String) throws -> String {
+        try SealedMessage(payload: ciphertext).open(from: senderPubkey, using: keyPair)
+    }
+
     /// Builds an unsigned event for this signer's public key and signs it.
     ///
     /// The convenience signers below differ only in their `kind`, `tags`, and

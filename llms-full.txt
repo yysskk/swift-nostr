@@ -580,6 +580,30 @@ let report = try signer.signReport(pubkey: "authorHex", type: .impersonation)  /
 let eventReport = try signer.signReport(event: note, type: .illegal, reason: "reason")  // reports the event and its author
 ```
 
+### NIP-44 Encryption
+
+```swift
+// Encrypt/decrypt with NIP-44 v2 as this signer's identity (self as sender/recipient).
+let ct = try signer.nip44Encrypt("secret", to: recipientPubkey)   // base64 payload
+let pt = try signer.nip44Decrypt(ct, from: senderPubkey)
+```
+
+## NostrSigning
+
+A signer abstraction over a local key (`EventSigner`) and a remote NIP-46 signer (`RemoteSigner`, `NostrConnect` library), so callers can accept either interchangeably (protocol: Sendable). All requirements are `async throws` so a remote conformance may perform relay round-trips; `EventSigner` satisfies them synchronously. NIP-04 is intentionally excluded (legacy, NostrWalletConnect-only).
+
+```swift
+public protocol NostrSigning: Sendable {
+    var publicKey: String { get async throws }   // author key (the user key for a remote signer)
+    func sign(_ event: UnsignedEvent) async throws -> Event
+    func nip44Encrypt(_ plaintext: String, to recipientPubkey: String) async throws -> String
+    func nip44Decrypt(_ ciphertext: String, from senderPubkey: String) async throws -> String
+}
+
+let signer: any NostrSigning = EventSigner(keyPair: keyPair)   // or a RemoteSigner
+let event = try await signer.sign(unsignedEvent)
+```
+
 ## ProofOfWork
 
 NIP-13 proof of work: leading-zero-bit difficulty over event ids, with mining and validation (enum).
@@ -1082,7 +1106,7 @@ let tags = NostrContentReference.tags(for: content)  // [["p", ...], ["q", ...]]
 
 ## RemoteSigner
 
-NIP-46 remote signing over a relay transport (actor, `NostrConnect` library; import `NostrConnect` and `NostrCore`). Delegates signing to a remote signer (a "bunker") that holds the user's private key. The client holds a separate identity, encrypts each request to the signer, signs a kind-24133 event, and awaits the matching response — correlated by the `id` inside the decrypted JSON body (not by any event tag). Two connection flows are supported: the signer-initiated `bunker://` token and the client-initiated `nostrconnect://` invitation.
+NIP-46 remote signing over a relay transport (actor, `NostrConnect` library; import `NostrConnect` and `NostrCore`). Delegates signing to a remote signer (a "bunker") that holds the user's private key. The client holds a separate identity, encrypts each request to the signer, signs a kind-24133 event, and awaits the matching response — correlated by the `id` inside the decrypted JSON body (not by any event tag). Two connection flows are supported: the signer-initiated `bunker://` token and the client-initiated `nostrconnect://` invitation. Conforms to `NostrSigning` (its `publicKey` is the user key from `get_public_key`), so it is usable anywhere a local `EventSigner` is.
 
 ```swift
 import NostrConnect
