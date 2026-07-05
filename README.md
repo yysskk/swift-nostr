@@ -17,6 +17,7 @@ Swift library for Nostr protocol
 - **NIP-57 Zaps**: Full Lightning zap flow — sign zap requests (kind 9734), resolve LNURL-pay endpoints, fetch invoices, decode bolt11, and verify kind-9735 zap receipts
 - **NIP-47 Nostr Wallet Connect**: Pay Lightning invoices through a remote wallet over Nostr — the full command set, NIP-44/NIP-04 encryption, notifications, and one-call zap payment (separate `NostrWalletConnect` library)
 - **NIP-19 Entities**: bech32 encoding/decoding of npub, nsec, note, nprofile, nevent, and naddr
+- **NIP-49 Private Key Encryption**: Password-encrypt a private key to an `ncryptsec` string with scrypt and XChaCha20-Poly1305
 - **NIP-65 Outbox Model**: Per-user read/write relay lists with gossip routing for subscriptions and publishing
 - **Cryptographic Operations**: Schnorr signatures with secp256k1
 - **Async/Await**: Modern Swift concurrency, actor-isolated and fully `Sendable`
@@ -188,6 +189,7 @@ Each of these is covered in depth, with worked examples, in the [documentation](
 - [x] NIP-44: Versioned encryption
 - [x] NIP-45: Event counts (COUNT)
 - [x] NIP-47: Nostr Wallet Connect (full command set, NIP-44/NIP-04 encryption, notifications, end-to-end zap payment — separate `NostrWalletConnect` library)
+- [x] NIP-49: Private key encryption (ncryptsec)
 - [x] NIP-50: Search capability
 - [x] NIP-51: Lists (standard lists + parameterized sets; NIP-44-encrypted private items)
 - [x] NIP-56: Reporting (kind 1984)

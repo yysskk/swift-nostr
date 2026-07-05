@@ -35,6 +35,8 @@ public enum NostrError: Error, LocalizedError, Sendable, Equatable {
     case invalidMnemonicWord(String)
     case invalidMnemonicChecksum
     case randomGenerationFailed
+    case invalidNcryptsec
+    case unsupportedScryptCost(UInt8)
 
     public var errorDescription: String? {
         switch self {
@@ -105,6 +107,10 @@ public enum NostrError: Error, LocalizedError, Sendable, Equatable {
             return "Invalid mnemonic checksum"
         case .randomGenerationFailed:
             return "Failed to generate secure random bytes"
+        case .invalidNcryptsec:
+            return "The ncryptsec payload is malformed or has an unsupported version"
+        case .unsupportedScryptCost:
+            return "The ncryptsec declares an unsupported scrypt cost"
         }
     }
 }
