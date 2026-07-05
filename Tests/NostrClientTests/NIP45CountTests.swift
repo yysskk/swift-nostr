@@ -237,6 +237,62 @@ struct NIP45CountTests {
         await pool.disconnectAll()
     }
 
+    @Test("the pool tolerates a relay that never answers and returns only the replies")
+    func poolCountToleratesPartialFailure() async throws {
+        let mockA = MockWebSocketSession()
+        let mockB = MockWebSocketSession()
+        let mocks = [mockA, mockB]
+        let counter = SocketCounter()
+        let pool = RelayPool(
+            config: RelayPoolConfig(defaultRelayConfig: noReconnectConfig),
+            webSocketFactory: MockWebSocketSessionFactory(makeSession: { mocks[counter.next()] })
+        )
+
+        let urlA = URL(string: "wss://relay-a.example.com")!
+        let urlB = URL(string: "wss://relay-b.example.com")!
+        let connectionA = await pool.addRelay(url: urlA)
+        let connectionB = await pool.addRelay(url: urlB)
+        try await connectionA.connect()
+        try await connectionB.connect()
+
+        // Relay A answers; relay B never replies and times out. The pool tolerates the
+        // partial failure and returns only the relay that answered.
+        let task = Task { try await pool.count(filters: [Filter(kinds: [.textNote])], timeout: 0.3) }
+
+        try await pollUntil { mockA.sentTextFrames.contains { $0.hasPrefix("[\"COUNT\"") } }
+        let subA = try subscriptionId(fromCountFrame: countFrames(in: mockA)[0])
+        mockA.deliver(.string("[\"COUNT\",\"\(subA)\",{\"count\":7}]"))
+
+        let results = try await task.value
+        #expect(results[urlA] == EventCount(value: 7))
+        #expect(results[urlB] == nil)
+        #expect(results.count == 1)
+        await pool.disconnectAll()
+    }
+
+    @Test("the pool count throws when no targeted relay answers")
+    func poolCountThrowsWhenNoneAnswer() async throws {
+        let mockA = MockWebSocketSession()
+        let mockB = MockWebSocketSession()
+        let mocks = [mockA, mockB]
+        let counter = SocketCounter()
+        let pool = RelayPool(
+            config: RelayPoolConfig(defaultRelayConfig: noReconnectConfig),
+            webSocketFactory: MockWebSocketSessionFactory(makeSession: { mocks[counter.next()] })
+        )
+
+        let connectionA = await pool.addRelay(url: URL(string: "wss://relay-a.example.com")!)
+        let connectionB = await pool.addRelay(url: URL(string: "wss://relay-b.example.com")!)
+        try await connectionA.connect()
+        try await connectionB.connect()
+
+        // Neither relay replies; every per-relay count times out, so the pool surfaces the error.
+        await #expect(throws: NostrError.timeout) {
+            try await pool.count(filters: [Filter(kinds: [.textNote])], timeout: 0.2)
+        }
+        await pool.disconnectAll()
+    }
+
     // MARK: - NostrClient
 
     @Test("the client returns the maximum count across relays")
