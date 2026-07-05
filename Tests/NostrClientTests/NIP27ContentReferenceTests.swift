@@ -29,6 +29,20 @@ struct NIP27ContentReferenceTests {
         #expect(reference.entity == .npub(npubPubkeyHex))
     }
 
+    @Test("a case-folding-unstable character before a reference keeps the range accurate")
+    func referenceAfterExpandingUppercaseCharacter() throws {
+        // `İ` (U+0130) lowercases to two scalars, so indices computed on a lowercased copy
+        // would be shifted relative to the original content. The scanned range must still
+        // slice the original content back to exactly the matched reference.
+        let content = "İstanbul nostr:\(npubVector) gm"
+        let references = NostrContentReference.references(in: content)
+        #expect(references.count == 1)
+        let reference = try #require(references.first)
+        #expect(String(content[reference.range]) == reference.text)
+        #expect(reference.text == "nostr:\(npubVector)")
+        #expect(reference.entity == .npub(npubPubkeyHex))
+    }
+
     @Test("multiple references are returned in order of appearance")
     func multipleReferencesInOrder() {
         let content = "see nostr:\(npubVector) and nostr:\(noteVector) today"

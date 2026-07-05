@@ -33,29 +33,32 @@ public struct NostrContentReference: Sendable, Hashable {
     /// bech32 characters. Malformed or non-referenceable entities (including `nsec`) are skipped.
     public static func references(in content: String) -> [NostrContentReference] {
         let scheme = "nostr:"
-        let lowercased = content.lowercased()
         var references: [NostrContentReference] = []
-        var searchStart = lowercased.startIndex
+        var searchStart = content.startIndex
 
-        while let schemeRange = lowercased.range(of: scheme, range: searchStart..<lowercased.endIndex) {
+        // Search case-insensitively on `content` itself so every index is valid on it.
+        // Lowercasing a copy first is unsafe: some code points expand under case folding
+        // (e.g. `İ` U+0130 → two scalars), which shifts the indices of everything after them.
+        while let schemeRange = content.range(
+            of: scheme, options: [.caseInsensitive], range: searchStart..<content.endIndex)
+        {
             searchStart = schemeRange.upperBound
 
             // Require a word boundary before the scheme so `xnostr:` is not matched.
-            if schemeRange.lowerBound > lowercased.startIndex {
-                let previous = lowercased[lowercased.index(before: schemeRange.lowerBound)]
+            if schemeRange.lowerBound > content.startIndex {
+                let previous = content[content.index(before: schemeRange.lowerBound)]
                 if previous.isLetter || previous.isNumber { continue }
             }
 
             // Take the maximal run of bech32 characters after the scheme.
             var tokenEnd = schemeRange.upperBound
-            while tokenEnd < lowercased.endIndex, lowercased[tokenEnd].isBech32Character {
-                tokenEnd = lowercased.index(after: tokenEnd)
+            while tokenEnd < content.endIndex, content[tokenEnd].isBech32Character {
+                tokenEnd = content.index(after: tokenEnd)
             }
             guard tokenEnd > schemeRange.upperBound else { continue }
 
-            // Map the range back onto the original content to preserve its scalars/casing.
             let matchRange = schemeRange.lowerBound..<tokenEnd
-            let token = String(lowercased[schemeRange.upperBound..<tokenEnd])
+            let token = String(content[schemeRange.upperBound..<tokenEnd])
             guard let entity = try? NIP19Entity.decode(token),
                 let reference = NostrContentReference(
                     text: String(content[matchRange]),
