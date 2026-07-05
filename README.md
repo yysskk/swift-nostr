@@ -183,6 +183,7 @@ Each of these is covered in depth, with worked examples, in the [documentation](
 - [x] NIP-42: Client authentication (automatic challenge response, auth-required retry)
 - [x] NIP-44: Versioned encryption
 - [x] NIP-47: Nostr Wallet Connect (full command set, NIP-44/NIP-04 encryption, notifications, end-to-end zap payment — separate `NostrWalletConnect` library)
+- [x] NIP-50: Search capability
 - [x] NIP-57: Lightning Zaps (zap request kind 9734, LNURL helpers, invoice fetch, bolt11 decoding, kind-9735 receipt validation)
 - [x] NIP-59: Gift wrap
 - [x] NIP-65: Relay list metadata (outbox model)

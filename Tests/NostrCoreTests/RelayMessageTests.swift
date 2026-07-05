@@ -161,6 +161,17 @@ struct ClientMessageTests {
         #expect(serialized.contains("kinds"))
     }
 
+    @Test("Serialize REQ message with search filter")
+    func serializeReqMessageWithSearch() throws {
+        let filter = Filter.search("nostr", kinds: [.textNote], limit: 20)
+        let message = ClientMessage.request(subscriptionId: "sub1", filters: [filter])
+        let serialized = try message.serialize()
+
+        #expect(serialized.contains("REQ"))
+        #expect(serialized.contains("sub1"))
+        #expect(serialized.contains(#""search":"nostr""#))
+    }
+
     @Test("Serialize CLOSE message")
     func serializeCloseMessage() throws {
         let message = ClientMessage.close(subscriptionId: "sub1")

@@ -27,6 +27,11 @@ public struct Filter: Codable, Sendable, Hashable {
     /// Maximum number of events to be returned
     public var limit: Int?
 
+    /// Free-text search query (NIP-50). Relays that support search return events
+    /// matching the query; relays without NIP-50 support may ignore this field.
+    /// https://github.com/nostr-protocol/nips/blob/master/50.md
+    public var search: String?
+
     /// Generic tag queries (e.g., #t for hashtags)
     private var tagQueries: [String: [String]]
 
@@ -39,6 +44,7 @@ public struct Filter: Codable, Sendable, Hashable {
         case since
         case until
         case limit
+        case search
     }
 
     public init(
@@ -49,7 +55,8 @@ public struct Filter: Codable, Sendable, Hashable {
         pubkeyReferences: [String]? = nil,
         since: Int64? = nil,
         until: Int64? = nil,
-        limit: Int? = nil
+        limit: Int? = nil,
+        search: String? = nil
     ) {
         self.ids = ids
         self.authors = authors
@@ -59,6 +66,7 @@ public struct Filter: Codable, Sendable, Hashable {
         self.since = since
         self.until = until
         self.limit = limit
+        self.search = search
         self.tagQueries = [:]
     }
 
@@ -73,6 +81,7 @@ public struct Filter: Codable, Sendable, Hashable {
         since = try container.decodeIfPresent(Int64.self, forKey: .since)
         until = try container.decodeIfPresent(Int64.self, forKey: .until)
         limit = try container.decodeIfPresent(Int.self, forKey: .limit)
+        search = try container.decodeIfPresent(String.self, forKey: .search)
 
         // Decode generic tag queries
         let dynamicContainer = try decoder.container(keyedBy: DynamicCodingKeys.self)
@@ -96,6 +105,7 @@ public struct Filter: Codable, Sendable, Hashable {
         try container.encodeIfPresent(since, forKey: .since)
         try container.encodeIfPresent(until, forKey: .until)
         try container.encodeIfPresent(limit, forKey: .limit)
+        try container.encodeIfPresent(search, forKey: .search)
 
         // Encode generic tag queries
         var dynamicContainer = encoder.container(keyedBy: DynamicCodingKeys.self)
@@ -235,6 +245,15 @@ extension Filter {
             authors: [pubkey],
             kinds: [.directMessageRelayList],
             limit: 1
+        )
+    }
+
+    /// Create a filter for a free-text relay search (NIP-50)
+    public static func search(_ query: String, kinds: [Event.Kind]? = nil, limit: Int? = nil) -> Filter {
+        Filter(
+            kinds: kinds,
+            limit: limit,
+            search: query
         )
     }
 }
