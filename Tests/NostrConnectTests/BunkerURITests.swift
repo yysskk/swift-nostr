@@ -59,6 +59,14 @@ struct BunkerURITests {
         }
     }
 
+    @Test("rejects a non-WebSocket relay")
+    func rejectsNonWebSocketRelay() {
+        // Relay values come from an untrusted signer/QR code; only ws:// and wss:// are accepted.
+        #expect(throws: RemoteSignerError.self) {
+            try BunkerURI(string: "bunker://\(pubkey)?relay=https%3A%2F%2Frelay.example")
+        }
+    }
+
     @Test("round-trips through stringValue with a secret")
     func roundTripsWithSecret() throws {
         let uri = try BunkerURI(

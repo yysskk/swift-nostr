@@ -93,6 +93,14 @@ struct NostrConnectURITests {
         }
     }
 
+    @Test("rejects a non-WebSocket relay")
+    func rejectsNonWebSocketRelay() throws {
+        let pubkey = try KeyPair().publicKeyHex
+        #expect(throws: RemoteSignerError.self) {
+            try NostrConnectURI(string: "nostrconnect://\(pubkey)?relay=https%3A%2F%2Frelay.example&secret=s")
+        }
+    }
+
     @Test("parses a comma-separated permission list")
     func parsesPermissionList() throws {
         let keyPair = try KeyPair()

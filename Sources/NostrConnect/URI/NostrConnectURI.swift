@@ -67,6 +67,9 @@ public struct NostrConnectURI: Sendable, Hashable {
         guard !relays.isEmpty else {
             throw RemoteSignerError.invalidURI(reason: "at least one relay is required")
         }
+        guard relays.allSatisfy(URIQuery.isWebSocketURL) else {
+            throw RemoteSignerError.invalidURI(reason: "relays must be ws:// or wss:// URLs")
+        }
 
         self.clientPubkey = normalizedPubkey
         self.relays = relays

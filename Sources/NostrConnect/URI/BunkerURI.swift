@@ -41,6 +41,9 @@ public struct BunkerURI: Sendable, Hashable {
         guard !relays.isEmpty else {
             throw RemoteSignerError.invalidURI(reason: "at least one relay is required")
         }
+        guard relays.allSatisfy(URIQuery.isWebSocketURL) else {
+            throw RemoteSignerError.invalidURI(reason: "relays must be ws:// or wss:// URLs")
+        }
 
         self.remoteSignerPubkey = normalizedPubkey
         self.relays = relays

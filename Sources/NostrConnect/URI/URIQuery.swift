@@ -29,6 +29,15 @@ enum URIQuery {
         .joined(separator: "&")
     }
 
+    /// Whether `url` is a WebSocket relay URL (`ws://` or `wss://`). Relay values in a connection
+    /// URI come from an untrusted signer or QR code, so both URI types reject non-WebSocket schemes.
+    static func isWebSocketURL(_ url: URL) -> Bool {
+        switch url.scheme?.lowercased() {
+        case "ws", "wss": return true
+        default: return false
+        }
+    }
+
     /// Returns `count` cryptographically-seeded random bytes as a lowercase hex string.
     ///
     /// Used to mint connection secrets. `SecureRandom` in NostrCore is not visible here, so this
