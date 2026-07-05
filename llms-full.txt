@@ -314,6 +314,7 @@ NIP-01 Subscription Filter (struct: Codable, Sendable, Hashable).
 - `since: Int64?` -- unix timestamp lower bound
 - `until: Int64?` -- unix timestamp upper bound
 - `limit: Int?` -- max events to return
+- `search: String?` -- free-text search query (NIP-50); unsupported relays may ignore it
 
 ### Generic Tag Queries
 
@@ -332,6 +333,7 @@ Filter.replies(to: "eventId", limit: 20)
 Filter.mentions(pubkey: "...")
 Filter.globalFeed(limit: 100)
 Filter.contactList(pubkey: "...")
+Filter.search("nostr", kinds: [.textNote], limit: 20)  // NIP-50 full-text search
 ```
 
 ## SubscriptionEvent
@@ -821,6 +823,7 @@ Cases: `invalidPrivateKey`, `invalidPublicKey`, `invalidSignature`, `invalidEven
 - NIP-42: Client authentication (automatic challenge response, auth-required retry)
 - NIP-44: Versioned encryption v2 (ECDH + HKDF + ChaCha20 + HMAC-SHA256)
 - NIP-47: Nostr Wallet Connect (full command set, NIP-44/NIP-04 encryption, notifications — `NostrWalletConnect` library)
+- NIP-50: Search capability
 - NIP-57: Lightning Zaps (zap request kind 9734, LNURL helpers, bolt11 decoding, kind-9735 receipt validation)
 - NIP-59: Gift wrap (rumor > seal > gift wrap with randomized timestamps)
 - NIP-65: Relay list metadata (outbox model with gossip routing)

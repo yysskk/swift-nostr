@@ -137,6 +137,68 @@ struct FilterTests {
         #expect(filter.limit == 50)
     }
 
+    @Test("Filter with search query")
+    func filterWithSearch() {
+        let filter = Filter(
+            kinds: [1],
+            limit: 20,
+            search: "nostr"
+        )
+
+        #expect(filter.search == "nostr")
+        #expect(filter.kinds == [1])
+        #expect(filter.limit == 20)
+    }
+
+    @Test("Search convenience filter")
+    func searchConvenienceFilter() {
+        let filter = Filter.search("nostr", kinds: [.textNote], limit: 20)
+
+        #expect(filter.search == "nostr")
+        #expect(filter.kinds == [.textNote])
+        #expect(filter.limit == 20)
+    }
+
+    @Test("Filter JSON encoding includes search")
+    func filterJsonEncodingIncludesSearch() throws {
+        let filter = Filter(kinds: [1], search: "nostr")
+
+        let encoder = JSONEncoder()
+        let data = try encoder.encode(filter)
+        let json = String(data: data, encoding: .utf8)!
+
+        #expect(json.contains(#""search":"nostr""#))
+    }
+
+    @Test("Filter JSON encoding omits search when nil")
+    func filterJsonEncodingOmitsSearchWhenNil() throws {
+        let filter = Filter(kinds: [1], limit: 10)
+
+        let encoder = JSONEncoder()
+        let data = try encoder.encode(filter)
+        let json = String(data: data, encoding: .utf8)!
+
+        #expect(!json.contains("search"))
+    }
+
+    @Test("Filter JSON decoding reads search")
+    func filterJsonDecodingReadsSearch() throws {
+        let json = """
+            {
+                "kinds": [1],
+                "search": "nostr",
+                "limit": 20
+            }
+            """
+
+        let decoder = JSONDecoder()
+        let filter = try decoder.decode(Filter.self, from: json.data(using: .utf8)!)
+
+        #expect(filter.search == "nostr")
+        #expect(filter.kinds == [1])
+        #expect(filter.limit == 20)
+    }
+
     @Test("Filter with generic tag query")
     func filterWithGenericTagQuery() {
         var filter = Filter(kinds: [1])
