@@ -106,6 +106,34 @@ extension NostrClient {
         return PublishedEvent(event: deletion, result: result)
     }
 
+    /// Publishes a report of a pubkey (kind 1984, NIP-56).
+    /// - Returns: The signed event together with the per-relay publish outcome.
+    @discardableResult
+    public func publishReport(
+        pubkey: String,
+        type: ReportType,
+        reason: String = "",
+        strategy: PublishStrategy? = nil
+    ) async throws -> PublishedEvent {
+        let report = try withSigner { try $0.signReport(pubkey: pubkey, type: type, reason: reason) }
+        let result = try await relayPool.publish(report, strategy: strategy)
+        return PublishedEvent(event: report, result: result)
+    }
+
+    /// Publishes a report of an event and its author (kind 1984, NIP-56).
+    /// - Returns: The signed event together with the per-relay publish outcome.
+    @discardableResult
+    public func publishReport(
+        event: Event,
+        type: ReportType,
+        reason: String = "",
+        strategy: PublishStrategy? = nil
+    ) async throws -> PublishedEvent {
+        let report = try withSigner { try $0.signReport(event: event, type: type, reason: reason) }
+        let result = try await relayPool.publish(report, strategy: strategy)
+        return PublishedEvent(event: report, result: result)
+    }
+
     /// Publishes a raw signed event.
     /// - Parameter strategy: How many relay acknowledgments to wait for before returning
     ///   (default: the pool config's ``RelayPoolConfig/defaultPublishStrategy``).
