@@ -743,6 +743,57 @@ let theirs = try await client.fetchList(kind: .muteList, for: pubkey)
 let publicView = NostrList(event: event)
 ```
 
+## NostrListSet
+
+NIP-51 set (struct: Sendable, Hashable): an addressable 30000-series categorized list identified
+by a `d` tag, e.g. follow sets (30000), relay sets (30002), bookmark sets (30003), curation sets
+(30004). Public items are the event's non-metadata tags; private items are a NIP-44-self-encrypted
+JSON tag array in the content, readable only by the author. Sets are addressable, so publishing
+replaces the previous set with the same kind and `d` identifier — edit the fetched current set to
+avoid dropping items.
+
+### Properties
+
+- `kind: Event.Kind` -- the set kind (`.followSet`, `.relaySet`, `.bookmarkSet`, ...)
+- `identifier: String` -- the `d` tag value naming the set within its kind
+- `title: String?` -- optional `title` tag
+- `imageURL: String?` -- optional `image` tag
+- `description: String?` -- optional `description` tag
+- `publicItems: [Tag]` -- publicly visible items (the event's non-metadata tags)
+- `privateItems: [Tag]` -- self-encrypted items (empty in the public-only view)
+
+### Usage
+
+```swift
+// Build and publish (replaces the current set with this kind and identifier)
+let set = try NostrListSet(
+    kind: .bookmarkSet,
+    identifier: "reading",
+    title: "Reading list",
+    publicItems: [.event(noteId), .reference("https://example.com")],
+    privateItems: [.hashtag("private-topic")]
+)
+try await client.publishSet(set)
+
+// Read-modify-write: start from the fetched set so nothing is dropped.
+// No pubkey -> the current user's set, with private items decrypted (throws if undecryptable).
+if var mine = try await client.fetchSet(kind: .bookmarkSet, identifier: "reading") {
+    mine.publicItems.append(.reference("https://another.example"))
+    try await client.publishSet(mine)
+}
+
+// All sets of a kind, newest per identifier.
+let all = try await client.fetchSets(kind: .bookmarkSet)
+
+// Another user's set, or a set addressed by naddr: public items only.
+let theirs = try await client.fetchSet(kind: .bookmarkSet, identifier: "reading", for: pubkey)
+let addr = try set.naddr(author: authorPubkey)     // NIP-19 naddr coordinate
+let byAddr = try await client.fetchSet(naddr: addr)
+
+// Public-only view of any set event (private items stay empty).
+let publicView = try NostrListSet(event: event)
+```
+
 ## ReportType
 
 The reason category of a NIP-56 report, kind 1984 (enum: String, Sendable, Hashable, CaseIterable, Codable).
@@ -955,7 +1006,7 @@ Cases: `invalidPrivateKey`, `invalidPublicKey`, `invalidSignature`, `invalidEven
 - NIP-44: Versioned encryption v2 (ECDH + HKDF + ChaCha20 + HMAC-SHA256)
 - NIP-47: Nostr Wallet Connect (full command set, NIP-44/NIP-04 encryption, notifications — `NostrWalletConnect` library)
 - NIP-50: Search capability
-- NIP-51: Lists (mute 10000, pin 10001, bookmarks 10003; public tags + NIP-44-self-encrypted private items)
+- NIP-51: Lists (standard lists 10000/10001/10003 + parameterized 30000-series sets; public tags + NIP-44-self-encrypted private items)
 - NIP-57: Lightning Zaps (zap request kind 9734, LNURL helpers, bolt11 decoding, kind-9735 receipt validation)
 - NIP-59: Gift wrap (rumor > seal > gift wrap with randomized timestamps)
 - NIP-65: Relay list metadata (outbox model with gossip routing)

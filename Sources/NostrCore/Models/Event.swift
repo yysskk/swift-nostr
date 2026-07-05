@@ -139,6 +139,27 @@ extension Event {
         public static let categorizedPeopleList = Kind(rawValue: 30000)
         /// The legacy NIP-51 categorized bookmarks kind, superseded by bookmark sets (30003).
         public static let categorizedBookmarkList = Kind(rawValue: 30001)
+        /// A NIP-51 follow set: a categorized set of profiles.
+        ///
+        /// Shares raw value 30000 with ``categorizedPeopleList`` — the standard-list and set
+        /// names refer to the same addressable kind.
+        public static let followSet = Kind(rawValue: 30000)
+        /// A NIP-51 relay set: a categorized set of relays.
+        public static let relaySet = Kind(rawValue: 30002)
+        /// A NIP-51 bookmark set: a categorized set of bookmarked events, articles, hashtags, URLs.
+        public static let bookmarkSet = Kind(rawValue: 30003)
+        /// A NIP-51 curation set: a categorized set of articles and notes.
+        public static let curationSet = Kind(rawValue: 30004)
+        /// A NIP-51 video curation set: a categorized set of videos.
+        public static let videoCurationSet = Kind(rawValue: 30005)
+        /// A NIP-51 picture curation set: a categorized set of pictures.
+        public static let pictureCurationSet = Kind(rawValue: 30006)
+        /// A NIP-51 kind mute set: a categorized set of muted event kinds.
+        public static let kindMuteSet = Kind(rawValue: 30007)
+        /// A NIP-51 interest set: a categorized set of interest hashtags.
+        public static let interestSet = Kind(rawValue: 30015)
+        /// A NIP-51 emoji set: a categorized set of custom emoji.
+        public static let emojiSet = Kind(rawValue: 30030)
         public static let profileBadges = Kind(rawValue: 30008)
         public static let badgeDefinition = Kind(rawValue: 30009)
         public static let longFormContent = Kind(rawValue: 30023)
