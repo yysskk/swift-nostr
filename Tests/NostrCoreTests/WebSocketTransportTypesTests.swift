@@ -3,10 +3,31 @@ import Foundation
 import NostrCore
 import Testing
 
+#if canImport(FoundationNetworking)
+    import FoundationNetworking
+#endif
+
 /// Locks in the public contract of the transport value types that a host transport
 /// (e.g. an OkHttp-backed factory on Android) maps to and from.
 @Suite("WebSocket Transport Type Tests")
 struct WebSocketTransportTypesTests {
+
+    /// Every close code the library defines, kept in sync with `WebSocketCloseCode`.
+    /// The enum is not `CaseIterable`, so the cases are listed explicitly.
+    private static let allCloseCodes: [WebSocketCloseCode] = [
+        .normalClosure,
+        .goingAway,
+        .protocolError,
+        .unsupportedData,
+        .noStatusReceived,
+        .abnormalClosure,
+        .invalidFramePayloadData,
+        .policyViolation,
+        .messageTooBig,
+        .mandatoryExtensionMissing,
+        .internalServerError,
+        .tlsHandshakeFailure,
+    ]
 
     @Test("close codes carry their RFC 6455 status numbers")
     func closeCodeRawValues() {
@@ -23,5 +44,16 @@ struct WebSocketTransportTypesTests {
         #expect(WebSocketMessage.string("a") != .string("b"))
         #expect(WebSocketMessage.data(Data([0x01])) == .data(Data([0x01])))
         #expect(WebSocketMessage.string("a") != .data(Data()))
+    }
+
+    /// The `URLSession` transport maps each ``WebSocketCloseCode`` straight through
+    /// its raw value. This asserts every case has a real
+    /// `URLSessionWebSocketTask.CloseCode`, so the transport never needs the
+    /// `.invalid` fallback that only backstops a future enum addition.
+    @Test("every close code has a URLSession equivalent")
+    func closeCodesMapToURLSession() {
+        for closeCode in Self.allCloseCodes {
+            #expect(URLSessionWebSocketTask.CloseCode(rawValue: closeCode.rawValue) != nil)
+        }
     }
 }

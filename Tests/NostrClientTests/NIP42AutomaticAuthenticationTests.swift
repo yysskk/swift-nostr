@@ -62,6 +62,51 @@ struct NIP42AutomaticAuthenticationTests {
         return sent
     }
 
+    /// Delivers an OK `false` for the next AUTH frame the connection sends,
+    /// simulating the relay rejecting the authentication.
+    @discardableResult
+    private func rejectAuth(
+        on connection: RelayConnection, mock: MockWebSocketSession, message: String
+    ) async throws -> Event {
+        try await pollUntil { mock.sentTextFrames.contains { $0.hasPrefix("[\"AUTH\"") } }
+        let sent = try sentAuthEvent(in: mock)
+        mock.deliver(.string("[\"OK\",\"\(sent.id)\",false,\"\(message)\"]"))
+        return sent
+    }
+
+    /// Number of AUTH frames the connection has sent so far.
+    private func authFrameCount(in mock: MockWebSocketSession) -> Int {
+        mock.sentTextFrames.filter { $0.hasPrefix("[\"AUTH\"") }.count
+    }
+
+    /// Extracts the event of the most recently sent AUTH frame.
+    private func latestSentAuthEvent(in mock: MockWebSocketSession) throws -> Event {
+        guard let frame = mock.sentTextFrames.last(where: { $0.hasPrefix("[\"AUTH\"") }),
+            let data = frame.data(using: .utf8),
+            let array = try JSONSerialization.jsonObject(with: data) as? [Any],
+            array.count >= 2,
+            let eventDict = array[1] as? [String: Any]
+        else {
+            throw NostrError.invalidMessageFormat
+        }
+        let eventData = try JSONSerialization.data(withJSONObject: eventDict)
+        return try JSONDecoder().decode(Event.self, from: eventData)
+    }
+
+    /// Waits for a new AUTH frame beyond `previousCount`, delivers the relay's OK
+    /// `true` for it, and waits for the pubkey to be recorded. Use when a prior
+    /// AUTH frame is already on the wire so the newest one must be acknowledged.
+    @discardableResult
+    private func acknowledgeLatestAuth(
+        on connection: RelayConnection, mock: MockWebSocketSession, after previousCount: Int
+    ) async throws -> Event {
+        try await pollUntil { authFrameCount(in: mock) > previousCount }
+        let sent = try latestSentAuthEvent(in: mock)
+        mock.deliver(.string("[\"OK\",\"\(sent.id)\",true,\"\"]"))
+        try await pollUntil { await connection.isAuthenticated }
+        return sent
+    }
+
     // MARK: - RelayConnection
 
     @Test("a responder answers AUTH challenges automatically")
@@ -131,6 +176,79 @@ struct NIP42AutomaticAuthenticationTests {
 
         try await Task.sleep(for: .milliseconds(50))
         #expect(!mock.sentTextFrames.contains { $0.hasPrefix("[\"AUTH\"") })
+        await connection.disconnect()
+    }
+
+    @Test("a rejected automatic authentication is recorded on lastAuthenticationError")
+    func responderFailureRecorded() async throws {
+        let (connection, mock) = makeConnection()
+        let signer = EventSigner(keyPair: try KeyPair())
+        await connection.setAuthenticationResponder { relayURL, challenge in
+            try? signer.signClientAuthentication(relayURL: relayURL, challenge: challenge)
+        }
+        try await connection.connect()
+
+        mock.deliver(.string(#"["AUTH","challengestringhere"]"#))
+        try await rejectAuth(on: connection, mock: mock, message: "restricted: not allowed")
+
+        try await pollUntil { await connection.lastAuthenticationError != nil }
+        #expect(await connection.lastAuthenticationError == .authenticationFailed("restricted: not allowed"))
+        #expect(await connection.isAuthenticated == false)
+        await connection.disconnect()
+    }
+
+    @Test("a later successful authentication clears lastAuthenticationError")
+    func responderFailureClearedOnSuccess() async throws {
+        let (connection, mock) = makeConnection()
+        let signer = EventSigner(keyPair: try KeyPair())
+        await connection.setAuthenticationResponder { relayURL, challenge in
+            try? signer.signClientAuthentication(relayURL: relayURL, challenge: challenge)
+        }
+        try await connection.connect()
+
+        mock.deliver(.string(#"["AUTH","first-challenge"]"#))
+        try await rejectAuth(on: connection, mock: mock, message: "restricted: not allowed")
+        try await pollUntil { await connection.lastAuthenticationError != nil }
+
+        // A fresh challenge drives another automatic answer, this time accepted.
+        // The rejected AUTH frame is already on the wire, so acknowledge the new one.
+        let priorAuthFrames = authFrameCount(in: mock)
+        mock.deliver(.string(#"["AUTH","second-challenge"]"#))
+        try await acknowledgeLatestAuth(on: connection, mock: mock, after: priorAuthFrames)
+
+        #expect(await connection.lastAuthenticationError == nil)
+        await connection.disconnect()
+    }
+
+    @Test("disconnect clears lastAuthenticationError")
+    func disconnectClearsAuthenticationError() async throws {
+        let (connection, mock) = makeConnection()
+        let signer = EventSigner(keyPair: try KeyPair())
+        await connection.setAuthenticationResponder { relayURL, challenge in
+            try? signer.signClientAuthentication(relayURL: relayURL, challenge: challenge)
+        }
+        try await connection.connect()
+
+        mock.deliver(.string(#"["AUTH","challengestringhere"]"#))
+        try await rejectAuth(on: connection, mock: mock, message: "restricted: not allowed")
+        try await pollUntil { await connection.lastAuthenticationError != nil }
+
+        await connection.disconnect()
+        #expect(await connection.lastAuthenticationError == nil)
+    }
+
+    @Test("a responder returning nil records no authentication error")
+    func responderDeclineRecordsNoError() async throws {
+        let (connection, mock) = makeConnection()
+        await connection.setAuthenticationResponder { _, _ in nil }
+        try await connection.connect()
+
+        mock.deliver(.string(#"["AUTH","challengestringhere"]"#))
+        try await pollUntil { await connection.authenticationChallenge != nil }
+
+        // Give a would-be authentication task a chance to run before asserting.
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(await connection.lastAuthenticationError == nil)
         await connection.disconnect()
     }
 
