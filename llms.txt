@@ -38,7 +38,7 @@ The high-level `NostrClient` library provides an actor-based API for the Nostr n
 - NIP-42: Client authentication (automatic challenge response, auth-required retry)
 - NIP-44: Versioned encryption (v2)
 - NIP-45: Event counts (COUNT)
-- NIP-46: Nostr Connect (remote signing; bunker:// connect handshake, auth_url challenges, typed commands — separate `NostrConnect` library)
+- NIP-46: Nostr Connect (remote signing; bunker:// and client-initiated nostrconnect:// flows, auth_url challenges, typed commands — separate `NostrConnect` library)
 - NIP-47: Nostr Wallet Connect (full command set, NIP-44/NIP-04 encryption, notifications — separate `NostrWalletConnect` library)
 - NIP-49: Private key encryption (ncryptsec)
 - NIP-50: Search capability

@@ -16,7 +16,7 @@ Swift library for Nostr protocol
 - **NIP-42 Authentication**: Relay AUTH challenges answered automatically, with auth-required retry
 - **NIP-57 Zaps**: Full Lightning zap flow — sign zap requests (kind 9734), resolve LNURL-pay endpoints, fetch invoices, decode bolt11, and verify kind-9735 zap receipts
 - **NIP-47 Nostr Wallet Connect**: Pay Lightning invoices through a remote wallet over Nostr — the full command set, NIP-44/NIP-04 encryption, notifications, and one-call zap payment (separate `NostrWalletConnect` library)
-- **NIP-46 Nostr Connect**: Delegate signing to a remote signer (a `bunker://`) that holds the user's key — connect handshake, `auth_url` challenges, and typed commands for signing, encryption, and key proof (separate `NostrConnect` library)
+- **NIP-46 Nostr Connect**: Delegate signing to a remote signer that holds the user's key — both the signer-initiated `bunker://` and client-initiated `nostrconnect://` flows, `auth_url` challenges, and typed commands for signing, encryption, and key proof (separate `NostrConnect` library)
 - **NIP-19 Entities**: bech32 encoding/decoding of npub, nsec, note, nprofile, nevent, and naddr
 - **NIP-49 Private Key Encryption**: Password-encrypt a private key to an `ncryptsec` string with scrypt and XChaCha20-Poly1305
 - **NIP-65 Outbox Model**: Per-user read/write relay lists with gossip routing for subscriptions and publishing
@@ -52,7 +52,7 @@ The package vends four libraries:
 - **`NostrCore`** — the shared protocol primitives, cryptography, NIP-19 encoding, and a single-relay WebSocket transport: `Event`, `KeyPair`, `EventSigner`, `Filter`, `Bech32`, `SealedMessage`, `RelayConnection`, and the relay messages. Depend on it directly if that is all you need.
 - **`NostrClient`** — the high-level, actor-based client (multi-relay pool, NIP-65 outbox/gossip, NIP-17 direct messages, fetches, NIP-19 entities, zap receipts). It is built on `NostrCore` but does not re-export it; add the `NostrCore` product too and import both.
 - **`NostrWalletConnect`** — NIP-47 wallet payments, built on `NostrCore`. Its API surfaces core types (`LNURLPayResponse`, `Event`, …), so add the `NostrCore` product and `import NostrCore` alongside it.
-- **`NostrConnect`** — NIP-46 remote signing (`bunker://`), built on `NostrCore`. Its API surfaces core types (`Event`, `KeyPair`, `UnsignedEvent`, …), so add the `NostrCore` product and `import NostrCore` alongside it.
+- **`NostrConnect`** — NIP-46 remote signing (`bunker://` and `nostrconnect://` flows), built on `NostrCore`. Its API surfaces core types (`Event`, `KeyPair`, `UnsignedEvent`, …), so add the `NostrCore` product and `import NostrCore` alongside it.
 
 > **Migrating from an earlier release:** the protocol primitives moved out of `NostrClient` into the new `NostrCore` module. Add the `NostrCore` product to your target and `import NostrCore` alongside `import NostrClient` wherever you reference `Event`, `KeyPair`, `EventSigner`, `Filter`, `RelayConnection`, `Bech32`, `NostrError`, and the other primitives — the higher-level `NostrClient` API (the `NostrClient` actor, `RelayPool`, direct messages, outbox) is unchanged.
 
@@ -158,7 +158,7 @@ print(zap.preimage)
 
 ### Sign remotely with a bunker (NIP-46)
 
-The `NostrConnect` library delegates signing to a remote signer (a `bunker://`) that holds the user's key, so the app never handles an `nsec`. See its [API documentation](https://yysskk.github.io/swift-nostr/documentation/nostrconnect) and [Getting Started](https://yysskk.github.io/swift-nostr/documentation/nostrconnect/gettingstarted) guide.
+The `NostrConnect` library delegates signing to a remote signer that holds the user's key, so the app never handles an `nsec`. It supports both the signer-initiated `bunker://` flow and the client-initiated `nostrconnect://` flow. See its [API documentation](https://yysskk.github.io/swift-nostr/documentation/nostrconnect) and [Getting Started](https://yysskk.github.io/swift-nostr/documentation/nostrconnect/gettingstarted) guide.
 
 ```swift
 import NostrConnect
@@ -172,6 +172,16 @@ let userPubkey = try await signer.userPublicKey()
 let signed = try await signer.sign(
     UnsignedEvent(pubkey: userPubkey, kind: .textNote, content: "Signed by my bunker"))
 print(signed.id, try signed.verify())
+```
+
+Or start the handshake from the client: generate a `nostrconnect://` invitation, show it as a QR code or link, and wait for the signer to accept — its pubkey is discovered from the response, which is validated against the invitation secret.
+
+```swift
+let invitation = try NostrConnectURI.invitation(clientKeyPair: clientKeyPair, relays: [relayURL])
+displayQRCode(invitation.stringValue)
+
+let signer = try RemoteSigner(invitation: invitation, clientKeyPair: clientKeyPair)
+let remotePubkey = try await signer.awaitConnection()   // resolves once the signer accepts
 ```
 
 `ping`, NIP-44/NIP-04 encrypt and decrypt, `switch_relays`, and `logout` are available too, along with an `authChallenges()` stream for `auth_url` approvals.
@@ -210,7 +220,7 @@ Each of these is covered in depth, with worked examples, in the [documentation](
 - [x] NIP-42: Client authentication (automatic challenge response, auth-required retry)
 - [x] NIP-44: Versioned encryption
 - [x] NIP-45: Event counts (COUNT)
-- [x] NIP-46: Nostr Connect (remote signing; bunker:// — separate NostrConnect library)
+- [x] NIP-46: Nostr Connect (remote signing; bunker:// and nostrconnect:// — separate NostrConnect library)
 - [x] NIP-47: Nostr Wallet Connect (full command set, NIP-44/NIP-04 encryption, notifications, end-to-end zap payment — separate `NostrWalletConnect` library)
 - [x] NIP-49: Private key encryption (ncryptsec)
 - [x] NIP-50: Search capability

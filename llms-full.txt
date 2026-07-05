@@ -1082,7 +1082,7 @@ let tags = NostrContentReference.tags(for: content)  // [["p", ...], ["q", ...]]
 
 ## RemoteSigner
 
-NIP-46 remote signing over a relay transport (actor, `NostrConnect` library; import `NostrConnect` and `NostrCore`). Delegates signing to a remote signer (a "bunker") that holds the user's private key. The client holds a separate identity, encrypts each request to the signer, signs a kind-24133 event, and awaits the matching response — correlated by the `id` inside the decrypted JSON body (not by any event tag).
+NIP-46 remote signing over a relay transport (actor, `NostrConnect` library; import `NostrConnect` and `NostrCore`). Delegates signing to a remote signer (a "bunker") that holds the user's private key. The client holds a separate identity, encrypts each request to the signer, signs a kind-24133 event, and awaits the matching response — correlated by the `id` inside the decrypted JSON body (not by any event tag). Two connection flows are supported: the signer-initiated `bunker://` token and the client-initiated `nostrconnect://` invitation.
 
 ```swift
 import NostrConnect
@@ -1104,7 +1104,27 @@ let tuned = try RemoteSigner(bunker: bunker, config: config)
 // when present). Commands call this automatically; call it to surface errors up front.
 try await signer.connect()
 signer.clientPublicKey                       // the local client identity (hex, nonisolated)
-let remotePubkey = await signer.remoteSignerPubkey   // the signer's pubkey (not necessarily the user's)
+let remotePubkey = await signer.remoteSignerPubkey   // String? — the signer's pubkey (not necessarily the user's)
+```
+
+### Client-initiated nostrconnect:// flow
+
+```swift
+// The client starts the handshake: generate an invitation, show it as a QR code or deep link, and
+// wait for the signer to accept. The signer's pubkey is unknown until then, so remoteSignerPubkey is
+// nil until awaitConnection() resolves.
+let invitation = try NostrConnectURI.invitation(clientKeyPair: clientKeyPair, relays: [relayURL])
+displayQRCode(invitation.stringValue)
+
+// clientKeyPair MUST match invitation.clientPubkey (else RemoteSignerError.invalidURI). Transport
+// defaults to a RelayConnectionTransport over the invitation's relays.
+let signer = try RemoteSigner(invitation: invitation, clientKeyPair: clientKeyPair)
+
+// Waits for the first kind-24133 response whose result echoes the invitation secret (validated per
+// spec), pins subsequent traffic to that pubkey, marks the session connected, and returns it. A
+// response with a mismatched secret is ignored (keeps waiting); throws RemoteSignerError.timedOut
+// after Config.requestTimeout. Commands then work exactly as in the bunker flow.
+let remoteSignerPubkey = try await signer.awaitConnection()
 ```
 
 ### Commands
@@ -1172,7 +1192,7 @@ Cases: `invalidPrivateKey`, `invalidPublicKey`, `invalidSignature`, `invalidEven
 - NIP-40: Expiration timestamp (disappearing messages)
 - NIP-42: Client authentication (automatic challenge response, auth-required retry)
 - NIP-44: Versioned encryption v2 (ECDH + HKDF + ChaCha20 + HMAC-SHA256)
-- NIP-46: Nostr Connect (remote signing; bunker:// connect handshake, auth_url challenges, typed commands — `NostrConnect` library)
+- NIP-46: Nostr Connect (remote signing; bunker:// and client-initiated nostrconnect:// flows, auth_url challenges, typed commands — `NostrConnect` library)
 - NIP-47: Nostr Wallet Connect (full command set, NIP-44/NIP-04 encryption, notifications — `NostrWalletConnect` library)
 - NIP-50: Search capability
 - NIP-51: Lists (standard lists 10000/10001/10003 + parameterized 30000-series sets; public tags + NIP-44-self-encrypted private items)

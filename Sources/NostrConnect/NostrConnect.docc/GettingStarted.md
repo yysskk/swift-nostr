@@ -50,6 +50,31 @@ To resume a previously authorized session, persist the client keypair and pass i
 let signer = try RemoteSigner(bunker: bunker, clientKeyPair: savedClientKeyPair)
 ```
 
+## Start the Handshake From the Client
+
+Alternatively the *client* can begin the handshake with a `nostrconnect://` invitation. Generate one
+with ``NostrConnectURI/invitation(clientKeyPair:relays:permissions:name:url:image:)``, show its
+``NostrConnectURI/stringValue`` as a QR code or deep link, and create a ``RemoteSigner`` from it. The
+signer's pubkey is unknown until it scans the invitation and replies, so wait for it with
+``RemoteSigner/awaitConnection()``:
+
+```swift
+let clientKeyPair = try KeyPair()
+let invitation = try NostrConnectURI.invitation(
+    clientKeyPair: clientKeyPair, relays: [URL(string: "wss://relay.example")!])
+displayQRCode(invitation.stringValue)
+
+let signer = try RemoteSigner(invitation: invitation, clientKeyPair: clientKeyPair)
+
+// Resolves once the signer accepts. The response's secret is validated against the invitation, per
+// NIP-46, so a spoofed reply is ignored; a reply that never arrives throws
+// ``RemoteSignerError/timedOut``.
+let remoteSignerPubkey = try await signer.awaitConnection()
+```
+
+Once ``RemoteSigner/awaitConnection()`` returns, the session is connected and the commands below work
+exactly as for a `bunker://` session.
+
 ## Prove the User's Public Key
 
 ``RemoteSigner/userPublicKey()`` asks the signer which key it signs with. This may differ from
