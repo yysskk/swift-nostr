@@ -24,6 +24,7 @@ public enum NostrError: Error, LocalizedError, Sendable, Equatable {
     case unknownPrefix(String)
     case invalidTLV
     case invalidNIP19Entity
+    case invalidNostrURI
     case encryptionFailed
     case decryptionFailed
     case unsupportedEncryptionVersion(UInt8)
@@ -82,6 +83,8 @@ public enum NostrError: Error, LocalizedError, Sendable, Equatable {
             return "Invalid TLV encoding"
         case .invalidNIP19Entity:
             return "Invalid NIP-19 entity"
+        case .invalidNostrURI:
+            return "Invalid nostr: URI"
         case .encryptionFailed:
             return "Encryption failed"
         case .decryptionFailed:
