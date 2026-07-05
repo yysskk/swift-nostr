@@ -1,6 +1,6 @@
 # swift-nostr
 
-> A modern Swift toolkit for Nostr protocol: the shared `NostrCore` primitives, the high-level, multi-relay `NostrClient` built on them, and `NostrWalletConnect` for NIP-47 payments. Actor-based concurrency, NIP-44 encryption, NIP-59 gift wrap, and BIP-39 key derivation. MIT licensed, requires Swift 6.3+.
+> A modern Swift toolkit for Nostr protocol: the shared `NostrCore` primitives, the high-level, multi-relay `NostrClient` built on them, `NostrWalletConnect` for NIP-47 payments, and `NostrConnect` for NIP-46 remote signing. Actor-based concurrency, NIP-44 encryption, NIP-59 gift wrap, and BIP-39 key derivation. MIT licensed, requires Swift 6.3+.
 
 The high-level `NostrClient` library provides an actor-based API for the Nostr network, built on the `NostrCore` primitives (import both):
 
@@ -38,6 +38,7 @@ The high-level `NostrClient` library provides an actor-based API for the Nostr n
 - NIP-42: Client authentication (automatic challenge response, auth-required retry)
 - NIP-44: Versioned encryption (v2)
 - NIP-45: Event counts (COUNT)
+- NIP-46: Nostr Connect (remote signing; bunker:// connect handshake, auth_url challenges, typed commands — separate `NostrConnect` library)
 - NIP-47: Nostr Wallet Connect (full command set, NIP-44/NIP-04 encryption, notifications — separate `NostrWalletConnect` library)
 - NIP-49: Private key encryption (ncryptsec)
 - NIP-50: Search capability

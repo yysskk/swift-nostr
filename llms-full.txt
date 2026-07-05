@@ -1,6 +1,6 @@
 # swift-nostr: Complete Documentation
 
-> swift-nostr is a modern Swift toolkit for Nostr protocol. It vends three libraries: `NostrCore` (protocol primitives, signing, NIP-44 encryption, NIP-19 encoding, and relay transport), the high-level `NostrClient` (multi-relay pools, NIP-65 outbox routing, and NIP-17 private direct messages), and `NostrWalletConnect` (NIP-47 wallet payments). All types are `Sendable` for Swift concurrency. MIT licensed.
+> swift-nostr is a modern Swift toolkit for Nostr protocol. It vends four libraries: `NostrCore` (protocol primitives, signing, NIP-44 encryption, NIP-19 encoding, and relay transport), the high-level `NostrClient` (multi-relay pools, NIP-65 outbox routing, and NIP-17 private direct messages), `NostrWalletConnect` (NIP-47 wallet payments), and `NostrConnect` (NIP-46 remote signing via `bunker://`). All types are `Sendable` for Swift concurrency. MIT licensed.
 
 ## Installation
 
@@ -1080,6 +1080,70 @@ let content = "gm nostr:npub1... quoting nostr:note1..."
 let tags = NostrContentReference.tags(for: content)  // [["p", ...], ["q", ...]]
 ```
 
+## RemoteSigner
+
+NIP-46 remote signing over a relay transport (actor, `NostrConnect` library; import `NostrConnect` and `NostrCore`). Delegates signing to a remote signer (a "bunker") that holds the user's private key. The client holds a separate identity, encrypts each request to the signer, signs a kind-24133 event, and awaits the matching response — correlated by the `id` inside the decrypted JSON body (not by any event tag).
+
+```swift
+import NostrConnect
+import NostrCore
+
+// Start a session from a signer-issued bunker:// token. clientKeyPair defaults to a fresh random
+// keypair (pass a persisted one to resume an authorized session); transport defaults to a
+// RelayConnectionTransport over the token's relays.
+let bunker = try BunkerURI(string: "bunker://<remote-signer-pubkey>?relay=wss://...&secret=...")
+let signer = try RemoteSigner(bunker: bunker)
+
+// Session behavior.
+let config = RemoteSigner.Config(
+    requestTimeout: 30,          // seconds to wait for a response before failing
+    authChallengeTimeout: 300)   // seconds a request may stay pending after an auth_url challenge
+let tuned = try RemoteSigner(bunker: bunker, config: config)
+
+// Connect, subscribe to responses, and perform the connect handshake (presents the bunker secret
+// when present). Commands call this automatically; call it to surface errors up front.
+try await signer.connect()
+signer.clientPublicKey                       // the local client identity (hex, nonisolated)
+let remotePubkey = await signer.remoteSignerPubkey   // the signer's pubkey (not necessarily the user's)
+```
+
+### Commands
+
+```swift
+let userPubkey = try await signer.userPublicKey()  // get_public_key; cached; may differ from the signer's
+
+// sign_event: signs remotely, then verifies the returned event and checks its kind/content/tags/
+// created_at match the request (throws RemoteSignerError.responseValidationFailed otherwise).
+let signed = try await signer.sign(UnsignedEvent(pubkey: userPubkey, kind: .textNote, content: "hi"))
+
+try await signer.ping()                                       // expects "pong"
+let ct = try await signer.nip44Encrypt("hi", to: thirdPartyPubkey)
+let pt = try await signer.nip44Decrypt(ct, from: thirdPartyPubkey)
+let ct04 = try await signer.nip04Encrypt("hi", to: thirdPartyPubkey)  // legacy NIP-04
+let pt04 = try await signer.nip04Decrypt(ct04, from: thirdPartyPubkey)
+let relays = try await signer.switchRelays()                  // [URL]? — nil when the signer keeps its set
+await signer.logout()                                          // best-effort logout, then disconnect
+await signer.disconnect()                                      // tear down; fails in-flight with notConnected
+```
+
+### Authentication challenges
+
+```swift
+// A signer may answer with an auth_url challenge instead of a result. The originating request stays
+// pending (its timeout extended to authChallengeTimeout) while the challenge URL is delivered here;
+// the real response arrives later with the same id.
+for await challenge in await signer.authChallenges() {
+    openInBrowser(challenge.url)  // challenge.method and challenge.requestID identify the pending request
+}
+```
+
+- `BunkerURI(string:)` / `NostrConnectURI(string:)` — parse `bunker://` tokens and `nostrconnect://` invitations
+- `RemoteSignerMethod` — the method set (`connect`, `sign_event`, `ping`, `get_public_key`, `nip04_*`, `nip44_*`, `switch_relays`, `logout`)
+- `RemoteSignerPermission` — `perms` tokens (e.g. `.signEvent(kind:)`, `.nip44Encrypt`)
+- `RemoteSignerAuthChallenge` — `url`, `method`, `requestID`
+- `RemoteSignerTransport` / `RelayConnectionTransport` — the relay seam; inject a fake for tests
+- `RemoteSignerError` — `invalidURI(reason:)`, `notConnected`, `requestEncodingFailed`, `responseDecodingFailed`, `timedOut`, `connectionRejected(message:)`, `secretMismatch`, `signerError(message:)`, `responseValidationFailed`
+
 ## NostrError
 
 Error types (enum: Error, LocalizedError, Sendable, Equatable).
@@ -1108,6 +1172,7 @@ Cases: `invalidPrivateKey`, `invalidPublicKey`, `invalidSignature`, `invalidEven
 - NIP-40: Expiration timestamp (disappearing messages)
 - NIP-42: Client authentication (automatic challenge response, auth-required retry)
 - NIP-44: Versioned encryption v2 (ECDH + HKDF + ChaCha20 + HMAC-SHA256)
+- NIP-46: Nostr Connect (remote signing; bunker:// connect handshake, auth_url challenges, typed commands — `NostrConnect` library)
 - NIP-47: Nostr Wallet Connect (full command set, NIP-44/NIP-04 encryption, notifications — `NostrWalletConnect` library)
 - NIP-50: Search capability
 - NIP-51: Lists (standard lists 10000/10001/10003 + parameterized 30000-series sets; public tags + NIP-44-self-encrypted private items)
