@@ -151,13 +151,12 @@ enum XChaCha20Poly1305 {
         let cipher = Data(ciphertext[ciphertext.startIndex..<splitIndex])
         let tag = Data(ciphertext[splitIndex...])
 
-        let sealedBox = try ChaChaPoly.SealedBox(
-            nonce: ChaChaPoly.Nonce(data: ietfNonce),
-            ciphertext: cipher,
-            tag: tag
-        )
-
         do {
+            let sealedBox = try ChaChaPoly.SealedBox(
+                nonce: ChaChaPoly.Nonce(data: ietfNonce),
+                ciphertext: cipher,
+                tag: tag
+            )
             return try ChaChaPoly.open(sealedBox, using: SymmetricKey(data: subkey), authenticating: aad)
         } catch {
             throw NostrError.decryptionFailed
