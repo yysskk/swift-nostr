@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- `RemoteSigner.awaitConnection()` now throws a distinct `RemoteSignerError.connectionInProgress`
+  when another wait is already running on the session, instead of conflating that with
+  `.notConnected`. The new case is additive but a source break for code that switches over
+  `RemoteSignerError` exhaustively.
+
 ## [0.6.0] - 2026-07-05
 
 A large protocol and tooling release: ten new NIPs, a new `NostrConnect` library for

@@ -379,7 +379,7 @@ public actor RemoteSigner {
 
         // Only one waiter at a time; a concurrent caller would clobber the continuation.
         guard connectionWaiter == nil else {
-            throw RemoteSignerError.notConnected
+            throw RemoteSignerError.connectionInProgress
         }
 
         let signerPubkey: String
@@ -489,6 +489,11 @@ public actor RemoteSigner {
     /// Whether the `connect` handshake has completed. Exposed for tests.
     var isConnectedForTesting: Bool {
         didConnect
+    }
+
+    /// Whether an ``awaitConnection()`` wait is currently suspended. Exposed for tests.
+    var isAwaitingConnectionForTesting: Bool {
+        connectionWaiter != nil
     }
 }
 

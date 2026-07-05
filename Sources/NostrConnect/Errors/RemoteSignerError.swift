@@ -8,6 +8,10 @@ public enum RemoteSignerError: Error, LocalizedError, Sendable, Equatable {
     /// An operation was attempted before a session was established.
     case notConnected
 
+    /// A ``RemoteSigner/awaitConnection()`` wait is already in progress on this session; only one
+    /// may run at a time.
+    case connectionInProgress
+
     /// The request could not be encoded or encrypted.
     case requestEncodingFailed
 
@@ -35,6 +39,8 @@ public enum RemoteSignerError: Error, LocalizedError, Sendable, Equatable {
             return "Invalid Nostr Connect URI: \(reason)"
         case .notConnected:
             return "The remote signer session is not established"
+        case .connectionInProgress:
+            return "A remote signer connection attempt is already in progress"
         case .requestEncodingFailed:
             return "Failed to encode the remote signer request"
         case .responseDecodingFailed:
