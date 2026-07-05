@@ -3,6 +3,10 @@
 Thank you for your interest in contributing! Bug reports, feature requests, documentation
 improvements, and pull requests are all welcome.
 
+By participating, you agree to abide by the [Code of Conduct](CODE_OF_CONDUCT.md).
+Notable changes are recorded in the [changelog](CHANGELOG.md); add an entry under
+"Unreleased" for user-visible changes.
+
 ## Getting started
 
 You need Swift 6.3 or later (bundled with a recent Xcode on Apple platforms, or the
