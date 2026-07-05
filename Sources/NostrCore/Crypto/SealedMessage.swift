@@ -35,6 +35,28 @@ public struct SealedMessage: Sendable {
         for recipientPubkey: String,
         using senderKeyPair: KeyPair
     ) throws -> SealedMessage {
+        // Generate a random 32-byte nonce, then delegate to the deterministic implementation.
+        let nonce = try generateSecureRandomBytes(count: 32)
+        return try seal(message, for: recipientPubkey, using: senderKeyPair, nonce: nonce)
+    }
+
+    /// Seals a message with a caller-supplied nonce.
+    ///
+    /// Internal and intended for tests that pin the on-wire output to a known nonce (e.g. the
+    /// official NIP-44 vectors). Production callers should use ``seal(_:for:using:)``, which
+    /// generates a fresh random nonce for every message as the spec requires.
+    /// - Parameters:
+    ///   - message: The plaintext message to seal.
+    ///   - recipientPubkey: The recipient's public key (hex string).
+    ///   - senderKeyPair: The sender's key pair.
+    ///   - nonce: The 32-byte nonce to use.
+    /// - Returns: A SealedMessage containing the encrypted payload.
+    static func seal(
+        _ message: String,
+        for recipientPubkey: String,
+        using senderKeyPair: KeyPair,
+        nonce: Data
+    ) throws -> SealedMessage {
         guard let recipientPubkeyData = Data(hexString: recipientPubkey) else {
             throw NostrError.invalidPublicKey
         }
@@ -53,23 +75,20 @@ public struct SealedMessage: Sendable {
             recipientPubkey: recipientPubkeyData
         )
 
-        // 2. Generate random nonce (32 bytes)
-        let nonce = try generateSecureRandomBytes(count: 32)
-
-        // 3. Derive message keys from conversation key and nonce
+        // 2. Derive message keys from conversation key and nonce
         let (chachaKey, chachaNonce, hmacKey) = deriveMessageKeys(conversationKey: conversationKey, nonce: nonce)
 
-        // 4. Pad the plaintext
+        // 3. Pad the plaintext
         let padded = try pad(plaintextData)
 
-        // 5. Encrypt with ChaCha20
-        let ciphertext = try chacha20Encrypt(data: padded, key: chachaKey, nonce: chachaNonce)
+        // 4. Encrypt with ChaCha20
+        let ciphertext = try chacha20(padded, key: chachaKey, nonce: chachaNonce)
 
-        // 6. Calculate HMAC
+        // 5. Calculate HMAC
         let hmacInput = nonce + ciphertext
         let mac = HMAC<Crypto.SHA256>.authenticationCode(for: hmacInput, using: SymmetricKey(data: hmacKey))
 
-        // 7. Assemble payload: version || nonce || ciphertext || mac
+        // 6. Assemble payload: version || nonce || ciphertext || mac
         var payloadData = Data([version])
         payloadData.append(nonce)
         payloadData.append(ciphertext)
@@ -126,7 +145,7 @@ public struct SealedMessage: Sendable {
         }
 
         // 5. Decrypt with ChaCha20
-        let padded = try Self.chacha20Stream(data: Data(ciphertext), key: chachaKey, nonce: chachaNonce)
+        let padded = try Self.chacha20(Data(ciphertext), key: chachaKey, nonce: chachaNonce)
 
         // 6. Unpad
         let plaintext = try Self.unpad(padded)
@@ -139,6 +158,25 @@ public struct SealedMessage: Sendable {
     }
 
     // MARK: - Internal Methods
+
+    /// Derives the NIP-44 conversation key from hex-encoded keys and returns it as hex.
+    ///
+    /// Internal and intended for tests that check the derivation against the official
+    /// `get_conversation_key` vectors.
+    /// - Parameters:
+    ///   - privateKeyHex: The caller's private key (hex string).
+    ///   - publicKeyHex: The peer's x-only public key (hex string).
+    /// - Returns: The 32-byte conversation key as a hex string.
+    static func conversationKeyHex(privateKeyHex: String, publicKeyHex: String) throws -> String {
+        guard let privateKey = Data(hexString: privateKeyHex) else {
+            throw NostrError.invalidPrivateKey
+        }
+        guard let publicKey = Data(hexString: publicKeyHex) else {
+            throw NostrError.invalidPublicKey
+        }
+        let conversationKey = try getConversationKey(senderPrivateKey: privateKey, recipientPubkey: publicKey)
+        return conversationKey.hexEncodedString()
+    }
 
     /// Computes the conversation key using ECDH + HKDF
     private static func getConversationKey(senderPrivateKey: Data, recipientPubkey: Data) throws -> Data {
@@ -215,31 +253,13 @@ public struct SealedMessage: Sendable {
         return output.prefix(length)
     }
 
-    /// ChaCha20 encryption
-    private static func chacha20Encrypt(data: Data, key: Data, nonce: Data) throws -> Data {
-        let symmetricKey = SymmetricKey(data: key)
-        let chachaNonce = try ChaChaPoly.Nonce(data: nonce)
-
-        // Use ChaCha20-Poly1305 but ignore the tag (NIP-44 uses separate HMAC)
-        let sealedBox = try ChaChaPoly.seal(data, using: symmetricKey, nonce: chachaNonce)
-
-        return sealedBox.ciphertext
-    }
-
-    /// Pure ChaCha20 stream cipher (XOR with keystream)
-    private static func chacha20Stream(data: Data, key: Data, nonce: Data) throws -> Data {
-        // Generate keystream by encrypting zeros
-        let zeros = Data(repeating: 0, count: data.count)
-        let symmetricKey = SymmetricKey(data: key)
-        let chachaNonce = try ChaChaPoly.Nonce(data: nonce)
-
-        let sealedBox = try ChaChaPoly.seal(zeros, using: symmetricKey, nonce: chachaNonce)
-        let keystream = sealedBox.ciphertext
-
-        // XOR data with keystream using zip for safer iteration
-        let result = Data(zip(data, keystream).map { $0 ^ $1 })
-
-        return result
+    /// Applies the NIP-44 ChaCha20 stream cipher to `data`.
+    ///
+    /// NIP-44 uses bare ChaCha20 with the block counter starting at 0 (RFC 8439 §2.4), not the
+    /// AEAD construction, whose message keystream starts at counter 1. Because ChaCha20 is a
+    /// stream cipher the same XOR both encrypts and decrypts, so `seal` and `open` share this.
+    private static func chacha20(_ data: Data, key: Data, nonce: Data) throws -> Data {
+        try ChaCha20.xor(data, key: key, nonce: nonce)
     }
 
     /// Pads plaintext according to NIP-44 spec
@@ -282,15 +302,20 @@ public struct SealedMessage: Sendable {
         return padded[2..<(2 + unpaddedLen)]
     }
 
-    /// Calculates the padded length for a given unpadded length
+    /// Calculates the padded length for a given unpadded length, per the NIP-44 `calc_padded_len`
+    /// algorithm. Uses integer arithmetic so the result is exact at power-of-two boundaries where
+    /// floating-point rounding would drift.
     private static func calcPaddedLen(_ unpaddedLen: Int) -> Int {
         if unpaddedLen <= 32 {
             return 32
         }
 
-        let nextPower = Int(ceil(log2(Double(unpaddedLen))))
-        let chunk = max(32, 1 << (nextPower - 1))
-        return chunk * Int(ceil(Double(unpaddedLen) / Double(chunk)))
+        // nextPower = 2^(floor(log2(unpaddedLen - 1)) + 1); floor(log2(x)) for a positive Int is
+        // its highest set bit index, i.e. (bitWidth - leadingZeroBitCount - 1).
+        let highestBit = (unpaddedLen - 1).bitWidth - (unpaddedLen - 1).leadingZeroBitCount - 1
+        let nextPower = 1 << (highestBit + 1)
+        let chunk = nextPower <= 256 ? 32 : nextPower / 8
+        return chunk * ((unpaddedLen - 1) / chunk + 1)
     }
 
     /// Compares two Data values in constant time to prevent timing attacks
