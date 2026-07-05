@@ -91,6 +91,24 @@ extension EventSigner {
         )
     }
 
+    /// Creates and signs a long-form article (kind 30023, or 30024 when `draft`; NIP-23).
+    /// When `publishedAt` is nil it is set to the current time (first-publication time per the spec);
+    /// it is preserved verbatim on later edits.
+    public func signLongFormContent(_ article: LongFormContent, draft: Bool = false) throws -> Event {
+        var article = article
+        if article.publishedAt == nil {
+            article.publishedAt = Date()
+        }
+        return try sign(
+            UnsignedEvent(
+                pubkey: publicKey,
+                kind: draft ? .longFormDraft : .longFormContent,
+                rawTags: article.toTags(),
+                content: article.content
+            )
+        )
+    }
+
     /// Creates and signs a NIP-51 list event, encrypting private items to the signer's own key
     /// (NIP-44). Content is empty when there are no private items.
     public func signList(_ list: NostrList) throws -> Event {

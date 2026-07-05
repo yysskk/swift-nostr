@@ -4,9 +4,16 @@ import NostrCore
 // MARK: - One-time Fetches
 extension NostrClient {
     /// Fetches events matching the given filters (one-time)
-    /// Waits for all subscribed relays to send EOSE, or until timeout (whichever comes first)
-    public func fetch(filters: [Filter], timeout: TimeInterval = 10) async throws -> [Event] {
-        let subscription = try await subscribe(filters: filters)
+    /// Waits for all subscribed relays to send EOSE, or until timeout (whichever comes first).
+    ///
+    /// Pass `relayURLs` to scope the fetch to a subset of relays (e.g. `naddr` relay hints);
+    /// the default `nil` fetches from all relays in the pool.
+    public func fetch(
+        filters: [Filter],
+        to relayURLs: Set<URL>? = nil,
+        timeout: TimeInterval = 10
+    ) async throws -> [Event] {
+        let subscription = try await subscribe(filters: filters, to: relayURLs)
 
         let timeoutTask = Task {
             do {
