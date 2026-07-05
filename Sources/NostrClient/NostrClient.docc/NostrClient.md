@@ -74,6 +74,10 @@ let note = try await client.publishTextNote(content: "Hello, Nostr!")
 - ``NEvent``
 - ``NAddr``
 
+### Content References (NIP-27)
+
+- ``NostrContentReference``
+
 ### Relay Pool
 
 - ``RelayPool``

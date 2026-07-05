@@ -1026,6 +1026,24 @@ let entity = try NIP19Entity(nostrURI: "nostr:npub1...")
 let uri = try entity.nostrURI  // "nostr:npub1..."
 ```
 
+## NostrContentReference
+
+A `nostr:` reference found inside event content (NIP-27; struct: Sendable, Hashable). Locates the NIP-21 entities clients embed inline and derives the tags the referencing event should carry.
+
+- `let text: String` -- the full matched text, e.g. `"nostr:npub1..."`
+- `let range: Range<String.Index>` -- the range of `text` within the scanned content (native `String.Index`, safe for multi-scalar content)
+- `let entity: NIP19Entity` -- the decoded entity; never `nsec`
+- `static func references(in content: String) -> [NostrContentReference]` -- all decodable references in order; word-boundary scan (`xnostr:` is not matched), skips malformed tokens and `nsec`
+- `var tag: Tag` -- the tag this reference contributes: `p` for npub/nprofile, `q` for note/nevent, `a` for `naddr`, each carrying the entity's first relay hint when present
+- `static func tags(for content: String) -> [Tag]` -- the deduplicated tags for every reference, in first-seen order
+
+The matching `q` tag is built with `Tag.quote(_ id:relayURL:pubkey:)` -- a NIP-18 `["q", id, relay, pubkey]` tag with empty-string placeholders for skipped middle elements.
+
+```swift
+let content = "gm nostr:npub1... quoting nostr:note1..."
+let tags = NostrContentReference.tags(for: content)  // [["p", ...], ["q", ...]]
+```
+
 ## NostrError
 
 Error types (enum: Error, LocalizedError, Sendable, Equatable).
@@ -1050,6 +1068,7 @@ Cases: `invalidPrivateKey`, `invalidPublicKey`, `invalidSignature`, `invalidEven
 - NIP-21: nostr: URI scheme
 - NIP-23: Long-form content (kind 30023 articles, kind 30024 drafts)
 - NIP-25: Reactions
+- NIP-27: Text note references (nostr: mentions and quotes in content, mapped to p/q/a tags)
 - NIP-40: Expiration timestamp (disappearing messages)
 - NIP-42: Client authentication (automatic challenge response, auth-required retry)
 - NIP-44: Versioned encryption v2 (ECDH + HKDF + ChaCha20 + HMAC-SHA256)

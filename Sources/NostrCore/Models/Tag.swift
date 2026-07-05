@@ -88,6 +88,21 @@ extension Tag {
         return Tag(name: "e", values: values)
     }
 
+    /// A "q" tag quoting another event (NIP-18): `["q", id, relay, pubkey]`.
+    /// Skipped middle elements are padded with empty-string placeholders.
+    public static func quote(_ id: String, relayURL: String? = nil, pubkey: String? = nil) -> Tag {
+        var values = [id]
+        if let relayURL {
+            values.append(relayURL)
+        } else if pubkey != nil {
+            values.append("")
+        }
+        if let pubkey {
+            values.append(pubkey)
+        }
+        return Tag(name: "q", values: values)
+    }
+
     /// A "p" tag referencing a pubkey: `["p", pubkey, relay, petname]`.
     /// Skipped middle elements are padded with empty-string placeholders.
     public static func pubkey(
