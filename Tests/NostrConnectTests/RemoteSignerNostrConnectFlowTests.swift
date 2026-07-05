@@ -162,12 +162,47 @@ struct RemoteSignerNostrConnectFlowTests {
         }
     }
 
+    // MARK: - concurrent calls
+
+    @Test("a concurrent awaitConnection throws connectionInProgress, distinct from notConnected")
+    func concurrentAwaitConnectionIsRejected() async throws {
+        let invitation = try makeInvitation()
+        let transport = FakeRemoteSignerTransport()
+        let remote = try makeSigner(invitation: invitation, transport: transport, requestTimeout: 2)
+
+        // The first call suspends, waiting for the signer's connect ack.
+        let connection = Task { try await remote.awaitConnection() }
+        try await waitForConnectionWaiter(remote)
+
+        // A second call arriving while the first is still waiting must be rejected with a distinct
+        // error rather than clobbering the first waiter or being conflated with a torn-down session.
+        await #expect(throws: RemoteSignerError.connectionInProgress) {
+            try await remote.awaitConnection()
+        }
+
+        // The original waiter is untouched and still resolves once the signer answers.
+        try await transport.deliver(
+            RemoteSignerFixtures.response(
+                requestID: "connect-ack", result: invitation.secret, client: client, signer: signer))
+        #expect(try await connection.value == signer.publicKeyHex)
+    }
+
     // MARK: - Helpers
 
     /// Polls until the session has registered its response subscription on the transport.
     private func waitForSubscription(_ transport: FakeRemoteSignerTransport) async throws {
         for _ in 0..<400 {
             if await !transport.subscriptions.isEmpty { return }
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        throw RemoteSignerError.timedOut
+    }
+
+    /// Polls until an ``RemoteSigner/awaitConnection()`` waiter is suspended on the session, so a
+    /// concurrent call is guaranteed to hit the in-progress guard rather than race ahead of it.
+    private func waitForConnectionWaiter(_ remote: RemoteSigner) async throws {
+        for _ in 0..<400 {
+            if await remote.isAwaitingConnectionForTesting { return }
             try await Task.sleep(for: .milliseconds(5))
         }
         throw RemoteSignerError.timedOut

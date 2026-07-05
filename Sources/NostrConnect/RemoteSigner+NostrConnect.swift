@@ -56,8 +56,9 @@ extension RemoteSigner {
     ///
     /// - Returns: The remote signer's public key (hex).
     /// - Throws: ``RemoteSignerError/timedOut`` if no valid response arrives within
-    ///   ``Config/requestTimeout``, ``RemoteSignerError/notConnected`` if the session is torn down or
-    ///   another wait is already in progress, or a transport error.
+    ///   ``Config/requestTimeout``, ``RemoteSignerError/connectionInProgress`` if another
+    ///   ``awaitConnection()`` wait is already running on this session,
+    ///   ``RemoteSignerError/notConnected`` if the session is torn down, or a transport error.
     @discardableResult
     public func awaitConnection() async throws -> String {
         try await discoverSigner()

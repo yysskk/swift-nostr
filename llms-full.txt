@@ -1206,7 +1206,7 @@ for await challenge in await signer.authChallenges() {
 - `RemoteSignerPermission` — `perms` tokens (e.g. `.signEvent(kind:)`, `.nip44Encrypt`)
 - `RemoteSignerAuthChallenge` — `url`, `method`, `requestID`
 - `RemoteSignerTransport` / `RelayConnectionTransport` — the relay seam; inject a fake for tests
-- `RemoteSignerError` — `invalidURI(reason:)`, `notConnected`, `requestEncodingFailed`, `responseDecodingFailed`, `timedOut`, `connectionRejected(message:)`, `secretMismatch`, `signerError(message:)`, `responseValidationFailed`
+- `RemoteSignerError` — `invalidURI(reason:)`, `notConnected`, `connectionInProgress`, `requestEncodingFailed`, `responseDecodingFailed`, `timedOut`, `connectionRejected(message:)`, `secretMismatch`, `signerError(message:)`, `responseValidationFailed`
 
 ## NostrError
 
