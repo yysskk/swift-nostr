@@ -72,10 +72,13 @@ public struct NostrListSet: Sendable, Hashable {
         self.imageURL = tags.first { $0.name == "image" }?.primaryValue
         self.description = tags.first { $0.name == "description" }?.primaryValue
         // Everything except the metadata tags is a public item, preserving unmodeled tags.
-        let metadata: Set<String> = ["d", "title", "image", "description"]
-        self.publicItems = tags.filter { !metadata.contains($0.name) }
+        self.publicItems = tags.filter { !Self.reservedTagNames.contains($0.name) }
         self.privateItems = []
     }
+
+    /// Tag names carried by dedicated properties (`d`, `title`, `image`, `description`)
+    /// rather than as free-form public items, so they are never emitted twice.
+    static let reservedTagNames: Set<String> = ["d", "title", "image", "description"]
 
     /// The `kind:pubkey:identifier` coordinate used in `a`-tag references to this set.
     public func coordinate(author: String) -> String {

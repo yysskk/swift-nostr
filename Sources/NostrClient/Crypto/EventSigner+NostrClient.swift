@@ -126,7 +126,9 @@ extension EventSigner {
         if let description = set.description {
             tags.append(Tag(name: "description", values: [description]))
         }
-        tags.append(contentsOf: set.publicItems)
+        // Drop any reserved metadata tags a caller may have left in publicItems so they are
+        // never emitted twice alongside the dedicated properties above.
+        tags.append(contentsOf: set.publicItems.filter { !NostrListSet.reservedTagNames.contains($0.name) })
         let content = try ListItemCipher.encrypt(set.privateItems, using: keyPair)
         let unsigned = UnsignedEvent(
             pubkey: publicKey,

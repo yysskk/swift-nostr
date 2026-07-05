@@ -225,4 +225,37 @@ struct NIP51SetTests {
         let resigned = try signer.signSet(reread)
         #expect(try NostrListSet(event: resigned).publicItems == set.publicItems)
     }
+
+    @Test("signSet drops reserved metadata tags left in publicItems, avoiding duplicates")
+    func signSetDeduplicatesReservedTags() throws {
+        let signer = EventSigner(keyPair: try KeyPair())
+        // A caller stuffs reserved metadata tags into publicItems; the dedicated properties
+        // must remain the single source of truth so the event has no duplicate reserved tags.
+        var set = try NostrListSet(
+            kind: .bookmarkSet,
+            identifier: "reading",
+            title: "Reading",
+            imageURL: "https://x/cover.png",
+            description: "My reading list"
+        )
+        set.publicItems = [
+            Event.Tag(name: "d", values: ["injected"]),
+            Event.Tag(name: "title", values: ["Injected"]),
+            Event.Tag(name: "image", values: ["https://x/injected.png"]),
+            Event.Tag(name: "description", values: ["injected"]),
+            .hashtag("nostr"),
+        ]
+
+        let event = try signer.signSet(set)
+        #expect(event.structuredTags.filter { $0.name == "d" }.count == 1)
+        #expect(event.structuredTags.filter { $0.name == "title" }.count == 1)
+        #expect(event.structuredTags.filter { $0.name == "image" }.count == 1)
+        #expect(event.structuredTags.filter { $0.name == "description" }.count == 1)
+        // The dedicated properties win; the injected reserved tags are discarded.
+        let reread = try NostrListSet(event: event)
+        #expect(reread.identifier == "reading")
+        #expect(reread.title == "Reading")
+        #expect(reread.imageURL == "https://x/cover.png")
+        #expect(reread.publicItems == [.hashtag("nostr")])
+    }
 }
