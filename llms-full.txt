@@ -239,6 +239,9 @@ Tag.pubkey(pk, petname: "alice") // ["p", pk, "", "alice"]
 Tag.hashtag("nostr")             // ["t", "nostr"]
 Tag.identifier("my-article")     // ["d", "my-article"]
 Tag.subject("hi")                // ["subject", "hi"]
+Tag.word("spam")                 // ["word", "spam"] (NIP-51 muted word)
+Tag.address(kind: .longFormContent, pubkey: pk, identifier: "d")  // ["a", "30023:pk:d"] (optional relayURL:)
+Tag.reference("https://x")       // ["r", "https://x"]
 Tag(rawArray: ["custom", "x"])   // failable, nil for []
 tag.rawArray                     // [String] wire form
 // Raw escape hatch when you hold [[String]]:
@@ -533,6 +536,8 @@ let contacts = try signer.signContactList([Contact(pubkey: "...")])
 let relayList = try signer.signRelayListMetadata(read: ["wss://in.example"], write: ["wss://out.example"])
 let auth = try signer.signClientAuthentication(relayURL: url, challenge: "challenge")  // kind 22242, NIP-42
 let pow = try await signer.sign(unsignedEvent, proofOfWork: 20)  // mine to 20 leading zero bits, then sign (NIP-13)
+let listEvent = try signer.signList(list)   // NIP-51: private items NIP-44-self-encrypted into content
+let opened = try signer.openList(listEvent) // decrypts private items (throws if not decryptable with this key)
 let report = try signer.signReport(pubkey: "authorHex", type: .impersonation)  // kind 1984, NIP-56
 let eventReport = try signer.signReport(event: note, type: .illegal, reason: "reason")  // reports the event and its author
 ```
@@ -698,6 +703,44 @@ let parsed = Contact.fromTag(tag)   // parse from tag array
 // Extract contacts from kind-3 event
 let contacts = event.contacts       // [Contact]?
 let isList = event.isContactList    // Bool
+```
+
+## NostrList
+
+NIP-51 standard list (struct: Sendable, Hashable). Covers the mute list (kind 10000),
+pin list (10001), and bookmark list (10003). Public items are the event's tags; private
+items are a NIP-44-self-encrypted JSON tag array stored in the content, readable only by
+the author. Lists are replaceable, so edit the fetched current list to avoid dropping items.
+
+### Properties
+
+- `kind: Event.Kind` -- the list kind (`.muteList`, `.pinList`, `.bookmarkList`)
+- `publicItems: [Tag]` -- publicly visible items (the event's tags)
+- `privateItems: [Tag]` -- self-encrypted items (empty in the public-only view)
+
+### Usage
+
+```swift
+// Build and publish (replaces the current list of this kind)
+var list = NostrList(
+    kind: .bookmarkList,
+    publicItems: [.event(noteId), .reference("https://example.com")],
+    privateItems: [.hashtag("private-topic")]
+)
+try await client.publishList(list)
+
+// Read-modify-write: start from the fetched list so nothing is dropped.
+// No pubkey -> the current user's list, with private items decrypted (throws if undecryptable).
+if var mine = try await client.fetchList(kind: .bookmarkList) {
+    mine.publicItems.append(.reference("https://another.example"))
+    try await client.publishList(mine)
+}
+
+// Another user's list returns public items only.
+let theirs = try await client.fetchList(kind: .muteList, for: pubkey)
+
+// Public-only view of any list event (private items stay empty).
+let publicView = NostrList(event: event)
 ```
 
 ## ReportType
@@ -912,6 +955,7 @@ Cases: `invalidPrivateKey`, `invalidPublicKey`, `invalidSignature`, `invalidEven
 - NIP-44: Versioned encryption v2 (ECDH + HKDF + ChaCha20 + HMAC-SHA256)
 - NIP-47: Nostr Wallet Connect (full command set, NIP-44/NIP-04 encryption, notifications — `NostrWalletConnect` library)
 - NIP-50: Search capability
+- NIP-51: Lists (mute 10000, pin 10001, bookmarks 10003; public tags + NIP-44-self-encrypted private items)
 - NIP-57: Lightning Zaps (zap request kind 9734, LNURL helpers, bolt11 decoding, kind-9735 receipt validation)
 - NIP-59: Gift wrap (rumor > seal > gift wrap with randomized timestamps)
 - NIP-65: Relay list metadata (outbox model with gossip routing)
