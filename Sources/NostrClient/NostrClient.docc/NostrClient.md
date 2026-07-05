@@ -92,6 +92,10 @@ let note = try await client.publishTextNote(content: "Hello, Nostr!")
 - ``NostrList``
 - ``NostrListSet``
 
+### Long-form Content (NIP-23)
+
+- ``LongFormContent``
+
 ### Moderation (NIP-56)
 
 - ``ReportType``

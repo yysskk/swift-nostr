@@ -30,6 +30,7 @@ The high-level `NostrClient` library provides an actor-based API for the Nostr n
 - NIP-19: bech32-encoded entities (npub, nsec, note, nprofile, nevent, naddr)
 - NIP-20: Command results (OK)
 - NIP-21: nostr: URI scheme
+- NIP-23: Long-form content (kind 30023 articles, kind 30024 drafts)
 - NIP-25: Reactions (incl. private DM reactions)
 - NIP-40: Expiration timestamp (disappearing messages)
 - NIP-42: Client authentication (automatic challenge response, auth-required retry)

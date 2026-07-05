@@ -163,6 +163,9 @@ extension Event {
         public static let profileBadges = Kind(rawValue: 30008)
         public static let badgeDefinition = Kind(rawValue: 30009)
         public static let longFormContent = Kind(rawValue: 30023)
+        /// A NIP-23 long-form draft: an unpublished article, addressed by a `d` tag like ``longFormContent``.
+        /// https://github.com/nostr-protocol/nips/blob/master/23.md
+        public static let longFormDraft = Kind(rawValue: 30024)
         public static let applicationSpecificData = Kind(rawValue: 30078)
     }
 }
