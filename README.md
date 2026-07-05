@@ -45,7 +45,7 @@ Add to your `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/yysskk/swift-nostr", from: "0.5.0")
+    .package(url: "https://github.com/yysskk/swift-nostr", from: "0.6.0")
 ]
 ```
 
@@ -261,8 +261,9 @@ swift format lint --strict --recursive --parallel Sources Tests Package.swift
 ## Contributing
 
 Contributions are welcome! See the [contributing guide](CONTRIBUTING.md) for how to build,
-test, and submit changes, and the [security policy](SECURITY.md) for how to report
-vulnerabilities.
+test, and submit changes, the [changelog](CHANGELOG.md) for release history, the
+[code of conduct](CODE_OF_CONDUCT.md) for community expectations, and the
+[security policy](SECURITY.md) for how to report vulnerabilities.
 
 ## License
 
