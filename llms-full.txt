@@ -77,12 +77,32 @@ The main entry point for the library. Manages relays, publishing, and subscripti
 ### Signer Setup
 
 ```swift
-try await client.setSigner(signer)         // EventSigner
-try await client.setPrivateKey("hex...")    // hex private key
-try await client.setNsec("nsec1...")        // bech32 nsec
+await client.setSigner(eventSigner)              // local EventSigner (async, non-throwing)
+try await client.setSigner(remoteSigner)         // any NostrSigning, e.g. a NIP-46 RemoteSigner
+try await client.setPrivateKey("hex...")         // hex private key
+try await client.setNsec("nsec1...")             // bech32 nsec
 ```
 
+`setSigner(_:)` is overloaded: it takes a local `EventSigner` or any `NostrSigning` (including a
+NIP-46 `RemoteSigner` from the `NostrConnect` library). The signer's `publicKey` is resolved once
+and cached, so `publicKey`/`npub` stay synchronous even for a remote signer.
+
 Setting a signer also starts answering NIP-42 AUTH challenges automatically (see Authentication).
+
+A remote signer works for the generic signing/publishing/auth paths — `sign(_:)`,
+`publish(_:strategy:)`, and NIP-42 authentication — but the convenience `publish*` and
+direct-message helpers require a local key and throw `NostrError.localSignerRequired` for a remote
+signer (a deliberate boundary):
+
+```swift
+try await client.setSigner(remoteSigner)   // a RemoteSigner or any NostrSigning
+let pubkey = await client.publicKey!
+let signed = try await client.sign(
+    UnsignedEvent(pubkey: pubkey, kind: .textNote, content: "Signed remotely"))
+try await client.publish(signed)           // generic publish of a pre-signed event
+
+// try await client.publishTextNote(content: "x")  // throws NostrError.localSignerRequired
+```
 
 ### Authentication (NIP-42)
 
@@ -1106,7 +1126,7 @@ let tags = NostrContentReference.tags(for: content)  // [["p", ...], ["q", ...]]
 
 ## RemoteSigner
 
-NIP-46 remote signing over a relay transport (actor, `NostrConnect` library; import `NostrConnect` and `NostrCore`). Delegates signing to a remote signer (a "bunker") that holds the user's private key. The client holds a separate identity, encrypts each request to the signer, signs a kind-24133 event, and awaits the matching response — correlated by the `id` inside the decrypted JSON body (not by any event tag). Two connection flows are supported: the signer-initiated `bunker://` token and the client-initiated `nostrconnect://` invitation. Conforms to `NostrSigning` (its `publicKey` is the user key from `get_public_key`), so it is usable anywhere a local `EventSigner` is.
+NIP-46 remote signing over a relay transport (actor, `NostrConnect` library; import `NostrConnect` and `NostrCore`). Delegates signing to a remote signer (a "bunker") that holds the user's private key. The client holds a separate identity, encrypts each request to the signer, signs a kind-24133 event, and awaits the matching response — correlated by the `id` inside the decrypted JSON body (not by any event tag). Two connection flows are supported: the signer-initiated `bunker://` token and the client-initiated `nostrconnect://` invitation. Conforms to `NostrSigning` (its `publicKey` is the user key from `get_public_key`), so it is usable anywhere a local `EventSigner` is — including `NostrClient.setSigner(_:)`, after which the client's `sign(_:)`, `publish(_:)`, and NIP-42 auth run through the bunker (the convenience `publish*`/DM helpers still require a local key).
 
 ```swift
 import NostrConnect
