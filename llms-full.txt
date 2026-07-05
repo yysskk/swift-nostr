@@ -121,6 +121,8 @@ try await client.publishMetadata(UserMetadata(name: "Alice", about: "Nostr user"
 try await client.publishReaction(to: note.event, content: "🤙")
 try await client.publishRepost(of: note.event, relayUrl: "wss://relay.example.com")
 try await client.publishDeletion(eventIds: ["eventId1"], reason: "posted by mistake")
+try await client.publishReport(pubkey: "authorHex", type: .impersonation)  // report a pubkey (NIP-56)
+try await client.publishReport(event: note.event, type: .spam, reason: "unsolicited")  // report an event and its author
 try await client.publishTextNote(content: "Important!", strategy: .quorum(2))
 try await client.publish(signedEvent)  // publish any pre-signed event
 ```
@@ -531,6 +533,8 @@ let contacts = try signer.signContactList([Contact(pubkey: "...")])
 let relayList = try signer.signRelayListMetadata(read: ["wss://in.example"], write: ["wss://out.example"])
 let auth = try signer.signClientAuthentication(relayURL: url, challenge: "challenge")  // kind 22242, NIP-42
 let pow = try await signer.sign(unsignedEvent, proofOfWork: 20)  // mine to 20 leading zero bits, then sign (NIP-13)
+let report = try signer.signReport(pubkey: "authorHex", type: .impersonation)  // kind 1984, NIP-56
+let eventReport = try signer.signReport(event: note, type: .illegal, reason: "reason")  // reports the event and its author
 ```
 
 ## ProofOfWork
@@ -694,6 +698,26 @@ let parsed = Contact.fromTag(tag)   // parse from tag array
 // Extract contacts from kind-3 event
 let contacts = event.contacts       // [Contact]?
 let isList = event.isContactList    // Bool
+```
+
+## ReportType
+
+The reason category of a NIP-56 report, kind 1984 (enum: String, Sendable, Hashable, CaseIterable, Codable).
+
+### Cases
+
+- `nudity`, `malware`, `profanity`, `illegal`, `spam`, `impersonation`, `other` -- raw values match the spec strings
+
+### Usage
+
+```swift
+// Report a pubkey: the type rides on the "p" tag.
+let report = try signer.signReport(pubkey: "authorHex", type: .impersonation, reason: "")
+try await client.publishReport(pubkey: "authorHex", type: .impersonation)
+
+// Report an event: the type rides on the "e" tag, plus a bare "p" tag naming the author.
+let eventReport = try signer.signReport(event: note, type: .illegal, reason: "against the law")
+try await client.publishReport(event: note, type: .spam, reason: "unsolicited")
 ```
 
 ## InternetIdentifier

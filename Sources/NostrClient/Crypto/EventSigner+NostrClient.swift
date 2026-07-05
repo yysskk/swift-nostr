@@ -69,4 +69,25 @@ extension EventSigner {
     public func signDirectMessageRelayList(relays: [String]) throws -> Event {
         try signDirectMessageRelayList(DirectMessageRelayList(relays: relays))
     }
+
+    /// Creates and signs a report of a pubkey (kind 1984, NIP-56).
+    /// The report type rides on the "p" tag; `reason` becomes the content.
+    public func signReport(pubkey: String, type: ReportType, reason: String = "") throws -> Event {
+        let tags = [Tag(name: "p", values: [pubkey, type.rawValue])]
+        return try sign(
+            UnsignedEvent(pubkey: publicKey, kind: .report, rawTags: tags.map(\.rawArray), content: reason)
+        )
+    }
+
+    /// Creates and signs a report of an event and its author (kind 1984, NIP-56).
+    /// The report type rides on the "e" tag; a bare "p" tag names the author.
+    public func signReport(event: Event, type: ReportType, reason: String = "") throws -> Event {
+        let tags = [
+            Tag(name: "e", values: [event.id, type.rawValue]),
+            Tag(name: "p", values: [event.pubkey]),
+        ]
+        return try sign(
+            UnsignedEvent(pubkey: publicKey, kind: .report, rawTags: tags.map(\.rawArray), content: reason)
+        )
+    }
 }

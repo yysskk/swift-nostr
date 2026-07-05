@@ -87,6 +87,10 @@ let note = try await client.publishTextNote(content: "Hello, Nostr!")
 - ``RelayUsage``
 - ``GossipRelayPolicy``
 
+### Moderation (NIP-56)
+
+- ``ReportType``
+
 ### Lightning Zaps (NIP-57)
 
 - ``ZapReceipt``
