@@ -246,6 +246,52 @@ public actor RelayPool {
         return nil
     }
 
+    /// Requests NIP-45 event counts from the targeted relays (all relays when `relayURLs` is nil).
+    /// Tolerates partial failures — relays that error or time out are omitted from the result.
+    ///
+    /// Distinct from ``count`` (the number of relays in the pool): this returns per-relay
+    /// event counts reported over the wire.
+    /// - Returns: the per-relay count for every relay that answered.
+    /// - Throws: the last relay error only when no targeted relay answered.
+    public func count(
+        filters: [Filter],
+        to relayURLs: Set<URL>? = nil,
+        timeout: TimeInterval = 10
+    ) async throws -> [URL: EventCount] {
+        let connections = targetConnections(relayURLs)
+
+        return try await withThrowingTaskGroup(of: (URL, Result<EventCount, Error>).self) { group in
+            for connection in connections {
+                group.addTask {
+                    do {
+                        let count = try await connection.count(filters: filters, timeout: timeout)
+                        return (connection.url, .success(count))
+                    } catch {
+                        return (connection.url, .failure(error))
+                    }
+                }
+            }
+
+            var results: [URL: EventCount] = [:]
+            var lastError: Error?
+            for try await (url, result) in group {
+                switch result {
+                case .success(let count):
+                    results[url] = count
+                case .failure(let error):
+                    lastError = error
+                }
+            }
+
+            // No relay answered: surface a failure rather than an empty dictionary,
+            // but only when at least one relay was actually targeted.
+            if results.isEmpty && !connections.isEmpty {
+                throw lastError ?? NostrError.notConnected
+            }
+            return results
+        }
+    }
+
     /// Subscribes to events on all relays.
     /// Tolerates partial failures - succeeds if at least one relay accepts the subscription.
     /// Events are deduplicated across relays.

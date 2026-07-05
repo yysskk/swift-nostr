@@ -43,6 +43,16 @@ extension RelayConnection {
                                 {
                                     subscriptionsAwaitingAuthentication.insert(subscriptionId)
                                 }
+                                // A relay lacking NIP-45 often answers a COUNT with CLOSED;
+                                // fail the waiter fast rather than let it time out.
+                                if let waiter = pendingCountWaiters.removeValue(forKey: subscriptionId) {
+                                    waiter.finish(throwing: NostrError.relayError(message))
+                                }
+                            case .count(let subscriptionId, let count, let approximate):
+                                if let waiter = pendingCountWaiters.removeValue(forKey: subscriptionId) {
+                                    waiter.yield(EventCount(value: count, isApproximate: approximate ?? false))
+                                    waiter.finish()
+                                }
                             default:
                                 break
                             }

@@ -50,6 +50,7 @@ let isValid = try event.verify()
 
 - ``ClientMessage``
 - ``RelayMessage``
+- ``EventCount``
 - ``RelayResponsePrefix``
 - ``RelayInformation``
 

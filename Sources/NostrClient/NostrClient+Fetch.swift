@@ -39,6 +39,16 @@ extension NostrClient {
         return events
     }
 
+    /// Requests the number of events matching `filters` (NIP-45 COUNT).
+    ///
+    /// Queries every relay in the pool and returns the maximum reported count — each relay's
+    /// count is a lower bound on the events it holds, so the maximum is the best single estimate.
+    /// For per-relay results use ``RelayPool/count(filters:to:timeout:)`` on ``relayPool``.
+    public func count(filters: [Filter], timeout: TimeInterval = 10) async throws -> Int {
+        let results = try await relayPool.count(filters: filters, timeout: timeout)
+        return results.values.map(\.value).max() ?? 0
+    }
+
     /// Fetches a single event by ID
     public func fetchEvent(id: String, timeout: TimeInterval = 10) async throws -> Event? {
         let filter = Filter(ids: [id])
