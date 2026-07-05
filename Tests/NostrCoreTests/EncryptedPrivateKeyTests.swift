@@ -207,13 +207,14 @@ struct EncryptedPrivateKeyTests {
         }
     }
 
-    @Test("Decrypting rejects an oversized cost exponent")
-    func decryptRejectsUnsupportedCost() throws {
-        // Craft a structurally valid payload declaring log_n 23; the guard rejects it before scrypt
-        // runs, so the (garbage) ciphertext is never touched.
+    @Test("Decrypting rejects a cost exponent outside 1...22", arguments: [UInt8(0), UInt8(23)])
+    func decryptRejectsUnsupportedCost(logN: UInt8) throws {
+        // Craft a structurally valid payload declaring an out-of-range log_n; the guard rejects it
+        // before scrypt runs (so scrypt never sees N = 1 or a huge N and never leaks a raw
+        // CryptoKit error), and the (garbage) ciphertext is never touched.
         var payload = Data()
         payload.append(0x02)  // version
-        payload.append(23)  // log_n
+        payload.append(logN)  // log_n
         payload.append(Data(repeating: 0, count: 16))  // salt
         payload.append(Data(repeating: 0, count: 24))  // nonce
         payload.append(0x02)  // key-security byte
@@ -221,7 +222,7 @@ struct EncryptedPrivateKeyTests {
         let ncryptsec = try Bech32.encode(hrp: "ncryptsec", data: payload)
 
         let encrypted = try EncryptedPrivateKey(ncryptsec: ncryptsec)
-        #expect(throws: NostrError.unsupportedScryptCost(23)) {
+        #expect(throws: NostrError.unsupportedScryptCost(logN)) {
             try encrypted.decrypt(password: "anything")
         }
     }

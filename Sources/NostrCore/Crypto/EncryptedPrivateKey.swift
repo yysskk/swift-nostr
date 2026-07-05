@@ -1,8 +1,5 @@
 import Foundation
-
-#if canImport(_CryptoExtras)
-    import _CryptoExtras
-#endif
+import _CryptoExtras
 
 /// A NIP-49 password-encrypted Nostr private key (`ncryptsec1...`), protected with scrypt and
 /// XChaCha20-Poly1305.
@@ -113,14 +110,14 @@ public struct EncryptedPrivateKey: Sendable, Hashable {
     /// - Parameter password: The password protecting the key. It is NFKC-normalized before key
     ///   derivation.
     /// - Returns: The decrypted 32-byte private key.
-    /// - Throws: ``NostrError/unsupportedScryptCost(_:)`` if the recorded cost is too large, or
-    ///   ``NostrError/decryptionFailed`` if authentication fails (almost always a wrong password).
+    /// - Throws: ``NostrError/unsupportedScryptCost(_:)`` if the recorded cost is outside `1...22`,
+    ///   or ``NostrError/decryptionFailed`` if authentication fails (almost always a wrong password).
     public func decrypt(password: String) throws -> Data {
         let payload = try Self.decodePayload(ncryptsec)
         let base = payload.startIndex
 
         let logN = payload[base + 1]
-        guard logN <= Self.maximumLogN else {
+        guard 1...Self.maximumLogN ~= logN else {
             throw NostrError.unsupportedScryptCost(logN)
         }
 
