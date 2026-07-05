@@ -111,4 +111,38 @@ extension EventSigner {
         list.privateItems = try ListItemCipher.decrypt(event.content, using: keyPair)
         return list
     }
+
+    /// Creates and signs a NIP-51 set event: the `d` identifier, presentation metadata, and
+    /// public items as tags, with private items NIP-44-encrypted to the signer's own key in
+    /// the content. Content is empty when there are no private items.
+    public func signSet(_ set: NostrListSet) throws -> Event {
+        var tags: [Tag] = [.identifier(set.identifier)]
+        if let title = set.title {
+            tags.append(Tag(name: "title", values: [title]))
+        }
+        if let imageURL = set.imageURL {
+            tags.append(Tag(name: "image", values: [imageURL]))
+        }
+        if let description = set.description {
+            tags.append(Tag(name: "description", values: [description]))
+        }
+        tags.append(contentsOf: set.publicItems)
+        let content = try ListItemCipher.encrypt(set.privateItems, using: keyPair)
+        let unsigned = UnsignedEvent(
+            pubkey: publicKey,
+            kind: set.kind,
+            rawTags: tags.map(\.rawArray),
+            content: content
+        )
+        return try sign(unsigned)
+    }
+
+    /// Reads a NIP-51 set authored by this signer, decrypting its private items.
+    /// - Throws: when the event has no `d` identifier, or its content cannot be decrypted
+    ///   with this key.
+    public func openSet(_ event: Event) throws -> NostrListSet {
+        var set = try NostrListSet(event: event)
+        set.privateItems = try ListItemCipher.decrypt(event.content, using: keyPair)
+        return set
+    }
 }

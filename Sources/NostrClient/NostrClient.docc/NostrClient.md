@@ -90,6 +90,7 @@ let note = try await client.publishTextNote(content: "Hello, Nostr!")
 ### Lists (NIP-51)
 
 - ``NostrList``
+- ``NostrListSet``
 
 ### Moderation (NIP-56)
 
