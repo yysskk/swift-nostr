@@ -13,9 +13,10 @@
 // primitives. Callers that work with those core types `import NostrCore` directly (it is not
 // re-exported).
 //
-// The public surface is the `RemoteSigner` actor, driven from a `BunkerURI`: it runs the connect
-// handshake, correlates each request with its response by the JSON `id`, surfaces `auth_url`
-// challenges, and exposes typed commands (sign, get_public_key, ping, NIP-44/NIP-04, switch_relays,
-// logout). Underneath sit the model layer (the remote-signing method set, the request and response
-// envelope, permission tokens, the authentication-challenge value, and the module's errors), the
-// connection URIs, and the `RemoteSignerTransport` relay seam.
+// The public surface is the `RemoteSigner` actor, driven from a signer-issued `BunkerURI` or a
+// client-generated `NostrConnectURI` invitation: it runs the connect handshake, correlates each
+// request with its response by the JSON `id`, surfaces `auth_url` challenges, and exposes typed
+// commands (sign, get_public_key, ping, NIP-44/NIP-04, switch_relays, logout). Underneath sit the
+// model layer (the remote-signing method set, the request and response envelope, permission tokens,
+// the authentication-challenge value, and the module's errors), the connection URIs, and the
+// `RemoteSignerTransport` relay seam.

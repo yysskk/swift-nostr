@@ -15,7 +15,10 @@ or decrypt a message, prove a public key — to the remote signer over Nostr rel
 answers with the result. The user's private key never leaves the signer.
 
 - Actor-based ``RemoteSigner`` with full `Sendable` compliance.
-- The `bunker://` connect handshake, with the connection secret presented automatically.
+- The signer-initiated `bunker://` connect handshake, with the connection secret presented
+  automatically.
+- The client-initiated `nostrconnect://` flow: generate an invitation, then discover the signer from
+  its first response after validating the invitation secret.
 - Typed commands: sign an event, fetch the user public key, ping, NIP-44/NIP-04 encrypt and
   decrypt, and switch relays.
 - Request/response correlation by the request `id`, with per-request timeouts.
