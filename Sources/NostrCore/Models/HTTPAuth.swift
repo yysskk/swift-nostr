@@ -268,8 +268,8 @@ extension URLRequest {
     ///
     /// The request must already be in its final form: the event commits to the
     /// exact URL (including query parameters), the HTTP method, and — when
-    /// ``httpBody`` is set — the body's SHA-256. A body supplied as
-    /// ``httpBodyStream`` cannot be read without consuming it and is not
+    /// `httpBody` is set — the body's SHA-256. A body supplied as
+    /// `httpBodyStream` cannot be read without consuming it and is not
     /// committed to. Call immediately before sending; servers reject events
     /// whose timestamp falls outside a small window around their clock.
     ///
