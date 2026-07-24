@@ -256,4 +256,23 @@ extension Filter {
             search: query
         )
     }
+
+    /// Create a filter for the content timeline of a NIP-29 group (events carrying its "h" tag).
+    ///
+    /// Pass nil `kinds` (the default) to match all content kinds.
+    /// https://github.com/nostr-protocol/nips/blob/master/29.md
+    public static func groupTimeline(
+        groupID: String,
+        kinds: [Event.Kind]? = nil,
+        since: Int64? = nil,
+        limit: Int? = nil
+    ) -> Filter {
+        var filter = Filter(
+            kinds: kinds,
+            since: since,
+            limit: limit
+        )
+        filter.addTagQuery("h", values: [groupID])
+        return filter
+    }
 }

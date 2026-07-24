@@ -122,6 +122,14 @@ extension Tag {
         return Tag(name: "p", values: values)
     }
 
+    /// A "p" tag carrying trailing role names (NIP-29 kind-9000 put-user events and
+    /// kind-39001 admin lists): `["p", pubkey, role...]`. Unlike
+    /// ``pubkey(_:relayURL:petname:)``, index 1 here is a role, not a relay hint.
+    /// https://github.com/nostr-protocol/nips/blob/master/29.md
+    public static func pubkey(_ pubkey: String, roles: [String]) -> Tag {
+        Tag(name: "p", values: [pubkey] + roles)
+    }
+
     /// A "t" hashtag tag.
     public static func hashtag(_ topic: String) -> Tag {
         Tag(name: "t", values: [topic])
@@ -218,6 +226,48 @@ extension Tag {
     /// An "r" tag carrying a URL reference.
     public static func reference(_ url: String) -> Tag {
         Tag(name: "r", values: [url])
+    }
+
+    /// An "h" tag scoping an event to a NIP-29 group. Required on everything a user sends
+    /// to a group relay: content, join/leave requests, and moderation events.
+    /// https://github.com/nostr-protocol/nips/blob/master/29.md
+    public static func group(_ groupID: String) -> Tag {
+        Tag(name: "h", values: [groupID])
+    }
+
+    /// A "previous" tag carrying NIP-29 timeline references (the first 8 characters of
+    /// recent event ids). See ``Groups/previousReferences(from:excludingAuthor:maxCount:)``.
+    /// https://github.com/nostr-protocol/nips/blob/master/29.md
+    public static func previous(_ references: [String]) -> Tag {
+        Tag(name: "previous", values: references)
+    }
+
+    /// A "code" tag carrying a NIP-29 invite code (kind-9009 create-invite events and
+    /// kind-9021 join requests).
+    /// https://github.com/nostr-protocol/nips/blob/master/29.md
+    public static func inviteCode(_ code: String) -> Tag {
+        Tag(name: "code", values: [code])
+    }
+
+    /// A "role" tag of a NIP-29 kind-39003 roles event: `["role", name, description?]`.
+    /// https://github.com/nostr-protocol/nips/blob/master/29.md
+    public static func role(_ name: String, description: String? = nil) -> Tag {
+        var values = [name]
+        if let description {
+            values.append(description)
+        }
+        return Tag(name: "role", values: values)
+    }
+
+    /// A "group" tag of the NIP-51 kind-10009 simple group list:
+    /// `["group", groupID, relayURL, name?]`.
+    /// https://github.com/nostr-protocol/nips/blob/master/51.md
+    public static func simpleGroup(id: String, relayURL: String, name: String? = nil) -> Tag {
+        var values = [id, relayURL]
+        if let name {
+            values.append(name)
+        }
+        return Tag(name: "group", values: values)
     }
 
     /// An arbitrary raw tag. Returns nil if the array is empty.
