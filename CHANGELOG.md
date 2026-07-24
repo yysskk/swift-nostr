@@ -28,6 +28,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   eight moderation kinds (put-user, remove-user, edit-metadata, delete-event, create-group,
   delete-group, create-invite, update-pin-list) and `Groups.ModerationRequest` parsing for
   admin and audit views.
+- **NIP-29 Relay-based groups (client)**: `GroupReference` (naddr share links with invite codes),
+  `GroupState` snapshots, and `NostrClient` flows — `joinGroup`, `leaveGroup`,
+  `publishGroupMessage`, `publishGroupModeration`, `fetchGroupMetadata`/`fetchGroupState` with
+  relay-author validation, and `subscribeToGroupTimeline` — all scoped to the group's relay.
 
 ### Changed
 
