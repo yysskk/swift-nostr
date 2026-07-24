@@ -173,6 +173,12 @@ extension HTTPAuth {
     /// "payload" tag matching the body's SHA-256. On success the caller can
     /// trust ``Event/pubkey`` as the authenticated identity.
     ///
+    /// > Note: NIP-98 has no nonce, so within the tolerance window a captured
+    /// > header replays verbatim — validation alone cannot tell a resent
+    /// > credential from a fresh one. Endpoints for which that matters should
+    /// > additionally reject an ``Event/id`` they have already seen within the
+    /// > window.
+    ///
     /// - Parameters:
     ///   - authorization: The full header value, e.g. `"Nostr eyJpZCI6…"`.
     ///   - url: The absolute URL the server received the request on.
