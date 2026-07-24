@@ -14,13 +14,19 @@ public struct GroupListEntry: Sendable, Hashable {
     /// The URL of the relay hosting the group.
     public var relayURL: String
 
-    /// An optional human-readable group name.
-    public var name: String?
+    /// An optional human-readable group name. An empty string is normalized to nil on
+    /// every construction and mutation path, so an entry always round-trips through its
+    /// wire ``tag`` unchanged.
+    public var name: String? {
+        didSet {
+            if name?.isEmpty == true { name = nil }
+        }
+    }
 
     public init(groupID: String, relayURL: String, name: String? = nil) {
         self.groupID = groupID
         self.relayURL = relayURL
-        self.name = name
+        self.name = name?.isEmpty == true ? nil : name
     }
 
     /// Builds an entry from a group reference.
