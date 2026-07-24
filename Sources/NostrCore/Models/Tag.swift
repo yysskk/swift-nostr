@@ -149,6 +149,27 @@ extension Tag {
         Tag(name: "challenge", values: [challenge])
     }
 
+    /// A "u" tag carrying the absolute request URL, including any query
+    /// parameters, of a NIP-98 HTTP authorization event.
+    /// https://github.com/nostr-protocol/nips/blob/master/98.md
+    public static func url(_ url: String) -> Tag {
+        Tag(name: "u", values: [url])
+    }
+
+    /// A "method" tag carrying the HTTP request method of a NIP-98 HTTP
+    /// authorization event, e.g. "GET" or "POST".
+    /// https://github.com/nostr-protocol/nips/blob/master/98.md
+    public static func method(_ method: String) -> Tag {
+        Tag(name: "method", values: [method])
+    }
+
+    /// A "payload" tag carrying the lowercase hex SHA-256 of the request body
+    /// of a NIP-98 HTTP authorization event.
+    /// https://github.com/nostr-protocol/nips/blob/master/98.md
+    public static func payload(sha256 hex: String) -> Tag {
+        Tag(name: "payload", values: [hex])
+    }
+
     /// An "expiration" tag marking when relays should stop serving the event (NIP-40).
     ///
     /// The value is the Unix timestamp in whole seconds; sub-second precision is dropped.
