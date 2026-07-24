@@ -114,6 +114,12 @@ extension Event {
         public static let repost = Kind(rawValue: 6)
         public static let reaction = Kind(rawValue: 7)
         public static let badgeAward = Kind(rawValue: 8)
+        /// A chat message (NIP-C7), commonly posted into NIP-29 relay-based groups with an "h" tag.
+        /// https://github.com/nostr-protocol/nips/blob/master/C7.md
+        public static let chatMessage = Kind(rawValue: 9)
+        /// A thread root post (NIP-7D), replied to with kind-1111 comments.
+        /// https://github.com/nostr-protocol/nips/blob/master/7D.md
+        public static let thread = Kind(rawValue: 11)
         public static let seal = Kind(rawValue: 13)
         public static let privateDirectMessage = Kind(rawValue: 14)
         public static let fileMessage = Kind(rawValue: 15)
@@ -126,6 +132,42 @@ extension Event {
         public static let fileMetadata = Kind(rawValue: 1063)
         public static let report = Kind(rawValue: 1984)
         public static let label = Kind(rawValue: 1985)
+        /// A NIP-29 moderation event adding a user to a group and/or updating their roles,
+        /// sent by a group admin or the relay itself.
+        /// https://github.com/nostr-protocol/nips/blob/master/29.md
+        public static let groupPutUser = Kind(rawValue: 9000)
+        /// A NIP-29 moderation event removing a user from a group, sent by a group admin
+        /// or the relay itself.
+        /// https://github.com/nostr-protocol/nips/blob/master/29.md
+        public static let groupRemoveUser = Kind(rawValue: 9001)
+        /// A NIP-29 moderation event editing a group's metadata (name, picture, visibility),
+        /// sent by a group admin or the relay itself.
+        /// https://github.com/nostr-protocol/nips/blob/master/29.md
+        public static let groupEditMetadata = Kind(rawValue: 9002)
+        /// A NIP-29 moderation event deleting an event from a group, sent by a group admin
+        /// or the relay itself.
+        /// https://github.com/nostr-protocol/nips/blob/master/29.md
+        public static let groupDeleteEvent = Kind(rawValue: 9005)
+        /// A NIP-29 moderation event creating a group, sent by a group admin or the relay itself.
+        /// https://github.com/nostr-protocol/nips/blob/master/29.md
+        public static let groupCreation = Kind(rawValue: 9007)
+        /// A NIP-29 moderation event deleting a group, sent by a group admin or the relay itself.
+        /// https://github.com/nostr-protocol/nips/blob/master/29.md
+        public static let groupDeletion = Kind(rawValue: 9008)
+        /// A NIP-29 moderation event creating an invite code for a closed group, sent by a
+        /// group admin or the relay itself.
+        /// https://github.com/nostr-protocol/nips/blob/master/29.md
+        public static let groupCreateInvite = Kind(rawValue: 9009)
+        /// A NIP-29 moderation event updating a group's list of pinned events, sent by a
+        /// group admin or the relay itself.
+        /// https://github.com/nostr-protocol/nips/blob/master/29.md
+        public static let groupUpdatePinList = Kind(rawValue: 9010)
+        /// A NIP-29 request from a user to join a group, optionally carrying an invite code.
+        /// https://github.com/nostr-protocol/nips/blob/master/29.md
+        public static let groupJoinRequest = Kind(rawValue: 9021)
+        /// A NIP-29 request from a user to leave a group.
+        /// https://github.com/nostr-protocol/nips/blob/master/29.md
+        public static let groupLeaveRequest = Kind(rawValue: 9022)
         public static let zapRequest = Kind(rawValue: 9734)
         public static let zap = Kind(rawValue: 9735)
         public static let muteList = Kind(rawValue: 10000)
@@ -133,6 +175,9 @@ extension Event {
         public static let relayListMetadata = Kind(rawValue: 10002)
         /// A NIP-51 bookmark list (public/private bookmarked events, articles, hashtags, URLs).
         public static let bookmarkList = Kind(rawValue: 10003)
+        /// The NIP-51 "Simple groups" list: the NIP-29 groups a user is in.
+        /// https://github.com/nostr-protocol/nips/blob/master/51.md
+        public static let simpleGroupList = Kind(rawValue: 10009)
         public static let directMessageRelayList = Kind(rawValue: 10050)
         public static let clientAuthentication = Kind(rawValue: 22242)
         /// A NIP-98 HTTP authorization event, carried base64-encoded in an
@@ -171,6 +216,27 @@ extension Event {
         /// https://github.com/nostr-protocol/nips/blob/master/23.md
         public static let longFormDraft = Kind(rawValue: 30024)
         public static let applicationSpecificData = Kind(rawValue: 30078)
+        /// A NIP-29 group's metadata (name, picture, about, visibility), generated and signed
+        /// by the group's relay with the group id in a "d" tag — clients parse these events,
+        /// never publish them.
+        /// https://github.com/nostr-protocol/nips/blob/master/29.md
+        public static let groupMetadata = Kind(rawValue: 39000)
+        /// A NIP-29 group's admins and their roles, generated and signed by the group's relay
+        /// with the group id in a "d" tag — clients parse these events, never publish them.
+        /// https://github.com/nostr-protocol/nips/blob/master/29.md
+        public static let groupAdmins = Kind(rawValue: 39001)
+        /// A NIP-29 group's members, generated and signed by the group's relay with the group
+        /// id in a "d" tag — clients parse these events, never publish them.
+        /// https://github.com/nostr-protocol/nips/blob/master/29.md
+        public static let groupMembers = Kind(rawValue: 39002)
+        /// A NIP-29 group's supported roles, generated and signed by the group's relay with
+        /// the group id in a "d" tag — clients parse these events, never publish them.
+        /// https://github.com/nostr-protocol/nips/blob/master/29.md
+        public static let groupRoles = Kind(rawValue: 39003)
+        /// A NIP-29 group's pinned events, generated and signed by the group's relay with the
+        /// group id in a "d" tag — clients parse these events, never publish them.
+        /// https://github.com/nostr-protocol/nips/blob/master/29.md
+        public static let groupPinList = Kind(rawValue: 39005)
     }
 }
 

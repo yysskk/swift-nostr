@@ -17,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   check chain — scheme, decoding, kind, signature, timestamp window, URL, method, and body
   hash — returning the verified event, with each failure reported as a typed
   `HTTPAuth.ValidationError`.
+- **NIP-29 Relay-based groups (core events)**: group event kind constants,
+  `h`/`previous`/`code`/`role`/`group` tag constructors, join/leave request builders,
+  group-scoped content events, and timeline-reference helpers under the new `Groups` namespace.
 
 ### Changed
 
