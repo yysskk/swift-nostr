@@ -96,6 +96,13 @@ let note = try await client.publishTextNote(content: "Hello, Nostr!")
 - ``NostrList``
 - ``NostrListSet``
 
+### Relay-based Groups (NIP-29)
+
+- ``GroupReference``
+- ``GroupState``
+- ``SimpleGroupList``
+- ``GroupListEntry``
+
 ### Long-form Content (NIP-23)
 
 - ``LongFormContent``

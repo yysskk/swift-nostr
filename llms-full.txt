@@ -233,6 +233,43 @@ for await giftWrap in giftWraps.events {
 let dm = try await client.parseDirectMessage(giftWrapEvent)
 ```
 
+### Relay-based Groups (NIP-29)
+
+A NIP-29 group lives on a single relay; every flow below targets exactly that relay (added to
+the pool and connected on demand). Signing goes through the active signer, so a remote NIP-46
+signer works too, and private groups require NIP-42 AUTH — answered automatically once a
+signer is set.
+
+```swift
+// Parse an naddr share link (optionally with ?invite=<code>) and join / leave.
+let group = try GroupReference(naddrString: "naddr1...?invite=A7fjq2")
+try await client.joinGroup(group)              // kind 9021; applies group.inviteCode
+try await client.leaveGroup(group)             // kind 9022; relay answers with a kind-9001 removal
+
+// Live timeline of the group's content (events carrying its "h" tag).
+var recent: [Event] = []
+let timeline = try await client.subscribeToGroupTimeline(group)
+for await event in timeline.events { recent.append(event) }
+
+// Chat (kind 9, NIP-C7, by default; any kind allowed) with "previous" timeline references.
+try await client.publishGroupMessage(
+    "hello", in: group,
+    previous: Groups.previousReferences(from: recent, excludingAuthor: await client.publicKey))
+
+// Moderation (kinds 9000-9010): the relay checks the author's role and answers with OK.
+try await client.publishGroupModeration(
+    .putUser(pubkey: memberPubkey, roles: ["moderator"]), in: group, reason: "welcome")
+
+// Relay-signed state, newest event per kind. With a known relay pubkey (group.relayPubkey,
+// the naddr coordinate's author), wrong-author and invalid-signature events are dropped.
+let metadata = try await client.fetchGroupMetadata(for: group)   // Groups.Metadata?
+let state = try await client.fetchGroupState(for: group)         // GroupState snapshot
+
+// The user's kind-10009 simple group list (see SimpleGroupList below).
+let list = try await client.fetchSimpleGroupList()               // SimpleGroupList?
+try await client.publishSimpleGroupList(list ?? SimpleGroupList())
+```
+
 ## Event
 
 NIP-01 Nostr Event (struct: Codable, Identifiable, Hashable, Sendable).
@@ -264,6 +301,12 @@ Tag.subject("hi")                // ["subject", "hi"]
 Tag.word("spam")                 // ["word", "spam"] (NIP-51 muted word)
 Tag.address(kind: .longFormContent, pubkey: pk, identifier: "d")  // ["a", "30023:pk:d"] (optional relayURL:)
 Tag.reference("https://x")       // ["r", "https://x"]
+Tag.group("abcdef")              // ["h", "abcdef"] (NIP-29 group scope, on everything a user sends)
+Tag.previous(["12345678"])       // ["previous", ref...] (NIP-29 timeline references)
+Tag.inviteCode("A7fjq2")         // ["code", "A7fjq2"] (NIP-29 kinds 9009/9021)
+Tag.role("mod", description: "kicks")  // ["role", name, description?] (NIP-29 kind 39003)
+Tag.pubkey(pk, roles: ["admin"]) // ["p", pk, role...] (NIP-29; index 1 is a role, not a relay hint)
+Tag.simpleGroup(id: "abcdef", relayURL: "wss://g", name: "Cool")  // ["group", ...] (NIP-51 kind 10009)
 Tag(rawArray: ["custom", "x"])   // failable, nil for []
 tag.rawArray                     // [String] wire form
 // Raw escape hatch when you hold [[String]]:
@@ -298,11 +341,17 @@ Event.Kind.encryptedDirectMessage // 4
 Event.Kind.eventDeletion         // 5
 Event.Kind.repost                // 6
 Event.Kind.reaction              // 7
+Event.Kind.chatMessage           // 9   (NIP-C7 chat message, common in NIP-29 groups)
+Event.Kind.thread                // 11  (NIP-7D thread root)
 Event.Kind.seal                  // 13  (NIP-59)
 Event.Kind.privateDirectMessage  // 14  (NIP-17)
 Event.Kind.giftWrap              // 1059 (NIP-59)
+Event.Kind.groupPutUser          // 9000 (NIP-29 moderation: 9000-9002, 9005, 9007-9010)
+Event.Kind.groupJoinRequest      // 9021 (NIP-29; groupLeaveRequest = 9022)
 Event.Kind.zapRequest            // 9734
 Event.Kind.zap                   // 9735
+Event.Kind.simpleGroupList       // 10009 (NIP-51 simple group list)
+Event.Kind.groupMetadata         // 39000 (NIP-29 relay-generated state: 39000-39003, 39005)
 ```
 
 ### Verification
@@ -374,6 +423,8 @@ Filter.mentions(pubkey: "...")
 Filter.globalFeed(limit: 100)
 Filter.contactList(pubkey: "...")
 Filter.search("nostr", kinds: [.textNote], limit: 20)  // NIP-50 full-text search
+Filter.groupTimeline(groupID: "abcdef", kinds: [.chatMessage], limit: 50)  // NIP-29 "#h" timeline
+Filter.groupState(groupID: "abcdef")  // NIP-29 kind-39xxx state by "#d" (all five kinds by default)
 ```
 
 ## SubscriptionEvent
@@ -922,6 +973,149 @@ let byCoord = try await client.fetchLongFormContent(naddr: naddr)
 let event = try signer.signLongFormContent(article, draft: false)
 ```
 
+## Groups (NIP-29)
+
+NIP-29 relay-based groups (`Groups` enum namespace, NostrCore). A group lives on one relay and
+is identified by a short id; users send ordinary events carrying the group id in an "h" tag,
+the relay enforces membership and permissions, and it publishes the group's state as
+relay-signed kind-39xxx events (group id in the "d" tag) that clients only parse. Private
+groups require NIP-42 AUTH. `event.groupID` reads the "h" tag value, or the "d" tag for kinds
+39000-39005.
+
+### Event Builders
+
+Every builder has an unsigned variant (pass `pubkey:`, returns `UnsignedEvent`) and a signing
+variant (pass `signer:`, any `NostrSigning` — local or NIP-46 remote — returns `Event`):
+
+```swift
+// Join (kind 9021; invite code joins a closed group without admin approval) and leave (9022).
+let join = try await Groups.joinRequest(groupID: "abcdef", inviteCode: "A7fjq2", signer: signer)
+let leave = try await Groups.leaveRequest(groupID: "abcdef", reason: "bye", signer: signer)
+
+// Group-scoped content of any kind — NIP-29 defines no content kinds of its own; kind 9
+// (NIP-C7 chat) and kind 11 (NIP-7D thread) are common. First tag is ["h", groupID].
+let message = try await Groups.contentEvent(
+    groupID: "abcdef", kind: .chatMessage, content: "hello",
+    previous: Groups.previousReferences(from: recentEvents, excludingAuthor: signer.publicKey),
+    signer: signer)
+
+// Moderation (kinds 9000-9010) via Groups.ModerationAction: .putUser(pubkey:roles:),
+// .removeUser(pubkey:), .editMetadata(Metadata), .deleteEvent(id:), .createGroup,
+// .deleteGroup, .createInvite(code:), .updatePinList([PinnedItem]).
+let promote = try await Groups.moderationEvent(
+    .putUser(pubkey: memberPubkey, roles: ["moderator"]),
+    groupID: "abcdef", reason: "welcome", signer: signer)
+```
+
+### Timeline References ("previous")
+
+```swift
+Groups.previousReference(forEventID: id)  // first 8 chars of an event id
+Groups.previousReferences(from: recentEvents, excludingAuthor: myPubkey, maxCount: 3)
+    // random sample over the newest 50 events, for a trailing "previous" tag (spec: carry >= 3)
+Groups.previousReferences(of: event)      // the references an event carries ([] when absent)
+Groups.unknownPreviousReferences(of: event, knownEventIDs: seenIds)
+    // references matching no known id — non-empty means the timeline may be forged
+```
+
+A deterministic overload `previousReferences(from:excludingAuthor:maxCount:using:)` takes an
+`inout RandomNumberGenerator` for reproducible sampling.
+
+### Relay-Generated State (kinds 39000-39005)
+
+Parsers check the kind, read the group id from the "d" tag, and — when `relayPubkey` is given —
+reject any other author; they never verify signatures (call `event.verify()` yourself). All
+throw `Groups.ValidationError` (`invalidEventKind`, `missingGroupID`, `unexpectedAuthor`,
+`missingTag`, `unsupportedModerationKind`).
+
+```swift
+let meta = try Groups.Metadata(event: e39000, relayPubkey: relayPubkey)
+// meta.groupID, .name, .picture, .banner, .about, .isPrivate, .isRestricted, .isHidden,
+// .isClosed, .isLiveKitEnabled, .supportedKinds, .parentGroupID, .childGroupIDs,
+// .additionalTags (uninterpreted tags, lossless), .toTags / .fieldTags for re-emission
+// (fieldTags is exactly the kind-9002 edit-metadata tag layout)
+
+let admins = try Groups.AdminList(event: e39001)   // .admins: [Groups.Admin] (pubkey + roles)
+let members = try Groups.MemberList(event: e39002) // .members: [String]; may be partial or withheld
+let roles = try Groups.RoleList(event: e39003)     // .roles: [Groups.Role] (name + description?)
+let pins = try Groups.PinList(event: e39005)       // .items: [Groups.PinnedItem] (.event(id:) / .address)
+```
+
+LiveKit AV rooms (kind 39004 and the .well-known JWT flow) are not modeled — only the
+kind-39000 `livekit` flag is parsed (`isLiveKitEnabled`). NIP-22 comment threads are a
+separate NIP and not part of this library's NIP-29 surface.
+
+### Moderation Parsing and Membership
+
+```swift
+// Typed view of a received kind-9000-9010 event, for admin/audit UIs.
+let request = try Groups.ModerationRequest(event: e9000)
+print(request.action, request.groupID, request.reason ?? "", request.previousReferences)
+
+// A pubkey's standing from kind-9000/9001 history — the latest event targeting it wins
+// (ties broken by lowest id, the NIP-01 convention). nil means no record: assume non-member.
+switch Groups.membership(of: pubkey, in: moderationEvents) {
+case .member(let roles): print("member", roles)
+case .removed: print("removed")
+case nil: print("no record")
+}
+```
+
+## GroupReference
+
+Where a NIP-29 group lives (struct: Sendable, Hashable; NostrClient library): the (relay,
+group id) pair, optionally with the relay's pubkey (the author of its kind-39000 metadata) and
+an invite code — everything an `naddr` share link carries. Groups are shared as the naddr of
+their kind-39000 metadata event, sometimes suffixed with `?invite=<code>`.
+
+```swift
+let group = try GroupReference(naddrString: "naddr1...?invite=A7fjq2")
+// group.relayURL, group.id, group.relayPubkey (String?), group.inviteCode (String?)
+let direct = GroupReference(relayURL: "wss://groups.example", id: "abcdef")
+let fromNaddr = try GroupReference(naddr: naddr, inviteCode: "A7fjq2")  // kind must be 39000
+let link = try group.shareableString()  // naddr + "?invite=<code>", round-trips the code
+let coord = try group.naddr()           // throws without relayPubkey
+```
+
+## GroupState
+
+One fetch's snapshot of a NIP-29 group's relay-generated state (struct: Sendable, Hashable;
+NostrClient library). Returned by `fetchGroupState(for:authorPubkey:timeout:)`; each field is
+nil when the relay published nothing for that kind (e.g. the member list of a private group):
+
+- `metadata: Groups.Metadata?` -- kind 39000
+- `admins: Groups.AdminList?` -- kind 39001
+- `members: Groups.MemberList?` -- kind 39002
+- `roles: Groups.RoleList?` -- kind 39003
+- `pins: Groups.PinList?` -- kind 39005
+
+## SimpleGroupList
+
+The NIP-51 "Simple groups" list, kind 10009 (struct: Sendable, Hashable; NostrClient library):
+the NIP-29 groups a user is in plus the group relays in use — what other clients read to
+detect group migrations and forks. A typed view over `NostrList` (`init(list:)` / `.list`);
+private entries ride the NIP-44 list machinery, readable only by the author.
+
+- `publicEntries: [GroupListEntry]` / `privateEntries: [GroupListEntry]` -- the "group" tags
+- `relayURLs: [String]` -- the public single-value "r" tags, one per group relay
+- `additionalPublicTags` / `additionalPrivateTags: [Tag]` -- out-of-shape tags, preserved losslessly
+
+`GroupListEntry` is one `["group", groupID, relayURL, name?]` entry: `groupID`, `relayURL`,
+optional `name`; build one from a reference with `GroupListEntry(_ reference:name:)` and
+convert back via `.reference` (relay pubkey and invite code are not part of the list format).
+
+```swift
+// Keep the list fresh as the user joins and leaves. Unlike the group flows this broadcasts to
+// the whole pool; publishing needs the local signer (a remote signer throws
+// NostrError.localSignerRequired), because private entries are NIP-44-encrypted locally.
+var list = try await client.fetchSimpleGroupList() ?? SimpleGroupList()
+list.publicEntries.append(GroupListEntry(group, name: "Cool Group"))
+if !list.relayURLs.contains(group.relayURL) { list.relayURLs.append(group.relayURL) }
+try await client.publishSimpleGroupList(list)
+
+let theirs = try await client.fetchSimpleGroupList(for: pubkey)  // public entries only
+```
+
 ## ReportType
 
 The reason category of a NIP-56 report, kind 1984 (enum: String, Sendable, Hashable, CaseIterable, Codable).
@@ -1233,13 +1427,14 @@ Cases: `invalidPrivateKey`, `invalidPublicKey`, `invalidSignature`, `invalidEven
 - NIP-23: Long-form content (kind 30023 articles, kind 30024 drafts)
 - NIP-25: Reactions
 - NIP-27: Text note references (nostr: mentions and quotes in content, mapped to p/q/a tags)
+- NIP-29: Relay-based groups (join/leave, group-scoped content with timeline references, moderation kinds 9000-9010, relay-signed state parsing 39000-39005, naddr share links with invite codes)
 - NIP-40: Expiration timestamp (disappearing messages)
 - NIP-42: Client authentication (automatic challenge response, auth-required retry)
 - NIP-44: Versioned encryption v2 (ECDH + HKDF + ChaCha20 + HMAC-SHA256)
 - NIP-46: Nostr Connect (remote signing; bunker:// and client-initiated nostrconnect:// flows, auth_url challenges, typed commands — `NostrConnect` library)
 - NIP-47: Nostr Wallet Connect (full command set, NIP-44/NIP-04 encryption, notifications — `NostrWalletConnect` library)
 - NIP-50: Search capability
-- NIP-51: Lists (standard lists 10000/10001/10003 + parameterized 30000-series sets; public tags + NIP-44-self-encrypted private items)
+- NIP-51: Lists (standard lists 10000/10001/10003 + parameterized 30000-series sets; public tags + NIP-44-self-encrypted private items; kind-10009 simple group list)
 - NIP-57: Lightning Zaps (zap request kind 9734, LNURL helpers, bolt11 decoding, kind-9735 receipt validation)
 - NIP-59: Gift wrap (rumor > seal > gift wrap with randomized timestamps)
 - NIP-65: Relay list metadata (outbox model with gossip routing)

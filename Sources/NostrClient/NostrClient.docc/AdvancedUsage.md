@@ -392,6 +392,138 @@ The convenience helpers (``NostrClient/publishTextNote(content:tags:strategy:)``
 ``NostrCore/NostrError/localSignerRequired`` for a remote signer — a deliberate boundary, since
 they build and sign events internally rather than accepting a pre-signed one.
 
+## Relay-based Groups (NIP-29)
+
+A NIP-29 group lives on a single relay and is identified by a short id; the relay enforces
+membership and permissions. Every group flow targets exactly that relay (added to the pool and
+connected on demand), signing goes through the active signer — so a remote NIP-46 signer works
+too — and private groups require NIP-42 AUTH, which the automatic responder answers once a
+signer is set.
+
+### Share Links and Joining
+
+Groups are shared as the `naddr` of their kind-39000 metadata event, sometimes with an invite
+code appended as `?invite=<code>`. ``GroupReference`` parses both parts, and
+``NostrClient/joinGroup(_:inviteCode:reason:strategy:)`` applies the parsed code automatically
+(closed groups accept a valid code without waiting for an admin):
+
+```swift
+let group = try GroupReference(naddrString: "naddr1...?invite=A7fjq2")
+try await client.joinGroup(group)
+
+// Later, ask to be removed (the relay answers with a kind-9001 removal):
+try await client.leaveGroup(group)
+```
+
+Share a group you hold a reference to with ``GroupReference/shareableString()``, which
+round-trips the invite code.
+
+### Timeline and Chat
+
+``NostrClient/subscribeToGroupTimeline(_:kinds:since:limit:)`` follows the group's content —
+events carrying its "h" tag — from its relay. Keep the events you see: the spec asks each
+message to reference a few recent timeline events in a "previous" tag so an out-of-context
+rebroadcast is detectable, and `Groups.previousReferences(from:excludingAuthor:maxCount:)`
+samples them for you. Check inbound events' references against what you have seen with
+`Groups.unknownPreviousReferences(of:knownEventIDs:)`:
+
+```swift
+var recent: [Event] = []
+let timeline = try await client.subscribeToGroupTimeline(group)
+for await event in timeline.events {
+    let unknown = Groups.unknownPreviousReferences(of: event, knownEventIDs: recent.map(\.id))
+    if !unknown.isEmpty {
+        print("timeline references I have not seen: \(unknown)")
+    }
+    recent.append(event)
+}
+
+// NIP-29 defines no content kinds of its own; the default is the NIP-C7 chat message (kind 9).
+try await client.publishGroupMessage(
+    "gm group",
+    in: group,
+    previous: Groups.previousReferences(from: recent, excludingAuthor: await client.publicKey)
+)
+```
+
+### Moderation
+
+Admins request changes with kind-9000–9010 moderation events; the relay checks the author's
+role and answers with an OK message. `Groups.ModerationAction` covers the whole
+set — put/remove user, edit metadata, delete an event, create/delete the group, create an
+invite code, and update the pin list:
+
+```swift
+try await client.publishGroupModeration(
+    .putUser(pubkey: newMemberPubkey, roles: ["moderator"]),
+    in: group,
+    reason: "welcome aboard"
+)
+```
+
+Parse received moderation events for an admin or audit UI with
+`Groups.ModerationRequest`.
+
+### Validated Group State
+
+The relay publishes each group's current state as relay-signed kind-39xxx events: metadata
+(39000), admins (39001), members (39002), roles (39003), and pins (39005).
+``NostrClient/fetchGroupState(for:authorPubkey:timeout:)`` fetches a snapshot in one round
+trip, newest event per kind. With a known ``GroupReference/relayPubkey`` — an `naddr` share
+link carries it as the coordinate's author — events by any other author or with an invalid
+signature are dropped before the pick:
+
+```swift
+let state = try await client.fetchGroupState(for: group)
+print(state.metadata?.name ?? group.id)
+print("private:", state.metadata?.isPrivate ?? false)
+print("admins:", state.admins?.admins.map(\.pubkey) ?? [])
+```
+
+Never treat ``GroupState/members`` as exhaustive — relays may withhold or truncate the member
+list. To check your own standing, derive it from the kind-9000/9001 moderation history with
+`Groups.membership(of:in:)` instead (the latest event targeting the pubkey wins):
+
+```swift
+if let pubkey = await client.publicKey {
+    var filter = Filter.groupTimeline(groupID: group.id, kinds: [.groupPutUser, .groupRemoveUser])
+    filter.pubkeyReferences = [pubkey]
+    let history = try await client.fetch(filters: [filter])
+    switch Groups.membership(of: pubkey, in: history) {
+    case .member(let roles):
+        print("member, roles: \(roles)")
+    case .removed:
+        print("removed from the group")
+    case nil:
+        print("no record — assume not a member")
+    }
+}
+```
+
+### The Simple Group List (NIP-51 kind 10009)
+
+Other clients discover which groups a user is in — and detect a group migrating to another
+relay — from the kind-10009 simple group list, so keep it updated as the user joins and
+leaves. Unlike the group flows, ``NostrClient/publishSimpleGroupList(_:strategy:)`` broadcasts
+to the whole pool, and private entries are NIP-44-encrypted with the local key, so a remote
+signer throws `NostrError.localSignerRequired`:
+
+```swift
+var list = try await client.fetchSimpleGroupList() ?? SimpleGroupList()
+list.publicEntries.append(GroupListEntry(group, name: "Cool Group"))
+if !list.relayURLs.contains(group.relayURL) {
+    list.relayURLs.append(group.relayURL)
+}
+try await client.publishSimpleGroupList(list)
+```
+
+Each ``GroupListEntry`` converts back to a ``GroupReference`` via ``GroupListEntry/reference``
+for joining or subscribing.
+
+> Note: LiveKit AV rooms (kind 39004 and the `.well-known` JWT flow) are not modeled — only
+> the kind-39000 `livekit` flag is parsed. NIP-22 comment threads are a separate NIP and not
+> part of this library's NIP-29 surface.
+
 ## Outbox Model (NIP-65)
 
 The outbox (gossip) model routes reads and writes to each user's declared relays instead of
