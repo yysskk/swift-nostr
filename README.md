@@ -287,7 +287,7 @@ Each of these is covered in depth, with worked examples, in the [documentation](
 - [x] NIP-23: Long-form content (kind 30023 articles, kind 30024 drafts)
 - [x] NIP-25: Reactions (incl. gift-wrapped private DM reactions)
 - [x] NIP-27: Text note references
-- [x] NIP-29: Relay-based Groups (join/leave, chat, moderation kinds 9000-9010, relay-signed state parsing, naddr share links with invite codes; LiveKit AV rooms are not modeled — only the kind-39000 `livekit` flag is parsed)
+- [x] NIP-29: Relay-based Groups (join/leave, chat, moderation kinds 9000-9002, 9005, 9007-9010, relay-signed state parsing, naddr share links with invite codes; LiveKit AV rooms are not modeled — only the kind-39000 `livekit` flag is parsed)
 - [x] NIP-40: Expiration timestamp (disappearing messages)
 - [x] NIP-42: Client authentication (automatic challenge response, auth-required retry)
 - [x] NIP-44: Versioned encryption
