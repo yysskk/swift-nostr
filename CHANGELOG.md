@@ -24,6 +24,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Groups.Metadata`, `Groups.AdminList`, `Groups.MemberList`, `Groups.RoleList`, and
   `Groups.PinList` — plus membership derivation from moderation history and a
   `Filter.groupState` convenience.
+- **NIP-29 Relay-based groups (moderation)**: typed `Groups.ModerationAction` builders for the
+  eight moderation kinds (put-user, remove-user, edit-metadata, delete-event, create-group,
+  delete-group, create-invite, update-pin-list) and `Groups.ModerationRequest` parsing for
+  admin and audit views.
 
 ### Changed
 

@@ -6,19 +6,29 @@ extension Groups {
     public enum ValidationError: Error, Equatable, Sendable, LocalizedError {
         /// The event is not of the kind the model parses.
         case invalidEventKind(expected: Event.Kind, actual: Event.Kind)
-        /// The event carries no "d" tag with a non-empty group id.
+        /// The event carries no group id: no non-empty "d" tag (relay-generated state) or
+        /// "h" tag (moderation events).
         case missingGroupID(Event.Kind)
         /// The event author is not the expected relay pubkey.
         case unexpectedAuthor(expected: String, actual: String)
+        /// The event lacks a tag the kind requires (e.g. a kind-9000 without "p").
+        case missingTag(name: String, kind: Event.Kind)
+        /// The kind is not one of the moderation kinds this library models (defined by the
+        /// spec: 9000-9002, 9005, 9007-9010).
+        case unsupportedModerationKind(Event.Kind)
 
         public var errorDescription: String? {
             switch self {
             case .invalidEventKind(let expected, let actual):
                 return "Expected a kind-\(expected) group event, got kind \(actual)"
             case .missingGroupID(let kind):
-                return "The kind-\(kind) group event carries no d tag with a group id"
+                return "The kind-\(kind) group event carries no d or h tag with a group id"
             case .unexpectedAuthor(let expected, let actual):
                 return "The group event author \(actual) is not the expected relay pubkey \(expected)"
+            case .missingTag(let name, let kind):
+                return "The kind-\(kind) group event lacks a required \(name) tag"
+            case .unsupportedModerationKind(let kind):
+                return "Kind \(kind) is not a NIP-29 moderation kind"
             }
         }
     }
@@ -50,7 +60,9 @@ extension Groups {
     /// Flag tags are presence-based: "private", "restricted", "hidden", "closed", and
     /// "livekit" set their flag by appearing at all, and the parser also recognizes the
     /// explicit "public" and "open" complements as false. Tags the model does not
-    /// interpret are preserved in ``additionalTags`` for lossless re-emission.
+    /// interpret are preserved in ``additionalTags`` for lossless re-emission; duplicate
+    /// occurrences of recognized scalar tags (e.g. a second "name") are dropped — the first
+    /// wins — so ``toTags`` re-emission is not byte-lossless for such duplicates.
     /// https://github.com/nostr-protocol/nips/blob/master/29.md
     public struct Metadata: Sendable, Hashable {
         /// The group's id on its relay (the event's "d" tag).
@@ -145,8 +157,16 @@ extension Groups {
         ///     any other author is rejected. Nil skips the author check.
         /// - Throws: ``ValidationError`` naming the first failed check.
         public init(event: Event, relayPubkey: String? = nil) throws {
-            groupID = try Groups.validatedGroupID(
+            let groupID = try Groups.validatedGroupID(
                 of: event, expecting: .groupMetadata, relayPubkey: relayPubkey)
+            self.init(groupID: groupID, fieldTags: event.structuredTags)
+        }
+
+        /// Interprets metadata field tags — the tag layout of a kind-39000 event without its
+        /// "d" tag, which is also exactly what a kind-9002 edit-metadata event carries. "d"
+        /// tags are skipped; unrecognized tags are preserved in ``additionalTags``.
+        public init(groupID: String, fieldTags: some Sequence<Tag>) {
+            self.groupID = groupID
 
             var name: String?
             var picture: String?
@@ -162,7 +182,7 @@ extension Groups {
             var childGroupIDs: [String] = []
             var additionalTags: [Tag] = []
 
-            for tag in event.structuredTags {
+            for tag in fieldTags {
                 switch tag.name {
                 case "d":
                     break
