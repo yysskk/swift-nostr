@@ -20,6 +20,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **NIP-29 Relay-based groups (core events)**: group event kind constants,
   `h`/`previous`/`code`/`role`/`group` tag constructors, join/leave request builders,
   group-scoped content events, and timeline-reference helpers under the new `Groups` namespace.
+- **NIP-29 Relay-based groups (state)**: typed parsing of relay-generated group state —
+  `Groups.Metadata`, `Groups.AdminList`, `Groups.MemberList`, `Groups.RoleList`, and
+  `Groups.PinList` — plus membership derivation from moderation history and a
+  `Filter.groupState` convenience.
 
 ### Changed
 
