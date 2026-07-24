@@ -54,6 +54,17 @@ struct NIP51SimpleGroupListTests {
         #expect(entry.tag.rawArray == ["group", groupID, groupRelay])
     }
 
+    @Test("An empty name is normalized to nil on construction and mutation")
+    func emptyNameNormalizedEverywhere() {
+        #expect(GroupListEntry(groupID: groupID, relayURL: groupRelay, name: "").name == nil)
+
+        var entry = GroupListEntry(groupID: groupID, relayURL: groupRelay, name: "Cooking")
+        entry.name = ""
+        #expect(entry.name == nil)
+        #expect(entry.tag.rawArray == ["group", groupID, groupRelay])
+        #expect(GroupListEntry(tag: entry.tag) == entry)
+    }
+
     @Test(
         "Out-of-shape tags do not parse as entries",
         arguments: [
