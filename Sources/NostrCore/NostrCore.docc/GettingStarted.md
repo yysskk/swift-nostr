@@ -49,6 +49,25 @@ let isValid = try note.verify()
 assert(isValid)
 ```
 
+## Authorize an HTTP Request
+
+``HTTPAuth`` proves your identity to an HTTP server with a signed kind-27235 event in the `Authorization` header (NIP-98). Sign the final form of the request — the event commits to its exact URL, method, and body — immediately before sending:
+
+```swift
+var request = URLRequest(url: URL(string: "https://api.example.com/upload")!)
+request.httpMethod = "POST"
+request.httpBody = body
+try await request.setNostrAuthorization(signer: signer)  // any NostrSigning
+```
+
+A server (or any verifier) runs the full NIP-98 check chain with ``HTTPAuth/validate(authorization:url:method:payload:tolerance:now:)`` and trusts the returned event's ``Event/pubkey`` as the authenticated identity:
+
+```swift
+let event = try HTTPAuth.validate(
+    authorization: authorizationHeader, url: requestURL, method: "POST", payload: body)
+let authenticatedPubkey = event.pubkey
+```
+
 ## Talk to a Single Relay
 
 ``RelayConnection`` is one actor-isolated relay socket with its own connect/keepalive/reconnect state machine. Open it, publish, and read messages as an async stream.

@@ -20,6 +20,7 @@ Swift library for Nostr protocol
 - **NIP-17 Private DMs**: End-to-end encrypted direct messages with sender anonymity, kind 10050 DM relay routing, reactions, and encrypted file messages
 - **NIP-40 Expiration**: Disappearing messages via an expiration timestamp, including private DMs
 - **NIP-42 Authentication**: Relay AUTH challenges answered automatically, with auth-required retry
+- **NIP-98 HTTP Auth**: Sign `Authorization: Nostr` headers for HTTP requests with any signer, and validate them server-side
 - **NIP-57 Zaps**: Full Lightning zap flow — sign zap requests (kind 9734), resolve LNURL-pay endpoints, fetch invoices, decode bolt11, and verify kind-9735 zap receipts
 - **NIP-47 Nostr Wallet Connect**: Pay Lightning invoices through a remote wallet over Nostr — the full command set, NIP-44/NIP-04 encryption, notifications, and one-call zap payment (separate `NostrWalletConnect` library)
 - **NIP-46 Nostr Connect**: Delegate signing to a remote signer that holds the user's key — both the signer-initiated `bunker://` and client-initiated `nostrconnect://` flows, `auth_url` challenges, and typed commands for signing, encryption, and key proof (separate `NostrConnect` library)
@@ -202,6 +203,27 @@ let signed = try await client.sign(
 try await client.publish(signed)
 ```
 
+### Authorize an HTTP request (NIP-98)
+
+Prove your Nostr identity to an HTTP server with a signed kind-27235 event in the `Authorization` header — no account or session needed. Sign the final form of the request; the event commits to its exact URL, method, and body:
+
+```swift
+import NostrCore
+
+var request = URLRequest(url: URL(string: "https://api.example.com/upload")!)
+request.httpMethod = "POST"
+request.httpBody = body
+try await request.setNostrAuthorization(signer: signer)  // any NostrSigning
+```
+
+On the receiving side, `HTTPAuth.validate` runs the full NIP-98 check chain — scheme, decoding, kind, signature, timestamp window, URL, method, body hash — and returns the verified event, whose `pubkey` is the authenticated identity:
+
+```swift
+let event = try HTTPAuth.validate(
+    authorization: authorizationHeader, url: requestURL, method: "POST", payload: body)
+let authenticatedPubkey = event.pubkey
+```
+
 ## More
 
 Each of these is covered in depth, with worked examples, in the [documentation](https://yysskk.github.io/swift-nostr/documentation/nostrclient):
@@ -209,6 +231,7 @@ Each of these is covered in depth, with worked examples, in the [documentation](
 - **Lightning Zaps (NIP-57)** — resolve an LNURL-pay endpoint, sign a zap request, fetch the bolt11 invoice, and verify the kind-9735 receipt.
 - **Outbox model (NIP-65)** — publish your read/write relay list and route reads/writes to each user's declared relays with `subscribeOutbox` / `publishGossip`.
 - **Client authentication (NIP-42)** — AUTH challenges are answered automatically once a signer is set, with auth-required publish retry; an opt-in manual mode is available.
+- **HTTP authorization (NIP-98)** — sign requests with `URLRequest.setNostrAuthorization(signer:)` or `HTTPAuth`, and validate incoming headers with `HTTPAuth.validate`.
 - **Relay information (NIP-11)** — fetch a relay's capabilities with `RelayInformation.fetch(fromRelayURLString:)`.
 - **NIP-19 entities** — encode/decode `npub`/`nsec`/`note`/`nprofile`/`nevent`/`naddr` via `NIP19Entity`, `NProfile`, `NEvent`, and `NAddr`.
 - **Low-level APIs** — drive a single `RelayConnection` directly, or sign events by hand with `EventSigner`.
@@ -245,6 +268,7 @@ Each of these is covered in depth, with worked examples, in the [documentation](
 - [x] NIP-57: Lightning Zaps (zap request kind 9734, LNURL helpers, invoice fetch, bolt11 decoding, kind-9735 receipt validation)
 - [x] NIP-59: Gift wrap
 - [x] NIP-65: Relay list metadata (outbox model)
+- [x] NIP-98: HTTP Auth (kind-27235 authorization events, header encoding, server-side validation)
 
 ## Development
 

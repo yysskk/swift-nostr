@@ -45,6 +45,10 @@ let isValid = try event.verify()
 - ``SealedMessage``
 - ``EncryptedPrivateKey``
 
+### HTTP Authorization (NIP-98)
+
+- ``HTTPAuth``
+
 ### Encoding
 
 - ``Bech32``
