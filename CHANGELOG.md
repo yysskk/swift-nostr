@@ -32,6 +32,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `GroupState` snapshots, and `NostrClient` flows — `joinGroup`, `leaveGroup`,
   `publishGroupMessage`, `publishGroupModeration`, `fetchGroupMetadata`/`fetchGroupState` with
   relay-author validation, and `subscribeToGroupTimeline` — all scoped to the group's relay.
+- **NIP-29 Relay-based groups (group list)**: the NIP-51 kind-10009 simple group list as a typed
+  `SimpleGroupList`/`GroupListEntry` view over `NostrList` — including NIP-44 private entries —
+  with `fetchSimpleGroupList` and `publishSimpleGroupList` on `NostrClient`.
 
 ### Changed
 
