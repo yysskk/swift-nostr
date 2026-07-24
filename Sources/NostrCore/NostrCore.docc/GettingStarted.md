@@ -68,6 +68,29 @@ let event = try HTTPAuth.validate(
 let authenticatedPubkey = event.pubkey
 ```
 
+## Join and Post to a Relay-based Group
+
+``Groups`` builds the client side of NIP-29 relay-based groups. A group lives on a single relay, and everything a user sends carries the group id in an "h" tag. Ask to join (kind 9021, with an invite code for closed groups), then post content of any kind — here a NIP-C7 chat message — with "previous" timeline references sampled from recently seen group events:
+
+```swift
+let join = try await Groups.joinRequest(groupID: "abcdef", inviteCode: "A7fjq2", signer: signer)
+
+let message = try await Groups.contentEvent(
+    groupID: "abcdef",
+    kind: .chatMessage,
+    content: "hello",
+    previous: Groups.previousReferences(from: recentEvents, excludingAuthor: signer.publicKey),
+    signer: signer
+)
+```
+
+The relay answers with the group's state as relay-signed kind-39xxx events, which carry the group id in a "d" tag instead (user-sent events use "h"). Parse them with ``Groups/Metadata`` and its siblings, pinning the author to the relay's pubkey so an impostor's event is rejected:
+
+```swift
+let metadata = try Groups.Metadata(event: stateEvent, relayPubkey: relayPubkey)
+print(metadata.name ?? metadata.groupID, metadata.isPrivate ? "private" : "public")
+```
+
 ## Talk to a Single Relay
 
 ``RelayConnection`` is one actor-isolated relay socket with its own connect/keepalive/reconnect state machine. Open it, publish, and read messages as an async stream.

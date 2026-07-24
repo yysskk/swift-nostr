@@ -49,6 +49,10 @@ let isValid = try event.verify()
 
 - ``HTTPAuth``
 
+### Relay-based Groups (NIP-29)
+
+- ``Groups``
+
 ### Encoding
 
 - ``Bech32``

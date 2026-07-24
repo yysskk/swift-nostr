@@ -12,6 +12,8 @@ The high-level `NostrClient` library provides an actor-based API for the Nostr n
 - `RelayPool` / `RelayConnection`: multi-relay WebSocket management with auto-reconnect
 - `DirectMessage` / `DirectMessageReaction` / `DirectMessageFile` / `DirectMessagePayload` / `DirectMessageBuilder` / `DirectMessageParser`: NIP-17 private DMs, NIP-25 reactions, and kind 15 file messages
 - `EncryptedFile`: AES-256-GCM encryption for NIP-17 file messages
+- `Groups` / `GroupReference` / `GroupState`: NIP-29 relay-based groups — join/leave and chat with timeline references, moderation (kinds 9000-9010), relay-signed state parsing (metadata/admins/members/roles/pins), naddr share links with invite codes
+- `SimpleGroupList` / `GroupListEntry`: the NIP-51 kind-10009 list of the NIP-29 groups a user is in (public + NIP-44-encrypted private entries)
 - `SealedMessage` / `GiftWrap`: NIP-44 encryption and NIP-59 gift wrap
 - `LNURL` / `LNURLPayResponse`: NIP-57 zap LNURL-pay resolution and invoice-request URLs
 - `Mnemonic` / `KeyDerivation`: BIP-39 seed phrase and BIP-32 key derivation (NIP-06)
@@ -35,6 +37,7 @@ The high-level `NostrClient` library provides an actor-based API for the Nostr n
 - NIP-23: Long-form content (kind 30023 articles, kind 30024 drafts)
 - NIP-25: Reactions (incl. private DM reactions)
 - NIP-27: Text note references (nostr: mentions and quotes in content)
+- NIP-29: Relay-based groups (join/leave, chat with timeline references, moderation kinds 9000-9010, relay-signed state parsing, naddr share links with invite codes)
 - NIP-40: Expiration timestamp (disappearing messages)
 - NIP-42: Client authentication (automatic challenge response, auth-required retry)
 - NIP-44: Versioned encryption (v2)
@@ -43,7 +46,7 @@ The high-level `NostrClient` library provides an actor-based API for the Nostr n
 - NIP-47: Nostr Wallet Connect (full command set, NIP-44/NIP-04 encryption, notifications — separate `NostrWalletConnect` library)
 - NIP-49: Private key encryption (ncryptsec)
 - NIP-50: Search capability
-- NIP-51: Lists (standard lists + parameterized sets; NIP-44-encrypted private items)
+- NIP-51: Lists (standard lists + parameterized sets; NIP-44-encrypted private items; kind-10009 simple group list)
 - NIP-56: Reporting (kind 1984)
 - NIP-57: Lightning Zaps (zap request kind 9734, LNURL helpers, invoice fetch, bolt11 decoding, kind-9735 receipt validation)
 - NIP-59: Gift wrap

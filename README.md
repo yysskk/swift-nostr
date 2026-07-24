@@ -20,6 +20,7 @@ Swift library for Nostr protocol
 - **NIP-17 Private DMs**: End-to-end encrypted direct messages with sender anonymity, kind 10050 DM relay routing, reactions, and encrypted file messages
 - **NIP-40 Expiration**: Disappearing messages via an expiration timestamp, including private DMs
 - **NIP-42 Authentication**: Relay AUTH challenges answered automatically, with auth-required retry
+- **NIP-29 Relay-based Groups**: Join, chat in, and moderate groups managed by a single relay — `naddr` share links with invite codes, timeline references, relay-signed state parsing, and the kind-10009 simple group list
 - **NIP-98 HTTP Auth**: Sign `Authorization: Nostr` headers for HTTP requests with any signer, and validate them server-side
 - **NIP-57 Zaps**: Full Lightning zap flow — sign zap requests (kind 9734), resolve LNURL-pay endpoints, fetch invoices, decode bolt11, and verify kind-9735 zap receipts
 - **NIP-47 Nostr Wallet Connect**: Pay Lightning invoices through a remote wallet over Nostr — the full command set, NIP-44/NIP-04 encryption, notifications, and one-call zap payment (separate `NostrWalletConnect` library)
@@ -224,6 +225,36 @@ let event = try HTTPAuth.validate(
 let authenticatedPubkey = event.pubkey
 ```
 
+### Relay-based groups (NIP-29)
+
+A NIP-29 group lives on a single relay, which enforces membership and permissions; every group flow targets exactly that relay. Groups are shared as the `naddr` of their kind-39000 metadata event, optionally carrying an invite code:
+
+```swift
+import NostrClient
+import NostrCore
+
+// Parse a share link and join (kind 9021) — the invite code is applied automatically.
+let group = try GroupReference(naddrString: "naddr1...?invite=A7fjq2")
+try await client.joinGroup(group)
+
+// Follow the live timeline, keeping recent events for timeline references.
+var recent: [Event] = []
+let timeline = try await client.subscribeToGroupTimeline(group)
+for await event in timeline.events {
+    recent.append(event)
+    print(event.content)
+}
+
+// Chat (NIP-C7 kind 9 by default), referencing recent events so rebroadcasts are detectable.
+try await client.publishGroupMessage(
+    "Hello, group!",
+    in: group,
+    previous: Groups.previousReferences(from: recent, excludingAuthor: await client.publicKey)
+)
+```
+
+Private groups require NIP-42 AUTH, which the client answers automatically once a signer is set — no extra code.
+
 ## More
 
 Each of these is covered in depth, with worked examples, in the [documentation](https://yysskk.github.io/swift-nostr/documentation/nostrclient):
@@ -232,6 +263,7 @@ Each of these is covered in depth, with worked examples, in the [documentation](
 - **Outbox model (NIP-65)** — publish your read/write relay list and route reads/writes to each user's declared relays with `subscribeOutbox` / `publishGossip`.
 - **Client authentication (NIP-42)** — AUTH challenges are answered automatically once a signer is set, with auth-required publish retry; an opt-in manual mode is available.
 - **HTTP authorization (NIP-98)** — sign requests with `URLRequest.setNostrAuthorization(signer:)` or `HTTPAuth`, and validate incoming headers with `HTTPAuth.validate`.
+- **Relay-based groups (NIP-29)** — parse `naddr` share links with `GroupReference`, join and leave, chat with timeline references, moderate with `Groups.ModerationAction`, fetch validated relay-signed state with `fetchGroupState`, and keep the kind-10009 simple group list fresh.
 - **Relay information (NIP-11)** — fetch a relay's capabilities with `RelayInformation.fetch(fromRelayURLString:)`.
 - **NIP-19 entities** — encode/decode `npub`/`nsec`/`note`/`nprofile`/`nevent`/`naddr` via `NIP19Entity`, `NProfile`, `NEvent`, and `NAddr`.
 - **Low-level APIs** — drive a single `RelayConnection` directly, or sign events by hand with `EventSigner`.
@@ -255,6 +287,7 @@ Each of these is covered in depth, with worked examples, in the [documentation](
 - [x] NIP-23: Long-form content (kind 30023 articles, kind 30024 drafts)
 - [x] NIP-25: Reactions (incl. gift-wrapped private DM reactions)
 - [x] NIP-27: Text note references
+- [x] NIP-29: Relay-based Groups (join/leave, chat, moderation kinds 9000-9010, relay-signed state parsing, naddr share links with invite codes; LiveKit AV rooms are not modeled — only the kind-39000 `livekit` flag is parsed)
 - [x] NIP-40: Expiration timestamp (disappearing messages)
 - [x] NIP-42: Client authentication (automatic challenge response, auth-required retry)
 - [x] NIP-44: Versioned encryption
@@ -263,7 +296,7 @@ Each of these is covered in depth, with worked examples, in the [documentation](
 - [x] NIP-47: Nostr Wallet Connect (full command set, NIP-44/NIP-04 encryption, notifications, end-to-end zap payment — separate `NostrWalletConnect` library)
 - [x] NIP-49: Private key encryption (ncryptsec)
 - [x] NIP-50: Search capability
-- [x] NIP-51: Lists (standard lists + parameterized sets; NIP-44-encrypted private items)
+- [x] NIP-51: Lists (standard lists + parameterized sets; NIP-44-encrypted private items; kind-10009 simple group list)
 - [x] NIP-56: Reporting (kind 1984)
 - [x] NIP-57: Lightning Zaps (zap request kind 9734, LNURL helpers, invoice fetch, bolt11 decoding, kind-9735 receipt validation)
 - [x] NIP-59: Gift wrap
