@@ -275,4 +275,16 @@ extension Filter {
         filter.addTagQuery("h", values: [groupID])
         return filter
     }
+
+    /// Create a filter for the relay-generated state of a NIP-29 group (kind-39xxx events
+    /// carrying its "d" tag).
+    /// https://github.com/nostr-protocol/nips/blob/master/29.md
+    public static func groupState(
+        groupID: String,
+        kinds: [Event.Kind] = [.groupMetadata, .groupAdmins, .groupMembers, .groupRoles, .groupPinList]
+    ) -> Filter {
+        var filter = Filter(kinds: kinds)
+        filter.addTagQuery("d", values: [groupID])
+        return filter
+    }
 }
