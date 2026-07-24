@@ -135,6 +135,10 @@ extension Event {
         public static let bookmarkList = Kind(rawValue: 10003)
         public static let directMessageRelayList = Kind(rawValue: 10050)
         public static let clientAuthentication = Kind(rawValue: 22242)
+        /// A NIP-98 HTTP authorization event, carried base64-encoded in an
+        /// `Authorization: Nostr <event>` header rather than published to relays.
+        /// https://github.com/nostr-protocol/nips/blob/master/98.md
+        public static let httpAuth = Kind(rawValue: 27235)
         public static let nostrConnect = Kind(rawValue: 24133)
         public static let categorizedPeopleList = Kind(rawValue: 30000)
         /// The legacy NIP-51 categorized bookmarks kind, superseded by bookmark sets (30003).

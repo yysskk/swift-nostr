@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **NIP-98 HTTP Auth**: `HTTPAuth` builds and signs kind-27235 authorization events and encodes
+  them as `Authorization: Nostr <base64>` header values, with a
+  `URLRequest.setNostrAuthorization(signer:)` convenience that signs the request's URL, method,
+  and body. Works with any `NostrSigning` signer, local or remote.
+
 ### Changed
 
 - `RemoteSigner.awaitConnection()` now throws a distinct `RemoteSignerError.connectionInProgress`
