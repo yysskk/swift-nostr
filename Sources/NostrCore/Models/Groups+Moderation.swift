@@ -1,8 +1,8 @@
 import Foundation
 
-// MARK: - Moderation Actions (kinds 9000-9010)
+// MARK: - Moderation Actions (kinds 9000-9002, 9005, 9007-9010)
 extension Groups {
-    /// A typed NIP-29 moderation action (kinds 9000-9010), performed by a group admin or
+    /// A typed NIP-29 moderation action (kinds 9000-9002, 9005, 9007-9010), performed by a group admin or
     /// the relay itself.
     ///
     /// Sending an action asks the relay to apply it: the relay checks the author's role
@@ -154,7 +154,7 @@ extension Groups {
 
 // MARK: - Moderation Parsing
 extension Groups {
-    /// A parsed kind-9000-9010 moderation event, for admin and audit UIs.
+    /// A parsed moderation event (kinds 9000-9002, 9005, 9007-9010), for admin and audit UIs.
     ///
     /// Never verifies the event signature — callers check ``Event/verify()`` themselves —
     /// and cannot know whether the relay honored the action; the group's relay-generated

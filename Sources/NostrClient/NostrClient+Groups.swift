@@ -149,7 +149,7 @@ extension NostrClient {
         return PublishedEvent(event: event, result: result)
     }
 
-    /// Publishes a moderation action (kinds 9000-9010), only to the group's relay, which
+    /// Publishes a moderation action (kinds 9000-9002, 9005, 9007-9010), only to the group's relay, which
     /// enforces the author's role permissions and answers with an OK message.
     ///
     /// See ``Groups/ModerationAction`` for the actions and their tag layouts. Timeline

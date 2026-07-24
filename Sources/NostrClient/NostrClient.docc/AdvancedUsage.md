@@ -448,7 +448,7 @@ try await client.publishGroupMessage(
 
 ### Moderation
 
-Admins request changes with kind-9000–9010 moderation events; the relay checks the author's
+Admins request changes with moderation events (kinds 9000-9002, 9005, and 9007-9010); the relay checks the author's
 role and answers with an OK message. `Groups.ModerationAction` covers the whole
 set — put/remove user, edit metadata, delete an event, create/delete the group, create an
 invite code, and update the pin list:

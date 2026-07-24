@@ -256,7 +256,7 @@ try await client.publishGroupMessage(
     "hello", in: group,
     previous: Groups.previousReferences(from: recent, excludingAuthor: await client.publicKey))
 
-// Moderation (kinds 9000-9010): the relay checks the author's role and answers with OK.
+// Moderation (kinds 9000-9002, 9005, 9007-9010): the relay checks the author's role and answers with OK.
 try await client.publishGroupModeration(
     .putUser(pubkey: memberPubkey, roles: ["moderator"]), in: group, reason: "welcome")
 
@@ -999,7 +999,7 @@ let message = try await Groups.contentEvent(
     previous: Groups.previousReferences(from: recentEvents, excludingAuthor: signer.publicKey),
     signer: signer)
 
-// Moderation (kinds 9000-9010) via Groups.ModerationAction: .putUser(pubkey:roles:),
+// Moderation (kinds 9000-9002, 9005, 9007-9010) via Groups.ModerationAction: .putUser(pubkey:roles:),
 // .removeUser(pubkey:), .editMetadata(Metadata), .deleteEvent(id:), .createGroup,
 // .deleteGroup, .createInvite(code:), .updatePinList([PinnedItem]).
 let promote = try await Groups.moderationEvent(
@@ -1048,7 +1048,7 @@ separate NIP and not part of this library's NIP-29 surface.
 ### Moderation Parsing and Membership
 
 ```swift
-// Typed view of a received kind-9000-9010 event, for admin/audit UIs.
+// Typed view of a received moderation event (kinds 9000-9002, 9005, 9007-9010), for admin/audit UIs.
 let request = try Groups.ModerationRequest(event: e9000)
 print(request.action, request.groupID, request.reason ?? "", request.previousReferences)
 
@@ -1427,7 +1427,7 @@ Cases: `invalidPrivateKey`, `invalidPublicKey`, `invalidSignature`, `invalidEven
 - NIP-23: Long-form content (kind 30023 articles, kind 30024 drafts)
 - NIP-25: Reactions
 - NIP-27: Text note references (nostr: mentions and quotes in content, mapped to p/q/a tags)
-- NIP-29: Relay-based groups (join/leave, group-scoped content with timeline references, moderation kinds 9000-9010, relay-signed state parsing 39000-39005, naddr share links with invite codes)
+- NIP-29: Relay-based groups (join/leave, group-scoped content with timeline references, moderation kinds 9000-9002, 9005, 9007-9010, relay-signed state parsing 39000-39005, naddr share links with invite codes)
 - NIP-40: Expiration timestamp (disappearing messages)
 - NIP-42: Client authentication (automatic challenge response, auth-required retry)
 - NIP-44: Versioned encryption v2 (ECDH + HKDF + ChaCha20 + HMAC-SHA256)
