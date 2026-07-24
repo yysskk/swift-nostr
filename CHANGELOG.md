@@ -12,7 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **NIP-98 HTTP Auth**: `HTTPAuth` builds and signs kind-27235 authorization events and encodes
   them as `Authorization: Nostr <base64>` header values, with a
   `URLRequest.setNostrAuthorization(signer:)` convenience that signs the request's URL, method,
-  and body. Works with any `NostrSigning` signer, local or remote.
+  and body. Works with any `NostrSigning` signer, local or remote. On the server side,
+  `HTTPAuth.validate(authorization:url:method:payload:tolerance:now:)` performs the full NIP-98
+  check chain — scheme, decoding, kind, signature, timestamp window, URL, method, and body
+  hash — returning the verified event, with each failure reported as a typed
+  `HTTPAuth.ValidationError`.
 
 ### Changed
 
