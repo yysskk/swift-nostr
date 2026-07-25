@@ -13,7 +13,7 @@ NostrCore is a product of the swift-nostr package. Add the package, then the `No
 )
 ```
 
-If you need the higher-level client (relay pool, gossip routing, direct messages) add the `NostrClient` product; for wallet payments add `NostrWalletConnect`. Both are built on NostrCore but do not re-export it — add the `NostrCore` product and `import NostrCore` to use the primitives directly.
+If you need the higher-level client (relay pool, gossip routing, direct messages) add the `NostrClient` product; for wallet payments add `NostrWalletConnect`. Both are built on NostrCore.
 
 ## Keys
 

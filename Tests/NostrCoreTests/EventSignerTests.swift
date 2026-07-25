@@ -42,6 +42,27 @@ struct EventSignerTests {
         #expect(try event.verify())
     }
 
+    @Test("signRepost records the reposted event, its author, and the relay")
+    func signRepostCarriesRelayURL() throws {
+        let signer = try makeSigner()
+        let reposted = try signer.signTextNote(content: "gm")
+        let event = try signer.signRepost(of: reposted, relayURL: "wss://relay.example.com")
+
+        #expect(event.kind == .repost)
+        #expect(event.tags.contains(["e", reposted.id, "wss://relay.example.com"]))
+        #expect(event.tags.contains(["p", reposted.pubkey]))
+        #expect(try event.verify())
+    }
+
+    @Test("signRepost omits the relay when none is given")
+    func signRepostWithoutRelayURL() throws {
+        let signer = try makeSigner()
+        let reposted = try signer.signTextNote(content: "gm")
+        let event = try signer.signRepost(of: reposted)
+
+        #expect(event.tags.contains(["e", reposted.id]))
+    }
+
     @Test("verify rejects an event whose content was tampered with")
     func verifyRejectsTampering() throws {
         let signer = try makeSigner()

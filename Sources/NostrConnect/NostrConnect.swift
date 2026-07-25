@@ -9,9 +9,8 @@
 // signer answers with the result. Requests and responses are exchanged as kind 24133 events whose
 // content is a NIP-44 encrypted JSON-RPC-like envelope.
 //
-// This module builds on top of NostrCore, reusing its event, signing, encryption, and relay
-// primitives. Callers that work with those core types `import NostrCore` directly (it is not
-// re-exported).
+// This module builds on top of NostrCore — reusing its event, signing, encryption, and relay
+// primitives — and re-exports it.
 //
 // The public surface is the `RemoteSigner` actor, driven from a signer-issued `BunkerURI` or a
 // client-generated `NostrConnectURI` invitation: it runs the connect handshake, correlates each

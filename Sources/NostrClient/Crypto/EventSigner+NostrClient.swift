@@ -20,7 +20,7 @@ extension EventSigner {
 
     /// Creates and signs a contact list event (kind 3, NIP-02)
     public func signContactList(_ contacts: [Contact]) throws -> Event {
-        let tags = contacts.map { Tag.pubkey($0.pubkey, relayURL: $0.relayUrl, petname: $0.petname) }
+        let tags = contacts.map { Tag.pubkey($0.pubkey, relayURL: $0.relayURL, petname: $0.petname) }
         return try sign(UnsignedEvent(pubkey: publicKey, kind: .contacts, tags: tags, content: ""))
     }
 

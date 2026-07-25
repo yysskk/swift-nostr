@@ -12,12 +12,12 @@ dependencies: [
 ]
 ```
 
-Add the products you need. `NostrClient` builds on `NostrCore` but does not re-export it, so add both (add `NostrWalletConnect` too if you handle payments):
+Add the products you need. `NostrClient` builds on `NostrCore`, which it re-exports (add `NostrWalletConnect` too if you handle payments):
 
 ```swift
 .target(
     name: "YourTarget",
-    dependencies: ["NostrClient", "NostrCore"]
+    dependencies: ["NostrClient"]
 )
 ```
 
@@ -32,7 +32,6 @@ Or add via Xcode: File > Add Package Dependencies > Enter the repository URL.
 
 ```swift
 import NostrClient
-import NostrCore
 
 let client = NostrClient()
 
@@ -139,7 +138,7 @@ print(note.event.id, note.result.acceptedRelays)
 try await client.publishReply(to: parentEvent, content: "Nice post!")
 try await client.publishMetadata(UserMetadata(name: "Alice", about: "Nostr user"))
 try await client.publishReaction(to: note.event, content: "🤙")
-try await client.publishRepost(of: note.event, relayUrl: "wss://relay.example.com")
+try await client.publishRepost(of: note.event, relayURL: "wss://relay.example.com")
 try await client.publishDeletion(eventIds: ["eventId1"], reason: "posted by mistake")
 try await client.publishReport(pubkey: "authorHex", type: .impersonation)  // report a pubkey (NIP-56)
 try await client.publishReport(event: note.event, type: .spam, reason: "unsolicited")  // report an event and its author
@@ -639,7 +638,7 @@ let signed = try signer.sign(unsignedEvent)
 let note = try signer.signTextNote(content: "Hello", tags: [])
 let meta = try signer.signMetadata(UserMetadata(name: "Alice"))
 let reaction = try signer.signReaction(to: event, content: "🤙")
-let repost = try signer.signRepost(of: event, relayUrl: "wss://...")
+let repost = try signer.signRepost(of: event, relayURL: "wss://...")
 let deletion = try signer.signDeletion(eventIds: ["id1"], reason: "mistake")
 let contacts = try signer.signContactList([Contact(pubkey: "...")])
 let relayList = try signer.signRelayListMetadata(read: ["wss://in.example"], write: ["wss://out.example"])
@@ -822,15 +821,15 @@ Contact information for NIP-02 (struct: Codable, Hashable, Sendable).
 ### Properties
 
 - `pubkey: String` -- hex public key
-- `relayUrl: String?` -- recommended relay URL
+- `relayURL: String?` -- recommended relay URL
 - `petname: String?` -- local nickname
 
 ### Usage
 
 ```swift
-let contact = Contact(pubkey: "...", relayUrl: "wss://...", petname: "alice")
-let contact = try Contact(npub: "npub1...", relayUrl: nil, petname: nil)
-let tag = contact.toTag()           // ["p", pubkey, relayUrl, petname]
+let contact = Contact(pubkey: "...", relayURL: "wss://...", petname: "alice")
+let contact = try Contact(npub: "npub1...", relayURL: nil, petname: nil)
+let tag = contact.toTag()           // ["p", pubkey, relayURL, petname]
 let parsed = Contact.fromTag(tag)   // parse from tag array
 
 // Extract contacts from kind-3 event
@@ -1320,11 +1319,10 @@ let tags = NostrContentReference.tags(for: content)  // [["p", ...], ["q", ...]]
 
 ## RemoteSigner
 
-NIP-46 remote signing over a relay transport (actor, `NostrConnect` library; import `NostrConnect` and `NostrCore`). Delegates signing to a remote signer (a "bunker") that holds the user's private key. The client holds a separate identity, encrypts each request to the signer, signs a kind-24133 event, and awaits the matching response — correlated by the `id` inside the decrypted JSON body (not by any event tag). Two connection flows are supported: the signer-initiated `bunker://` token and the client-initiated `nostrconnect://` invitation. Conforms to `NostrSigning` (its `publicKey` is the user key from `get_public_key`), so it is usable anywhere a local `EventSigner` is — including `NostrClient.setSigner(_:)`, after which the client's `sign(_:)`, `publish(_:)`, and NIP-42 auth run through the bunker (the convenience `publish*`/DM helpers still require a local key).
+NIP-46 remote signing over a relay transport (actor, `NostrConnect` library). Delegates signing to a remote signer (a "bunker") that holds the user's private key. The client holds a separate identity, encrypts each request to the signer, signs a kind-24133 event, and awaits the matching response — correlated by the `id` inside the decrypted JSON body (not by any event tag). Two connection flows are supported: the signer-initiated `bunker://` token and the client-initiated `nostrconnect://` invitation. Conforms to `NostrSigning` (its `publicKey` is the user key from `get_public_key`), so it is usable anywhere a local `EventSigner` is — including `NostrClient.setSigner(_:)`, after which the client's `sign(_:)`, `publish(_:)`, and NIP-42 auth run through the bunker (the convenience `publish*`/DM helpers still require a local key).
 
 ```swift
 import NostrConnect
-import NostrCore
 
 // Start a session from a signer-issued bunker:// token. clientKeyPair defaults to a fresh random
 // keypair (pass a persisted one to resume an authorized session); transport defaults to a

@@ -38,6 +38,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Single import**: `NostrClient`, `NostrWalletConnect`, and `NostrConnect` now re-export
+  `NostrCore`; a separate `import NostrCore` is no longer required to use the primitives
+  (`Event`, `KeyPair`, `Filter`, …) they surface.
 - The package enables the `ExistentialAny` upcoming feature on every target, and CI compiles
   with `-warnings-as-errors` on the Linux and macOS jobs, so implicit existential spellings and
   new compiler warnings now fail the build instead of accumulating. No effect on consumers of
@@ -46,6 +49,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   when another wait is already running on the session, instead of conflating that with
   `.notConnected`. The new case is additive but a source break for code that switches over
   `RemoteSignerError` exhaustively.
+- **Breaking**: `Contact.relayUrl` is now `Contact.relayURL`, matching the `relayURL` spelling of the
+  tag API it feeds (`Tag.pubkey(_:relayURL:petname:)`) and the Swift API Design Guidelines rule that
+  acronyms are uniformly cased. The `relayUrl:` argument label on both `Contact` initializers is
+  renamed to `relayURL:` as well. Because `Contact` is `Codable`, its JSON key changes from
+  `relayUrl` to `relayURL`; clients that persist encoded contacts need to migrate stored data.
+- **Breaking**: the `relayUrl:` argument label is now `relayURL:` on
+  `EventSigner.signRepost(of:relayURL:)`, `NostrClient.publishReply(to:content:relayURL:strategy:)`,
+  and `NostrClient.publishRepost(of:relayURL:strategy:)`, completing the `relayURL` spelling across
+  the package.
 
 ## [0.6.0] - 2026-07-05
 
