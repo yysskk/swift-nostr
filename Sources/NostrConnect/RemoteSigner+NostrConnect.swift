@@ -21,7 +21,7 @@ extension RemoteSigner {
     ///     reply.
     ///   - clientKeyPair: The client identity whose public key originates the invitation. Must match
     ///     ``NostrConnectURI/clientPubkey``.
-    ///   - transport: The relay transport. Defaults to a ``RelayConnectionTransport`` over the
+    ///   - transport: The relay transport. Defaults to a `RelayConnectionTransport` over the
     ///     invitation's relays; inject a custom one (e.g. for tests).
     ///   - config: Session behavior.
     /// - Throws: ``RemoteSignerError/invalidURI(reason:)`` if `clientKeyPair` does not match the
@@ -29,7 +29,7 @@ extension RemoteSigner {
     public init(
         invitation: NostrConnectURI,
         clientKeyPair: KeyPair,
-        transport: (any RemoteSignerTransport)? = nil,
+        transport: (any RelayTransport)? = nil,
         config: Config = Config()
     ) throws {
         guard clientKeyPair.publicKeyHex == invitation.clientPubkey else {

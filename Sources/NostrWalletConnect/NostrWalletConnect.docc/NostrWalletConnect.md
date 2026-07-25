@@ -18,6 +18,10 @@ preimage.
 - The complete NIP-47 command set: pay, multi-pay, keysend, invoices, balance, info, and history.
 - NIP-44 (preferred) and NIP-04 (legacy) payload encryption, negotiated from the wallet's info event.
 - A wallet notification stream and a one-call end-to-end zap payment.
+- Relay I/O behind `NostrCore`'s `RelayTransport` seam: the default `RelayConnectionTransport`
+  drives the URI's relays, and a custom transport — or the default one on an injected
+  `WebSocketSessionFactory` — takes its place for another relay stack, a platform-native socket, or
+  a test without a live relay (see <doc:AdvancedUsage>).
 
 ```swift
 import NostrWalletConnect
@@ -80,11 +84,6 @@ print(payment.preimage)
 
 - ``WalletConnection/payZap(lnurlPay:amountMillisats:zapRequest:lnurl:urlSession:)``
 - ``ZapResult``
-
-### Relay Transport
-
-- ``WalletConnectTransport``
-- ``RelayConnectionTransport``
 
 ### Supporting Types
 

@@ -4,8 +4,8 @@ import Testing
 
 @testable import NostrConnect
 
-@Suite("RemoteSignerTransport Tests")
-struct RelayConnectionTransportTests {
+@Suite("FakeRemoteSignerTransport Tests")
+struct FakeRemoteSignerTransportTests {
     private func event(id: String, content: String = "x") -> Event {
         Event(
             id: id,
@@ -16,8 +16,6 @@ struct RelayConnectionTransportTests {
             content: content,
             sig: "")
     }
-
-    // MARK: - Fake transport
 
     @Test("connect and disconnect toggle the connected flag")
     func connectDisconnect() async throws {
@@ -78,47 +76,5 @@ struct RelayConnectionTransportTests {
         var iterator = first.makeAsyncIterator()
         let next = await iterator.next()
         #expect(next == nil)
-    }
-
-    // MARK: - Default RelayConnectionTransport
-
-    @Test("connect throws notConnected when there are no relays")
-    func connectWithoutRelaysThrows() async {
-        let transport = RelayConnectionTransport(relayURLs: [])
-        await #expect(throws: RemoteSignerError.notConnected) {
-            try await transport.connect()
-        }
-    }
-
-    @Test("subscribe throws notConnected when there are no relays")
-    func subscribeWithoutRelaysThrows() async {
-        let transport = RelayConnectionTransport(relayURLs: [])
-        await #expect(throws: RemoteSignerError.notConnected) {
-            try await transport.subscribe(id: "sub", filters: [Filter(kinds: [.nostrConnect])])
-        }
-    }
-
-    @Test("send throws notConnected when there are no relays")
-    func sendWithoutRelaysThrows() async {
-        let transport = RelayConnectionTransport(relayURLs: [])
-        await #expect(throws: RemoteSignerError.notConnected) {
-            try await transport.send(event(id: "aa"))
-        }
-    }
-
-    @Test("events() finishes immediately when there are no relays")
-    func eventsWithoutRelaysFinishes() async {
-        let transport = RelayConnectionTransport(relayURLs: [])
-        let stream = await transport.events()
-
-        var iterator = stream.makeAsyncIterator()
-        let next = await iterator.next()
-        #expect(next == nil)
-    }
-
-    @Test("disconnect is safe when there are no relays")
-    func disconnectWithoutRelays() async {
-        let transport = RelayConnectionTransport(relayURLs: [])
-        await transport.disconnect()
     }
 }

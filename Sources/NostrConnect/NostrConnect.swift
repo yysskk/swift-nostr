@@ -17,5 +17,5 @@
 // request with its response by the JSON `id`, surfaces `auth_url` challenges, and exposes typed
 // commands (sign, get_public_key, ping, NIP-44/NIP-04, switch_relays, logout). Underneath sit the
 // model layer (the remote-signing method set, the request and response envelope, permission tokens,
-// the authentication-challenge value, and the module's errors), the connection URIs, and the
-// `RemoteSignerTransport` relay seam.
+// the authentication-challenge value, and the module's errors) and the connection URIs. Relay I/O
+// goes through NostrCore's `RelayTransport` seam.

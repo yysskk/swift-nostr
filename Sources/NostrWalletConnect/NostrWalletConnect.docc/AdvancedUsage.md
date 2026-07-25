@@ -183,12 +183,13 @@ confirm it with `NostrClient` (subscribe to those relays and validate with
 
 ## Custom Transport
 
-``WalletConnection`` talks to relays through the ``WalletConnectTransport`` protocol. The default,
-``RelayConnectionTransport``, drives `NostrCore`'s relay connections over the URI's relays.
-Inject your own transport to run on a different relay stack or to test without a live relay:
+``WalletConnection`` talks to relays through `NostrCore`'s `RelayTransport` protocol — the same seam
+a NIP-46 signer session uses. The default, `RelayConnectionTransport`, drives one `NostrCore` relay
+connection per URI relay, sending each request to all of them and merging their events into one
+stream. Inject your own transport to run on a different relay stack or to test without a live relay:
 
 ```swift
-struct InMemoryTransport: WalletConnectTransport {
+struct InMemoryTransport: RelayTransport {
     func connect() async throws { /* ... */ }
     func subscribe(id: String, filters: [Filter]) async throws { /* ... */ }
     func unsubscribe(id: String) async { /* ... */ }
@@ -200,10 +201,20 @@ struct InMemoryTransport: WalletConnectTransport {
 let connection = WalletConnection(uri: uri, transport: InMemoryTransport())
 ```
 
-NIP-47 request events are ephemeral, so ``WalletConnectTransport/send(_:)`` is fire-and-forget: the
-matching response delivered through ``WalletConnectTransport/events()`` is the completion signal, not
-a relay `OK`. Because the seam is platform-independent, a wallet connection runs anywhere
-`NostrCore` does, including non-Apple platforms.
+To keep the default transport but put it on a different socket — a platform-native WebSocket on a
+platform whose Foundation has none, or an in-memory fake in tests — hand it a
+`WebSocketSessionFactory` instead:
+
+```swift
+let connection = WalletConnection(
+    uri: uri,
+    transport: RelayConnectionTransport(relayURLs: uri.relays, webSocketFactory: OkHttpWebSocketFactory()))
+```
+
+NIP-47 request events are ephemeral, so `RelayTransport`'s `send(_:)` is fire-and-forget: the
+matching response delivered through its `events()` stream is the completion signal, not a relay
+`OK`. Because the seam is platform-independent, a wallet connection runs anywhere `NostrCore` does,
+including non-Apple platforms.
 
 ## Error Handling
 

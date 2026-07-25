@@ -1276,6 +1276,26 @@ Connection state (enum: Sendable, Equatable).
 
 Cases: `.disconnected`, `.connecting`, `.connected`, `.disconnecting`, `.failed(String)`.
 
+## RelayTransport
+
+A session's seam over relay I/O (protocol: Sendable). A NIP-46 signer session (`RemoteSigner`) or a
+NIP-47 wallet connection (`WalletConnection`) talks to this instead of touching relays directly, and
+both accept one in their initializer. Requirements: `connect()`, `subscribe(id:filters:)`,
+`unsubscribe(id:)`, `send(_:)`, `events() -> AsyncStream<Event>`, `disconnect()`. Request events in
+both protocols are ephemeral, so `send(_:)` is fire-and-forget -- the matching response on `events()`
+is the completion signal, not a relay `OK`.
+
+`RelayConnectionTransport` is the default implementation (actor): one `RelayConnection` per URL, each
+request fanned out to all of them, their events merged into one stream, and `NostrError.notConnected`
+thrown when an operation reaches no relay.
+
+```swift
+let transport = RelayConnectionTransport(relayURLs: relays)                 // URLSession sockets
+let tuned = RelayConnectionTransport(relayURLs: relays, config: relayConfig)
+// Or run the relays on a platform-native socket (OkHttp on Android) or an in-memory test fake.
+let injected = RelayConnectionTransport(relayURLs: relays, webSocketFactory: OkHttpWebSocketFactory())
+```
+
 ## Bech32
 
 Bech32 encoding/decoding for NIP-19 (enum).
@@ -1397,7 +1417,8 @@ for await challenge in await signer.authChallenges() {
 - `RemoteSignerMethod` — the method set (`connect`, `sign_event`, `ping`, `get_public_key`, `nip04_*`, `nip44_*`, `switch_relays`, `logout`)
 - `RemoteSignerPermission` — `perms` tokens (e.g. `.signEvent(kind:)`, `.nip44Encrypt`)
 - `RemoteSignerAuthChallenge` — `url`, `method`, `requestID`
-- `RemoteSignerTransport` / `RelayConnectionTransport` — the relay seam; inject a fake for tests
+- `RelayTransport` / `RelayConnectionTransport` (`NostrCore`) — the relay seam; inject a fake for
+  tests, or the default transport with a `webSocketFactory:` for a platform-native socket
 - `RemoteSignerError` — `invalidURI(reason:)`, `notConnected`, `connectionInProgress`, `requestEncodingFailed`, `responseDecodingFailed`, `timedOut`, `connectionRejected(message:)`, `secretMismatch`, `signerError(message:)`, `responseValidationFailed`
 
 ## NostrError

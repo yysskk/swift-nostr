@@ -1,6 +1,6 @@
 # ``NostrCore``
 
-The shared Nostr protocol primitives, cryptography, and relay transport that both `NostrClient` and `NostrWalletConnect` build on.
+The shared Nostr protocol primitives, cryptography, and relay transport that `NostrClient`, `NostrWalletConnect`, and `NostrConnect` build on.
 
 ## Overview
 
@@ -79,6 +79,11 @@ let isValid = try event.verify()
 - ``URLSessionWebSocketFactory``
 - ``WebSocketMessage``
 - ``WebSocketCloseCode``
+
+### Relay Transport
+
+- ``RelayTransport``
+- ``RelayConnectionTransport``
 
 ### Lightning (NIP-57)
 

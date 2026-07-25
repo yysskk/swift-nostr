@@ -1,5 +1,5 @@
 import Foundation
-import NostrCore
+public import NostrCore
 
 /// A connection to a remote Lightning wallet over NIP-47 Nostr Wallet Connect.
 ///
@@ -34,7 +34,7 @@ public actor WalletConnection {
     private static let responseSubscriptionID = "nwc-responses"
     private static let infoSubscriptionID = "nwc-info"
 
-    private let transport: any WalletConnectTransport
+    private let transport: any RelayTransport
     private let config: Config
     private let keyPair: KeyPair
     private let signer: EventSigner
@@ -57,10 +57,10 @@ public actor WalletConnection {
     /// Creates a connection.
     /// - Parameters:
     ///   - uri: The wallet's connection URI.
-    ///   - transport: The relay transport. Defaults to a ``RelayConnectionTransport`` over the URI's
+    ///   - transport: The relay transport. Defaults to a `RelayConnectionTransport` over the URI's
     ///     relays; inject a custom one (e.g. for tests).
     ///   - config: Connection behavior.
-    public init(uri: WalletConnectURI, transport: (any WalletConnectTransport)? = nil, config: Config = Config()) {
+    public init(uri: WalletConnectURI, transport: (any RelayTransport)? = nil, config: Config = Config()) {
         let keyPair = uri.clientKeyPair()
         self.config = config
         self.keyPair = keyPair

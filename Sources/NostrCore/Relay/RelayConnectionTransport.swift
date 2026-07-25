@@ -1,17 +1,16 @@
 import Foundation
-public import NostrCore
 
 #if canImport(FoundationNetworking)
     import FoundationNetworking
 #endif
 
-/// The default ``RemoteSignerTransport``, backed by one or more `NostrCore` `RelayConnection`s.
+/// The default ``RelayTransport``, backed by one or more ``RelayConnection``s.
 ///
-/// A remote signer session usually targets a single relay, but a connection URI may list several;
-/// this transport connects to all of them, sends each request to all, and merges their incoming
-/// events into one stream. Duplicate responses across relays are harmless: ``RemoteSigner`` matches
-/// the first response to a request and ignores the rest.
-public actor RelayConnectionTransport: RemoteSignerTransport {
+/// A session usually targets a single relay, but a connection URI may list several; this transport
+/// connects to all of them, sends each request to all, and merges their incoming events into one
+/// stream. Duplicate responses across relays are harmless: a session matches the first response to
+/// a request and ignores the rest.
+public actor RelayConnectionTransport: RelayTransport {
     private let relays: [RelayConnection]
     private var forwardingTasks: [Task<Void, Never>] = []
     private var eventContinuation: AsyncStream<Event>.Continuation?
@@ -23,10 +22,30 @@ public actor RelayConnectionTransport: RemoteSignerTransport {
 
     /// Creates a transport for the given relay URLs.
     /// - Parameters:
-    ///   - relayURLs: The relays to connect to (typically the URLs from a NIP-46 connection URI).
+    ///   - relayURLs: The relays to connect to (typically the URLs from a connection URI).
     ///   - urlSession: The URL session backing the WebSocket connections (defaults to `.shared`).
-    public init(relayURLs: [URL], urlSession: URLSession = .shared) {
-        self.relays = relayURLs.map { RelayConnection(url: $0, urlSession: urlSession) }
+    ///   - config: Timeout, keepalive, and reconnection behavior for each relay.
+    public init(relayURLs: [URL], urlSession: URLSession = .shared, config: RelayConnectionConfig = .default) {
+        self.relays = relayURLs.map { RelayConnection(url: $0, urlSession: urlSession, config: config) }
+    }
+
+    /// Creates a transport whose relays run on the sockets `webSocketFactory` hands out.
+    ///
+    /// Supply a custom ``WebSocketSessionFactory`` to put a session on a platform-native socket —
+    /// for example an OkHttp-backed factory on Android — or on an in-memory fake in tests, so the
+    /// session's relay round-trips never touch the network.
+    /// - Parameters:
+    ///   - relayURLs: The relays to connect to (typically the URLs from a connection URI).
+    ///   - webSocketFactory: Creates the transport for each relay's connection attempts.
+    ///   - config: Timeout, keepalive, and reconnection behavior for each relay.
+    public init(
+        relayURLs: [URL],
+        webSocketFactory: any WebSocketSessionFactory,
+        config: RelayConnectionConfig = .default
+    ) {
+        self.relays = relayURLs.map {
+            RelayConnection(url: $0, webSocketFactory: webSocketFactory, config: config)
+        }
     }
 
     public func connect() async throws {
@@ -36,7 +55,7 @@ public actor RelayConnectionTransport: RemoteSignerTransport {
                 connected += 1
             }
         }
-        guard connected > 0 else { throw RemoteSignerError.notConnected }
+        guard connected > 0 else { throw NostrError.notConnected }
     }
 
     public func subscribe(id: String, filters: [Filter]) async throws {
@@ -46,7 +65,7 @@ public actor RelayConnectionTransport: RemoteSignerTransport {
                 subscribed += 1
             }
         }
-        guard subscribed > 0 else { throw RemoteSignerError.notConnected }
+        guard subscribed > 0 else { throw NostrError.notConnected }
     }
 
     public func unsubscribe(id: String) async {
@@ -62,7 +81,7 @@ public actor RelayConnectionTransport: RemoteSignerTransport {
                 sent += 1
             }
         }
-        guard sent > 0 else { throw RemoteSignerError.notConnected }
+        guard sent > 0 else { throw NostrError.notConnected }
     }
 
     public func events() -> AsyncStream<Event> {

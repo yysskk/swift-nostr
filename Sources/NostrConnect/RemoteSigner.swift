@@ -41,7 +41,7 @@ public actor RemoteSigner {
 
     private static let responseSubscriptionID = "nip46-responses"
 
-    private let transport: any RemoteSignerTransport
+    private let transport: any RelayTransport
     private let config: Config
     private let clientKeyPair: KeyPair
     private let signer: EventSigner
@@ -87,14 +87,14 @@ public actor RemoteSigner {
     ///   - bunker: The parsed token.
     ///   - clientKeyPair: The local client identity; a fresh random keypair by default. Pass a
     ///     persisted one to resume an authorized session.
-    ///   - transport: The relay transport. Defaults to a ``RelayConnectionTransport`` over the
+    ///   - transport: The relay transport. Defaults to a `RelayConnectionTransport` over the
     ///     token's relays; inject a custom one (e.g. for tests).
     ///   - config: Session behavior.
     /// - Throws: An error if `clientKeyPair` is `nil` and a fresh keypair cannot be generated.
     public init(
         bunker: BunkerURI,
         clientKeyPair: KeyPair? = nil,
-        transport: (any RemoteSignerTransport)? = nil,
+        transport: (any RelayTransport)? = nil,
         config: Config = Config()
     ) throws {
         let keyPair = try clientKeyPair ?? KeyPair()
@@ -115,7 +115,7 @@ public actor RemoteSigner {
     init(
         clientKeyPair: KeyPair,
         expectedInvitationSecret: String,
-        transport: any RemoteSignerTransport,
+        transport: any RelayTransport,
         config: Config
     ) {
         self.clientKeyPair = clientKeyPair
