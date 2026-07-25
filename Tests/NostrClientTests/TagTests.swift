@@ -73,12 +73,12 @@ struct TagTests {
     func pubkeyTagMatchesContactToTag() {
         let contacts = [
             Contact(pubkey: "pk1"),
-            Contact(pubkey: "pk1", relayUrl: "wss://r.example"),
+            Contact(pubkey: "pk1", relayURL: "wss://r.example"),
             Contact(pubkey: "pk1", petname: "alice"),
-            Contact(pubkey: "pk1", relayUrl: "wss://r.example", petname: "alice"),
+            Contact(pubkey: "pk1", relayURL: "wss://r.example", petname: "alice"),
         ]
         for contact in contacts {
-            let tag = Event.Tag.pubkey(contact.pubkey, relayURL: contact.relayUrl, petname: contact.petname)
+            let tag = Event.Tag.pubkey(contact.pubkey, relayURL: contact.relayURL, petname: contact.petname)
             #expect(tag.rawArray == contact.toTag())
         }
     }

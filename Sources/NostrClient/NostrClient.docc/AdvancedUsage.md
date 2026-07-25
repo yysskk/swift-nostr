@@ -266,7 +266,7 @@ let parsed = try NEvent(bech32String: nevent)
 
 ```swift
 let contacts = [
-    Contact(pubkey: "pubkey1", relayUrl: "wss://relay.example.com", petname: "alice"),
+    Contact(pubkey: "pubkey1", relayURL: "wss://relay.example.com", petname: "alice"),
     Contact(pubkey: "pubkey2")
 ]
 try await client.publishContactList(contacts)
