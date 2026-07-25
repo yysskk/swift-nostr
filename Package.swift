@@ -76,6 +76,13 @@ let package = Package(
             ],
             swiftSettings: swiftSettings
         ),
+        // Test-only doubles shared by the test targets. Deliberately not a product: nothing
+        // outside this package's tests depends on it, so it never reaches library consumers.
+        .target(
+            name: "NostrTestSupport",
+            dependencies: ["NostrCore"],
+            swiftSettings: swiftSettings
+        ),
         .testTarget(
             name: "NostrCoreTests",
             dependencies: ["NostrCore"],
@@ -88,7 +95,7 @@ let package = Package(
         ),
         .testTarget(
             name: "NostrClientTests",
-            dependencies: ["NostrClient", "NostrCore"],
+            dependencies: ["NostrClient", "NostrCore", "NostrTestSupport"],
             swiftSettings: swiftSettings
         ),
         .testTarget(

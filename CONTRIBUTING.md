@@ -19,9 +19,10 @@ swift build
 swift test
 ```
 
-The package vends three libraries — `NostrCore` (protocol primitives, cryptography, single-relay
-transport), `NostrClient` (the high-level actor-based client), and `NostrWalletConnect` (NIP-47
-wallet payments) — each with a matching test target under `Tests/`.
+The package vends four libraries — `NostrCore` (protocol primitives, cryptography, single-relay
+transport), `NostrClient` (the high-level actor-based client), `NostrWalletConnect` (NIP-47
+wallet payments), and `NostrConnect` (NIP-46 remote signing) — each with a matching test target
+under `Tests/`.
 
 ## Code formatting
 
@@ -43,8 +44,9 @@ Tests use [swift-testing](https://developer.apple.com/documentation/testing) (`@
 `#expect`) — not XCTest. Please follow the existing conventions:
 
 - Every behavior change needs test coverage in the matching test target.
-- Tests never touch the network. Relay behavior is driven through the in-memory mock transports
-  in `Tests/NostrClientTests/Support/` (`MockWebSocketSession`, `MockURLSession`); use them
+- Tests never touch the network. Relay behavior is driven through in-memory mock transports:
+  `MockWebSocketSession` lives in the shared, test-only `Sources/NostrTestSupport/` target
+  (`import NostrTestSupport`), `MockURLSession` in `Tests/NostrClientTests/Support/`; use them
   instead of live relays or timing-dependent sleeps.
 - Keep tests deterministic — prefer bounded polling helpers over fixed sleeps.
 
