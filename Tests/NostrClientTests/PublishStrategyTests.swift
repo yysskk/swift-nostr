@@ -23,11 +23,11 @@ struct PublishStrategyTests {
         )
     }
 
-    private func makePool() async -> RelayPool {
+    private func makePool() async throws -> RelayPool {
         let pool = RelayPool()
-        await pool.addRelay(url: urlA)
-        await pool.addRelay(url: urlB)
-        await pool.addRelay(url: urlC)
+        try await pool.addRelay(urlA)
+        try await pool.addRelay(urlB)
+        try await pool.addRelay(urlC)
         return pool
     }
 
@@ -84,8 +84,8 @@ struct PublishStrategyTests {
     }
 
     @Test("publishing to an empty target set throws")
-    func publishToEmptyTargetSetThrows() async {
-        let pool = await makePool()
+    func publishToEmptyTargetSetThrows() async throws {
+        let pool = try await makePool()
         await #expect(throws: NostrError.noMatchingRelays([])) {
             try await pool.publish(self.dummyEvent, to: [])
         }
@@ -102,8 +102,8 @@ struct PublishStrategyTests {
     @Test(
         "publish on a pool of disconnected relays throws for every strategy",
         arguments: [PublishStrategy.firstAck, .quorum(2), .allSettled])
-    func poolPublishThrowsWhenAllRelaysDisconnected(strategy: PublishStrategy) async {
-        let pool = await makePool()
+    func poolPublishThrowsWhenAllRelaysDisconnected(strategy: PublishStrategy) async throws {
+        let pool = try await makePool()
         await #expect(throws: NostrError.notConnected) {
             try await pool.publish(self.dummyEvent, strategy: strategy)
         }

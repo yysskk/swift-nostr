@@ -354,9 +354,9 @@ struct NIP51SimpleGroupListClientTests {
     @Test("publishSimpleGroupList broadcasts the kind-10009 event to every relay in the pool")
     func publishBroadcastsToWholePool() async throws {
         let (client, firstSocket, secondSocket) = makeTwoSocketClient()
-        let firstConnection = await client.relayPool.addRelay(url: firstRelayURL)
+        let firstConnection = try await client.relayPool.addRelay(firstRelayURL)
         try await firstConnection.connect()
-        let secondConnection = await client.relayPool.addRelay(url: secondRelayURL)
+        let secondConnection = try await client.relayPool.addRelay(secondRelayURL)
         try await secondConnection.connect()
         await client.setSigner(EventSigner(keyPair: try KeyPair()))
 

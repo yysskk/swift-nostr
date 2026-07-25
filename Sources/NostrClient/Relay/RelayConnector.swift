@@ -22,28 +22,24 @@ struct RelayConnector: Sendable {
 
     /// Ensures the given relay URLs are present (and, for `.addAndConnect`, connected) in the pool,
     /// honoring the configured policy and per-resolve cap.
-    /// - Returns: The subset of URLs available for routing.
+    /// - Returns: The subset of URLs available for routing, in their canonical (normalized)
+    ///   form regardless of the input spelling.
     func ensureConnected(_ urls: Set<URL>) async -> Set<URL> {
         var available: Set<URL> = []
         var added = 0
         for url in urls {
-            let isPresent = await pool.relay(for: url) != nil
-            switch policy {
-            case .requirePresent:
-                if isPresent {
-                    available.insert(url)
-                }
-            case .addAndConnect:
-                if isPresent {
-                    available.insert(url)
-                } else if added < maxRelaysPerResolve {
-                    let connection = await pool.addRelay(url: url)
-                    added += 1
-                    // Best-effort: a dead outbox/inbox relay must not fail the whole operation.
-                    try? await connection.connect()
-                    available.insert(url)
-                }
+            if let present = await pool.relay(for: url) {
+                available.insert(present.url)
+                continue
             }
+            guard policy == .addAndConnect, added < maxRelaysPerResolve else { continue }
+            // Relay lists are third-party data; an entry the pool refuses must not sink
+            // the whole route — urlSet's filtering makes this a second line of defense.
+            guard let connection = try? await pool.addRelay(url) else { continue }
+            added += 1
+            // Best-effort: a dead outbox/inbox relay must not fail the whole operation.
+            try? await connection.connect()
+            available.insert(connection.url)
         }
         return available
     }

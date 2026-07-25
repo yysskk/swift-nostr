@@ -13,6 +13,9 @@ public enum NostrError: Error, LocalizedError, Sendable, Equatable {
     case serializationFailed
     case invalidData
     case invalidMessageFormat
+    /// A relay URL string that is unparseable, has a non-ws(s) scheme, lacks a host,
+    /// or carries a fragment or user/password.
+    case invalidRelayURL(String)
     case connectionFailed(String)
     case notConnected
     case subscriptionNotFound(String)
@@ -67,6 +70,8 @@ public enum NostrError: Error, LocalizedError, Sendable, Equatable {
             return "Invalid data"
         case .invalidMessageFormat:
             return "Invalid message format"
+        case .invalidRelayURL(let url):
+            return "Invalid relay URL: \(url)"
         case .connectionFailed(let reason):
             return "Connection failed: \(reason)"
         case .notConnected:

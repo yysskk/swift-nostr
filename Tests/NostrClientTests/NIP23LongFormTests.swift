@@ -248,7 +248,7 @@ struct NIP23LongFormTests {
             webSocketFactory: MockWebSocketSessionFactory(makeSession: { mock })
         )
         let client = NostrClient(relayPool: pool)
-        let connection = await pool.addRelay(url: relayURL)
+        let connection = try await pool.addRelay(relayURL)
         try await connection.connect()
 
         let task = Task {
@@ -282,7 +282,7 @@ struct NIP23LongFormTests {
             webSocketFactory: MockWebSocketSessionFactory(makeSession: { mock })
         )
         let client = NostrClient(relayPool: pool)
-        let connection = await pool.addRelay(url: relayURL)
+        let connection = try await pool.addRelay(relayURL)
         try await connection.connect()
 
         // A relay hint matching the pooled relay: the fetch targets it (the new `to:` param).

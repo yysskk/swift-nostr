@@ -116,10 +116,16 @@ try await client.authenticate(relayURL: url)  // answer a pending challenge expl
 
 ### Relay Management
 
+Relay URLs are strings everywhere, validated strictly: an unparseable string, a
+non-`ws(s)` scheme, a missing host, or a fragment/userinfo throws
+`NostrError.invalidRelayURL`. Any spelling of the same relay (case, root slash,
+default port) routes to one pooled connection.
+
 ```swift
 try await client.addRelay("wss://relay.example.com")
 try await client.addRelay("wss://relay.example.com", config: customConfig)
 try await client.addRelays(["wss://relay1.example.com", "wss://relay2.example.com"])
+try await client.removeRelay("wss://relay.example.com")  // absent relay: no-op
 try await client.connect()
 try await client.connect(to: ["wss://relay.example.com"])  // addRelays + connect in one step
 await client.disconnect()
@@ -197,8 +203,9 @@ results. With zero resolved relays they throw (`NostrError.noRelaysInPool` /
 let events = try await client.fetch(filters: [filter])
 let event = try await client.fetchEvent(id: "eventId...")
 let metadata = try await client.fetchMetadata(pubkey: "...")
-// Scope a fetch to a subset of relays (e.g. naddr relay hints); nil (default) uses the whole pool.
-let scoped = try await client.fetch(filters: [filter], to: [URL(string: "wss://relay.example")!])
+// Scope a fetch to a subset of relays (e.g. naddr relay hints); nil (default) uses the
+// whole pool, [] throws, and an invalid string throws NostrError.invalidRelayURL.
+let scoped = try await client.fetch(filters: [filter], to: ["wss://relay.example"])
 ```
 
 ### Event Counts (NIP-45)
@@ -210,6 +217,8 @@ count fails fast.
 ```swift
 // Max count across relays (each relay's count is a lower bound):
 let total = try await client.count(filters: [filter])
+// Scope to a subset of relays (same to: semantics as fetch):
+let scoped = try await client.count(filters: [filter], to: ["wss://relay.example"])
 // Per-relay counts:
 let byRelay = try await client.relayPool.count(filters: [filter])  // [URL: EventCount]
 ```
@@ -373,9 +382,10 @@ itself is required.
 ```swift
 let published = try await client.publishTextNote(content: "hi")
 published.event          // Event
-published.result         // PublishResult
+published.result         // PublishResult (statuses keyed by canonical relay URL)
 published.id             // forwarded from Event
 published.result.acceptedRelays / .failedRelays / .pendingRelays
+published.result.status(for: "wss://Relay.Example.com/")  // any spelling; nil if not targeted
 ```
 
 ## UnsignedEvent
@@ -1214,18 +1224,22 @@ let config = RelayPoolConfig(
 ### Methods
 
 ```swift
-try await pool.addRelay(url: url, config: relayConfig)
-try await pool.removeRelay(url: url)
+try await pool.addRelay("wss://relay.example.com", config: relayConfig)  // also accepts a URL
+try await pool.removeRelay("wss://relay.example.com")
 try await pool.connectAll()      // tolerates partial failures
 await pool.disconnectAll()
 try await pool.subscribe(subscriptionId: "sub1", filters: [filter]) { message in }
-try await pool.subscribeWithRelayContext(subscriptionId: "sub1", filters: [filter]) { relayURL, message in }
 try await pool.unsubscribe(subscriptionId: "sub1")
 try await pool.publish(signedEvent)
+try await pool.publish(signedEvent, to: ["wss://relay.example.com"])  // targeted; statuses keyed canonically
 try await pool.count(filters: [filter])   // [URL: EventCount], per relay (NIP-45)
 await pool.setAuthenticationResponder { url, challenge in /* signed kind-22242 event or nil */ }
 await pool.clearDeduplicationCache()
 ```
+
+Targeting (`to:`) and management take relay URL strings; invalid strings throw
+`NostrError.invalidRelayURL`, nil broadcasts to the whole pool, and an empty array
+throws `noMatchingRelays`.
 
 ## RelayConnection
 
@@ -1429,7 +1443,7 @@ for await challenge in await signer.authChallenges() {
 
 Error types (enum: Error, LocalizedError, Sendable, Equatable).
 
-Cases: `invalidPrivateKey`, `invalidPublicKey`, `invalidSignature`, `invalidEventId`, `signingFailed`, `signerNotSet`, `verificationFailed`, `serializationFailed`, `invalidData`, `invalidMessageFormat`, `connectionFailed(String)`, `notConnected`, `subscriptionNotFound(String)`, `relayError(String)`, `authenticationFailed(String)`, `timeout`, `invalidHex`, `invalidBech32`, `unknownPrefix(String)`, `encryptionFailed`, `decryptionFailed`, `unsupportedEncryptionVersion(UInt8)`, `invalidPayloadFormat`, `hmacVerificationFailed`, `invalidPadding`, `invalidMnemonic`, `invalidMnemonicWord(String)`, `invalidMnemonicChecksum`, `randomGenerationFailed`.
+Cases: `invalidPrivateKey`, `invalidPublicKey`, `invalidSignature`, `invalidEventId`, `signingFailed`, `signerNotSet`, `localSignerRequired`, `verificationFailed`, `serializationFailed`, `invalidData`, `invalidMessageFormat`, `invalidRelayURL(String)`, `connectionFailed(String)`, `notConnected`, `subscriptionNotFound(String)`, `relayError(String)`, `noRelaysInPool`, `noMatchingRelays([String])`, `authenticationFailed(String)`, `cannotPublishAuthenticationEvent`, `timeout`, `invalidHex`, `invalidBech32`, `unknownPrefix(String)`, `invalidTLV`, `invalidNIP19Entity`, `invalidNostrURI`, `encryptionFailed`, `decryptionFailed`, `unsupportedEncryptionVersion(UInt8)`, `invalidPayloadFormat`, `hmacVerificationFailed`, `invalidPadding`, `invalidMnemonic`, `invalidMnemonicWord(String)`, `invalidMnemonicChecksum`, `randomGenerationFailed`, `invalidNcryptsec`, `unsupportedScryptCost(UInt8)`.
 
 ## Supported NIPs
 

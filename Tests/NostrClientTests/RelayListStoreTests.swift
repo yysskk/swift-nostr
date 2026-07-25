@@ -133,17 +133,53 @@ struct RelayListStoreTests {
             })
         )
         let store = RelayListStore(pool: pool, policy: .addAndConnect)
-        let connection = await pool.addRelay(url: URL(string: "wss://relay.example.com")!)
+        let connection = try await pool.addRelay(URL(string: "wss://relay.example.com")!)
         try await connection.connect()
         #expect(socketCount.current == 1)
 
         // The same relay spelled with a trailing slash must route to the existing
-        // connection instead of opening a duplicate socket.
+        // connection instead of opening a duplicate socket, and the returned set
+        // carries the canonical spelling, not the input's.
         let alternate = URL(string: "wss://relay.example.com/")!
         let available = await store.ensureConnected([alternate])
 
-        #expect(available == [alternate])
+        #expect(available == [URL(string: "wss://relay.example.com")!])
         #expect(socketCount.current == 1)
+        #expect(await pool.count == 1)
+        await pool.disconnectAll()
+    }
+
+    @Test("addAndConnect returns canonical URLs for relays it adds")
+    func addAndConnectReturnsCanonicalURLs() async throws {
+        let pool = RelayPool(
+            config: RelayPoolConfig(defaultRelayConfig: ConnectedClientFixture.noReconnectConfig),
+            webSocketFactory: MockWebSocketSessionFactory(makeSession: { MockWebSocketSession() })
+        )
+        let store = RelayListStore(pool: pool, policy: .addAndConnect)
+
+        let available = await store.ensureConnected([URL(string: "wss://New.Example.com/")!])
+
+        #expect(available == [URL(string: "wss://new.example.com")!])
+        #expect(await pool.relay(for: URL(string: "wss://new.example.com")!) != nil)
+        await pool.disconnectAll()
+    }
+
+    @Test("addAndConnect skips a URL the pool refuses without failing the route")
+    func addAndConnectSkipsRefusedURL() async {
+        let pool = RelayPool(
+            config: RelayPoolConfig(defaultRelayConfig: ConnectedClientFixture.noReconnectConfig),
+            webSocketFactory: MockWebSocketSessionFactory(makeSession: { MockWebSocketSession() })
+        )
+        let store = RelayListStore(pool: pool, policy: .addAndConnect)
+
+        // A non-WebSocket URL is refused by the pool's validation; the resolve
+        // must skip it (not throw) and keep the valid relay.
+        let available = await store.ensureConnected([
+            URL(string: "https://not-a-relay.example.com")!,
+            URL(string: "wss://good.example.com")!,
+        ])
+
+        #expect(available == [URL(string: "wss://good.example.com")!])
         #expect(await pool.count == 1)
         await pool.disconnectAll()
     }

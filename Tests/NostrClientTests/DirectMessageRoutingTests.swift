@@ -43,9 +43,9 @@ struct DirectMessageRoutingTests {
     // MARK: - Send side (routing resolution)
 
     @Test("Routes to a recipient's cached DM inbox relays present in the pool")
-    func routesRecipientInbox() async {
+    func routesRecipientInbox() async throws {
         let pool = RelayPool()
-        await pool.addRelay(url: inboxURL)
+        try await pool.addRelay(inboxURL)
         let client = NostrClient(relayPool: pool, gossipPolicy: .requirePresent)
 
         let recipient = "recipientpubkey"

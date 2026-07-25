@@ -160,9 +160,9 @@ extension NostrClient {
         let recipientTargets = await recipientTargetsTask
         let senderTargets = await senderTargetsTask
 
-        async let selfCopyDelivery = publishBestEffort(result.selfGiftWrap, to: senderTargets)
+        async let selfCopyDelivery = publishBestEffort(result.selfGiftWrap, toURLs: senderTargets)
         let recipientResult = try await relayPool.publish(
-            result.recipientGiftWrap, to: recipientTargets, strategy: strategy
+            result.recipientGiftWrap, toURLs: recipientTargets, strategy: strategy
         )
         let selfCopyResult = await selfCopyDelivery
 
@@ -178,10 +178,10 @@ extension NostrClient {
     /// Publishes an event, swallowing failures (used for non-fatal NIP-17 self-copies).
     /// Always uses the pool's default strategy so a caller-supplied strategy
     /// never makes the best-effort publish block the primary send.
-    /// - Parameter relayURLs: The relays to target, or nil to broadcast to the full pool.
+    /// - Parameter relayURLs: The canonical relays to target, or nil to broadcast to the full pool.
     /// - Returns: The per-relay outcome, or nil if the publish failed outright.
-    private func publishBestEffort(_ event: Event, to relayURLs: Set<URL>? = nil) async -> PublishResult? {
-        try? await relayPool.publish(event, to: relayURLs)
+    private func publishBestEffort(_ event: Event, toURLs relayURLs: Set<URL>?) async -> PublishResult? {
+        try? await relayPool.publish(event, toURLs: relayURLs, strategy: nil)
     }
 
     /// Resolves the kind-10050 DM inbox relays to route a gift wrap to for `pubkey`, connecting

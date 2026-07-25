@@ -141,6 +141,8 @@ public actor RelayConnection {
         isAuthenticated || !pendingAuthentications.isEmpty || authenticationResponder != nil
     }
 
+    /// Creates a connection to `url`, trusting it as given (no validation or normalization);
+    /// use ``init(urlString:config:)`` for validated input.
     public init(url: URL, urlSession: URLSession = .shared, config: RelayConnectionConfig = .default) {
         self.init(
             url: url,
@@ -149,11 +151,12 @@ public actor RelayConnection {
         )
     }
 
+    /// Creates a connection to `urlString`, validating it as a WebSocket relay URL and
+    /// normalizing it to its canonical form.
+    /// - Throws: ``NostrError/invalidRelayURL(_:)`` when the string does not parse, the
+    ///   scheme is not `ws`/`wss`, the host is empty, or a fragment or user/password is present.
     public init(urlString: String, config: RelayConnectionConfig = .default) throws {
-        guard let url = URL(string: urlString) else {
-            throw NostrError.connectionFailed("Invalid URL: \(urlString)")
-        }
-        self.init(url: url, config: config)
+        self.init(url: try RelayURL.requireTarget(urlString), config: config)
     }
 
     /// Designated initializer, creating a connection whose sockets come from `webSocketFactory`.

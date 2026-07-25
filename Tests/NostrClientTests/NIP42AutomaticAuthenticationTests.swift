@@ -293,11 +293,11 @@ struct NIP42AutomaticAuthenticationTests {
         let urlA = URL(string: "wss://relay-a.example.com")!
         let urlB = URL(string: "wss://relay-b.example.com")!
 
-        let connectionA = await pool.addRelay(url: urlA)
+        let connectionA = try await pool.addRelay(urlA)
         await pool.setAuthenticationResponder { relayURL, challenge in
             try? signer.signClientAuthentication(relayURL: relayURL, challenge: challenge)
         }
-        let connectionB = await pool.addRelay(url: urlB)
+        let connectionB = try await pool.addRelay(urlB)
         // Connect sequentially so the factory pairs mockA with relay A and
         // mockB with relay B deterministically.
         try await connectionA.connect()
@@ -400,8 +400,8 @@ struct NIP42AutomaticAuthenticationTests {
         let (client, _) = makeClient()
         await client.setSigner(EventSigner(keyPair: try KeyPair()))
 
-        await #expect(throws: NostrError.self) {
-            try await client.authenticate(relayURL: URL(string: "wss://unknown.example.com")!)
+        await #expect(throws: NostrError.noMatchingRelays(["wss://unknown.example.com"])) {
+            try await client.authenticate(relayURL: URL(string: "wss://Unknown.Example.com/")!)
         }
     }
 

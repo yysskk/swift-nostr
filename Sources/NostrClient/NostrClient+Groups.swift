@@ -13,14 +13,12 @@ extension NostrClient {
     /// stripped), the relay is added when absent, and connecting is idempotent when it
     /// already is connected.
     ///
-    /// - Returns: The normalized URL to pass to the pool's `to:` parameters.
-    /// - Throws: ``NostrError/connectionFailed(_:)`` when the URL does not parse or the
-    ///   relay cannot be connected.
+    /// - Returns: The normalized URL to pass to the pool's targeting parameters.
+    /// - Throws: ``NostrError/invalidRelayURL(_:)`` when the URL is not a valid WebSocket
+    ///   relay URL, or ``NostrError/connectionFailed(_:)`` when the relay cannot be connected.
     func ensureGroupRelay(_ group: GroupReference) async throws -> URL {
-        guard let url = URL(string: RelayURL.normalize(group.relayURL)) else {
-            throw NostrError.connectionFailed("Invalid relay URL: \(group.relayURL)")
-        }
-        let connection = await relayPool.addRelay(url: url)
+        let url = try RelayURL.requireTarget(group.relayURL)
+        let connection = try await relayPool.addRelay(url)
         try await connection.connect()
         return url
     }
@@ -64,7 +62,7 @@ extension NostrClient {
                 pubkey: pubkey
             )
         )
-        let result = try await relayPool.publish(event, to: [relayURL], strategy: strategy)
+        let result = try await relayPool.publish(event, toURLs: [relayURL], strategy: strategy)
         return PublishedEvent(event: event, result: result)
     }
 
@@ -96,7 +94,7 @@ extension NostrClient {
         let event = try await activeSign(
             Groups.leaveRequest(groupID: group.id, reason: reason, pubkey: pubkey)
         )
-        let result = try await relayPool.publish(event, to: [relayURL], strategy: strategy)
+        let result = try await relayPool.publish(event, toURLs: [relayURL], strategy: strategy)
         return PublishedEvent(event: event, result: result)
     }
 
@@ -147,7 +145,7 @@ extension NostrClient {
                 pubkey: pubkey
             )
         )
-        let result = try await relayPool.publish(event, to: [relayURL], strategy: strategy)
+        let result = try await relayPool.publish(event, toURLs: [relayURL], strategy: strategy)
         return PublishedEvent(event: event, result: result)
     }
 
@@ -187,7 +185,7 @@ extension NostrClient {
         let event = try await activeSign(
             Groups.moderationEvent(action, groupID: group.id, previous: previous, reason: reason, pubkey: pubkey)
         )
-        let result = try await relayPool.publish(event, to: [relayURL], strategy: strategy)
+        let result = try await relayPool.publish(event, toURLs: [relayURL], strategy: strategy)
         return PublishedEvent(event: event, result: result)
     }
 
@@ -220,7 +218,7 @@ extension NostrClient {
         let author = authorPubkey ?? group.relayPubkey
         let events = try await fetch(
             filters: [.groupState(groupID: group.id, kinds: [.groupMetadata])],
-            to: [relayURL],
+            toURLs: [relayURL],
             timeout: timeout
         )
         guard let newest = Self.newestGroupStateEvent(ofKind: .groupMetadata, in: events, author: author) else {
@@ -257,7 +255,7 @@ extension NostrClient {
         let author = authorPubkey ?? group.relayPubkey
         let events = try await fetch(
             filters: [.groupState(groupID: group.id)],
-            to: [relayURL],
+            toURLs: [relayURL],
             timeout: timeout
         )
 
@@ -310,7 +308,7 @@ extension NostrClient {
             since: since.map { Int64($0.timeIntervalSince1970) },
             limit: limit
         )
-        return try await subscribe(filters: [filter], to: [relayURL])
+        return try await subscribe(filters: [filter], toURLs: [relayURL])
     }
 
     /// Picks the winning event of one relay-generated state kind: the newest `createdAt`,
