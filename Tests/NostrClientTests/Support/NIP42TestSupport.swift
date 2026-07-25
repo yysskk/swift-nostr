@@ -1,5 +1,6 @@
 import Foundation
 import NostrCore
+import NostrTestSupport
 
 @testable import NostrClient
 
