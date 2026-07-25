@@ -84,12 +84,13 @@ struct DirectMessageSequenceTests {
 
     @Test("directMessages(limit:) opens and closes a subscription")
     func directMessagesOpensAndClosesSubscription() async throws {
-        let client = NostrClient()
+        let (client, _) = try await ConnectedClientFixture.make()
         try await client.setPrivateKey(String(repeating: "1", count: 64))
 
         let messages = try await client.directMessages()
         #expect(await client.activeSubscriptionCount == 1)
         await messages.close()
         #expect(await client.activeSubscriptionCount == 0)
+        await client.disconnect()
     }
 }

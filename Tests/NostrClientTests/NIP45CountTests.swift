@@ -202,6 +202,14 @@ struct NIP45CountTests {
 
     // MARK: - RelayPool
 
+    @Test("the pool count on an empty pool throws noRelaysInPool")
+    func poolCountOnEmptyPoolThrows() async {
+        let pool = RelayPool()
+        await #expect(throws: NostrError.noRelaysInPool) {
+            _ = try await pool.count(filters: [Filter(kinds: [.textNote])])
+        }
+    }
+
     @Test("the pool returns a per-relay count from every relay that answers")
     func poolCount() async throws {
         let mockA = MockWebSocketSession()

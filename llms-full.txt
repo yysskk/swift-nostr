@@ -130,7 +130,9 @@ await client.disconnect()
 Convenience publish methods return a `PublishedEvent` — the signed `event` plus the
 per-relay `result` (`PublishResult`). All accept an optional `strategy:` parameter
 (`.firstAck` / `.quorum(n)` / `.allSettled`) controlling how many acknowledgments to
-wait for before returning.
+wait for before returning. Publishing with zero resolved relays throws —
+`NostrError.noRelaysInPool` for an empty pool, `.noMatchingRelays` when no targeted
+URL is in the pool.
 
 ```swift
 let note = try await client.publishTextNote(content: "Hello!", tags: [.hashtag("nostr")])
@@ -187,7 +189,9 @@ and the closure convenience variants) are deprecated in favor of the async seque
 
 ### One-Shot Fetches
 
-Fetch methods open a temporary subscription, wait for all relays to signal EOSE, then return results:
+Fetch methods open a temporary subscription, wait for all relays to signal EOSE, then return
+results. With zero resolved relays they throw (`NostrError.noRelaysInPool` /
+`.noMatchingRelays`) instead of idling until the timeout:
 
 ```swift
 let events = try await client.fetch(filters: [filter])

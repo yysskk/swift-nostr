@@ -17,6 +17,10 @@ public enum NostrError: Error, LocalizedError, Sendable, Equatable {
     case notConnected
     case subscriptionNotFound(String)
     case relayError(String)
+    /// A relay-targeted operation ran against an empty pool.
+    case noRelaysInPool
+    /// None of the requested relay URLs are in the pool (payload: the normalized requested URLs).
+    case noMatchingRelays([String])
     case authenticationFailed(String)
     case cannotPublishAuthenticationEvent
     case timeout
@@ -71,6 +75,13 @@ public enum NostrError: Error, LocalizedError, Sendable, Equatable {
             return "Subscription not found: \(id)"
         case .relayError(let message):
             return "Relay error: \(message)"
+        case .noRelaysInPool:
+            return "The relay pool is empty — add relays with addRelay(_:) or connect(to:) first"
+        case .noMatchingRelays(let requested):
+            if requested.isEmpty {
+                return "The target relay list is empty"
+            }
+            return "None of the targeted relays are in the pool: \(requested.joined(separator: ", "))"
         case .authenticationFailed(let message):
             return "Authentication failed: \(message)"
         case .cannotPublishAuthenticationEvent:

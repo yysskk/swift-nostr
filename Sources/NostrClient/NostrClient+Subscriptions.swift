@@ -13,6 +13,9 @@ extension NostrClient {
     /// - Parameter bufferingPolicy: How items are buffered while the consumer is
     ///   slower than the relays (default: `.unbounded`). Use
     ///   `.bufferingNewest(n)` for firehose subscriptions where memory matters.
+    /// - Throws: ``NostrError/noRelaysInPool`` when the pool is empty,
+    ///   ``NostrError/noMatchingRelays(_:)`` when none of the targeted URLs are in the
+    ///   pool, or ``NostrError/relayError(_:)`` when every relay fails to subscribe.
     public func subscribe(
         filters: [Filter],
         to relayURLs: Set<URL>? = nil,
@@ -63,6 +66,8 @@ extension NostrClient {
     ///     print(event.content)
     /// }
     /// ```
+    /// - Throws: ``NostrError/noRelaysInPool``, ``NostrError/noMatchingRelays(_:)``, or
+    ///   ``NostrError/relayError(_:)`` — see ``subscribe(filters:to:bufferingPolicy:)``.
     public func events(
         filters: [Filter],
         to relayURLs: Set<URL>? = nil,

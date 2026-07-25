@@ -1,5 +1,6 @@
 import Foundation
 import NostrCore
+import NostrTestSupport
 import Testing
 
 @testable import NostrClient
@@ -8,26 +9,27 @@ import Testing
 struct DirectMessageRoutingTests {
 
     private let inboxURL = URL(string: "wss://inbox.example.com")!
-    private let absentURL = URL(string: "wss://absent.example.com")!
 
     // MARK: - Receive side
 
     @Test("connectDirectMessageInboxRelays connects the user's advertised inbox relays present in the pool")
     func connectOwnInbox() async throws {
-        let pool = RelayPool()
-        let client = NostrClient(relayPool: pool, gossipPolicy: .requirePresent)
+        let (client, socket) = try await ConnectedClientFixture.make(
+            relayURL: inboxURL, gossipPolicy: .requirePresent)
         try await client.setPrivateKey(String(repeating: "1", count: 64))
 
-        // Advertise (and cache) the user's own DM inbox relays. Empty pool: publish no-ops, but caches.
-        try await client.publishDirectMessageRelayList(
-            relays: ["wss://inbox.example.com", "wss://absent.example.com"]
-        )
-        // Only inbox.example.com is present in the pool.
-        await pool.addRelay(url: inboxURL)
+        // Advertise (and cache) the user's own DM inbox relays; only
+        // inbox.example.com is present in the pool.
+        try await PublishAckSupport.acknowledgingPublishes(on: socket) {
+            try await client.publishDirectMessageRelayList(
+                relays: ["wss://inbox.example.com", "wss://absent.example.com"]
+            )
+        }
 
         let connected = try await client.connectDirectMessageInboxRelays()
         // requirePresent: only the relay already in the pool is routable.
         #expect(connected == [inboxURL])
+        await client.disconnect()
     }
 
     @Test("connectDirectMessageInboxRelays without a signer throws signerNotSet")
@@ -81,15 +83,36 @@ struct DirectMessageRoutingTests {
         #expect(targets.isEmpty)
     }
 
-    @Test("sendDirectMessage falls back to the pool when no DM relay list is known")
-    func sendFallsBackToPool() async throws {
+    @Test("sendDirectMessage on an empty pool throws noRelaysInPool")
+    func sendOnEmptyPoolThrows() async throws {
         let client = NostrClient()
         try await client.setPrivateKey(String(repeating: "1", count: 64))
         let recipient = try KeyPair()
 
-        // Empty pool, no cached lists: both copies fall back to the (empty) pool — no statuses, no throw.
-        let result = try await client.sendDirectMessage("hi", to: recipient.publicKeyHex)
-        #expect(result.recipientPublishResult?.statuses.isEmpty == true)
-        #expect(result.selfCopyPublishResult?.statuses.isEmpty == true)
+        // Empty pool, no cached lists: the recipient copy's pool fallback finds nothing.
+        await #expect(throws: NostrError.noRelaysInPool) {
+            try await client.sendDirectMessage("hi", to: recipient.publicKeyHex)
+        }
+    }
+
+    @Test("sendDirectMessage falls back to the pool when no DM relay list is known")
+    func sendFallsBackToPool() async throws {
+        let (client, socket) = try await ConnectedClientFixture.make()
+        try await client.setPrivateKey(String(repeating: "1", count: 64))
+        let recipient = try KeyPair()
+        let sender = await client.publicKey!
+        // Confirmed-absent DM relay lists: both copies fall back to the pool's relay
+        // without a discovery fetch.
+        await client.dmRelayListStore.markNoList(for: recipient.publicKeyHex)
+        await client.dmRelayListStore.markNoList(for: sender)
+
+        let result = try await PublishAckSupport.acknowledgingPublishes(2, on: socket) {
+            try await client.sendDirectMessage("hi", to: recipient.publicKeyHex)
+        }
+
+        let poolRelay = ConnectedClientFixture.defaultRelayURL
+        #expect(result.recipientPublishResult?.acceptedRelays == [poolRelay])
+        #expect(result.selfCopyPublishResult?.acceptedRelays == [poolRelay])
+        await client.disconnect()
     }
 }

@@ -75,16 +75,20 @@ struct PublishStrategyTests {
 
     // MARK: - Publish behavior without a network
 
-    @Test("publishing to an empty pool is a no-op")
-    func publishToEmptyPoolIsNoOp() async throws {
+    @Test("publishing on an empty pool throws")
+    func publishOnEmptyPoolThrows() async {
         let pool = RelayPool()
-        try await pool.publish(dummyEvent)
+        await #expect(throws: NostrError.noRelaysInPool) {
+            try await pool.publish(self.dummyEvent)
+        }
     }
 
-    @Test("publishing to an empty target set is a no-op")
-    func publishToEmptyTargetSetIsNoOp() async throws {
+    @Test("publishing to an empty target set throws")
+    func publishToEmptyTargetSetThrows() async {
         let pool = await makePool()
-        try await pool.publish(dummyEvent, to: [])
+        await #expect(throws: NostrError.noMatchingRelays([])) {
+            try await pool.publish(self.dummyEvent, to: [])
+        }
     }
 
     @Test("publish on a disconnected connection fails fast with notConnected")

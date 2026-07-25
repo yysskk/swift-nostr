@@ -1,5 +1,6 @@
 import Foundation
 import NostrCore
+import NostrTestSupport
 import Testing
 
 @testable import NostrClient
@@ -146,7 +147,7 @@ struct NIP25DirectMessageReactionTests {
 
     @Test("reactToDirectMessage targets the message author and falls back to the pool")
     func reactRoutingFallsBackToPool() async throws {
-        let client = NostrClient()
+        let (client, socket) = try await ConnectedClientFixture.make()
         try await client.setPrivateKey(String(repeating: "1", count: 64))
         let author = try KeyPair()
 
@@ -155,10 +156,17 @@ struct NIP25DirectMessageReactionTests {
             rumorId: "mid", senderPubkey: author.publicKeyHex,
             recipientPubkey: myPubkey, content: "hi", createdAt: Date())
 
-        // Empty pool, no cached DM relay lists: both copies fall back to the (empty) pool.
-        let result = try await client.reactToDirectMessage(message, reaction: "+")
+        // Confirmed-absent DM relay lists: both copies fall back to the pool's relay
+        // without a discovery fetch.
+        await client.dmRelayListStore.markNoList(for: author.publicKeyHex)
+        await client.dmRelayListStore.markNoList(for: myPubkey)
+
+        let result = try await PublishAckSupport.acknowledgingPublishes(2, on: socket) {
+            try await client.reactToDirectMessage(message, reaction: "+")
+        }
         #expect(result.rumor.kind == .reaction)
         #expect(result.rumor.referencedEventIds == ["mid"])
-        #expect(result.recipientPublishResult?.statuses.isEmpty == true)
+        #expect(result.recipientPublishResult?.acceptedRelays == [ConnectedClientFixture.defaultRelayURL])
+        await client.disconnect()
     }
 }

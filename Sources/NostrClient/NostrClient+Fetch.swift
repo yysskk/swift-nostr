@@ -8,6 +8,8 @@ extension NostrClient {
     ///
     /// Pass `relayURLs` to scope the fetch to a subset of relays (e.g. `naddr` relay hints);
     /// the default `nil` fetches from all relays in the pool.
+    /// - Throws: ``NostrError/noRelaysInPool`` or ``NostrError/noMatchingRelays(_:)``
+    ///   (via the underlying subscribe) when nothing can be targeted.
     public func fetch(
         filters: [Filter],
         to relayURLs: Set<URL>? = nil,
@@ -26,7 +28,9 @@ extension NostrClient {
         defer { timeoutTask.cancel() }
 
         var eoseTracker = EOSETracker()
-        eoseTracker.setExpectedRelays(subscription.expectedRelays)
+        if eoseTracker.setExpectedRelays(subscription.expectedRelays) {
+            await subscription.close()
+        }
 
         var events: [Event] = []
         for await item in subscription {
@@ -51,6 +55,7 @@ extension NostrClient {
     /// Queries every relay in the pool and returns the maximum reported count — each relay's
     /// count is a lower bound on the events it holds, so the maximum is the best single estimate.
     /// For per-relay results use ``RelayPool/count(filters:to:timeout:)`` on ``relayPool``.
+    /// - Throws: ``NostrError/noRelaysInPool`` when the pool is empty.
     public func count(filters: [Filter], timeout: TimeInterval = 10) async throws -> Int {
         let results = try await relayPool.count(filters: filters, timeout: timeout)
         return results.values.map(\.value).max() ?? 0

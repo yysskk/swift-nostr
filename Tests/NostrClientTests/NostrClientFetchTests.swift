@@ -1,5 +1,6 @@
 import Foundation
 import NostrCore
+import NostrTestSupport
 import Testing
 
 @testable import NostrClient
@@ -31,6 +32,17 @@ struct NostrClientFetchTests {
         #expect(tracker.isComplete == true)
     }
 
+    @Test("EOSE tracker treats an empty expected set as vacuously complete")
+    func eoseTrackerEmptyExpectedSetIsComplete() {
+        var tracker = EOSETracker()
+
+        // Not complete while the expected set is unknown...
+        #expect(tracker.isComplete == false)
+        // ...but complete once it is known to be empty: nothing can send EOSE.
+        #expect(tracker.setExpectedRelays([]) == true)
+        #expect(tracker.isComplete == true)
+    }
+
     @Test("EOSE tracker ignores duplicate relay EOSE")
     func eoseTrackerIgnoresDuplicateRelayEOSE() {
         var tracker = EOSETracker()
@@ -45,9 +57,24 @@ struct NostrClientFetchTests {
         #expect(tracker.isComplete == true)
     }
 
+    @Test("Fetch on an empty pool throws noRelaysInPool immediately")
+    func fetchOnEmptyPoolThrows() async throws {
+        let client = NostrClient()
+
+        // The throw happens at subscribe time, before the timeout task could ever
+        // start — assert it does not consume the (long) timeout.
+        let start = ContinuousClock.now
+        await #expect(throws: NostrError.noRelaysInPool) {
+            _ = try await client.fetch(filters: [Filter()], timeout: 10)
+        }
+        #expect(ContinuousClock.now - start < .seconds(5))
+    }
+
     @Test("Fetch propagates task cancellation")
     func fetchPropagatesTaskCancellation() async throws {
-        let client = NostrClient()
+        // One connected mock relay that never sends EOSE, so the fetch blocks
+        // on its subscription until the task is cancelled.
+        let (client, _) = try await ConnectedClientFixture.make()
 
         let fetchTask = Task {
             try await client.fetch(filters: [Filter()], timeout: 10)
@@ -59,5 +86,6 @@ struct NostrClientFetchTests {
         await #expect(throws: CancellationError.self) {
             _ = try await fetchTask.value
         }
+        await client.disconnect()
     }
 }
