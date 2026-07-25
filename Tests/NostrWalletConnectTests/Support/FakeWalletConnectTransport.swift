@@ -3,11 +3,11 @@ import NostrCore
 
 @testable import NostrWalletConnect
 
-/// An in-memory ``WalletConnectTransport`` for tests.
+/// An in-memory ``RelayTransport`` for tests.
 ///
 /// It records what the connection sends and subscribes to, and lets a test push simulated wallet
 /// events into the ``events()`` stream via ``emit(_:)`` — no relay or network required.
-actor FakeWalletConnectTransport: WalletConnectTransport {
+actor FakeWalletConnectTransport: RelayTransport {
     private(set) var isConnected = false
     private(set) var connectCount = 0
     private(set) var sentEvents: [Event] = []

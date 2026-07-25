@@ -4,8 +4,8 @@ import Testing
 
 @testable import NostrWalletConnect
 
-@Suite("WalletConnectTransport (Fake) Tests")
-struct WalletConnectTransportTests {
+@Suite("FakeWalletConnectTransport Tests")
+struct FakeWalletConnectTransportTests {
     private func event(id: String, content: String = "x") -> Event {
         Event(
             id: id,

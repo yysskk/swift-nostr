@@ -23,6 +23,10 @@ answers with the result. The user's private key never leaves the signer.
   decrypt, and switch relays.
 - Request/response correlation by the request `id`, with per-request timeouts.
 - An `auth_url` challenge stream that keeps the request pending while the user authorizes.
+- Relay I/O behind `NostrCore`'s `RelayTransport` seam: the default `RelayConnectionTransport`
+  drives the URI's relays, and a custom transport — or the default one on an injected
+  `WebSocketSessionFactory` — takes its place for another relay stack, a platform-native socket, or
+  a test without a live relay.
 
 ```swift
 import NostrConnect
@@ -55,11 +59,6 @@ print(signed.id, try signed.verify())
 ### Authentication Challenges
 
 - ``RemoteSignerAuthChallenge``
-
-### Relay Transport
-
-- ``RemoteSignerTransport``
-- ``RelayConnectionTransport``
 
 ### Errors
 

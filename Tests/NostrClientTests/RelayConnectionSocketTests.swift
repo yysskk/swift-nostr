@@ -9,8 +9,8 @@ import Testing
     import FoundationNetworking
 #endif
 
-@Suite("Relay Connection Transport Tests")
-struct RelayConnectionTransportTests {
+@Suite("Relay Connection Socket Tests")
+struct RelayConnectionSocketTests {
 
     private func makeConnection(pingError: (any Error)? = nil) -> (RelayConnection, MockWebSocketSession) {
         let mock = MockWebSocketSession(pingError: pingError)

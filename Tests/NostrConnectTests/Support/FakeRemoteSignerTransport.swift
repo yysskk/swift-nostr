@@ -3,11 +3,11 @@ import NostrCore
 
 @testable import NostrConnect
 
-/// An in-memory ``RemoteSignerTransport`` for tests.
+/// An in-memory ``RelayTransport`` for tests.
 ///
 /// It records what the session sends and subscribes to, and lets a test push simulated signer
 /// events into the ``events()`` stream via ``deliver(_:)`` — no relay or network required.
-actor FakeRemoteSignerTransport: RemoteSignerTransport {
+actor FakeRemoteSignerTransport: RelayTransport {
     private(set) var isConnected = false
     private(set) var connectCount = 0
     private(set) var sentEvents: [Event] = []

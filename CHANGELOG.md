@@ -45,6 +45,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   relay connection on a platform-native socket (for example an OkHttp-backed
   `WebSocketSessionFactory` on Android) or on an in-memory fake — matching the injection `RelayPool`
   and `NostrClient` already expose.
+- **Transport injection in a NIP-46 or NIP-47 session**: the shared `RelayConnectionTransport` now
+  takes a `webSocketFactory:` and a `config:`, so a remote-signer session or a wallet connection can
+  run its relays on a platform-native socket or an in-memory fake and tune their timeouts, keepalive,
+  and reconnection. Neither was reachable before: the per-module transports it replaces hard-coded
+  `URLSession` and `RelayConnectionConfig.default`.
 
 ### Fixed
 
@@ -80,6 +85,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `EventSigner.signRepost(of:relayURL:)`, `NostrClient.publishReply(to:content:relayURL:strategy:)`,
   and `NostrClient.publishRepost(of:relayURL:strategy:)`, completing the `relayURL` spelling across
   the package.
+- **Breaking**: `RemoteSignerTransport` and `WalletConnectTransport` are replaced by a single
+  `NostrCore.RelayTransport`. The two protocols were the same six requirements with nothing
+  NIP-specific in either, and their default implementations were the same actor twice over. For a
+  custom transport this is a one-line rename — the requirements are unchanged and both libraries
+  re-export `NostrCore`, so no import changes either. The shared default `RelayConnectionTransport`
+  moves to `NostrCore` with them, and now throws `NostrError.notConnected` instead of
+  `RemoteSignerError.notConnected` / `WalletConnectError.notConnected` when an operation reaches no
+  relay; both of those cases remain, still thrown for the session-level failures they already
+  covered.
 
 ## [0.6.0] - 2026-07-05
 
