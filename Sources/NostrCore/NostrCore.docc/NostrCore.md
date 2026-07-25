@@ -73,6 +73,7 @@ let isValid = try event.verify()
 
 ### WebSocket Transport Seam
 
+- ``RelayConnection/init(url:webSocketFactory:config:)``
 - ``WebSocketSession``
 - ``WebSocketSessionFactory``
 - ``URLSessionWebSocketFactory``

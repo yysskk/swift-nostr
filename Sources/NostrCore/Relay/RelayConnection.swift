@@ -156,12 +156,17 @@ public actor RelayConnection {
         self.init(url: url, config: config)
     }
 
-    /// Designated initializer shared by the public initializers and by tests, which inject a
-    /// fake ``WebSocketSessionFactory`` to drive the connection state machine without a network.
+    /// Designated initializer, creating a connection whose sockets come from `webSocketFactory`.
     ///
-    /// `package` so the relay pool (in a separate module within this package) and tests can inject
-    /// a transport, without exposing factory injection as public API.
-    package init(
+    /// Supply a custom ``WebSocketSessionFactory`` to run the connection on a platform-native
+    /// socket — for example an OkHttp-backed factory on Android, whose Foundation has no WebSocket
+    /// support — or on an in-memory fake in tests. The whole connect/receive/keepalive/reconnect
+    /// state machine then runs on that transport, without a network.
+    /// - Parameters:
+    ///   - url: The relay's WebSocket URL.
+    ///   - webSocketFactory: Creates the transport for each connection attempt.
+    ///   - config: Timeout, keepalive, and reconnection behavior (defaults to `.default`).
+    public init(
         url: URL,
         webSocketFactory: any WebSocketSessionFactory,
         config: RelayConnectionConfig = .default
