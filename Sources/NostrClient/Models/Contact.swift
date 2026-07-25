@@ -8,30 +8,40 @@ public struct Contact: Codable, Hashable, Sendable {
     public let pubkey: String
 
     /// The main relay URL where the client reads events from this contact
-    public let relayUrl: String?
+    public let relayURL: String?
 
     /// A local name (petname) for this contact
     public let petname: String?
 
-    public init(pubkey: String, relayUrl: String? = nil, petname: String? = nil) {
+    /// Creates a contact from a hex-encoded public key.
+    /// - Parameters:
+    ///   - pubkey: The contact's hex-encoded public key.
+    ///   - relayURL: The main relay URL where the client reads events from this contact.
+    ///   - petname: A local name for this contact.
+    public init(pubkey: String, relayURL: String? = nil, petname: String? = nil) {
         self.pubkey = pubkey
-        self.relayUrl = relayUrl
+        self.relayURL = relayURL
         self.petname = petname
     }
 
     /// Creates a Contact from an npub
-    public init(npub: String, relayUrl: String? = nil, petname: String? = nil) throws {
+    /// - Parameters:
+    ///   - npub: The contact's public key in bech32 `npub` form (NIP-19).
+    ///   - relayURL: The main relay URL where the client reads events from this contact.
+    ///   - petname: A local name for this contact.
+    /// - Throws: ``NostrError`` if `npub` is not a valid npub string.
+    public init(npub: String, relayURL: String? = nil, petname: String? = nil) throws {
         let publicKey = try PublicKey(npub: npub)
         self.pubkey = publicKey.hex
-        self.relayUrl = relayUrl
+        self.relayURL = relayURL
         self.petname = petname
     }
 
     /// Converts to a tag array for NIP-02 event
     public func toTag() -> [String] {
         var tag = ["p", pubkey]
-        if let relayUrl = relayUrl {
-            tag.append(relayUrl)
+        if let relayURL = relayURL {
+            tag.append(relayURL)
             if let petname = petname {
                 tag.append(petname)
             }
@@ -49,10 +59,10 @@ public struct Contact: Codable, Hashable, Sendable {
         }
 
         let pubkey = tag[1]
-        let relayUrl = tag.count > 2 && !tag[2].isEmpty ? tag[2] : nil
+        let relayURL = tag.count > 2 && !tag[2].isEmpty ? tag[2] : nil
         let petname = tag.count > 3 && !tag[3].isEmpty ? tag[3] : nil
 
-        return Contact(pubkey: pubkey, relayUrl: relayUrl, petname: petname)
+        return Contact(pubkey: pubkey, relayURL: relayURL, petname: petname)
     }
 }
 

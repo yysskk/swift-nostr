@@ -11,12 +11,12 @@ struct ContactTests {
     func createContactWithAllFields() {
         let contact = Contact(
             pubkey: "abc123",
-            relayUrl: "wss://relay.example.com",
+            relayURL: "wss://relay.example.com",
             petname: "alice"
         )
 
         #expect(contact.pubkey == "abc123")
-        #expect(contact.relayUrl == "wss://relay.example.com")
+        #expect(contact.relayURL == "wss://relay.example.com")
         #expect(contact.petname == "alice")
     }
 
@@ -25,7 +25,7 @@ struct ContactTests {
         let contact = Contact(pubkey: "abc123")
 
         #expect(contact.pubkey == "abc123")
-        #expect(contact.relayUrl == nil)
+        #expect(contact.relayURL == nil)
         #expect(contact.petname == nil)
     }
 
@@ -33,7 +33,7 @@ struct ContactTests {
     func contactToTagAllFields() {
         let contact = Contact(
             pubkey: "abc123",
-            relayUrl: "wss://relay.example.com",
+            relayURL: "wss://relay.example.com",
             petname: "alice"
         )
 
@@ -50,7 +50,7 @@ struct ContactTests {
 
     @Test("Contact to tag - with relay only")
     func contactToTagWithRelayOnly() {
-        let contact = Contact(pubkey: "abc123", relayUrl: "wss://relay.example.com")
+        let contact = Contact(pubkey: "abc123", relayURL: "wss://relay.example.com")
         let tag = contact.toTag()
         #expect(tag == ["p", "abc123", "wss://relay.example.com"])
     }
@@ -69,7 +69,7 @@ struct ContactTests {
 
         #expect(contact != nil)
         #expect(contact?.pubkey == "abc123")
-        #expect(contact?.relayUrl == "wss://relay.example.com")
+        #expect(contact?.relayURL == "wss://relay.example.com")
         #expect(contact?.petname == "alice")
     }
 
@@ -80,7 +80,7 @@ struct ContactTests {
 
         #expect(contact != nil)
         #expect(contact?.pubkey == "abc123")
-        #expect(contact?.relayUrl == nil)
+        #expect(contact?.relayURL == nil)
         #expect(contact?.petname == nil)
     }
 
@@ -91,7 +91,7 @@ struct ContactTests {
 
         #expect(contact != nil)
         #expect(contact?.pubkey == "abc123")
-        #expect(contact?.relayUrl == nil)
+        #expect(contact?.relayURL == nil)
         #expect(contact?.petname == "alice")
     }
 
@@ -117,6 +117,38 @@ struct ContactTests {
         #expect(contact.pubkey == keyPair.publicKeyHex)
         #expect(contact.petname == "test")
     }
+
+    @Test("Contact encodes the relay URL under the relayURL key")
+    func contactEncodesRelayURLKey() throws {
+        let contact = Contact(
+            pubkey: "abc123",
+            relayURL: "wss://relay.example.com",
+            petname: "alice"
+        )
+
+        let json = try JSONSerialization.jsonObject(with: JSONEncoder().encode(contact))
+        let object = try #require(json as? [String: String])
+
+        #expect(
+            object == [
+                "pubkey": "abc123",
+                "relayURL": "wss://relay.example.com",
+                "petname": "alice",
+            ])
+    }
+
+    @Test("Contact round-trips through Codable")
+    func contactRoundTripsThroughCodable() throws {
+        let contact = Contact(
+            pubkey: "abc123",
+            relayURL: "wss://relay.example.com",
+            petname: "alice"
+        )
+
+        let decoded = try JSONDecoder().decode(Contact.self, from: JSONEncoder().encode(contact))
+
+        #expect(decoded == contact)
+    }
 }
 
 @Suite("Contact List Event Tests")
@@ -128,8 +160,8 @@ struct ContactListEventTests {
         let signer = EventSigner(keyPair: keyPair)
 
         let contacts = [
-            Contact(pubkey: "pubkey1", relayUrl: "wss://relay1.com", petname: "alice"),
-            Contact(pubkey: "pubkey2", relayUrl: "wss://relay2.com"),
+            Contact(pubkey: "pubkey1", relayURL: "wss://relay1.com", petname: "alice"),
+            Contact(pubkey: "pubkey2", relayURL: "wss://relay2.com"),
             Contact(pubkey: "pubkey3"),
         ]
 
@@ -165,7 +197,7 @@ struct ContactListEventTests {
         let signer = EventSigner(keyPair: keyPair)
 
         let contacts = [
-            Contact(pubkey: "pubkey1", relayUrl: "wss://relay1.com", petname: "alice"),
+            Contact(pubkey: "pubkey1", relayURL: "wss://relay1.com", petname: "alice"),
             Contact(pubkey: "pubkey2"),
         ]
 
@@ -175,10 +207,10 @@ struct ContactListEventTests {
         #expect(extractedContacts != nil)
         #expect(extractedContacts?.count == 2)
         #expect(extractedContacts?[0].pubkey == "pubkey1")
-        #expect(extractedContacts?[0].relayUrl == "wss://relay1.com")
+        #expect(extractedContacts?[0].relayURL == "wss://relay1.com")
         #expect(extractedContacts?[0].petname == "alice")
         #expect(extractedContacts?[1].pubkey == "pubkey2")
-        #expect(extractedContacts?[1].relayUrl == nil)
+        #expect(extractedContacts?[1].relayURL == nil)
     }
 
     @Test("isContactList property")

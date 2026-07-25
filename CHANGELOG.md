@@ -45,6 +45,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   when another wait is already running on the session, instead of conflating that with
   `.notConnected`. The new case is additive but a source break for code that switches over
   `RemoteSignerError` exhaustively.
+- **Breaking**: `Contact.relayUrl` is now `Contact.relayURL`, matching the `relayURL` spelling used
+  everywhere else in the package (`Tag.pubkey(_:relayURL:petname:)`, `RelayListMetadata`, …) and the
+  Swift API Design Guidelines rule that acronyms are uniformly cased. The `relayUrl:` argument label
+  on both `Contact` initializers is renamed to `relayURL:` as well. Because `Contact` is `Codable`,
+  its JSON key changes from `relayUrl` to `relayURL`; clients that persist encoded contacts need to
+  migrate stored data.
 
 ## [0.6.0] - 2026-07-05
 

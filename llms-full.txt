@@ -821,15 +821,15 @@ Contact information for NIP-02 (struct: Codable, Hashable, Sendable).
 ### Properties
 
 - `pubkey: String` -- hex public key
-- `relayUrl: String?` -- recommended relay URL
+- `relayURL: String?` -- recommended relay URL
 - `petname: String?` -- local nickname
 
 ### Usage
 
 ```swift
-let contact = Contact(pubkey: "...", relayUrl: "wss://...", petname: "alice")
-let contact = try Contact(npub: "npub1...", relayUrl: nil, petname: nil)
-let tag = contact.toTag()           // ["p", pubkey, relayUrl, petname]
+let contact = Contact(pubkey: "...", relayURL: "wss://...", petname: "alice")
+let contact = try Contact(npub: "npub1...", relayURL: nil, petname: nil)
+let tag = contact.toTag()           // ["p", pubkey, relayURL, petname]
 let parsed = Contact.fromTag(tag)   // parse from tag array
 
 // Extract contacts from kind-3 event
