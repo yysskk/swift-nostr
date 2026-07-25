@@ -81,8 +81,8 @@ public struct SealedMessage: Sendable {
     ///   - nonce: The 32-byte nonce.
     /// - Returns: The base64-encoded `version || nonce || ciphertext || mac` payload.
     static func encrypt(plaintext: String, conversationKey: Data, nonce: Data) throws -> String {
-        // Checked before anything else so an oversized plaintext — the invalid vectors go up to
-        // 10 MB — is rejected without copying it or deriving keys.
+        // Measured rather than encoded first, so an out-of-range plaintext — the invalid vectors
+        // reach 10 MB — is rejected without copying it or expanding the message keys.
         let unpaddedLen = plaintext.utf8.count
         guard unpaddedLen >= minPlaintextSize,
             unpaddedLen <= maxPlaintextSize
