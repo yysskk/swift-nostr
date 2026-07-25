@@ -79,6 +79,11 @@ let package = Package(
         .testTarget(
             name: "NostrCoreTests",
             dependencies: ["NostrCore"],
+            // `.copy` rather than `.process` so the official NIP-44 vectors are bundled byte for
+            // byte and stay verifiable against their published checksum.
+            resources: [
+                .copy("Resources/nip44.vectors.json")
+            ],
             swiftSettings: swiftSettings
         ),
         .testTarget(

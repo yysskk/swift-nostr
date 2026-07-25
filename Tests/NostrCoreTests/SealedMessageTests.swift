@@ -91,7 +91,7 @@ struct SealedMessageTests {
         }
     }
 
-    // Note: the reference NIP-44 v2 encrypt_decrypt vectors (paulmillr/nip44) are intentionally not
-    // baked in here. Decoding them exercises source behaviour that is out of scope for this
-    // test-only change, so this suite covers seal/open self-consistency and tamper detection.
+    // Note: the complete official NIP-44 vector suite lives in `NIP44VectorTests`, backed by the
+    // bundled `Resources/nip44.vectors.json`; this suite covers random-key round trips and tamper
+    // detection through the public API.
 }
