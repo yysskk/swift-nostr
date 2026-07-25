@@ -28,7 +28,7 @@ enum ConnectedClientFixture {
             webSocketFactory: MockWebSocketSessionFactory(makeSession: { socket })
         )
         let client = NostrClient(relayPool: pool, gossipPolicy: gossipPolicy)
-        let connection = await pool.addRelay(url: relayURL)
+        let connection = try await pool.addRelay(relayURL)
         try await connection.connect()
         return (client, socket)
     }

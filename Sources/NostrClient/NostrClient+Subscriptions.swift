@@ -5,20 +5,36 @@ import NostrCore
 extension NostrClient {
     /// Opens a subscription and returns it as an async sequence of relay-aware events.
     ///
-    /// Pass `relayURLs` to scope the subscription to a subset of relays (NIP-65 outbox routing);
-    /// the default `nil` subscribes on all relays in the pool.
+    /// Pass relay URL strings to scope the subscription to a subset of relays (NIP-65
+    /// outbox routing); the default `nil` subscribes on all relays in the pool. Targets
+    /// de-duplicate by their normalized routing key; an empty array always throws.
     ///
     /// Iteration termination (breaking out of the loop, task cancellation, or
     /// discarding the sequence) automatically sends CLOSE to the relays.
     /// - Parameter bufferingPolicy: How items are buffered while the consumer is
     ///   slower than the relays (default: `.unbounded`). Use
     ///   `.bufferingNewest(n)` for firehose subscriptions where memory matters.
-    /// - Throws: ``NostrError/noRelaysInPool`` when the pool is empty,
+    /// - Throws: ``NostrError/invalidRelayURL(_:)`` for an invalid target string,
+    ///   ``NostrError/noRelaysInPool`` when the pool is empty,
     ///   ``NostrError/noMatchingRelays(_:)`` when none of the targeted URLs are in the
     ///   pool, or ``NostrError/relayError(_:)`` when every relay fails to subscribe.
     public func subscribe(
         filters: [Filter],
-        to relayURLs: Set<URL>? = nil,
+        to relayURLs: [String]? = nil,
+        bufferingPolicy: AsyncStream<SubscriptionEvent>.Continuation.BufferingPolicy = .unbounded
+    ) async throws -> SubscriptionSequence {
+        try await subscribe(
+            filters: filters,
+            toURLs: relayURLs.map(RelayURL.requireTargets),
+            bufferingPolicy: bufferingPolicy
+        )
+    }
+
+    /// Core of ``subscribe(filters:to:bufferingPolicy:)`` taking pre-validated canonical
+    /// URLs; nil subscribes on the whole pool.
+    func subscribe(
+        filters: [Filter],
+        toURLs relayURLs: Set<URL>?,
         bufferingPolicy: AsyncStream<SubscriptionEvent>.Continuation.BufferingPolicy = .unbounded
     ) async throws -> SubscriptionSequence {
         let (stream, continuation) = AsyncStream.makeStream(
@@ -28,7 +44,7 @@ extension NostrClient {
 
         let opened: (id: String, expectedRelays: Set<URL>)
         do {
-            opened = try await openSubscription(filters: filters, to: relayURLs) { subscriptionEvent in
+            opened = try await openSubscription(filters: filters, toURLs: relayURLs) { subscriptionEvent in
                 continuation.yield(subscriptionEvent)
             }
         } catch {
@@ -66,21 +82,26 @@ extension NostrClient {
     ///     print(event.content)
     /// }
     /// ```
-    /// - Throws: ``NostrError/noRelaysInPool``, ``NostrError/noMatchingRelays(_:)``, or
-    ///   ``NostrError/relayError(_:)`` — see ``subscribe(filters:to:bufferingPolicy:)``.
+    /// - Throws: ``NostrError/invalidRelayURL(_:)``, ``NostrError/noRelaysInPool``,
+    ///   ``NostrError/noMatchingRelays(_:)``, or ``NostrError/relayError(_:)`` — see
+    ///   ``subscribe(filters:to:bufferingPolicy:)``.
     public func events(
         filters: [Filter],
-        to relayURLs: Set<URL>? = nil,
+        to relayURLs: [String]? = nil,
         bufferingPolicy: AsyncStream<SubscriptionEvent>.Continuation.BufferingPolicy = .unbounded
     ) async throws -> SubscriptionSequence.Events {
-        try await subscribe(filters: filters, to: relayURLs, bufferingPolicy: bufferingPolicy).events
+        try await subscribe(
+            filters: filters,
+            toURLs: relayURLs.map(RelayURL.requireTargets),
+            bufferingPolicy: bufferingPolicy
+        ).events
     }
 
     /// Registers a subscription with the relay pool and routes its messages to `handler`.
     /// Backs the stream-based ``subscribe(filters:to:bufferingPolicy:)``.
     func openSubscription(
         filters: [Filter],
-        to relayURLs: Set<URL>?,
+        toURLs relayURLs: Set<URL>?,
         handler: @escaping @Sendable (SubscriptionEvent) -> Void
     ) async throws -> (id: String, expectedRelays: Set<URL>) {
         subscriptionCounter += 1
@@ -96,7 +117,7 @@ extension NostrClient {
             let expectedRelayURLs = try await relayPool.subscribeWithRelayContext(
                 subscriptionId: subscriptionId,
                 filters: filters,
-                to: relayURLs
+                toURLs: relayURLs
             ) { [weak self] relayMessage in
                 guard let self else { return }
                 await self.handleMessage(

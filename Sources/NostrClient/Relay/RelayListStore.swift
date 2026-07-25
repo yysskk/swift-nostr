@@ -3,7 +3,7 @@ import NostrCore
 
 /// Policy controlling how the router brings relays into the pool when routing to a
 /// user's declared relays — NIP-65 read/write relays or NIP-17 DM inbox relays.
-public enum GossipRelayPolicy: Sendable {
+public enum GossipRelayPolicy: Sendable, Equatable {
     /// Add resolved relays to the pool and connect them on demand (default).
     case addAndConnect
     /// Only route to relays already present in the pool; never open new sockets.

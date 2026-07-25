@@ -43,12 +43,12 @@ extension NostrClient {
     /// — simply call it again to answer the fresh challenge.
     ///
     /// - Parameter relayURL: The relay to authenticate to; must be in the pool.
-    /// - Throws: ``NostrError/relayError(_:)`` when the relay is not in the
+    /// - Throws: ``NostrError/noMatchingRelays(_:)`` when the relay is not in the
     ///   pool, ``NostrError/signerNotSet`` without a signer, and everything
     ///   ``RelayConnection/authenticate(with:)`` throws.
     public func authenticate(relayURL: URL) async throws {
         guard let connection = await relayPool.relay(for: relayURL) else {
-            throw NostrError.relayError("No relay in the pool for \(relayURL.absoluteString)")
+            throw NostrError.noMatchingRelays([RelayURL.normalize(relayURL.absoluteString)])
         }
         guard let challenge = await connection.authenticationChallenge else {
             throw NostrError.authenticationFailed("The relay has not sent an AUTH challenge")

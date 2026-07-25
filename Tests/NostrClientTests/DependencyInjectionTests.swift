@@ -25,8 +25,8 @@ struct DependencyInjectionTests {
     @Test("pool connects its relays through an injected fake transport")
     func poolConnectsThroughFakeTransport() async throws {
         let pool = RelayPool(config: noReconnectConfig, webSocketFactory: fakeFactory())
-        await pool.addRelay(url: URL(string: "wss://relay.example.com")!)
-        await pool.addRelay(url: URL(string: "wss://relay2.example.com")!)
+        try await pool.addRelay(URL(string: "wss://relay.example.com")!)
+        try await pool.addRelay(URL(string: "wss://relay2.example.com")!)
 
         let connected = try await pool.connectAll()
 

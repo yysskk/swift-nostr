@@ -57,6 +57,16 @@ struct NostrClientFetchTests {
         #expect(tracker.isComplete == true)
     }
 
+    @Test("Fetch validates target strings before touching any relay")
+    func fetchRejectsInvalidTargetString() async throws {
+        let client = NostrClient()
+
+        // Validation precedes targeting, so the invalid string wins over the empty pool.
+        await #expect(throws: NostrError.invalidRelayURL("https://relay.example.com")) {
+            _ = try await client.fetch(filters: [Filter()], to: ["https://relay.example.com"])
+        }
+    }
+
     @Test("Fetch on an empty pool throws noRelaysInPool immediately")
     func fetchOnEmptyPoolThrows() async throws {
         let client = NostrClient()

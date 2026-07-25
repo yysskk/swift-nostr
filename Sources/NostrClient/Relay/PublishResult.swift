@@ -1,4 +1,5 @@
 import Foundation
+import NostrCore
 
 /// Per-relay outcome of a publish.
 public enum PublishRelayStatus: Sendable {
@@ -33,8 +34,15 @@ extension PublishRelayStatus: Equatable {
 /// strategy such as `.firstAck`, relays that were still in flight when the call
 /// returned are reported as ``PublishRelayStatus/pending``.
 public struct PublishResult: Sendable {
-    /// Outcome per targeted relay URL.
+    /// Outcome per targeted relay, keyed by the canonical (normalized) relay URL.
     public let statuses: [URL: PublishRelayStatus]
+
+    /// The status for a relay URL string, normalized to the result's canonical keys.
+    /// Returns nil when the string is not a valid relay URL or the relay was not targeted.
+    public func status(for relayURL: String) -> PublishRelayStatus? {
+        guard let url = try? RelayURL.requireTarget(relayURL) else { return nil }
+        return statuses[url]
+    }
 
     /// Relays that acknowledged the event before the call returned.
     public var acceptedRelays: Set<URL> {

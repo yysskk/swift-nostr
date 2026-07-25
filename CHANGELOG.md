@@ -50,6 +50,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   run its relays on a platform-native socket or an in-memory fake and tune their timeouts, keepalive,
   and reconnection. Neither was reachable before: the per-module transports it replaces hard-coded
   `URLSession` and `RelayConnectionConfig.default`.
+- **String-based relay conveniences**: `NostrClient.count(filters:to:timeout:)` scopes a NIP-45
+  count to a subset of relays; `NostrClient.removeRelay(_:)` removes a relay by URL string;
+  `NostrClient.addRelay(_:config:)` accepts a per-relay `RelayConnectionConfig`; and
+  `PublishResult.status(for:)` looks up a relay's publish status from any spelling of its URL
+  string, resolved against the result's canonical keys.
 
 ### Fixed
 
@@ -111,6 +116,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   slash stripped, default ports stripped — so any spelling of the same relay routes to the one
   connection, re-adding a relay under a different spelling returns the existing connection, and
   publish results are keyed by the canonical URL.
+- **Breaking**: relay targeting is string-based. The `to:` parameter of `RelayPool.publish`,
+  `RelayPool.count`, `RelayPool.subscribe`, and of `NostrClient.subscribe`, `events`, and `fetch`
+  is now `[String]?` instead of `Set<URL>?`: nil (the default) broadcasts to the whole pool, an
+  empty array throws `noMatchingRelays`, duplicates de-dupe by normalized key, and an invalid
+  string throws the new `NostrError.invalidRelayURL` — a target must parse, use a `ws`/`wss`
+  scheme, have a host, and carry no fragment or user/password.
+- **Breaking**: the relay-management surface validates strictly and drops its labels.
+  `RelayPool.addRelay(url:)`/`addRelay(urlString:)` collapse into `addRelay(_:config:)` overloads
+  taking a `String` or a `URL` — both now throw `invalidRelayURL` for a non-WebSocket URL — and
+  `removeRelay(url:)` becomes `removeRelay(_:)` with a validating `String` overload (removing an
+  absent relay stays a no-op). `RelayConnection(urlString:)` and the invalid-URL path of
+  `connect(to:)` now throw `invalidRelayURL` instead of `connectionFailed`, and
+  `NostrClient.authenticate(relayURL:)` throws `noMatchingRelays` instead of a generic
+  `relayError` when the relay is not in the pool.
+- **Breaking**: NIP-65/NIP-17 relay-list parsing skips non-WebSocket URLs. Routing sets built from
+  kind-10002/10050 tags (and the gossip resolvers on top of them) now drop entries with a
+  non-`ws(s)` scheme, a missing host, or a fragment/userinfo instead of keeping them as routing
+  keys, and the resolved sets always carry canonical URL spellings.
 - **Breaking**: `RemoteSignerTransport` and `WalletConnectTransport` are replaced by a single
   `NostrCore.RelayTransport`. The two protocols were the same six requirements with nothing
   NIP-specific in either, and their default implementations were the same actor twice over. For a

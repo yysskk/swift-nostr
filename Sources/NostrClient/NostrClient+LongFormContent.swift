@@ -54,7 +54,7 @@ extension NostrClient {
             }
         }
 
-        let events = try await fetch(filters: [filter], to: hinted.isEmpty ? nil : hinted, timeout: timeout)
+        let events = try await fetch(filters: [filter], toURLs: hinted.isEmpty ? nil : hinted, timeout: timeout)
         // Addressable event: pick the newest in case multiple relays return stale copies.
         guard let newest = events.max(by: { $0.createdAt < $1.createdAt }) else {
             return nil

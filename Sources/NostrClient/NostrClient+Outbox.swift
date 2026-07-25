@@ -70,7 +70,7 @@ extension NostrClient {
     ) async throws -> SubscriptionSequence {
         let routeSet = await resolveOutboxRelays(authors: authors)
         let filter = Filter(authors: authors, kinds: kinds, limit: limit)
-        return try await subscribe(filters: [filter], to: routeSet)
+        return try await subscribe(filters: [filter], toURLs: routeSet)
     }
 
     /// Resolves the WRITE relays of the given authors for outbox routing.
@@ -123,6 +123,6 @@ extension NostrClient {
         }
 
         let available = await relayListStore.ensureConnected(targets)
-        return try await relayPool.publish(event, to: available.isEmpty ? nil : available, strategy: strategy)
+        return try await relayPool.publish(event, toURLs: available.isEmpty ? nil : available, strategy: strategy)
     }
 }

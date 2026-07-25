@@ -42,4 +42,25 @@ struct PublishResultTests {
         #expect(result.failedRelays.isEmpty)
         #expect(result.pendingRelays.isEmpty)
     }
+
+    @Test("status(for:) resolves strings against the canonical keys")
+    func statusForString() {
+        let result = PublishResult(statuses: [
+            urlA: .accepted,
+            urlB: .failed(NostrError.timeout),
+        ])
+
+        // Exact and alternate spellings resolve to the canonical key.
+        #expect(result.status(for: "wss://a.example.com") == .accepted)
+        #expect(result.status(for: "WSS://A.Example.com/") == .accepted)
+        #expect(result.status(for: "wss://a.example.com:443") == .accepted)
+        #expect(result.status(for: "wss://b.example.com") == .failed(NostrError.timeout))
+
+        // Untargeted relays and non-relay URLs report nil.
+        #expect(result.status(for: "wss://unknown.example.com") == nil)
+        #expect(result.status(for: "https://a.example.com") == nil)
+        #expect(result.status(for: "wss:garbage") == nil)
+        #expect(result.status(for: "wss://a.example.com/#frag") == nil)
+        #expect(result.status(for: "wss://user:pw@a.example.com") == nil)
+    }
 }

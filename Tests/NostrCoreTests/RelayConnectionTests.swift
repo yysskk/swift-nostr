@@ -164,3 +164,22 @@ struct RelayConnectionTests {
         #expect(await connection.state == .disconnected)
     }
 }
+
+@Suite("Relay Connection URL Validation Tests")
+struct RelayConnectionURLValidationTests {
+
+    @Test("init(urlString:) accepts a relay URL and normalizes it")
+    func initAcceptsAndNormalizes() throws {
+        let connection = try RelayConnection(urlString: "WSS://Relay.Example.com/")
+        #expect(connection.url == URL(string: "wss://relay.example.com")!)
+    }
+
+    @Test(
+        "init(urlString:) rejects non-relay URLs with invalidRelayURL",
+        arguments: ["https://relay.example.com", "wss:garbage"])
+    func initRejectsInvalidURL(urlString: String) {
+        #expect(throws: NostrError.invalidRelayURL(urlString)) {
+            _ = try RelayConnection(urlString: urlString)
+        }
+    }
+}
