@@ -1,6 +1,13 @@
 // swift-tools-version: 6.3
 import PackageDescription
 
+// SE-0335: require the `any` keyword for existential types. The code base
+// already conforms; enabling the upcoming feature on every target keeps new
+// code from drifting until the syntax becomes the language default.
+let swiftSettings: [SwiftSetting] = [
+    .enableUpcomingFeature("ExistentialAny")
+]
+
 let package = Package(
     name: "swift-nostr",
     platforms: [
@@ -40,7 +47,8 @@ let package = Package(
                 .product(name: "P256K", package: "swift-secp256k1"),
                 .product(name: "Crypto", package: "swift-crypto"),
                 .product(name: "_CryptoExtras", package: "swift-crypto"),
-            ]
+            ],
+            swiftSettings: swiftSettings
         ),
         .target(
             name: "NostrClient",
@@ -48,7 +56,8 @@ let package = Package(
                 "NostrCore",
                 .product(name: "P256K", package: "swift-secp256k1"),
                 .product(name: "Crypto", package: "swift-crypto"),
-            ]
+            ],
+            swiftSettings: swiftSettings
         ),
         .target(
             name: "NostrWalletConnect",
@@ -57,29 +66,35 @@ let package = Package(
                 .product(name: "P256K", package: "swift-secp256k1"),
                 .product(name: "Crypto", package: "swift-crypto"),
                 .product(name: "_CryptoExtras", package: "swift-crypto"),
-            ]
+            ],
+            swiftSettings: swiftSettings
         ),
         .target(
             name: "NostrConnect",
             dependencies: [
                 "NostrCore"
-            ]
+            ],
+            swiftSettings: swiftSettings
         ),
         .testTarget(
             name: "NostrCoreTests",
-            dependencies: ["NostrCore"]
+            dependencies: ["NostrCore"],
+            swiftSettings: swiftSettings
         ),
         .testTarget(
             name: "NostrClientTests",
-            dependencies: ["NostrClient", "NostrCore"]
+            dependencies: ["NostrClient", "NostrCore"],
+            swiftSettings: swiftSettings
         ),
         .testTarget(
             name: "NostrWalletConnectTests",
-            dependencies: ["NostrWalletConnect", "NostrCore"]
+            dependencies: ["NostrWalletConnect", "NostrCore"],
+            swiftSettings: swiftSettings
         ),
         .testTarget(
             name: "NostrConnectTests",
-            dependencies: ["NostrConnect", "NostrCore"]
+            dependencies: ["NostrConnect", "NostrCore"],
+            swiftSettings: swiftSettings
         ),
     ]
 )
