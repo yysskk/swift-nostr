@@ -34,11 +34,16 @@ struct EventTests {
         )
 
         let serialized = try unsigned.serializedForHashing()
-        let json = String(data: serialized, encoding: .utf8)!
 
-        #expect(json.contains("\"p\""))
-        #expect(json.contains("test content"))
-        #expect(json.contains("1234567890"))
+        // Pinned to the exact canonical bytes: substring checks would pass for a serializer that
+        // computes ids no other client agrees with. The full escaping, ordering, and signature
+        // matrix lives in `NIP01VectorTests` in NostrCoreTests.
+        let expectedSerialization =
+            #"[0,"a000000000000000000000000000000000000000000000000000000000000000","#
+            + #"1234567890,1,[["p","test"]],"test content"]"#
+
+        #expect(String(decoding: serialized, as: UTF8.self) == expectedSerialization)
+        #expect(try unsigned.computedId == "50898905ac2070fd2d2bc67553e0379ccdb2cc964be4e93c98409c2c3be32c3d")
     }
 
     @Test("Sign and verify event")
