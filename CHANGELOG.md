@@ -35,6 +35,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **NIP-29 Relay-based groups (group list)**: the NIP-51 kind-10009 simple group list as a typed
   `SimpleGroupList`/`GroupListEntry` view over `NostrList` — including NIP-44 private entries —
   with `fetchSimpleGroupList` and `publishSimpleGroupList` on `NostrClient`.
+- **Official NIP-44 vectors**: the canonical vector file from
+  [paulmillr/nip44](https://github.com/paulmillr/nip44) is bundled as a test resource and run in
+  full — conversation keys, message-key derivation, the padding table, every `encrypt_decrypt`
+  payload and its maximum-length variants, and every rejection case — replacing the four
+  hand-copied vectors that previously stood in for the suite.
+
+### Fixed
+
+- **NIP-44 padding is now validated strictly.** Decryption accepted any padded block long enough
+  to hold the declared plaintext, so a payload carrying a valid MAC over non-canonical padding
+  decrypted successfully. The block must now be exactly the 2-byte length prefix plus
+  `calc_padded_len` of the declared length, matching the reference implementation; anything else
+  throws `NostrError.invalidPadding`. Payloads produced by this or any other compliant
+  implementation are unaffected.
+- The decoded-payload size check in NIP-44 decryption used a minimum of 97 bytes, derived from a
+  comment that undercounted the smallest ciphertext. The bounds are now the correct 99 to 65,603
+  bytes, so more malformed payloads are refused before any key derivation.
 
 ### Changed
 

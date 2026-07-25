@@ -61,40 +61,57 @@ public struct SealedMessage: Sendable {
             throw NostrError.invalidPublicKey
         }
 
-        let plaintextData = Data(message.utf8)
-
-        guard plaintextData.count >= minPlaintextSize,
-            plaintextData.count <= maxPlaintextSize
-        else {
-            throw NostrError.encryptionFailed
-        }
-
-        // 1. Calculate conversation key
         let conversationKey = try getConversationKey(
             senderPrivateKey: senderKeyPair.privateKey,
             recipientPubkey: recipientPubkeyData
         )
 
-        // 2. Derive message keys from conversation key and nonce
+        let payload = try encrypt(plaintext: message, conversationKey: conversationKey, nonce: nonce)
+        return SealedMessage(payload: payload)
+    }
+
+    /// Encrypts a plaintext under an already-derived conversation key.
+    ///
+    /// Internal and intended for tests that drive the official `encrypt_decrypt` vectors, which
+    /// give the conversation key and nonce directly rather than a pair of keys. Splitting this
+    /// out mirrors the reference implementation's own `encrypt`/`get_conversation_key` split.
+    /// - Parameters:
+    ///   - plaintext: The plaintext message.
+    ///   - conversationKey: The 32-byte conversation key.
+    ///   - nonce: The 32-byte nonce.
+    /// - Returns: The base64-encoded `version || nonce || ciphertext || mac` payload.
+    static func encrypt(plaintext: String, conversationKey: Data, nonce: Data) throws -> String {
+        // Measured rather than encoded first, so an out-of-range plaintext — the invalid vectors
+        // reach 10 MB — is rejected without copying it or expanding the message keys.
+        let unpaddedLen = plaintext.utf8.count
+        guard unpaddedLen >= minPlaintextSize,
+            unpaddedLen <= maxPlaintextSize
+        else {
+            throw NostrError.encryptionFailed
+        }
+
+        let plaintextData = Data(plaintext.utf8)
+
+        // 1. Derive message keys from conversation key and nonce
         let (chachaKey, chachaNonce, hmacKey) = deriveMessageKeys(conversationKey: conversationKey, nonce: nonce)
 
-        // 3. Pad the plaintext
+        // 2. Pad the plaintext
         let padded = try pad(plaintextData)
 
-        // 4. Encrypt with ChaCha20
+        // 3. Encrypt with ChaCha20
         let ciphertext = try chacha20(padded, key: chachaKey, nonce: chachaNonce)
 
-        // 5. Calculate HMAC
+        // 4. Calculate HMAC
         let hmacInput = nonce + ciphertext
         let mac = HMAC<Crypto.SHA256>.authenticationCode(for: hmacInput, using: SymmetricKey(data: hmacKey))
 
-        // 6. Assemble payload: version || nonce || ciphertext || mac
+        // 5. Assemble payload: version || nonce || ciphertext || mac
         var payloadData = Data([version])
         payloadData.append(nonce)
         payloadData.append(ciphertext)
         payloadData.append(Data(mac))
 
-        return SealedMessage(payload: payloadData.base64EncodedString())
+        return payloadData.base64EncodedString()
     }
 
     /// Opens a sealed message from a sender
@@ -107,12 +124,33 @@ public struct SealedMessage: Sendable {
             throw NostrError.invalidPublicKey
         }
 
+        let conversationKey = try Self.getConversationKey(
+            senderPrivateKey: recipientKeyPair.privateKey,
+            recipientPubkey: senderPubkeyData
+        )
+
+        return try Self.decrypt(payload: payload, conversationKey: conversationKey)
+    }
+
+    /// Decrypts a base64 payload under an already-derived conversation key.
+    ///
+    /// Internal and intended for tests that drive the official `encrypt_decrypt` and
+    /// `invalid.decrypt` vectors, which give the conversation key directly rather than a pair of
+    /// keys. Splitting this out mirrors the reference implementation's own `decrypt` /
+    /// `get_conversation_key` split.
+    /// - Parameters:
+    ///   - payload: The base64-encoded `version || nonce || ciphertext || mac` payload.
+    ///   - conversationKey: The 32-byte conversation key.
+    /// - Returns: The decrypted plaintext message.
+    static func decrypt(payload: String, conversationKey: Data) throws -> String {
         guard let payloadData = Data(base64Encoded: payload) else {
             throw NostrError.invalidPayloadFormat
         }
 
-        // Minimum: 1 (version) + 32 (nonce) + 32 (min ciphertext) + 32 (mac) = 97 bytes
-        guard payloadData.count >= 97 else {
+        // The smallest padded plaintext is a 2-byte length prefix plus one 32-byte block, and the
+        // largest is that prefix plus 65536 bytes, so the decoded payload is
+        // 1 (version) + 32 (nonce) + [34, 65538] (ciphertext) + 32 (mac) = [99, 65603] bytes.
+        guard payloadData.count >= 99, payloadData.count <= 65603 else {
             throw NostrError.invalidPayloadFormat
         }
 
@@ -126,17 +164,11 @@ public struct SealedMessage: Sendable {
         let mac = payloadData[(payloadData.count - 32)...]
         let ciphertext = payloadData[33..<(payloadData.count - 32)]
 
-        // 2. Calculate conversation key
-        let conversationKey = try Self.getConversationKey(
-            senderPrivateKey: recipientKeyPair.privateKey,
-            recipientPubkey: senderPubkeyData
-        )
-
-        // 3. Derive message keys
+        // 2. Derive message keys
         let (chachaKey, chachaNonce, hmacKey) = Self.deriveMessageKeys(
             conversationKey: conversationKey, nonce: Data(nonce))
 
-        // 4. Verify HMAC using timing-safe comparison
+        // 3. Verify HMAC using timing-safe comparison
         let hmacInput = Data(nonce) + Data(ciphertext)
         let expectedMac = HMAC<Crypto.SHA256>.authenticationCode(for: hmacInput, using: SymmetricKey(data: hmacKey))
 
@@ -144,10 +176,10 @@ public struct SealedMessage: Sendable {
             throw NostrError.hmacVerificationFailed
         }
 
-        // 5. Decrypt with ChaCha20
+        // 4. Decrypt with ChaCha20
         let padded = try Self.chacha20(Data(ciphertext), key: chachaKey, nonce: chachaNonce)
 
-        // 6. Unpad
+        // 5. Unpad
         let plaintext = try Self.unpad(padded)
 
         guard let message = String(data: plaintext, encoding: .utf8) else {
@@ -213,8 +245,11 @@ public struct SealedMessage: Sendable {
         return conversationKey
     }
 
-    /// Derives message keys from conversation key and nonce using HKDF-Expand
-    private static func deriveMessageKeys(
+    /// Derives message keys from conversation key and nonce using HKDF-Expand.
+    ///
+    /// Internal rather than private so tests can check the derivation against the official
+    /// `get_message_keys` vectors, which pin all three outputs for a fixed conversation key.
+    static func deriveMessageKeys(
         conversationKey: Data, nonce: Data
     ) -> (chachaKey: Data, chachaNonce: Data, hmacKey: Data) {
         let info = nonce
@@ -284,7 +319,14 @@ public struct SealedMessage: Sendable {
         return padded
     }
 
-    /// Unpads plaintext according to NIP-44 spec
+    /// Unpads plaintext according to NIP-44 spec.
+    ///
+    /// The padded block must be exactly what a compliant encryptor produces: the declared length
+    /// has to be in range *and* the block has to be the 2-byte prefix plus `calcPaddedLen` of that
+    /// length. A merely-sufficient block is not enough — an attacker who can re-pad a plaintext
+    /// into a longer or shorter block still produces a valid MAC over it, so accepting
+    /// non-canonical padding would make the ciphertext malleable. The official `invalid padding`
+    /// vectors are exactly that: correct MACs over blocks no compliant encryptor emits.
     private static func unpad(_ padded: Data) throws -> Data {
         guard padded.count >= 2 else {
             throw NostrError.invalidPadding
@@ -294,7 +336,7 @@ public struct SealedMessage: Sendable {
 
         guard unpaddedLen >= minPlaintextSize,
             unpaddedLen <= maxPlaintextSize,
-            unpaddedLen <= padded.count - 2
+            padded.count == 2 + calcPaddedLen(unpaddedLen)
         else {
             throw NostrError.invalidPadding
         }
@@ -305,7 +347,10 @@ public struct SealedMessage: Sendable {
     /// Calculates the padded length for a given unpadded length, per the NIP-44 `calc_padded_len`
     /// algorithm. Uses integer arithmetic so the result is exact at power-of-two boundaries where
     /// floating-point rounding would drift.
-    private static func calcPaddedLen(_ unpaddedLen: Int) -> Int {
+    ///
+    /// Internal rather than private so tests can check the table against the official
+    /// `calc_padded_len` vectors directly.
+    static func calcPaddedLen(_ unpaddedLen: Int) -> Int {
         if unpaddedLen <= 32 {
             return 32
         }
