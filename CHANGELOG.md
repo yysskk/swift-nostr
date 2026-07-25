@@ -40,6 +40,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   full — conversation keys, message-key derivation, the padding table, every `encrypt_decrypt`
   payload and its maximum-length variants, and every rejection case — replacing the four
   hand-copied vectors that previously stood in for the suite.
+- **Transport injection on a single relay**: the designated
+  `RelayConnection(url:webSocketFactory:config:)` initializer is now public, so a host can drive one
+  relay connection on a platform-native socket (for example an OkHttp-backed
+  `WebSocketSessionFactory` on Android) or on an in-memory fake — matching the injection `RelayPool`
+  and `NostrClient` already expose.
 
 ### Fixed
 
