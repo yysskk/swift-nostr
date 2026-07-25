@@ -301,7 +301,7 @@ extension RelayInformation {
         /// An inclusive range `[lower, upper]` of event kinds.
         case range(Int, Int)
 
-        public init(from decoder: Decoder) throws {
+        public init(from decoder: any Decoder) throws {
             let container = try decoder.singleValueContainer()
             if let value = try? container.decode(Int.self) {
                 self = .single(value)
@@ -317,7 +317,7 @@ extension RelayInformation {
             )
         }
 
-        public func encode(to encoder: Encoder) throws {
+        public func encode(to encoder: any Encoder) throws {
             var container = encoder.singleValueContainer()
             switch self {
             case .single(let value):

@@ -41,6 +41,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Single import**: `NostrClient`, `NostrWalletConnect`, and `NostrConnect` now re-export
   `NostrCore`; a separate `import NostrCore` is no longer required to use the primitives
   (`Event`, `KeyPair`, `Filter`, …) they surface.
+- The package enables the `ExistentialAny` upcoming feature on every target, and CI compiles
+  with `-warnings-as-errors` on the Linux and macOS jobs, so implicit existential spellings and
+  new compiler warnings now fail the build instead of accumulating. No effect on consumers of
+  the library.
 - `RemoteSigner.awaitConnection()` now throws a distinct `RemoteSignerError.connectionInProgress`
   when another wait is already running on the session, instead of conflating that with
   `.notConnected`. The new case is additive but a source break for code that switches over

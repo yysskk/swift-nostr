@@ -174,7 +174,7 @@ public actor RelayPool {
         let strategy = strategy ?? config.defaultPublishStrategy
         let requiredAcks = strategy.requiredAcks(targetCount: connections.count)
 
-        let (results, continuation) = AsyncStream<(URL, Result<Void, Error>)>.makeStream()
+        let (results, continuation) = AsyncStream<(URL, Result<Void, any Error>)>.makeStream()
         defer { continuation.finish() }
 
         // Deliberately unstructured: these tasks must survive an early return so the
@@ -198,7 +198,7 @@ public actor RelayPool {
 
         var successCount = 0
         var settledCount = 0
-        var lastError: Error?
+        var lastError: (any Error)?
 
         for await (relayURL, result) in results {
             settledCount += 1
@@ -235,7 +235,7 @@ public actor RelayPool {
 
     /// Decides whether a fully settled publish failed.
     /// Succeeds if at least one relay accepted the event and any required quorum was met.
-    static func publishFailure(successCount: Int, requiredAcks: Int?, lastError: Error?) -> Error? {
+    static func publishFailure(successCount: Int, requiredAcks: Int?, lastError: (any Error)?) -> (any Error)? {
         if successCount == 0, let error = lastError {
             return error
         }
@@ -260,7 +260,7 @@ public actor RelayPool {
     ) async throws -> [URL: EventCount] {
         let connections = targetConnections(relayURLs)
 
-        return try await withThrowingTaskGroup(of: (URL, Result<EventCount, Error>).self) { group in
+        return try await withThrowingTaskGroup(of: (URL, Result<EventCount, any Error>).self) { group in
             for connection in connections {
                 group.addTask {
                     do {
@@ -273,7 +273,7 @@ public actor RelayPool {
             }
 
             var results: [URL: EventCount] = [:]
-            var lastError: Error?
+            var lastError: (any Error)?
             for try await (url, result) in group {
                 switch result {
                 case .success(let count):

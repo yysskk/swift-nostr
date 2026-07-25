@@ -70,7 +70,7 @@ public struct Filter: Codable, Sendable, Hashable {
         self.tagQueries = [:]
     }
 
-    public init(from decoder: Decoder) throws {
+    public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
 
         ids = try container.decodeIfPresent([String].self, forKey: .ids)
@@ -94,7 +94,7 @@ public struct Filter: Codable, Sendable, Hashable {
         self.tagQueries = tagQueries
     }
 
-    public func encode(to encoder: Encoder) throws {
+    public func encode(to encoder: any Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
 
         try container.encodeIfPresent(ids, forKey: .ids)

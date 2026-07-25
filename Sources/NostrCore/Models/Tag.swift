@@ -290,12 +290,12 @@ extension Tag: ExpressibleByArrayLiteral {
 // MARK: - Codable
 extension Tag: Codable {
     /// Encodes as the bare NIP-01 JSON array, e.g. `["e","abc..."]`.
-    public func encode(to encoder: Encoder) throws {
+    public func encode(to encoder: any Encoder) throws {
         var container = encoder.singleValueContainer()
         try container.encode(rawArray)
     }
 
-    public init(from decoder: Decoder) throws {
+    public init(from decoder: any Decoder) throws {
         let container = try decoder.singleValueContainer()
         let rawArray = try container.decode([String].self)
         guard let tag = Tag(rawArray: rawArray) else {

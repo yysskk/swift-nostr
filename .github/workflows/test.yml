@@ -54,11 +54,15 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-spm-${{ steps.swift.outputs.key }}-
 
+      # -warnings-as-errors keeps the package's own targets warning-free
+      # (test targets included, via swift test). SwiftPM builds dependency
+      # packages with their warnings suppressed, so upstream releases cannot
+      # fail the build.
       - name: Build
-        run: swift build
+        run: swift build -Xswiftc -warnings-as-errors
 
       - name: Run tests
-        run: swift test
+        run: swift test -Xswiftc -warnings-as-errors
 
   test-macos:
     runs-on: macos-26
@@ -87,11 +91,12 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-spm-${{ steps.swift.outputs.key }}-
 
+      # Same strictness as the Linux job; see the comment there.
       - name: Build
-        run: swift build
+        run: swift build -Xswiftc -warnings-as-errors
 
       - name: Run tests with code coverage
-        run: swift test --enable-code-coverage
+        run: swift test --enable-code-coverage -Xswiftc -warnings-as-errors
 
       - name: Export coverage report
         run: |

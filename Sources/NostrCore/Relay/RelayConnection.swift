@@ -53,7 +53,7 @@ public actor RelayConnection {
     var keepaliveTask: Task<Void, Never>?
 
     /// In-flight connection attempt, shared by concurrent connect() callers
-    private var connectTask: Task<Void, Error>?
+    private var connectTask: Task<Void, any Error>?
 
     /// Continuations for async message receiving (supports multiple consumers)
     var messageContinuations: [UUID: AsyncStream<RelayMessage>.Continuation] = [:]
@@ -64,13 +64,13 @@ public actor RelayConnection {
     /// Pending continuations waiting for OK response after publish,
     /// keyed by event id and then by a per-publish token so concurrent
     /// publishes of the same event don't clobber each other's waiters
-    private var pendingPublishWaiters: [String: [UUID: AsyncThrowingStream<Void, Error>.Continuation]] = [:]
+    private var pendingPublishWaiters: [String: [UUID: AsyncThrowingStream<Void, any Error>.Continuation]] = [:]
 
     /// Continuations waiting for a NIP-45 COUNT response, keyed by the generated
     /// COUNT subscription id. One waiter per subid: the ids are unique per
     /// request, so a reply correlates to exactly one in-flight ``count(filters:timeout:)``.
     /// `internal` (not `private`) because the receive loop in `+Receiving` settles them.
-    var pendingCountWaiters: [String: AsyncThrowingStream<EventCount, Error>.Continuation] = [:]
+    var pendingCountWaiters: [String: AsyncThrowingStream<EventCount, any Error>.Continuation] = [:]
 
     /// The most recent challenge received in an AUTH message from the relay (NIP-42).
     ///
@@ -122,7 +122,7 @@ public actor RelayConnection {
 
     /// Continuations suspended in ``waitForAuthentication()``, settled by the
     /// receive loop when an AUTH round-trip concludes.
-    private var authenticationWaiters: [UUID: AsyncThrowingStream<Void, Error>.Continuation] = [:]
+    private var authenticationWaiters: [UUID: AsyncThrowingStream<Void, any Error>.Continuation] = [:]
 
     /// Whether at least one pubkey is authenticated on this connection (NIP-42).
     public var isAuthenticated: Bool {
@@ -467,7 +467,7 @@ public actor RelayConnection {
         if isAuthenticated { return }
 
         let token = UUID()
-        let (stream, continuation) = AsyncThrowingStream<Void, Error>.makeStream()
+        let (stream, continuation) = AsyncThrowingStream<Void, any Error>.makeStream()
         authenticationWaiters[token] = continuation
 
         defer {
@@ -606,7 +606,7 @@ public actor RelayConnection {
     ///   ``NostrError/timeout`` when no OK arrives in time.
     private func sendAndAwaitOK(_ message: ClientMessage, eventId: String) async throws {
         let token = UUID()
-        let (stream, continuation) = AsyncThrowingStream<Void, Error>.makeStream()
+        let (stream, continuation) = AsyncThrowingStream<Void, any Error>.makeStream()
         pendingPublishWaiters[eventId, default: [:]][token] = continuation
 
         do {
@@ -639,7 +639,10 @@ public actor RelayConnection {
 
     /// Removes and returns a single publish waiter (called from within the actor).
     @discardableResult
-    private func removePublishWaiter(eventId: String, token: UUID) -> AsyncThrowingStream<Void, Error>.Continuation? {
+    private func removePublishWaiter(
+        eventId: String,
+        token: UUID
+    ) -> AsyncThrowingStream<Void, any Error>.Continuation? {
         guard var waiters = pendingPublishWaiters[eventId] else { return nil }
         let continuation = waiters.removeValue(forKey: token)
         if waiters.isEmpty {
@@ -652,7 +655,7 @@ public actor RelayConnection {
 
     /// Removes and returns all publish waiters for an event id —
     /// one OK from the relay satisfies every pending publish of that event.
-    func removeAllPublishWaiters(eventId: String) -> [AsyncThrowingStream<Void, Error>.Continuation] {
+    func removeAllPublishWaiters(eventId: String) -> [AsyncThrowingStream<Void, any Error>.Continuation] {
         guard let waiters = pendingPublishWaiters.removeValue(forKey: eventId) else { return [] }
         return Array(waiters.values)
     }
@@ -671,7 +674,7 @@ public actor RelayConnection {
         }
 
         let subscriptionId = "count-" + String(UUID().uuidString.prefix(12))
-        let (stream, continuation) = AsyncThrowingStream<EventCount, Error>.makeStream()
+        let (stream, continuation) = AsyncThrowingStream<EventCount, any Error>.makeStream()
         pendingCountWaiters[subscriptionId] = continuation
 
         do {

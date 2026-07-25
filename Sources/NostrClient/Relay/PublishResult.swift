@@ -6,7 +6,7 @@ public enum PublishRelayStatus: Sendable {
     case accepted
 
     /// Publishing to the relay failed (rejected, timed out, or not connected).
-    case failed(Error)
+    case failed(any Error)
 
     /// The relay had not settled yet when the publish strategy was satisfied.
     /// The send continues in the background; only its outcome is unobserved.

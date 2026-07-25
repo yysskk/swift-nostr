@@ -69,7 +69,9 @@ Run the whole suite with `swift test`, or a single suite with
 - Keep PRs small and focused on a single concern; describe the motivation in the PR body.
 - CI must pass. The `Test` workflow lints formatting, builds and tests on Linux and macOS
   (with code coverage), compiles the libraries for iOS/tvOS/watchOS/visionOS, and builds for
-  Android; the documentation build must also succeed for changes to DocC catalogs.
+  Android; the documentation build must also succeed for changes to DocC catalogs. The Linux
+  and macOS jobs compile with `-warnings-as-errors`, so keep `swift build` and `swift test`
+  warning-free.
 - New NIP implementations should link the relevant [NIP specification](https://github.com/nostr-protocol/nips)
   from the code or the PR description.
 
