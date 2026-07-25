@@ -13,14 +13,13 @@ dependencies: [
 ]
 ```
 
-Then add the `NostrWalletConnect` product to your target. Its API surfaces `NostrCore` types
-(events, keys, `LNURLPayResponse`, …), so add `NostrCore` alongside it and `import` both — the
-wallet module does not re-export the primitives:
+Then add the `NostrWalletConnect` product to your target. It re-exports the `NostrCore`
+primitives its API surfaces (events, keys, `LNURLPayResponse`, …):
 
 ```swift
 .target(
     name: "YourTarget",
-    dependencies: ["NostrWalletConnect", "NostrCore"]
+    dependencies: ["NostrWalletConnect"]
 )
 ```
 
@@ -65,8 +64,6 @@ fetches the invoice and pays it in one step. Build the zap request with `NostrCo
 (`LNURL`, `KeyPair`, and `EventSigner` come from there):
 
 ```swift
-import NostrCore
-
 // Resolve the recipient's LNURL-pay endpoint (NostrCore).
 guard let serviceURL = LNURL.payServiceURL(forLightningAddress: "alice@example.com") else { return }
 let (data, _) = try await URLSession.shared.data(from: serviceURL)

@@ -6,7 +6,7 @@ The high-level, multi-relay Nostr client built on `NostrCore`.
 
 NostrClient provides a type-safe, actor-based API for interacting with the Nostr network. It handles relay connections, event signing, subscriptions, and encrypted direct messages out of the box.
 
-The lower-level primitives it builds on — the event model, keys and signing, NIP-44 encryption, NIP-19 encoding, the relay protocol messages, and a single `RelayConnection` — live in `NostrCore` and must be imported from there (`import NostrCore`).
+The lower-level primitives it builds on — the event model, keys and signing, NIP-44 encryption, NIP-19 encoding, the relay protocol messages, and a single `RelayConnection` — live in `NostrCore`, which `NostrClient` re-exports.
 
 - Actor-based concurrency with full `Sendable` compliance.
 - Multi-relay management with automatic reconnection.
