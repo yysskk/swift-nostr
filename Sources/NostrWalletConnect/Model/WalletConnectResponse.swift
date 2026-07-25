@@ -116,7 +116,7 @@ public struct GetInfoResult: Codable, Sendable, Hashable {
     }
 
     // Custom decoding so `methods` defaults to empty rather than throwing for wallets that omit it.
-    public init(from decoder: Decoder) throws {
+    public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         alias = try container.decodeIfPresent(String.self, forKey: .alias)
         color = try container.decodeIfPresent(String.self, forKey: .color)

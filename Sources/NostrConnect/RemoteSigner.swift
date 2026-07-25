@@ -59,7 +59,7 @@ public actor RemoteSigner {
     /// authenticate the signer before its pubkey is pinned. `nil` for a `bunker://` session.
     private let expectedInvitationSecret: String?
 
-    private var startTask: Task<Void, Error>?
+    private var startTask: Task<Void, any Error>?
     private var isStarted: Bool { startTask != nil }
     private var didConnect = false
     private var readerTask: Task<Void, Never>?
@@ -73,7 +73,7 @@ public actor RemoteSigner {
 
     /// The waiter suspended in ``awaitConnection()``, resolved once a valid connect response
     /// (echoing the invitation secret) arrives, or the wait times out. `nil` when not awaiting.
-    private var connectionWaiter: CheckedContinuation<String, Error>?
+    private var connectionWaiter: CheckedContinuation<String, any Error>?
     /// A discovered signer pubkey from a valid connect response that arrived before
     /// ``discoverSigner()`` registered its waiter (the response can be delivered as soon as the
     /// subscription exists, which is before the waiter is set). Consumed when the waiter registers so
@@ -269,7 +269,7 @@ public actor RemoteSigner {
         let request = RemoteSignerRequest(method: method, params: params)
         let event = try buildRequestEvent(request)
 
-        let (stream, continuation) = AsyncThrowingStream<RemoteSignerResponse, Error>.makeStream()
+        let (stream, continuation) = AsyncThrowingStream<RemoteSignerResponse, any Error>.makeStream()
         let timeoutTask = makeTimeoutTask(requestID: request.id, timeout: config.requestTimeout)
         pending[request.id] = PendingRequest(
             method: method, continuation: continuation, timeoutTask: timeoutTask)
@@ -501,7 +501,7 @@ public actor RemoteSigner {
 private struct PendingRequest {
     /// The method whose request this is, used to label an `auth_url` challenge.
     let method: RemoteSignerMethod
-    let continuation: AsyncThrowingStream<RemoteSignerResponse, Error>.Continuation
+    let continuation: AsyncThrowingStream<RemoteSignerResponse, any Error>.Continuation
     /// The task that fails the request on timeout; replaced with a longer one on an `auth_url`
     /// challenge, and cancelled once the request resolves.
     var timeoutTask: Task<Void, Never>?

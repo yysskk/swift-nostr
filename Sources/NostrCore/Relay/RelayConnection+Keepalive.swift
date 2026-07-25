@@ -14,7 +14,7 @@ extension RelayConnection {
         let resumeGuard = ResumeOnceGuard()
         let cancellationBox = PingCancellationBox()
         try await withTaskCancellationHandler {
-            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
                 guard cancellationBox.register(continuation) else {
                     // The task was cancelled before the wait began; onCancel found
                     // nothing to resume, so it is this path's job.
@@ -69,7 +69,7 @@ extension RelayConnection {
     }
 
     /// Tears the connection down after a failed keepalive ping and schedules a reconnect.
-    private func handleKeepaliveFailure(_ error: Error) {
+    private func handleKeepaliveFailure(_ error: any Error) {
         updateState(.failed(error.localizedDescription))
         // Cancel the socket so the receive loop's pending receive() exits promptly.
         webSocketTask?.cancel(with: .abnormalClosure, reason: nil)
@@ -87,12 +87,12 @@ extension RelayConnection {
 /// handler, the watchdog, and cancellation remains the job of ``ResumeOnceGuard``.
 private final class PingCancellationBox: @unchecked Sendable {
     private let lock = NSLock()
-    private var continuation: CheckedContinuation<Void, Error>?
+    private var continuation: CheckedContinuation<Void, any Error>?
     private var isCancelled = false
 
     /// Stores the continuation for a later `cancel`; returns `false` if the task
     /// was already cancelled (the continuation is not stored).
-    func register(_ continuation: CheckedContinuation<Void, Error>) -> Bool {
+    func register(_ continuation: CheckedContinuation<Void, any Error>) -> Bool {
         lock.lock()
         defer { lock.unlock() }
         if isCancelled { return false }
@@ -101,7 +101,7 @@ private final class PingCancellationBox: @unchecked Sendable {
     }
 
     /// Marks the box cancelled and returns the registered continuation, if any.
-    func cancel() -> CheckedContinuation<Void, Error>? {
+    func cancel() -> CheckedContinuation<Void, any Error>? {
         lock.lock()
         defer { lock.unlock() }
         isCancelled = true

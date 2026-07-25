@@ -12,7 +12,7 @@ enum MockResponse {
     case success(status: Int, body: Data)
 
     /// A transport-level failure (e.g. `URLError(.cannotConnectToHost)`).
-    case failure(Error)
+    case failure(any Error)
 }
 
 /// The request captured by ``MockURLProtocol`` plus the value returned by the closure under test.

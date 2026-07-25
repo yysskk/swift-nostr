@@ -63,7 +63,7 @@ public protocol WebSocketSession: Sendable {
     func receive() async throws -> WebSocketMessage
 
     /// Sends a ping; `pongReceiveHandler` is invoked when the pong arrives or the ping fails.
-    func sendPing(pongReceiveHandler: @escaping @Sendable (Error?) -> Void)
+    func sendPing(pongReceiveHandler: @escaping @Sendable ((any Error)?) -> Void)
 }
 
 /// Creates a ``WebSocketSession`` for a request.
@@ -120,7 +120,7 @@ final class URLSessionWebSocket: WebSocketSession, @unchecked Sendable {
         try WebSocketMessage(await task.receive())
     }
 
-    func sendPing(pongReceiveHandler: @escaping @Sendable (Error?) -> Void) {
+    func sendPing(pongReceiveHandler: @escaping @Sendable ((any Error)?) -> Void) {
         task.sendPing(pongReceiveHandler: pongReceiveHandler)
     }
 }

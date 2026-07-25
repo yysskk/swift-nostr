@@ -11,13 +11,13 @@ import NostrCore
 /// machine — connect, send, receive, publish-ack — without a live network relay.
 final class MockWebSocketSession: WebSocketSession, @unchecked Sendable {
     private let lock = NSLock()
-    private var queued: [Result<WebSocketMessage, Error>] = []
-    private var receiveWaiters: [CheckedContinuation<WebSocketMessage, Error>] = []
+    private var queued: [Result<WebSocketMessage, any Error>] = []
+    private var receiveWaiters: [CheckedContinuation<WebSocketMessage, any Error>] = []
     private var sent: [WebSocketMessage] = []
     private var resumed = false
-    private let pingError: Error?
+    private let pingError: (any Error)?
 
-    init(pingError: Error? = nil) {
+    init(pingError: (any Error)? = nil) {
         self.pingError = pingError
     }
 
@@ -61,7 +61,7 @@ final class MockWebSocketSession: WebSocketSession, @unchecked Sendable {
         }
     }
 
-    func sendPing(pongReceiveHandler: @escaping @Sendable (Error?) -> Void) {
+    func sendPing(pongReceiveHandler: @escaping @Sendable ((any Error)?) -> Void) {
         pongReceiveHandler(pingError)
     }
 
@@ -82,7 +82,7 @@ final class MockWebSocketSession: WebSocketSession, @unchecked Sendable {
 
     /// Fails the next `receive()` call (or buffers the failure), simulating the
     /// transport erroring out — e.g. a dropped connection.
-    func deliver(error: Error) {
+    func deliver(error: any Error) {
         lock.lock()
         if receiveWaiters.isEmpty {
             queued.append(.failure(error))

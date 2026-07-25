@@ -49,7 +49,7 @@ public actor WalletConnection {
     /// Open notification streams, keyed so each can deregister on termination.
     private var notificationStreams: [UUID: AsyncStream<WalletConnectNotification>.Continuation] = [:]
     /// The current ``fetchInfo()`` waiter, if any.
-    private var pendingInfo: AsyncThrowingStream<WalletInfo, Error>.Continuation?
+    private var pendingInfo: AsyncThrowingStream<WalletInfo, any Error>.Continuation?
 
     /// The last fetched wallet info, if any.
     public private(set) var info: WalletInfo?
@@ -132,7 +132,7 @@ public actor WalletConnection {
 
         // Register the waiter before subscribing so an info event delivered during the subscribe
         // round-trip is buffered into this stream rather than dropped.
-        let (stream, continuation) = AsyncThrowingStream<WalletInfo, Error>.makeStream()
+        let (stream, continuation) = AsyncThrowingStream<WalletInfo, any Error>.makeStream()
         // A prior in-flight fetchInfo is superseded by this one (the connection stays active).
         pendingInfo?.finish(throwing: WalletConnectError.superseded)
         pendingInfo = continuation
@@ -217,7 +217,7 @@ public actor WalletConnection {
         let event = try buildRequestEvent(method: method, params: params, scheme: scheme)
         let requestID = event.id
 
-        let (stream, continuation) = AsyncThrowingStream<[ResponsePart], Error>.makeStream()
+        let (stream, continuation) = AsyncThrowingStream<[ResponsePart], any Error>.makeStream()
         pending[requestID] = PendingRequest(
             scheme: scheme, collected: [], receivedCount: 0, expected: expectedResponses, continuation: continuation)
 
@@ -400,5 +400,5 @@ private struct PendingRequest {
     /// Total responses seen (including undecryptable ones), used for the completion check.
     var receivedCount: Int
     let expected: Int
-    let continuation: AsyncThrowingStream<[ResponsePart], Error>.Continuation
+    let continuation: AsyncThrowingStream<[ResponsePart], any Error>.Continuation
 }
