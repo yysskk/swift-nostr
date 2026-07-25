@@ -13,14 +13,13 @@ dependencies: [
 ]
 ```
 
-Then add the `NostrConnect` product to your target. Its API surfaces `NostrCore` types (`Event`,
-`KeyPair`, `UnsignedEvent`, …), so add `NostrCore` alongside it and `import` both — the module does
-not re-export the primitives:
+Then add the `NostrConnect` product to your target. It re-exports the `NostrCore` primitives
+its API surfaces (`Event`, `KeyPair`, `UnsignedEvent`, …):
 
 ```swift
 .target(
     name: "YourTarget",
-    dependencies: ["NostrConnect", "NostrCore"]
+    dependencies: ["NostrConnect"]
 )
 ```
 
@@ -33,7 +32,6 @@ and create a ``RemoteSigner``:
 
 ```swift
 import NostrConnect
-import NostrCore
 
 let bunker = try BunkerURI(string: "bunker://...")
 let signer = try RemoteSigner(bunker: bunker)
