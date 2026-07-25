@@ -19,12 +19,14 @@ extension NostrClient {
     }
 
     /// Publishes a reply to an event
+    /// - Parameter relayURL: The relay where the replied-to event can be found, recorded in the
+    ///   NIP-10 `e` tag.
     /// - Returns: The signed event together with the per-relay publish outcome.
     @discardableResult
     public func publishReply(
         to event: Event,
         content: String,
-        relayUrl: String? = nil,
+        relayURL: String? = nil,
         strategy: PublishStrategy? = nil
     ) async throws -> PublishedEvent {
         let signedEvent = try withSigner { signer -> Event in
@@ -33,10 +35,10 @@ extension NostrClient {
             // Add root and reply markers (NIP-10)
             if let rootTag = event.tags(named: "e").first(where: { $0.values.contains("root") }) {
                 tags.append(rootTag)
-                tags.append(.event(event.id, relayURL: relayUrl, marker: .reply))
+                tags.append(.event(event.id, relayURL: relayURL, marker: .reply))
             } else {
                 // This is a reply to a root event
-                tags.append(.event(event.id, relayURL: relayUrl, marker: .root))
+                tags.append(.event(event.id, relayURL: relayURL, marker: .root))
             }
 
             // Add p tag for the author we're replying to
@@ -81,14 +83,15 @@ extension NostrClient {
     }
 
     /// Publishes a repost
+    /// - Parameter relayURL: The relay where the reposted event can be found, recorded in the `e` tag.
     /// - Returns: The signed event together with the per-relay publish outcome.
     @discardableResult
     public func publishRepost(
         of event: Event,
-        relayUrl: String? = nil,
+        relayURL: String? = nil,
         strategy: PublishStrategy? = nil
     ) async throws -> PublishedEvent {
-        let repost = try withSigner { try $0.signRepost(of: event, relayUrl: relayUrl) }
+        let repost = try withSigner { try $0.signRepost(of: event, relayURL: relayURL) }
         let result = try await relayPool.publish(repost, strategy: strategy)
         return PublishedEvent(event: repost, result: result)
     }

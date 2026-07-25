@@ -57,6 +57,19 @@ struct PublishedEventTests {
         #expect(published.result.statuses.isEmpty)
     }
 
+    @Test("publishReply records the relay hint in the e tag")
+    func publishReplyRecordsRelayURL() async throws {
+        let client = try await makeClient()
+        let root = try await client.publishTextNote(content: "root note").event
+        let published = try await client.publishReply(
+            to: root,
+            content: "a reply",
+            relayURL: "wss://hint.example.com"
+        )
+
+        #expect(published.event.tags.contains(["e", root.id, "wss://hint.example.com", "root"]))
+    }
+
     @Test("publishReaction and publishRepost return published events")
     func reactionAndRepostReturnPublishedEvents() async throws {
         let client = try await makeClient()
@@ -69,6 +82,17 @@ struct PublishedEventTests {
         let repost = try await client.publishRepost(of: note)
         #expect(repost.event.kind == .repost)
         #expect(repost.result.statuses.isEmpty)
+    }
+
+    @Test("publishRepost records the relay hint in the e tag")
+    func publishRepostRecordsRelayURL() async throws {
+        let client = try await makeClient()
+        let note = try await client.publishTextNote(content: "note").event
+        let repost = try await client.publishRepost(of: note, relayURL: "wss://hint.example.com")
+
+        #expect(repost.event.kind == .repost)
+        #expect(repost.event.tags.contains(["e", note.id, "wss://hint.example.com"]))
+        #expect(repost.event.tags.contains(["p", note.pubkey]))
     }
 
     @Test("publishMetadata and publishDeletion return published events")

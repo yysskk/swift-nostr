@@ -50,6 +50,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   acronyms are uniformly cased. The `relayUrl:` argument label on both `Contact` initializers is
   renamed to `relayURL:` as well. Because `Contact` is `Codable`, its JSON key changes from
   `relayUrl` to `relayURL`; clients that persist encoded contacts need to migrate stored data.
+- **Breaking**: the `relayUrl:` argument label is now `relayURL:` on
+  `EventSigner.signRepost(of:relayURL:)`, `NostrClient.publishReply(to:content:relayURL:strategy:)`,
+  and `NostrClient.publishRepost(of:relayURL:strategy:)`, completing the `relayURL` spelling across
+  the package.
 
 ## [0.6.0] - 2026-07-05
 

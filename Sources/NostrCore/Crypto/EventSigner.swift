@@ -105,14 +105,17 @@ public struct EventSigner: Sendable {
     }
 
     /// Creates and signs a repost event (kind 6)
-    public func signRepost(of event: Event, relayUrl: String? = nil) throws -> Event {
+    /// - Parameters:
+    ///   - event: The event being reposted; it is embedded in the content and referenced by an `e` tag.
+    ///   - relayURL: The relay where the reposted event can be found, recorded in the `e` tag.
+    public func signRepost(of event: Event, relayURL: String? = nil) throws -> Event {
         let encoder = JSONEncoder()
         encoder.keyEncodingStrategy = .convertToSnakeCase
         let eventJson = try encoder.encode(event)
 
         return try sign(
             kind: .repost,
-            tags: [.event(event.id, relayURL: relayUrl), .pubkey(event.pubkey)],
+            tags: [.event(event.id, relayURL: relayURL), .pubkey(event.pubkey)],
             content: String(decoding: eventJson, as: UTF8.self)
         )
     }
