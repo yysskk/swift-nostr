@@ -1,5 +1,6 @@
 import Foundation
 import NostrCore
+import NostrTestSupport
 import Testing
 
 @testable import NostrClient
@@ -119,5 +120,49 @@ struct RelayListStoreTests {
         let urls: Set<URL> = [URL(string: "wss://absent.example.com")!]
         let available = await store.ensureConnected(urls)
         #expect(available.isEmpty)
+    }
+
+    @Test("addAndConnect reuses the pooled connection for an alternate spelling of its URL")
+    func addAndConnectReusesPooledRelayAcrossSpellings() async throws {
+        let socketCount = SocketCount()
+        let pool = RelayPool(
+            config: RelayPoolConfig(defaultRelayConfig: ConnectedClientFixture.noReconnectConfig),
+            webSocketFactory: MockWebSocketSessionFactory(makeSession: {
+                socketCount.increment()
+                return MockWebSocketSession()
+            })
+        )
+        let store = RelayListStore(pool: pool, policy: .addAndConnect)
+        let connection = await pool.addRelay(url: URL(string: "wss://relay.example.com")!)
+        try await connection.connect()
+        #expect(socketCount.current == 1)
+
+        // The same relay spelled with a trailing slash must route to the existing
+        // connection instead of opening a duplicate socket.
+        let alternate = URL(string: "wss://relay.example.com/")!
+        let available = await store.ensureConnected([alternate])
+
+        #expect(available == [alternate])
+        #expect(socketCount.current == 1)
+        #expect(await pool.count == 1)
+        await pool.disconnectAll()
+    }
+}
+
+/// Counts how many sockets a mock factory has handed out.
+private final class SocketCount: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value = 0
+
+    func increment() {
+        lock.lock()
+        defer { lock.unlock() }
+        value += 1
+    }
+
+    var current: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return value
     }
 }

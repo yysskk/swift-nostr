@@ -72,20 +72,6 @@ struct NIP29GroupClientTests {
         socket.sentTextFrames.contains { $0.hasPrefix("[\"EVENT\"") }
     }
 
-    /// Extracts the event of the first EVENT frame sent on `socket`.
-    private func sentEvent(in socket: MockWebSocketSession) throws -> Event {
-        guard let frame = socket.sentTextFrames.first(where: { $0.hasPrefix("[\"EVENT\"") }),
-            let data = frame.data(using: .utf8),
-            let array = try JSONSerialization.jsonObject(with: data) as? [Any],
-            array.count >= 2,
-            let eventDict = array[1] as? [String: Any]
-        else {
-            throw NostrError.invalidMessageFormat
-        }
-        let eventData = try JSONSerialization.data(withJSONObject: eventDict)
-        return try JSONDecoder().decode(Event.self, from: eventData)
-    }
-
     /// Extracts the subscription id and first filter of the first REQ frame sent on `socket`.
     private func sentREQ(in socket: MockWebSocketSession) throws -> (subscriptionId: String, filter: [String: Any]) {
         guard let frame = socket.sentTextFrames.first(where: { $0.hasPrefix("[\"REQ\"") }),
@@ -104,10 +90,7 @@ struct NIP29GroupClientTests {
     /// returns the sent event.
     @discardableResult
     private func acknowledgePublish(on socket: MockWebSocketSession) async throws -> Event {
-        try await NIP42TestSupport.pollUntil { self.hasEventFrame(socket) }
-        let sent = try sentEvent(in: socket)
-        socket.deliver(.string("[\"OK\",\"\(sent.id)\",true,\"\"]"))
-        return sent
+        try await PublishAckSupport.acknowledgePublish(on: socket)
     }
 
     /// A canned `["EVENT", subscriptionId, {...}]` relay frame for `event`.

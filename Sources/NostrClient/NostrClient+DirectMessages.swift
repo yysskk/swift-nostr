@@ -14,7 +14,9 @@ extension NostrClient {
     /// Each gift wrap is routed to its addressee's NIP-17 DM relays (kind 10050): the recipient
     /// copy to the recipient's inbox relays and the self-copy to the sender's own, discovering
     /// and caching the lists as needed. When an addressee has advertised no DM relay list, that
-    /// copy falls back to the full relay pool rather than being dropped.
+    /// copy falls back to the full relay pool rather than being dropped; the recipient copy's
+    /// fallback throws ``NostrError/noRelaysInPool`` when the pool is also empty, while the
+    /// self-copy stays best-effort.
     /// - Parameters:
     ///   - content: The message content
     ///   - recipientPubkey: The recipient's public key (hex)
@@ -143,7 +145,8 @@ extension NostrClient {
     /// reaction, and file send paths.
     ///
     /// A nil target means the addressee advertised no DM relay list (or none could be connected), so
-    /// the copy falls back to the full pool rather than being dropped. The recipient and sender
+    /// the copy falls back to the full pool rather than being dropped; the recipient copy's fallback
+    /// throws ``NostrError/noRelaysInPool`` when the pool is also empty. The recipient and sender
     /// addressees are resolved in parallel — each may trigger an independent relay-list fetch — and
     /// the best-effort self-copy never blocks or fails the primary send.
     private func deliverDirectMessage(

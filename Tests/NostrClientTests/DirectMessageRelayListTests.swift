@@ -192,22 +192,3 @@ struct DirectMessageRelayListFilterTests {
         #expect(filter.limit == nil)
     }
 }
-
-@Suite("Relay URL Normalization Tests")
-struct RelayURLTests {
-
-    @Test("Lowercases the URL")
-    func lowercases() {
-        #expect(RelayURL.normalize("wss://Relay.Example.COM") == "wss://relay.example.com")
-    }
-
-    @Test("Strips a single trailing slash")
-    func stripsTrailingSlash() {
-        #expect(RelayURL.normalize("wss://relay.example.com/") == "wss://relay.example.com")
-    }
-
-    @Test("Leaves a URL without a trailing slash unchanged")
-    func noTrailingSlash() {
-        #expect(RelayURL.normalize("wss://relay.example.com") == "wss://relay.example.com")
-    }
-}

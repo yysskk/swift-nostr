@@ -6,10 +6,12 @@ extension NostrClient {
     /// Ensures the group's relay is in the pool and connected, returning its routing URL.
     ///
     /// A NIP-29 group lives on a single relay, so every group flow targets exactly that
-    /// relay; publishing to a URL the pool does not know is a silent no-op, which this
-    /// helper prevents. The URL is normalized like every other routing key (lowercased,
-    /// trailing slash removed), the relay is added when absent, and connecting is
-    /// idempotent when it already is connected.
+    /// relay; targeting a URL the pool does not know throws
+    /// ``NostrError/noMatchingRelays(_:)``, so this helper guarantees the relay is
+    /// present and connected first. The URL is normalized like every other routing key
+    /// (lowercased scheme and host, root trailing slash stripped, default ports
+    /// stripped), the relay is added when absent, and connecting is idempotent when it
+    /// already is connected.
     ///
     /// - Returns: The normalized URL to pass to the pool's `to:` parameters.
     /// - Throws: ``NostrError/connectionFailed(_:)`` when the URL does not parse or the

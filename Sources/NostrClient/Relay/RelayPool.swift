@@ -42,18 +42,22 @@ public actor RelayPool {
         self.webSocketFactory = webSocketFactory
     }
 
-    /// Adds a relay to the pool
+    /// Adds a relay to the pool.
+    ///
+    /// The URL is normalized to a canonical routing key, so re-adding the same relay
+    /// under a different spelling returns the existing connection (its `config` is ignored).
     @discardableResult
     public func addRelay(url: URL, config: RelayConnectionConfig? = nil) async -> RelayConnection {
-        if let existing = relays[url] {
+        let key = RelayURL.normalizedURL(url)
+        if let existing = relays[key] {
             return existing
         }
         let connection = RelayConnection(
-            url: url,
+            url: key,
             webSocketFactory: webSocketFactory,
             config: config ?? self.config.defaultRelayConfig
         )
-        relays[url] = connection
+        relays[key] = connection
         if let authenticationResponder {
             await connection.setAuthenticationResponder(authenticationResponder)
         }
@@ -81,12 +85,14 @@ public actor RelayPool {
         }
     }
 
-    /// Removes a relay from the pool
+    /// Removes a relay from the pool.
+    ///
+    /// The entry is removed before the disconnect suspends, so a concurrent
+    /// `addRelay` of the same relay cannot receive a connection that is about
+    /// to be torn down.
     public func removeRelay(url: URL) async {
-        if let connection = relays[url] {
-            await connection.disconnect()
-            relays.removeValue(forKey: url)
-        }
+        guard let connection = relays.removeValue(forKey: RelayURL.normalizedURL(url)) else { return }
+        await connection.disconnect()
     }
 
     /// Connects to all relays in the pool.
@@ -151,10 +157,11 @@ public actor RelayPool {
     /// cancels in-flight sends — slower relays still receive the event for redundancy,
     /// and their pending OK-waits clean themselves up on their own timeouts.
     ///
-    /// Publishing to an empty target set is a no-op.
     /// - Returns: The per-relay outcome. Relays still in flight when the strategy
     ///   was satisfied are reported as ``PublishRelayStatus/pending``.
-    /// - Throws: The last relay error if no targeted relay accepts the event, or
+    /// - Throws: ``NostrError/noRelaysInPool`` when the pool is empty,
+    ///   ``NostrError/noMatchingRelays(_:)`` when none of the targeted URLs are in the
+    ///   pool, the last relay error if no targeted relay accepts the event, or
     ///   ``NostrError/relayError(_:)`` if a `.quorum` strategy cannot be satisfied.
     @discardableResult
     public func publish(
@@ -168,8 +175,7 @@ public actor RelayPool {
             throw NostrError.cannotPublishAuthenticationEvent
         }
 
-        let connections = targetConnections(relayURLs)
-        guard !connections.isEmpty else { return PublishResult(statuses: [:]) }
+        let connections = try targetConnections(relayURLs)
 
         let strategy = strategy ?? config.defaultPublishStrategy
         let requiredAcks = strategy.requiredAcks(targetCount: connections.count)
@@ -252,13 +258,15 @@ public actor RelayPool {
     /// Distinct from ``count`` (the number of relays in the pool): this returns per-relay
     /// event counts reported over the wire.
     /// - Returns: the per-relay count for every relay that answered.
-    /// - Throws: the last relay error only when no targeted relay answered.
+    /// - Throws: ``NostrError/noRelaysInPool`` when the pool is empty,
+    ///   ``NostrError/noMatchingRelays(_:)`` when none of the targeted URLs are in the
+    ///   pool, or the last relay error when no targeted relay answered.
     public func count(
         filters: [Filter],
         to relayURLs: Set<URL>? = nil,
         timeout: TimeInterval = 10
     ) async throws -> [URL: EventCount] {
-        let connections = targetConnections(relayURLs)
+        let connections = try targetConnections(relayURLs)
 
         return try await withThrowingTaskGroup(of: (URL, Result<EventCount, any Error>).self) { group in
             for connection in connections {
@@ -283,9 +291,8 @@ public actor RelayPool {
                 }
             }
 
-            // No relay answered: surface a failure rather than an empty dictionary,
-            // but only when at least one relay was actually targeted.
-            if results.isEmpty && !connections.isEmpty {
+            // No relay answered: surface a failure rather than an empty dictionary.
+            if results.isEmpty {
                 throw lastError ?? NostrError.notConnected
             }
             return results
@@ -296,7 +303,9 @@ public actor RelayPool {
     /// Tolerates partial failures - succeeds if at least one relay accepts the subscription.
     /// Events are deduplicated across relays.
     /// - Returns: The number of relays that successfully subscribed
-    /// - Throws: Only if all relays fail to subscribe
+    /// - Throws: ``NostrError/noRelaysInPool`` when the pool is empty,
+    ///   ``NostrError/noMatchingRelays(_:)`` when none of the targeted URLs are in the
+    ///   pool, or ``NostrError/relayError(_:)`` when every relay fails to subscribe.
     @discardableResult
     public func subscribe(
         subscriptionId: String,
@@ -322,12 +331,13 @@ public actor RelayPool {
         to relayURLs: Set<URL>? = nil,
         handler: @escaping @Sendable (RelaySubscriptionMessage) async -> Void
     ) async throws -> Set<URL> {
+        let connections = try targetConnections(relayURLs)
         subscriptionHandlers[subscriptionId] = handler
 
         // Start listening for messages BEFORE sending subscription request
         // This ensures we don't miss any events that arrive immediately after subscribing
         var tasks: [Task<Void, Never>] = []
-        for connection in targetConnections(relayURLs) {
+        for connection in connections {
             let task = Task {
                 for await message in await connection.messages() {
                     guard !Task.isCancelled else { break }
@@ -390,7 +400,7 @@ public actor RelayPool {
         var successfulRelayURLs: Set<URL> = []
 
         await withTaskGroup(of: URL?.self) { group in
-            for connection in targetConnections(relayURLs) {
+            for connection in connections {
                 group.addTask {
                     do {
                         try await connection.subscribe(subscriptionId: subscriptionId, filters: filters)
@@ -408,7 +418,12 @@ public actor RelayPool {
             }
         }
 
-        if successfulRelayURLs.isEmpty && !targetConnections(relayURLs).isEmpty {
+        // A failed subscribe must not leak handler/listener state when the pool is used directly.
+        if successfulRelayURLs.isEmpty {
+            subscriptionHandlers.removeValue(forKey: subscriptionId)
+            if let tasks = subscriptionTasks.removeValue(forKey: subscriptionId) {
+                for task in tasks { task.cancel() }
+            }
             throw NostrError.relayError("Failed to subscribe on any relay")
         }
 
@@ -442,18 +457,33 @@ public actor RelayPool {
 
     /// Returns the relay connection for a given URL
     public func relay(for url: URL) -> RelayConnection? {
-        relays[url]
+        relays[RelayURL.normalizedURL(url)]
     }
 
     /// Resolves the connections to target for a routed operation.
     /// `nil` targets all relays in the pool (the default broadcast behavior);
-    /// a non-nil set targets only those URLs currently present in the pool.
-    func targetConnections(_ relayURLs: Set<URL>?) -> [RelayConnection] {
+    /// a non-nil set targets only those URLs currently present in the pool,
+    /// and partial matches proceed with the present subset.
+    /// - Throws: ``NostrError/noRelaysInPool`` when the pool is empty, or
+    ///   ``NostrError/noMatchingRelays(_:)`` when none of the requested URLs are in
+    ///   the pool (including an empty set).
+    func targetConnections(_ relayURLs: Set<URL>?) throws -> [RelayConnection] {
         guard let relayURLs else {
+            guard !relays.isEmpty else { throw NostrError.noRelaysInPool }
             return Array(relays.values)
         }
-        return relayURLs.compactMap { relays[$0] }
+        let connections = relayURLs.compactMap { relays[RelayURL.normalizedURL($0)] }
+        guard !connections.isEmpty else {
+            throw NostrError.noMatchingRelays(Set(relayURLs.map { RelayURL.normalize($0.absoluteString) }).sorted())
+        }
+        return connections
     }
+
+    /// The number of registered subscription handlers (test hook).
+    var subscriptionHandlerCount: Int { subscriptionHandlers.count }
+
+    /// The number of subscriptions with live listener tasks (test hook).
+    var subscriptionTaskCount: Int { subscriptionTasks.count }
 
     /// Returns the number of relays in the pool
     public var count: Int {

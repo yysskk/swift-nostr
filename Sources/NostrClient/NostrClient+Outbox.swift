@@ -61,7 +61,8 @@ extension NostrClient {
     /// For each author, resolves their WRITE relays (fetching the relay list if not cached),
     /// connects them per the gossip policy, and issues a single subscription scoped to those relays.
     /// If any author has no known relay list, the subscription falls back to the full relay pool so
-    /// no author is silently dropped.
+    /// no author is silently dropped; the fallback throws ``NostrError/noRelaysInPool`` when the
+    /// pool is also empty.
     public func subscribeOutbox(
         authors: [String],
         kinds: [Event.Kind] = [.textNote],
@@ -99,7 +100,8 @@ extension NostrClient {
     ///
     /// Routes the event to the author's own WRITE relays plus the READ (inbox) relays of every
     /// pubkey referenced in the event's "p" tags, so mentions and replies reach their recipients.
-    /// Falls back to the full relay pool if nothing resolves.
+    /// Falls back to the full relay pool if nothing resolves; the fallback throws
+    /// ``NostrError/noRelaysInPool`` when the pool is also empty.
     /// - Parameter strategy: How many relay acknowledgments to wait for before returning
     ///   (default: the pool config's ``RelayPoolConfig/defaultPublishStrategy``).
     /// - Returns: The per-relay outcome of the publish.

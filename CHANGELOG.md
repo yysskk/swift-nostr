@@ -62,6 +62,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The decoded-payload size check in NIP-44 decryption used a minimum of 97 bytes, derived from a
   comment that undercounted the smallest ciphertext. The bounds are now the correct 99 to 65,603
   bytes, so more malformed payloads are refused before any key derivation.
+- **`fetch` no longer idles its full timeout when nothing was targeted.** With zero resolved
+  relays the fetch waited the entire timeout (default 10s) and then returned `[]`; it now fails
+  fast with the new zero-relay errors (see Changed).
+- **Duplicate sockets for differently-spelled URLs of the same relay.** The pool keyed
+  connections by the raw `URL`, so `wss://Relay.Example.com/` and `wss://relay.example.com`
+  produced two entries and two sockets to one relay; connections are now keyed by the
+  normalized URL.
+- **`RelayPool.subscribe` leaked state when every REQ send failed.** The subscription handler
+  and the per-relay message-listener tasks stayed registered after the throw; a totally failed
+  subscribe now removes the handler and cancels the listeners before surfacing the error.
+- **`RelayPool.removeRelay` raced a concurrent re-add of the same relay.** The pool entry was
+  removed only after the disconnect suspended, so an `addRelay` interleaving with the removal
+  could receive a connection about to be torn down; the entry is now removed first.
 
 ### Changed
 
@@ -85,6 +98,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `EventSigner.signRepost(of:relayURL:)`, `NostrClient.publishReply(to:content:relayURL:strategy:)`,
   and `NostrClient.publishRepost(of:relayURL:strategy:)`, completing the `relayURL` spelling across
   the package.
+- **Breaking**: relay-targeted operations now throw instead of silently succeeding against zero
+  relays. `RelayPool.publish`/`subscribe`/`count` — and the `NostrClient` publish, subscribe,
+  fetch, and count flows built on them — throw the new `NostrError.noRelaysInPool` when the pool
+  is empty and `NostrError.noMatchingRelays` when none of the targeted URLs are in the pool
+  (partial matches still proceed). Previously publish returned an empty result, subscribe
+  reported 0 relays, count returned `[:]`, and fetch stalled to its timeout before returning
+  `[]`. The two cases are additive but a source break for code that switches over `NostrError`
+  exhaustively; `connectAll()` on an empty pool still returns 0.
+- **Breaking**: relay pool keys are normalized. `addRelay`, `removeRelay`, `relay(for:)`, and
+  targeted publish/subscribe/count canonicalize URLs — lowercased scheme and host, root trailing
+  slash stripped, default ports stripped — so any spelling of the same relay routes to the one
+  connection, re-adding a relay under a different spelling returns the existing connection, and
+  publish results are keyed by the canonical URL.
 - **Breaking**: `RemoteSignerTransport` and `WalletConnectTransport` are replaced by a single
   `NostrCore.RelayTransport`. The two protocols were the same six requirements with nothing
   NIP-specific in either, and their default implementations were the same actor twice over. For a

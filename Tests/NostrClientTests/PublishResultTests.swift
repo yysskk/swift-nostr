@@ -42,21 +42,4 @@ struct PublishResultTests {
         #expect(result.failedRelays.isEmpty)
         #expect(result.pendingRelays.isEmpty)
     }
-
-    @Test("publishing to an empty pool returns an empty result")
-    func emptyPoolReturnsEmptyResult() async throws {
-        let pool = RelayPool()
-        let event = Event(
-            id: String(repeating: "a", count: 64),
-            pubkey: String(repeating: "b", count: 64),
-            createdAt: 1_700_000_000,
-            kind: 1,
-            tags: [],
-            content: "test",
-            sig: String(repeating: "c", count: 128)
-        )
-
-        let result = try await pool.publish(event)
-        #expect(result.statuses.isEmpty)
-    }
 }
