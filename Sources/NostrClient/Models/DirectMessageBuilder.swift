@@ -130,7 +130,6 @@ public struct DirectMessageBuilder: Sendable {
         // relay round-trip apiece for a remote signer — so they run concurrently and are put back
         // in `recipientPubkeys` order, which callers index into.
         let addressees = recipientPubkeys + [senderPubkey]
-        let signer = self.signer
         return try await withThrowingTaskGroup(of: (offset: Int, wrap: Event).self) { group in
             for (offset, addressee) in addressees.enumerated() {
                 group.addTask {
