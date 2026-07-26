@@ -30,11 +30,14 @@ reported on the result as `recipientPublishResult` and `selfCopyPublishResult`.
 
 ### Receiving
 
-``NostrClient/directMessages(limit:)`` delivers messages already unwrapped and
-parsed (gift wraps that fail to decrypt are skipped):
+``NostrClient/directMessages(limit:)`` delivers messages already unwrapped and parsed. A
+gift-wrap stream carries everyone's messages, so wraps sealed to someone else — and malformed
+ones — are skipped. A signer that cannot *attempt* the read is a different matter: with a remote
+NIP-46 signer every unwrap is a relay round-trip, so a timeout, a disconnect, or a refused request
+throws out of the loop rather than silently dropping messages. Resubscribe to resume.
 
 ```swift
-for await message in try await client.directMessages() {
+for try await message in try await client.directMessages() {
     print("From: \(message.senderPubkey)")
     print("Content: \(message.content)")
 }
@@ -110,7 +113,7 @@ try await client.sendDirectMessage(
 together as a ``DirectMessagePayload``, so one loop can handle every kind:
 
 ```swift
-for await payload in try await client.directMessagePayloads() {
+for try await payload in try await client.directMessagePayloads() {
     switch payload {
     case .message(let message):
         print("\(message.senderPubkey): \(message.content)")

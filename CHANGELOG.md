@@ -98,6 +98,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `sign`/`nip44Encrypt`/`nip44Decrypt`, which every signer already provides. Nothing in the
   library needs a local key any more, so `NostrError.localSignerRequired` is removed — a source
   break for code that switches over `NostrError` exhaustively or matches that case.
+  `DirectMessageSequence` and `DirectMessagePayloadSequence` are throwing async sequences as a
+  result — iterate them with `for try await`. They still skip gift wraps that are not readable
+  messages for the signer (sealed to someone else, or malformed), which is routine on a shared
+  gift-wrap stream, but a signer that could not *attempt* the read now throws instead. With a
+  remote signer every unwrap is a relay round-trip, so swallowing those would consume genuine
+  messages from the stream and leave the caller unable to notice or resubscribe.
   Gift wrapping is the API this surfaces in: `GiftWrap.wrap(event:signer:recipientPubkey:)` and
   `GiftWrap.unwrap(giftWrap:recipient:)` take an `any NostrSigning` in place of a `KeyPair` (pass
   `EventSigner(keyPair:)` for a local key) and are now `async`, as are `DirectMessageBuilder` and

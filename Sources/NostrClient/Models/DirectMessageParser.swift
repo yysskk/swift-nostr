@@ -70,6 +70,64 @@ public struct DirectMessageParser: Sendable {
         }
     }
 
+    // MARK: - Stream parsing
+
+    /// Parses `giftWrap`, returning nil when it is simply not a readable message for this signer.
+    ///
+    /// Used by the direct-message sequences, which walk a public relay stream where foreign and
+    /// malformed gift wraps are routine. See ``describesUnreadableEvent(_:)`` for what that
+    /// covers — everything else propagates.
+    func parseIfReadable(_ giftWrap: Event) async throws -> DirectMessage? {
+        try await skippingUnreadableEvent { try await parse(giftWrap) }
+    }
+
+    /// Parses `giftWrap` into a payload, returning nil when it is simply not a readable message
+    /// for this signer. The streaming counterpart of ``parsePayload(_:)``, mirroring
+    /// ``parseIfReadable(_:)``.
+    func parsePayloadIfReadable(_ giftWrap: Event) async throws -> DirectMessagePayload? {
+        try await skippingUnreadableEvent { try await parsePayload(giftWrap) }
+    }
+
+    /// Runs `parse`, turning "this event is not readable" into nil and letting every other failure
+    /// through.
+    private func skippingUnreadableEvent<T>(_ parse: () async throws -> T) async throws -> T? {
+        do {
+            return try await parse()
+        } catch  where Self.describesUnreadableEvent(error) {
+            return nil
+        }
+    }
+
+    /// Whether `error` describes the *event* rather than the signer.
+    ///
+    /// A gift-wrap stream carries everyone's messages, so wraps sealed to someone else and wraps
+    /// whose contents are not a valid NIP-17 payload are expected, and skipping them is how the
+    /// sequences find the caller's own messages. A signer that timed out, disconnected, or refused
+    /// the request never got as far as judging the event — with a remote NIP-46 signer every
+    /// decryption is a relay round-trip — so those failures must reach the caller instead of
+    /// silently dropping messages that were merely unread. Anything unrecognized is treated as the
+    /// latter: skipping is the lossy answer, so it is only given for known-unreadable events.
+    private static func describesUnreadableEvent(_ error: any Error) -> Bool {
+        // A seal or rumor that is not the JSON this parser expects.
+        if error is DecodingError { return true }
+
+        switch error as? NostrError {
+        // The wrap is not a gift wrap, its seal is not a seal, or the rumor is not a well-formed
+        // message, reaction, or file.
+        case .invalidData:
+            return true
+        // The seal does not verify as the event it claims to be.
+        case .verificationFailed, .invalidEventId, .invalidHex:
+            return true
+        // NIP-44 refused the payload — the usual outcome for a wrap sealed to someone else.
+        case .decryptionFailed, .invalidPublicKey, .invalidPayloadFormat, .hmacVerificationFailed,
+            .invalidPadding, .unsupportedEncryptionVersion:
+            return true
+        default:
+            return false
+        }
+    }
+
     // MARK: - Private builders
 
     private func makeMessage(

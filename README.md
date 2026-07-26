@@ -128,8 +128,9 @@ Need per-relay EOSE, notices, and auth challenges? Iterate `client.subscribe(fil
 try await client.publishDirectMessageRelayList(relays: ["wss://inbox.example.com"])
 try await client.connectDirectMessageInboxRelays()
 
-// Receive — already decrypted and parsed.
-for await message in try await client.directMessages() {
+// Receive — already decrypted and parsed. Wraps meant for someone else are skipped;
+// a signer that cannot be reached throws, so a failure is never mistaken for silence.
+for try await message in try await client.directMessages() {
     print("\(message.senderPubkey): \(message.content)")
 }
 

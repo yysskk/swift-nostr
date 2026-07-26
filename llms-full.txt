@@ -230,8 +230,10 @@ let byRelay = try await client.relayPool.count(filters: [filter])  // [URL: Even
 // Send
 try await client.sendDirectMessage("Hello!", to: "recipientPubkey")
 
-// Subscribe to incoming DMs, parsed automatically (unparseable wraps skipped)
-for await message in try await client.directMessages() {
+// Subscribe to incoming DMs, parsed automatically. Wraps sealed to someone else and malformed
+// ones are skipped; a signer that cannot be reached (a remote NIP-46 timeout/disconnect) throws,
+// so a transient failure never passes for an empty inbox. Resubscribe to resume.
+for try await message in try await client.directMessages() {
     print("From: \(message.senderPubkey), Content: \(message.content)")
 }
 
