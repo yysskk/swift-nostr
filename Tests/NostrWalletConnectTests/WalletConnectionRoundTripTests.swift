@@ -190,7 +190,10 @@ struct WalletConnectionRoundTripTests {
 
         #expect(mapped.count == 1)
         #expect(try mapped["a"]?.get().preimage == "pa")
-        // Far below the 5s timeout: completion fired once both responses arrived.
-        #expect(elapsed < .seconds(1))
+        // The two outcomes this separates are "completed when the second response arrived" and
+        // "waited out the 5s timeout", so the bound only has to sit between them. A tighter one
+        // measures the scheduler instead: on a loaded CI runner the arrival path alone can take
+        // a second, which made this fail while the behavior under test was correct.
+        #expect(elapsed < .seconds(2.5))
     }
 }
