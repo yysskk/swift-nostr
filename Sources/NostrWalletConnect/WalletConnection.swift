@@ -286,29 +286,25 @@ public actor WalletConnection {
     }
 
     private func handleResponse(_ event: Event) async {
-        guard let requestID = event.firstTagValue(named: "e"),
-            var request = await session.state(for: requestID)
-        else {
-            return
-        }
-        request.receivedCount += 1
+        guard let requestID = event.firstTagValue(named: "e") else { return }
+        let walletPubkey = walletPubkey
+        let keyPair = keyPair
 
-        if let content = try? WalletConnectCipher(request.scheme).decrypt(
-            event.content, senderPubkey: walletPubkey, recipient: keyPair)
-        {
-            request.collected.append(ResponsePart(dTag: event.firstTagValue(named: "d"), content: content))
-        } else if request.expected == 1 {
-            // Nothing to preserve for a single-response request, so fail fast.
-            await session.fail(requestID, with: WalletConnectError.responseDecodingFailed)
-            return
-        }
+        await session.withPendingRequest(requestID) { request in
+            request.receivedCount += 1
 
-        // Count undecryptable responses toward completion so a multi-response request finishes as
-        // soon as every response has arrived, rather than waiting out the timeout.
-        if request.receivedCount >= request.expected {
-            await session.complete(requestID, with: request.collected)
-        } else {
-            await session.update(request, for: requestID)
+            if let content = try? WalletConnectCipher(request.scheme).decrypt(
+                event.content, senderPubkey: walletPubkey, recipient: keyPair)
+            {
+                request.collected.append(ResponsePart(dTag: event.firstTagValue(named: "d"), content: content))
+            } else if request.expected == 1 {
+                // Nothing to preserve for a single-response request, so fail fast.
+                return .failed(WalletConnectError.responseDecodingFailed)
+            }
+
+            // Count undecryptable responses toward completion so a multi-response request finishes
+            // as soon as every response has arrived, rather than waiting out the timeout.
+            return request.receivedCount >= request.expected ? .resolved(request.collected) : .pending
         }
     }
 

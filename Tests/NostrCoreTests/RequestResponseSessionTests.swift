@@ -29,12 +29,15 @@ struct RequestResponseSessionTests {
     }
 
     /// Starts `session`, resolving each incoming event's request — keyed by its `e` tag — with the
-    /// event's content.
+    /// event's content, the way an owner resolves a request once it has decoded the response.
     private func start(_ session: Session) async throws {
         try await session.ensureStarted(subscriptionID: Self.subscriptionID, filters: [Filter(kinds: [1])]) {
             [weak session] event in
             guard let session, let key = event.firstTagValue(named: "e") else { return }
-            await session.complete(key, with: [event.content])
+            await session.withPendingRequest(key) { state in
+                state.append(event.content)
+                return .resolved(state)
+            }
         }
     }
 
@@ -149,8 +152,8 @@ struct RequestResponseSessionTests {
         await #expect(throws: TestError.timedOut) { try await pending.value }
     }
 
-    @Test("state registered with a request is readable and replaceable while it is in flight")
-    func stateRoundTrips() async throws {
+    @Test("a request left pending keeps the state it accumulated for the next response")
+    func pendingStateAccumulates() async throws {
         let transport = FakeTransport()
         let session = makeSession(transport)
         try await start(session)
@@ -158,25 +161,43 @@ struct RequestResponseSessionTests {
         let pending = Task { try await session.perform(self.request("a"), key: "a", state: ["one"], timeout: 1) }
         try await transport.waitForSends(1)
 
-        #expect(await session.state(for: "a") == ["one"])
-        await session.update(["one", "two"], for: "a")
-        #expect(await session.state(for: "a") == ["one", "two"])
+        // The first response is folded in but does not complete the request…
+        let afterFirst = await session.withPendingRequest("a") { state in
+            state.append("two")
+            return .pending
+        }
+        #expect(afterFirst == ["one", "two"])
 
-        await session.complete("a", with: await session.state(for: "a") ?? [])
-        #expect(try await pending.value == ["one", "two"])
-        // Resolved requests are deregistered, so their state is gone.
-        #expect(await session.state(for: "a") == nil)
+        // …so the second sees what the first wrote, and resolves with the whole of it.
+        let afterSecond = await session.withPendingRequest("a") { state in
+            state.append("three")
+            return .resolved(state)
+        }
+        #expect(afterSecond == ["one", "two", "three"])
+        #expect(try await pending.value == ["one", "two", "three"])
+
+        // Resolved requests are deregistered, so a late duplicate finds nothing.
+        #expect(await session.withPendingRequest("a") { _ in .pending } == nil)
     }
 
-    @Test("fail surfaces the given error to the waiter")
-    func failSurfacesError() async throws {
+    @Test("withPendingRequest reports nothing for a key with no request in flight")
+    func withPendingRequestIgnoresUnknownKeys() async throws {
+        let transport = FakeTransport()
+        let session = makeSession(transport)
+        try await start(session)
+
+        #expect(await session.withPendingRequest("nobody-waiting") { _ in .pending } == nil)
+    }
+
+    @Test("a resolution of failed surfaces its error to the waiter")
+    func failedResolutionSurfacesError() async throws {
         let transport = FakeTransport()
         let session = makeSession(transport)
         try await start(session)
 
         let pending = Task { try await session.perform(self.request("a"), key: "a", state: [], timeout: 5) }
         try await transport.waitForSends(1)
-        await session.fail("a", with: TestError.rejected)
+        await session.withPendingRequest("a") { _ in .failed(TestError.rejected) }
 
         await #expect(throws: TestError.rejected) { try await pending.value }
     }
@@ -205,13 +226,17 @@ struct RequestResponseSessionTests {
                 self.request("a"), key: "a", state: [], timeout: 0.3, partialResult: { $0 })
         }
         try await transport.waitForSends(1)
-        // One part arrives before the deadline; the request resolves with it instead of failing.
-        await session.update(["arrived"], for: "a")
+        // One part arrives before the deadline but does not complete the request, so the timeout
+        // resolves it with what did arrive instead of failing.
+        await session.withPendingRequest("a") { state in
+            state.append("arrived")
+            return .pending
+        }
 
         #expect(try await pending.value == ["arrived"])
     }
 
-    @Test("extendTimeout keeps a request pending past its original deadline")
+    @Test("a pendingFor resolution keeps a request alive past its original deadline")
     func extendedTimeoutOutlivesTheOriginal() async throws {
         let transport = FakeTransport()
         let session = makeSession(transport)
@@ -219,7 +244,7 @@ struct RequestResponseSessionTests {
 
         let pending = Task { try await session.perform(self.request("a"), key: "a", state: [], timeout: 0.2) }
         try await transport.waitForSends(1)
-        await session.extendTimeout(for: "a", to: 5)
+        await session.withPendingRequest("a") { _ in .pendingFor(5) }
 
         // Wait out the original timeout, then answer: the request is still waiting.
         try await Task.sleep(for: .milliseconds(400))

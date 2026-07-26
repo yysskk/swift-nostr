@@ -13,12 +13,12 @@ import Foundation
 /// The owner drives it from three places:
 /// - ``ensureStarted(subscriptionID:filters:handler:)``, from every entry point, to connect lazily.
 /// - ``perform(_:key:state:timeout:partialResult:)``, to send a request and await its response.
-/// - ``state(for:)``, ``update(_:for:)``, ``complete(_:with:)``, ``fail(_:with:)``, and
-///   ``extendTimeout(for:to:)``, from the handler, as each incoming event is decoded.
+/// - ``withPendingRequest(_:_:)``, from the handler, to fold each decoded response into the request
+///   it belongs to.
 ///
-/// The reader task awaits the handler for one event before pulling the next, so a handler's
-/// read-modify-write of a request's `State` — NIP-47 accumulating the parts of a `multi_pay_*`
-/// reply, say — cannot interleave with another response for the same request.
+/// Folding happens in one closure on this actor, so reading a request's state, updating it, and
+/// deciding whether that completes the request is a single atomic step: the request's timeout
+/// cannot fire partway through and drop a response the owner has already decoded.
 ///
 /// - Note: `Sendable` payloads only: `Key` correlates a response to its request, `State` is
 ///   whatever the owner needs to interpret that response (the method a request used, the scheme it
@@ -177,40 +177,42 @@ package actor RequestResponseSession<Key: Hashable & Sendable, State: Sendable, 
         throw timedOut
     }
 
-    /// The state of the in-flight request under `key`, or `nil` when nothing is waiting on it: the
-    /// response is unknown, duplicated, or arrived after the request resolved.
-    package func state(for key: Key) -> State? {
-        pending[key]?.state
-    }
+    /// Folds a decoded response into the in-flight request under `key`.
+    ///
+    /// `body` runs synchronously on this actor, so it sees the request's state, updates it, and
+    /// says what that means for the waiter without anything interleaving — in particular the
+    /// request cannot time out between the read and the update.
+    /// - Parameters:
+    ///   - key: The key the response correlates to.
+    ///   - body: Folds the response into the request's state and returns the resulting
+    ///     ``RequestResolution``.
+    /// - Returns: The request's state after `body` ran, or `nil` when nothing was pending under
+    ///   `key` — an unknown, duplicate, or already-resolved response.
+    @discardableResult
+    package func withPendingRequest(
+        _ key: Key,
+        _ body: @Sendable (inout State) -> RequestResolution<Response>
+    ) -> State? {
+        guard var request = pending[key] else { return nil }
 
-    /// Replaces the state of the in-flight request under `key`, keeping it pending.
-    package func update(_ state: State, for key: Key) {
-        pending[key]?.state = state
-    }
-
-    /// Resolves the request under `key` with `response`.
-    package func complete(_ key: Key, with response: Response) {
-        guard let request = pending.removeValue(forKey: key) else { return }
-        request.timeoutTask?.cancel()
-        request.continuation.yield(response)
-        request.continuation.finish()
-    }
-
-    /// Fails the request under `key` with `error`.
-    package func fail(_ key: Key, with error: any Error) {
-        guard let request = pending.removeValue(forKey: key) else { return }
-        request.timeoutTask?.cancel()
-        request.continuation.finish(throwing: error)
-    }
-
-    /// Restarts the timeout of the request under `key` with a new duration, keeping it pending —
-    /// NIP-46 extends a request that drew an `auth_url` challenge, to give the user time to
-    /// authorize it.
-    package func extendTimeout(for key: Key, to timeout: TimeInterval) {
-        guard var request = pending[key] else { return }
-        request.timeoutTask?.cancel()
-        request.timeoutTask = makeTimeoutTask(key: key, timeout: timeout)
-        pending[key] = request
+        switch body(&request.state) {
+        case .pending:
+            pending[key] = request
+        case .pendingFor(let timeout):
+            request.timeoutTask?.cancel()
+            request.timeoutTask = makeTimeoutTask(key: key, timeout: timeout)
+            pending[key] = request
+        case .resolved(let response):
+            pending.removeValue(forKey: key)
+            request.timeoutTask?.cancel()
+            request.continuation.yield(response)
+            request.continuation.finish()
+        case .failed(let error):
+            pending.removeValue(forKey: key)
+            request.timeoutTask?.cancel()
+            request.continuation.finish(throwing: error)
+        }
+        return request.state
     }
 
     /// A task that resolves the request under `key` once `timeout` seconds have elapsed.
@@ -250,4 +252,22 @@ package actor RequestResponseSession<Key: Hashable & Sendable, State: Sendable, 
         /// When non-`nil`, a timeout resolves the waiter with this instead of failing it.
         let partialResult: PartialResult?
     }
+}
+
+/// What a decoded response means for the request it belongs to — the verdict
+/// ``RequestResponseSession/withPendingRequest(_:_:)`` acts on.
+package enum RequestResolution<Response: Sendable>: Sendable {
+    /// Keep the request pending, retaining whatever the handler wrote to its state: NIP-47
+    /// collecting one part of a `multi_pay_*` reply that is still incomplete.
+    case pending
+
+    /// Keep it pending and restart its timeout to run for this many seconds from now: NIP-46
+    /// extending a request that drew an `auth_url` challenge, to give the user time to authorize.
+    case pendingFor(TimeInterval)
+
+    /// Resolve the waiter with this response.
+    case resolved(Response)
+
+    /// Fail the waiter with this error.
+    case failed(any Error)
 }

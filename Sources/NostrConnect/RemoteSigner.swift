@@ -284,21 +284,22 @@ public actor RemoteSigner {
             return
         }
 
-        guard let method = await session.state(for: response.id) else { return }
-
-        if response.isAuthChallenge, let error = response.error, let url = URL(string: error) {
-            // Keep the request pending — the real response arrives later with the same id. Extend
-            // its timeout so the user has time to authorize, and surface the challenge.
-            await session.extendTimeout(for: response.id, to: config.authChallengeTimeout)
-
-            let challenge = RemoteSignerAuthChallenge(url: url, method: method, requestID: response.id)
-            for stream in authChallengeStreams.values {
-                stream.yield(challenge)
-            }
-            return
+        // An `auth_url` challenge does not answer the request: it stays pending until the signer
+        // sends the real response with the same id, on a timeout long enough for the user to
+        // authorize. Anything else resolves it.
+        let challengeURL = response.isAuthChallenge ? response.error.flatMap(URL.init(string:)) : nil
+        let authChallengeTimeout = config.authChallengeTimeout
+        let method = await session.withPendingRequest(response.id) { _ in
+            challengeURL == nil ? .resolved(response) : .pendingFor(authChallengeTimeout)
         }
 
-        await session.complete(response.id, with: response)
+        // No pending request (an unknown or already-resolved id), or the response resolved it.
+        guard let method, let challengeURL else { return }
+
+        let challenge = RemoteSignerAuthChallenge(url: challengeURL, method: method, requestID: response.id)
+        for stream in authChallengeStreams.values {
+            stream.yield(challenge)
+        }
     }
 
     // MARK: - Client-initiated connection
