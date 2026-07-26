@@ -30,7 +30,8 @@ struct EventDeduplicationCache {
     private var seenEventIds: [String: Set<String>] = [:]
 
     /// Every entry in the order it was recorded, oldest first, so eviction and expiry take from
-    /// the front rather than searching for the oldest.
+    /// the front rather than searching for the oldest. Holds exactly what `seenEventIds` holds,
+    /// which is what lets ``count`` be read off it directly.
     private var entries: [Entry] = []
 
     /// The position of the oldest entry in `entries`. Taking from the front advances this
@@ -71,6 +72,11 @@ struct EventDeduplicationCache {
     }
 
     /// Forgets everything `subscriptionId` has seen, so an event recorded for it again is new.
+    ///
+    /// Sweeping the subscription out of `entries` costs a pass over the cache, traded for
+    /// keeping the two stores in step: subscriptions end far less often than events arrive, and
+    /// leaving its entries behind as tombstones would make every ``count`` a sum instead of a
+    /// subtraction.
     mutating func removeSubscription(_ subscriptionId: String) {
         guard seenEventIds.removeValue(forKey: subscriptionId) != nil else { return }
         entries = entries[oldestIndex...].filter { $0.subscriptionId != subscriptionId }
