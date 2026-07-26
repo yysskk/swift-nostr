@@ -191,7 +191,7 @@ extension NostrClient {
 
         switch message {
         case .event(_, let event):
-            // Note: Deduplication is now handled at the RelayPool level
+            // Note: Deduplication is handled at the RelayPool level, per subscription
             subscription.handler(.event(relayURL: relayURL, event: event))
 
         case .endOfStoredEvents:

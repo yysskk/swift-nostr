@@ -77,6 +77,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`RelayPool.subscribe` leaked state when every REQ send failed.** The subscription handler
   and the per-relay message-listener tasks stayed registered after the throw; a totally failed
   subscribe now removes the handler and cancels the listeners before surfacing the error.
+- **Event deduplication dropped events from every subscription but the first.** The pool kept a
+  single cache keyed only by event ID, so an event matching two subscriptions reached only
+  whichever one processed it first — overlapping feeds silently lost events, and a repeated
+  `fetch` of the same event returned it once and then nothing. Each subscription now has its own
+  cache, so cross-relay copies still collapse into a single delivery while every subscription
+  receives its own; a subscription's cache is discarded on `unsubscribe`, and
+  `maxDeduplicationCacheSize` still bounds the entries across all of them.
 - **`RelayPool.removeRelay` raced a concurrent re-add of the same relay.** The pool entry was
   removed only after the disconnect suspended, so an `addRelay` interleaving with the removal
   could receive a connection about to be torn down; the entry is now removed first.

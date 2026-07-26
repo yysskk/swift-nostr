@@ -16,8 +16,13 @@ public actor RelayPool {
     /// supply a fake transport in place of `URLSession`.
     private let webSocketFactory: any WebSocketSessionFactory
 
-    /// Event deduplication cache with timestamps
-    private var eventCache: [String: Date] = [:]
+    /// Event deduplication caches with timestamps, per subscription:
+    /// subscription ID → event ID → the time that subscription first saw the event.
+    ///
+    /// Scoped per subscription rather than pool-wide so that an event matching two
+    /// subscriptions is delivered to both; only the copies a single subscription receives
+    /// from several relays collapse into one delivery.
+    private var eventCaches: [String: [String: Date]] = [:]
 
     /// Last cache cleanup time
     private var lastCacheCleanup: Date = Date()
@@ -348,7 +353,9 @@ public actor RelayPool {
 
     /// Subscribes to events on the targeted relays.
     /// Tolerates partial failures - succeeds if at least one relay accepts the subscription.
-    /// Events are deduplicated across relays.
+    /// Events are deduplicated across the relays of this subscription: each event is
+    /// delivered once here however many relays send it, while other subscriptions matching
+    /// the same event still receive their own copy.
     ///
     /// `relayURLs` is nil (the default) to subscribe on the whole pool, or relay URL
     /// strings to target a subset. Targets de-duplicate by their normalized routing key;
@@ -399,18 +406,22 @@ public actor RelayPool {
                     let relayURL = connection.url
                     switch message {
                     case .event(let subId, let event) where subId == subscriptionId:
-                        // Deduplicate events across relays
-                        let isDuplicate = self.isDuplicateEvent(eventId: event.id)
-                        if !isDuplicate {
-                            self.markEventAsSeen(eventId: event.id)
-                            if let currentHandler = self.subscriptionHandlers[subscriptionId] {
-                                await currentHandler(
-                                    RelaySubscriptionMessage(
-                                        relayURL: relayURL,
-                                        message: message
-                                    )
+                        // Deduplicate the copies of one event arriving from several relays,
+                        // scoped to this subscription so a different subscription matching the
+                        // same event still receives it.
+                        let isNewToSubscription = self.recordEvent(
+                            eventId: event.id,
+                            subscriptionId: subscriptionId
+                        )
+                        if isNewToSubscription,
+                            let currentHandler = self.subscriptionHandlers[subscriptionId]
+                        {
+                            await currentHandler(
+                                RelaySubscriptionMessage(
+                                    relayURL: relayURL,
+                                    message: message
                                 )
-                            }
+                            )
                         }
                     case .endOfStoredEvents(let subId) where subId == subscriptionId:
                         if let currentHandler = self.subscriptionHandlers[subscriptionId] {
@@ -473,19 +484,21 @@ public actor RelayPool {
             }
         }
 
-        // A failed subscribe must not leak handler/listener state when the pool is used directly.
+        // A failed subscribe must not leak handler/listener/cache state when the pool is
+        // used directly.
         if successfulRelayURLs.isEmpty {
             subscriptionHandlers.removeValue(forKey: subscriptionId)
             if let tasks = subscriptionTasks.removeValue(forKey: subscriptionId) {
                 for task in tasks { task.cancel() }
             }
+            removeDeduplicationCache(subscriptionId: subscriptionId)
             throw NostrError.relayError("Failed to subscribe on any relay")
         }
 
         return successfulRelayURLs
     }
 
-    /// Unsubscribes from a subscription on all relays.
+    /// Unsubscribes from a subscription on all relays, discarding its deduplication cache.
     /// Tolerates partial failures - best effort unsubscription.
     public func unsubscribe(subscriptionId: String) async {
         subscriptionHandlers.removeValue(forKey: subscriptionId)
@@ -495,6 +508,8 @@ public actor RelayPool {
                 task.cancel()
             }
         }
+
+        removeDeduplicationCache(subscriptionId: subscriptionId)
 
         await withTaskGroup(of: Void.self) { group in
             for connection in relays.values {
@@ -570,19 +585,22 @@ extension RelayPool {
 
 // MARK: - Event Deduplication
 extension RelayPool {
-    /// Checks if an event has already been seen
-    private func isDuplicateEvent(eventId: String) -> Bool {
+    /// Records that `subscriptionId` has seen `eventId`, returning whether it is new to that
+    /// subscription — that is, whether this copy should be delivered to its handler.
+    private func recordEvent(eventId: String, subscriptionId: String) -> Bool {
         cleanupCacheIfNeeded()
-        return eventCache[eventId] != nil
+        guard eventCaches[subscriptionId]?[eventId] == nil else { return false }
+        eventCaches[subscriptionId, default: [:]][eventId] = Date()
+        return true
     }
 
-    /// Marks an event as seen
-    private func markEventAsSeen(eventId: String) {
-        cleanupCacheIfNeeded()
-        eventCache[eventId] = Date()
+    /// Discards one subscription's cache, so a later subscription reusing the ID starts from
+    /// an empty one instead of silently dropping events its predecessor already delivered.
+    private func removeDeduplicationCache(subscriptionId: String) {
+        eventCaches.removeValue(forKey: subscriptionId)
     }
 
-    /// Cleans up expired entries from the cache
+    /// Cleans up expired entries from the caches
     private func cleanupCacheIfNeeded() {
         let now = Date()
 
@@ -592,26 +610,43 @@ extension RelayPool {
 
         let cutoff = now.addingTimeInterval(-config.deduplicationCacheTTL)
 
-        // Remove expired entries
-        eventCache = eventCache.filter { $0.value > cutoff }
+        // Remove expired entries, dropping any subscription left with none
+        eventCaches = eventCaches.compactMapValues { cache in
+            let live = cache.filter { $0.value > cutoff }
+            return live.isEmpty ? nil : live
+        }
 
-        // If still over limit, remove oldest entries
-        if eventCache.count > config.maxDeduplicationCacheSize {
-            let sortedEntries = eventCache.sorted { $0.value < $1.value }
-            let entriesToRemove = eventCache.count - config.maxDeduplicationCacheSize
-            for entry in sortedEntries.prefix(entriesToRemove) {
-                eventCache.removeValue(forKey: entry.key)
+        // The size limit is pool-wide, so memory stays bounded however many subscriptions
+        // are open: if still over it, remove the oldest entries across all of them.
+        let cachedCount = deduplicationCacheSize
+        guard cachedCount > config.maxDeduplicationCacheSize else { return }
+
+        let oldestFirst =
+            eventCaches
+            .flatMap { subscriptionId, cache in
+                cache.map { (subscriptionId: subscriptionId, eventId: $0.key, seenAt: $0.value) }
+            }
+            .sorted { $0.seenAt < $1.seenAt }
+        for entry in oldestFirst.prefix(cachedCount - config.maxDeduplicationCacheSize) {
+            eventCaches[entry.subscriptionId]?.removeValue(forKey: entry.eventId)
+            if eventCaches[entry.subscriptionId]?.isEmpty == true {
+                eventCaches.removeValue(forKey: entry.subscriptionId)
             }
         }
     }
 
-    /// Clears the event deduplication cache
+    /// Clears every subscription's event deduplication cache
     public func clearDeduplicationCache() {
-        eventCache.removeAll()
+        eventCaches.removeAll()
     }
 
-    /// Returns the current size of the deduplication cache
+    /// Returns the current number of cached event IDs, summed over every subscription
     public var deduplicationCacheSize: Int {
-        eventCache.count
+        eventCaches.values.reduce(0) { $0 + $1.count }
+    }
+
+    /// The number of cached event IDs for a single subscription (test hook).
+    func deduplicationCacheSize(forSubscription subscriptionId: String) -> Int {
+        eventCaches[subscriptionId]?.count ?? 0
     }
 }

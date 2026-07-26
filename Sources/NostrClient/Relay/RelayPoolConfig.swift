@@ -6,7 +6,7 @@ public struct RelayPoolConfig: Sendable {
     /// Default connection configuration for new relays
     public var defaultRelayConfig: RelayConnectionConfig
 
-    /// Maximum size of the event deduplication cache
+    /// Maximum number of cached event IDs, summed over every subscription's cache
     public var maxDeduplicationCacheSize: Int
 
     /// Time-to-live for cached event IDs in seconds

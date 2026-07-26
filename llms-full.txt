@@ -1250,6 +1250,11 @@ Targeting (`to:`) and management take relay URL strings; invalid strings throw
 `NostrError.invalidRelayURL`, nil broadcasts to the whole pool, and an empty array
 throws `noMatchingRelays`.
 
+Event deduplication is per subscription: copies of one event arriving from several relays
+collapse into a single delivery, an event matching two subscriptions is delivered to both,
+and `unsubscribe` discards that subscription's cache. `maxDeduplicationCacheSize` bounds the
+entries across all subscriptions.
+
 ## RelayConnection
 
 Manages WebSocket connection to a single relay (actor).
