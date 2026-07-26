@@ -278,7 +278,7 @@ public struct NostrEventsAPI: NostrEventPublishing, NostrEventFetching {
     /// the shape every convenience `publish*` helper above shares.
     private func signAndPublish(
         strategy: PublishStrategy?,
-        _ build: @Sendable @escaping (_ publicKey: String) throws -> UnsignedEvent
+        _ build: @Sendable (_ publicKey: String) throws -> UnsignedEvent
     ) async throws -> PublishedEvent {
         let event = try await client.signEvent(build)
         let result = try await client.pool.publish(event, strategy: strategy)

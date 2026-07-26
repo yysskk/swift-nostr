@@ -67,7 +67,7 @@ React to a received message with ``NostrMessagesAPI/react(to:reaction:expiration
 The reaction is gift-wrapped exactly like a message, so it stays private and sender-anonymous:
 
 ```swift
-try await client.messages.react(message, reaction: "🤙")
+try await client.messages.react(to: message, reaction: "🤙")
 ```
 
 ### Encrypted File Messages (NIP-17 kind 15)
@@ -749,7 +749,7 @@ let isValid = try signed.verify()
 ``RelayPool`` automatically deduplicates events across relays using an in-memory cache.
 Deduplication is scoped to a single subscription: an event stored on several relays is
 delivered once, while an event matching two subscriptions is delivered to both — so
-overlapping feeds and repeated ``NostrClient/fetch(filters:to:timeout:)`` calls each see it.
+overlapping feeds and repeated ``NostrEventsAPI/fetch(filters:to:timeout:)`` calls each see it.
 A subscription's cache is discarded when it ends, so a later subscription receives events its
 predecessor already delivered.
 

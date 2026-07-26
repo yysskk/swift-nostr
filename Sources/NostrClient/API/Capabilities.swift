@@ -1,24 +1,22 @@
 import Foundation
 import NostrCore
 
-// Capability protocols — one per feature namespace on ``NostrClient``.
+// Capability protocols — one per feature namespace on `NostrClient`.
 //
 // An app feature declares the slice of the client it needs (`any NostrMessaging` rather than
 // `NostrClient`), which keeps the dependency honest and makes the feature testable against a
 // stub instead of a live relay pool:
 //
-// ```swift
-// struct ChatViewModel {
-//     let messages: any NostrMessaging
-// }
+//     struct ChatViewModel {
+//         let messages: any NostrMessaging
+//     }
 //
-// ChatViewModel(messages: client.messages)
-// ```
+//     ChatViewModel(messages: client.messages)
 //
 // Swift does not allow default argument values on protocol requirements, so the requirements
 // below spell out every parameter. The concrete namespaces still supply the defaults, so a call
-// through ``NostrClient/messages`` stays short; only a call through the protocol passes the
-// full argument list.
+// through `client.messages` stays short; only a call through the protocol passes the full
+// argument list.
 
 // MARK: - Identity
 
