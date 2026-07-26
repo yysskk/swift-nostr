@@ -13,7 +13,7 @@ extension NostrClient {
         tags: [Tag] = [],
         strategy: PublishStrategy? = nil
     ) async throws -> PublishedEvent {
-        let event = try withSigner { try $0.signTextNote(content: content, tags: tags) }
+        let event = try await signEvent { .textNote(pubkey: $0, content: content, tags: tags) }
         let result = try await relayPool.publish(event, strategy: strategy)
         return PublishedEvent(event: event, result: result)
     }
@@ -29,7 +29,7 @@ extension NostrClient {
         relayURL: String? = nil,
         strategy: PublishStrategy? = nil
     ) async throws -> PublishedEvent {
-        let signedEvent = try withSigner { signer -> Event in
+        let signedEvent = try await signEvent { publicKey in
             var tags: [Tag] = []
 
             // Add root and reply markers (NIP-10)
@@ -44,14 +44,7 @@ extension NostrClient {
             // Add p tag for the author we're replying to
             tags.append(.pubkey(event.pubkey))
 
-            let unsigned = UnsignedEvent(
-                pubkey: signer.publicKey,
-                kind: .textNote,
-                tags: tags,
-                content: content
-            )
-
-            return try signer.sign(unsigned)
+            return .textNote(pubkey: publicKey, content: content, tags: tags)
         }
         let result = try await relayPool.publish(signedEvent, strategy: strategy)
         return PublishedEvent(event: signedEvent, result: result)
@@ -64,7 +57,7 @@ extension NostrClient {
         _ metadata: UserMetadata,
         strategy: PublishStrategy? = nil
     ) async throws -> PublishedEvent {
-        let event = try withSigner { try $0.signMetadata(metadata) }
+        let event = try await signEvent { try .metadata(pubkey: $0, metadata) }
         let result = try await relayPool.publish(event, strategy: strategy)
         return PublishedEvent(event: event, result: result)
     }
@@ -77,7 +70,7 @@ extension NostrClient {
         content: String = "+",
         strategy: PublishStrategy? = nil
     ) async throws -> PublishedEvent {
-        let reaction = try withSigner { try $0.signReaction(to: event, content: content) }
+        let reaction = try await signEvent { .reaction(pubkey: $0, to: event, content: content) }
         let result = try await relayPool.publish(reaction, strategy: strategy)
         return PublishedEvent(event: reaction, result: result)
     }
@@ -91,7 +84,7 @@ extension NostrClient {
         relayURL: String? = nil,
         strategy: PublishStrategy? = nil
     ) async throws -> PublishedEvent {
-        let repost = try withSigner { try $0.signRepost(of: event, relayURL: relayURL) }
+        let repost = try await signEvent { try .repost(pubkey: $0, of: event, relayURL: relayURL) }
         let result = try await relayPool.publish(repost, strategy: strategy)
         return PublishedEvent(event: repost, result: result)
     }
@@ -104,7 +97,7 @@ extension NostrClient {
         reason: String = "",
         strategy: PublishStrategy? = nil
     ) async throws -> PublishedEvent {
-        let deletion = try withSigner { try $0.signDeletion(eventIds: eventIds, reason: reason) }
+        let deletion = try await signEvent { .deletion(pubkey: $0, eventIds: eventIds, reason: reason) }
         let result = try await relayPool.publish(deletion, strategy: strategy)
         return PublishedEvent(event: deletion, result: result)
     }
@@ -118,7 +111,7 @@ extension NostrClient {
         reason: String = "",
         strategy: PublishStrategy? = nil
     ) async throws -> PublishedEvent {
-        let report = try withSigner { try $0.signReport(pubkey: pubkey, type: type, reason: reason) }
+        let report = try await signEvent { .report(pubkey: $0, target: pubkey, type: type, reason: reason) }
         let result = try await relayPool.publish(report, strategy: strategy)
         return PublishedEvent(event: report, result: result)
     }
@@ -132,7 +125,7 @@ extension NostrClient {
         reason: String = "",
         strategy: PublishStrategy? = nil
     ) async throws -> PublishedEvent {
-        let report = try withSigner { try $0.signReport(event: event, type: type, reason: reason) }
+        let report = try await signEvent { .report(pubkey: $0, event: event, type: type, reason: reason) }
         let result = try await relayPool.publish(report, strategy: strategy)
         return PublishedEvent(event: report, result: result)
     }

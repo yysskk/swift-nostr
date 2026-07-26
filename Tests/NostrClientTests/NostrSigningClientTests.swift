@@ -109,28 +109,74 @@ struct NostrSigningClientTests {
         }
     }
 
-    // MARK: - Local-only convenience helpers reject a remote signer
+    // MARK: - The convenience helpers work with a remote signer
 
-    @Test("a convenience publish helper with a remote signer throws localSignerRequired")
-    func remoteSignerRejectsConvenienceHelper() async throws {
-        let (client, _) = makeClient()
-        try await client.setSigner(MockRemoteSigner(keyPair: try KeyPair()) as any NostrSigning)
+    @Test("a convenience publish helper signs and publishes with a remote signer")
+    func remoteSignerDrivesConvenienceHelper() async throws {
+        let (client, socket) = try await ConnectedClientFixture.make()
+        let keyPair = try KeyPair()
+        try await client.setSigner(MockRemoteSigner(keyPair: keyPair) as any NostrSigning)
 
-        // The boundary is enforced at signing, before any network, so no relay is needed.
-        await #expect(throws: NostrError.localSignerRequired) {
-            try await client.publishTextNote(content: "x")
+        let published = try await PublishAckSupport.acknowledgingPublishes(on: socket) {
+            try await client.publishTextNote(content: "signed by my bunker")
         }
+
+        #expect(published.event.kind == .textNote)
+        #expect(published.event.pubkey == keyPair.publicKeyHex)
+        #expect(published.event.content == "signed by my bunker")
+        #expect(try published.event.verify())
+        await client.disconnect()
     }
 
-    @Test("a direct-message helper with a remote signer throws localSignerRequired")
-    func remoteSignerRejectsDirectMessageHelper() async throws {
-        let (client, _) = makeClient()
-        try await client.setSigner(MockRemoteSigner(keyPair: try KeyPair()) as any NostrSigning)
-        let recipient = try KeyPair().publicKeyHex
+    @Test("a direct-message helper gift-wraps and delivers with a remote signer")
+    func remoteSignerDrivesDirectMessageHelper() async throws {
+        let (client, socket) = try await ConnectedClientFixture.make()
+        let sender = try KeyPair()
+        let recipient = try KeyPair()
+        try await client.setSigner(MockRemoteSigner(keyPair: sender) as any NostrSigning)
+        // Confirmed-absent DM relay lists: both copies fall back to the pool's relay
+        // without a discovery fetch.
+        await client.dmRelayListStore.markNoList(for: sender.publicKeyHex)
+        await client.dmRelayListStore.markNoList(for: recipient.publicKeyHex)
 
-        await #expect(throws: NostrError.localSignerRequired) {
-            try await client.sendDirectMessage("x", to: recipient)
+        // Two EVENT frames: the recipient gift wrap and the self-copy gift wrap.
+        let result = try await PublishAckSupport.acknowledgingPublishes(2, on: socket) {
+            try await client.sendDirectMessage("wrapped by my bunker", to: recipient.publicKeyHex)
         }
+
+        #expect(result.recipientGiftWrap.kind == .giftWrap)
+        // The seal inside is authored by the remote signer's user key, and the recipient
+        // reads the message with nothing but their own key.
+        let message = try await DirectMessageParser(signer: EventSigner(keyPair: recipient))
+            .parse(result.recipientGiftWrap)
+        #expect(message.content == "wrapped by my bunker")
+        #expect(message.senderPubkey == sender.publicKeyHex)
+        await client.disconnect()
+    }
+
+    @Test("a NIP-51 list round-trips its private items through a remote signer")
+    func remoteSignerSealsPrivateListItems() async throws {
+        let (client, socket) = try await ConnectedClientFixture.make()
+        let keyPair = try KeyPair()
+        try await client.setSigner(MockRemoteSigner(keyPair: keyPair) as any NostrSigning)
+
+        let list = NostrList(
+            kind: .muteList,
+            publicItems: [.pubkey(String(repeating: "a", count: 64))],
+            privateItems: [.pubkey(String(repeating: "b", count: 64))]
+        )
+
+        let published = try await PublishAckSupport.acknowledgingPublishes(on: socket) {
+            try await client.publishList(list)
+        }
+
+        #expect(published.event.kind == .muteList)
+        #expect(!published.event.content.isEmpty)
+        // Only the author's key opens the private items; the remote signer sealed them.
+        let opened = try EventSigner(keyPair: keyPair).openList(published.event)
+        #expect(opened.privateItems == list.privateItems)
+        #expect(opened.publicItems == list.publicItems)
+        await client.disconnect()
     }
 
     // MARK: - The local path is unchanged

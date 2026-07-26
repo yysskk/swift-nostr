@@ -88,19 +88,20 @@ and cached, so `publicKey`/`npub` stay synchronous even for a remote signer.
 
 Setting a signer also starts answering NIP-42 AUTH challenges automatically (see Authentication).
 
-A remote signer works for the generic signing/publishing/auth paths — `sign(_:)`,
-`publish(_:strategy:)`, and NIP-42 authentication — but the convenience `publish*` and
-direct-message helpers require a local key and throw `NostrError.localSignerRequired` for a remote
-signer (a deliberate boundary):
+Every feature runs through the signer, so a remote one is a drop-in for a local key: `sign(_:)`,
+`publish(_:strategy:)`, the convenience `publish*` helpers, NIP-17 direct messages, NIP-51 private
+list items, and NIP-42 authentication all work unchanged:
 
 ```swift
 try await client.setSigner(remoteSigner)   // a RemoteSigner or any NostrSigning
+try await client.publishTextNote(content: "Signed remotely")
+try await client.sendDirectMessage("gift-wrapped by the bunker", to: recipientPubkey)
+
+// Or author an event with no helper: build it under the signer's pubkey and sign it.
 let pubkey = await client.publicKey!
 let signed = try await client.sign(
     UnsignedEvent(pubkey: pubkey, kind: .textNote, content: "Signed remotely"))
 try await client.publish(signed)           // generic publish of a pre-signed event
-
-// try await client.publishTextNote(content: "x")  // throws NostrError.localSignerRequired
 ```
 
 ### Authentication (NIP-42)
@@ -229,8 +230,10 @@ let byRelay = try await client.relayPool.count(filters: [filter])  // [URL: Even
 // Send
 try await client.sendDirectMessage("Hello!", to: "recipientPubkey")
 
-// Subscribe to incoming DMs, parsed automatically (unparseable wraps skipped)
-for await message in try await client.directMessages() {
+// Subscribe to incoming DMs, parsed automatically. Wraps sealed to someone else and malformed
+// ones are skipped; a signer that cannot be reached (a remote NIP-46 timeout/disconnect) throws,
+// so a transient failure never passes for an empty inbox. Resubscribe to resume.
+for try await message in try await client.directMessages() {
     print("From: \(message.senderPubkey), Content: \(message.content)")
 }
 
@@ -765,18 +768,20 @@ NIP-59 Gift Wrap for sender anonymity (struct: Sendable).
 
 Wraps events through rumor > seal > gift wrap layers with randomized timestamps for privacy.
 
+Both sides take any `NostrSigning`, so a remote NIP-46 signer wraps and unwraps as well as a local key does; the outer wrap key is ephemeral and always generated locally.
+
 ```swift
 // Wrap
-let wrapped = try GiftWrap.wrap(
+let wrapped = try await GiftWrap.wrap(
     event: rumorEvent,
-    senderKeyPair: senderKeyPair,
+    signer: EventSigner(keyPair: senderKeyPair),
     recipientPubkey: recipientPubkey
 )
 
 // Unwrap
-let unwrapped = try GiftWrap.unwrap(
+let unwrapped = try await GiftWrap.unwrap(
     giftWrap: wrappedEvent,
-    recipientKeyPair: recipientKeyPair
+    recipient: EventSigner(keyPair: recipientKeyPair)
 )
 print(unwrapped.senderPubkey)  // original sender
 print(unwrapped.event)         // original event
@@ -800,11 +805,13 @@ NIP-17 Private Direct Message (struct: Sendable, Identifiable, Hashable).
 
 Builder for NIP-17 direct message events (struct: Sendable).
 
-```swift
-let builder = DirectMessageBuilder(keyPair: keyPair)
+Takes any `NostrSigning` — a local key or a remote NIP-46 signer.
 
-// Single recipient
-let giftWraps = try builder.createMessage(
+```swift
+let builder = DirectMessageBuilder(signer: EventSigner(keyPair: keyPair))
+
+// Single recipient (the recipient gift wrap plus the sender's self-copy)
+let result = try await builder.createMessageWithSelfCopy(
     content: "Hello!",
     to: recipientPubkey,
     subject: "Greetings",
@@ -812,7 +819,7 @@ let giftWraps = try builder.createMessage(
 )
 
 // Group message (one gift wrap per recipient + sender copy)
-let allWraps = try builder.createGroupMessage(
+let allWraps = try await builder.createGroupMessage(
     content: "Group hello!",
     to: [pubkey1, pubkey2]
 )
@@ -822,9 +829,11 @@ let allWraps = try builder.createGroupMessage(
 
 Parser for received NIP-17 direct messages (struct: Sendable).
 
+Takes any `NostrSigning`; opening a gift wrap needs only NIP-44 decryption.
+
 ```swift
-let parser = DirectMessageParser(keyPair: recipientKeyPair)
-let dm = try parser.parse(giftWrapEvent)
+let parser = DirectMessageParser(signer: EventSigner(keyPair: recipientKeyPair))
+let dm = try await parser.parse(giftWrapEvent)
 print(dm.content)
 ```
 
@@ -1119,8 +1128,8 @@ convert back via `.reference` (relay pubkey and invite code are not part of the 
 
 ```swift
 // Keep the list fresh as the user joins and leaves. Unlike the group flows this broadcasts to
-// the whole pool; publishing needs the local signer (a remote signer throws
-// NostrError.localSignerRequired), because private entries are NIP-44-encrypted locally.
+// the whole pool; private entries are NIP-44-encrypted to the user's own key through the
+// configured signer, local or remote.
 var list = try await client.fetchSimpleGroupList() ?? SimpleGroupList()
 list.publicEntries.append(GroupListEntry(group, name: "Cool Group"))
 if !list.relayURLs.contains(group.relayURL) { list.relayURLs.append(group.relayURL) }
@@ -1357,7 +1366,7 @@ let tags = NostrContentReference.tags(for: content)  // [["p", ...], ["q", ...]]
 
 ## RemoteSigner
 
-NIP-46 remote signing over a relay transport (actor, `NostrConnect` library). Delegates signing to a remote signer (a "bunker") that holds the user's private key. The client holds a separate identity, encrypts each request to the signer, signs a kind-24133 event, and awaits the matching response — correlated by the `id` inside the decrypted JSON body (not by any event tag). Two connection flows are supported: the signer-initiated `bunker://` token and the client-initiated `nostrconnect://` invitation. Conforms to `NostrSigning` (its `publicKey` is the user key from `get_public_key`), so it is usable anywhere a local `EventSigner` is — including `NostrClient.setSigner(_:)`, after which the client's `sign(_:)`, `publish(_:)`, and NIP-42 auth run through the bunker (the convenience `publish*`/DM helpers still require a local key).
+NIP-46 remote signing over a relay transport (actor, `NostrConnect` library). Delegates signing to a remote signer (a "bunker") that holds the user's private key. The client holds a separate identity, encrypts each request to the signer, signs a kind-24133 event, and awaits the matching response — correlated by the `id` inside the decrypted JSON body (not by any event tag). Two connection flows are supported: the signer-initiated `bunker://` token and the client-initiated `nostrconnect://` invitation. Conforms to `NostrSigning` (its `publicKey` is the user key from `get_public_key`), so it is usable anywhere a local `EventSigner` is — including `NostrClient.setSigner(_:)`, after which every client feature runs through the bunker: `sign(_:)`, `publish(_:)`, the convenience `publish*` helpers, NIP-17 direct messages, NIP-51 private list items, and NIP-42 auth.
 
 ```swift
 import NostrConnect
@@ -1443,7 +1452,7 @@ for await challenge in await signer.authChallenges() {
 
 Error types (enum: Error, LocalizedError, Sendable, Equatable).
 
-Cases: `invalidPrivateKey`, `invalidPublicKey`, `invalidSignature`, `invalidEventId`, `signingFailed`, `signerNotSet`, `localSignerRequired`, `verificationFailed`, `serializationFailed`, `invalidData`, `invalidMessageFormat`, `invalidRelayURL(String)`, `connectionFailed(String)`, `notConnected`, `subscriptionNotFound(String)`, `relayError(String)`, `noRelaysInPool`, `noMatchingRelays([String])`, `authenticationFailed(String)`, `cannotPublishAuthenticationEvent`, `timeout`, `invalidHex`, `invalidBech32`, `unknownPrefix(String)`, `invalidTLV`, `invalidNIP19Entity`, `invalidNostrURI`, `encryptionFailed`, `decryptionFailed`, `unsupportedEncryptionVersion(UInt8)`, `invalidPayloadFormat`, `hmacVerificationFailed`, `invalidPadding`, `invalidMnemonic`, `invalidMnemonicWord(String)`, `invalidMnemonicChecksum`, `randomGenerationFailed`, `invalidNcryptsec`, `unsupportedScryptCost(UInt8)`.
+Cases: `invalidPrivateKey`, `invalidPublicKey`, `invalidSignature`, `invalidEventId`, `signingFailed`, `signerNotSet`, `verificationFailed`, `serializationFailed`, `invalidData`, `invalidMessageFormat`, `invalidRelayURL(String)`, `connectionFailed(String)`, `notConnected`, `subscriptionNotFound(String)`, `relayError(String)`, `noRelaysInPool`, `noMatchingRelays([String])`, `authenticationFailed(String)`, `cannotPublishAuthenticationEvent`, `timeout`, `invalidHex`, `invalidBech32`, `unknownPrefix(String)`, `invalidTLV`, `invalidNIP19Entity`, `invalidNostrURI`, `encryptionFailed`, `decryptionFailed`, `unsupportedEncryptionVersion(UInt8)`, `invalidPayloadFormat`, `hmacVerificationFailed`, `invalidPadding`, `invalidMnemonic`, `invalidMnemonicWord(String)`, `invalidMnemonicChecksum`, `randomGenerationFailed`, `invalidNcryptsec`, `unsupportedScryptCost(UInt8)`.
 
 ## Supported NIPs
 

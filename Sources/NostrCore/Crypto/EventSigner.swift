@@ -4,11 +4,10 @@ import P256K
 
 /// Handles signing and verification of Nostr events
 public struct EventSigner: Sendable {
-    /// The signer's key pair. `package`-scoped (not `public`) so other modules in
-    /// this package — e.g. NostrClient's NIP-17 direct messaging, which needs the
-    /// private key for ECDH — can reach it, without exposing the private key as
-    /// public API.
-    package let keyPair: KeyPair
+    /// The signer's key pair. `private`: nothing outside this type reads the private key —
+    /// callers that need one go through ``NostrSigning``, whose signing and NIP-44 requirements
+    /// this type satisfies with the key it holds.
+    private let keyPair: KeyPair
 
     public init(keyPair: KeyPair) {
         self.keyPair = keyPair
@@ -77,31 +76,14 @@ public struct EventSigner: Sendable {
         try SealedMessage(payload: ciphertext).open(from: senderPubkey, using: keyPair)
     }
 
-    /// Builds an unsigned event for this signer's public key and signs it.
-    ///
-    /// The convenience signers below differ only in their `kind`, `tags`, and
-    /// `content`; this overload keeps the shared `UnsignedEvent` construction in
-    /// one place.
-    private func sign(kind: Event.Kind, tags: [Tag] = [], content: String = "") throws -> Event {
-        try sign(UnsignedEvent(pubkey: publicKey, kind: kind, tags: tags, content: content))
-    }
-
-    /// Builds an unsigned event from raw NIP-01 tag arrays and signs it.
-    ///
-    /// Used by signers whose tags are produced as wire-form arrays (e.g. relay
-    /// lists) rather than ``Tag`` values.
-    private func sign(kind: Event.Kind, rawTags: [[String]], content: String = "") throws -> Event {
-        try sign(UnsignedEvent(pubkey: publicKey, kind: kind, rawTags: rawTags, content: content))
-    }
-
     /// Creates and signs a text note (kind 1)
     public func signTextNote(content: String, tags: [Tag] = []) throws -> Event {
-        try sign(kind: .textNote, tags: tags, content: content)
+        try sign(.textNote(pubkey: publicKey, content: content, tags: tags))
     }
 
     /// Creates and signs a reaction event (kind 7)
     public func signReaction(to event: Event, content: String = "+") throws -> Event {
-        try sign(kind: .reaction, tags: [.event(event.id), .pubkey(event.pubkey)], content: content)
+        try sign(.reaction(pubkey: publicKey, to: event, content: content))
     }
 
     /// Creates and signs a repost event (kind 6)
@@ -109,20 +91,12 @@ public struct EventSigner: Sendable {
     ///   - event: The event being reposted; it is embedded in the content and referenced by an `e` tag.
     ///   - relayURL: The relay where the reposted event can be found, recorded in the `e` tag.
     public func signRepost(of event: Event, relayURL: String? = nil) throws -> Event {
-        let encoder = JSONEncoder()
-        encoder.keyEncodingStrategy = .convertToSnakeCase
-        let eventJson = try encoder.encode(event)
-
-        return try sign(
-            kind: .repost,
-            tags: [.event(event.id, relayURL: relayURL), .pubkey(event.pubkey)],
-            content: String(decoding: eventJson, as: UTF8.self)
-        )
+        try sign(.repost(pubkey: publicKey, of: event, relayURL: relayURL))
     }
 
     /// Creates and signs a delete event (kind 5)
     public func signDeletion(eventIds: [String], reason: String = "") throws -> Event {
-        try sign(kind: .eventDeletion, tags: eventIds.map { Tag.event($0) }, content: reason)
+        try sign(.deletion(pubkey: publicKey, eventIds: eventIds, reason: reason))
     }
 
     /// Creates and signs a client authentication event (kind 22242, NIP-42)
@@ -137,11 +111,7 @@ public struct EventSigner: Sendable {
     ///   - relayURL: The URL of the relay being authenticated to, as used to connect.
     ///   - challenge: The challenge string received in the relay's AUTH message.
     public func signClientAuthentication(relayURL: URL, challenge: String) throws -> Event {
-        try sign(
-            kind: .clientAuthentication,
-            tags: [.relay(relayURL.absoluteString), .challenge(challenge)],
-            content: ""
-        )
+        try sign(.clientAuthentication(pubkey: publicKey, relayURL: relayURL, challenge: challenge))
     }
 
     /// Creates and signs a zap request event (kind 9734, NIP-57).
@@ -191,7 +161,7 @@ public struct EventSigner: Sendable {
             tags.append(Tag(name: "a", values: [eventCoordinate]))
         }
 
-        return try sign(kind: .zapRequest, tags: tags, content: comment)
+        return try sign(UnsignedEvent(pubkey: publicKey, kind: .zapRequest, tags: tags, content: comment))
     }
 }
 

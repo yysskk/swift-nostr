@@ -8,14 +8,7 @@ import NostrCore
 extension EventSigner {
     /// Creates and signs a metadata event (kind 0)
     public func signMetadata(_ metadata: UserMetadata) throws -> Event {
-        let content = try JSONEncoder().encode(metadata)
-        return try sign(
-            UnsignedEvent(
-                pubkey: publicKey,
-                kind: .setMetadata,
-                content: String(decoding: content, as: UTF8.self)
-            )
-        )
+        try sign(.metadata(pubkey: publicKey, metadata))
     }
 
     /// Creates and signs a contact list event (kind 3, NIP-02)
@@ -32,26 +25,13 @@ extension EventSigner {
 
     /// Creates and signs a relay list metadata event (kind 10002, NIP-65)
     public func signRelayListMetadata(_ relayList: RelayListMetadata) throws -> Event {
-        try sign(
-            UnsignedEvent(pubkey: publicKey, kind: .relayListMetadata, rawTags: relayList.toTags(), content: "")
-        )
+        try sign(.relayListMetadata(pubkey: publicKey, relayList))
     }
 
     /// Creates and signs a relay list metadata event from explicit read/write relay URLs (NIP-65).
     /// URLs present in both lists are marked as read+write.
     public func signRelayListMetadata(read: [String] = [], write: [String] = []) throws -> Event {
-        let both = Set(read).intersection(write)
-        var entries: [RelayListEntry] = []
-        for url in read where !both.contains(url) {
-            entries.append(RelayListEntry(url: url, usage: .read))
-        }
-        for url in write where !both.contains(url) {
-            entries.append(RelayListEntry(url: url, usage: .write))
-        }
-        for url in both {
-            entries.append(RelayListEntry(url: url, usage: .readWrite))
-        }
-        return try signRelayListMetadata(RelayListMetadata(entries: entries))
+        try signRelayListMetadata(RelayListMetadata(read: read, write: write))
     }
 
     /// Creates and signs a DM relay list event (kind 10050, NIP-17).
@@ -60,9 +40,7 @@ extension EventSigner {
     /// private direct messages. Its content is empty; the relays are carried as
     /// `relay` tags.
     public func signDirectMessageRelayList(_ relayList: DirectMessageRelayList) throws -> Event {
-        try sign(
-            UnsignedEvent(pubkey: publicKey, kind: .directMessageRelayList, rawTags: relayList.toTags(), content: "")
-        )
+        try sign(.directMessageRelayList(pubkey: publicKey, relayList))
     }
 
     /// Creates and signs a DM relay list event from relay URLs (kind 10050, NIP-17).
@@ -73,60 +51,33 @@ extension EventSigner {
     /// Creates and signs a report of a pubkey (kind 1984, NIP-56).
     /// The report type rides on the "p" tag; `reason` becomes the content.
     public func signReport(pubkey: String, type: ReportType, reason: String = "") throws -> Event {
-        let tags = [Tag(name: "p", values: [pubkey, type.rawValue])]
-        return try sign(
-            UnsignedEvent(pubkey: publicKey, kind: .report, rawTags: tags.map(\.rawArray), content: reason)
-        )
+        try sign(.report(pubkey: publicKey, target: pubkey, type: type, reason: reason))
     }
 
     /// Creates and signs a report of an event and its author (kind 1984, NIP-56).
     /// The report type rides on the "e" tag; a bare "p" tag names the author.
     public func signReport(event: Event, type: ReportType, reason: String = "") throws -> Event {
-        let tags = [
-            Tag(name: "e", values: [event.id, type.rawValue]),
-            Tag(name: "p", values: [event.pubkey]),
-        ]
-        return try sign(
-            UnsignedEvent(pubkey: publicKey, kind: .report, rawTags: tags.map(\.rawArray), content: reason)
-        )
+        try sign(.report(pubkey: publicKey, event: event, type: type, reason: reason))
     }
 
     /// Creates and signs a long-form article (kind 30023, or 30024 when `draft`; NIP-23).
     /// When `publishedAt` is nil it is set to the current time (first-publication time per the spec);
     /// it is preserved verbatim on later edits.
     public func signLongFormContent(_ article: LongFormContent, draft: Bool = false) throws -> Event {
-        var article = article
-        if article.publishedAt == nil {
-            article.publishedAt = Date()
-        }
-        return try sign(
-            UnsignedEvent(
-                pubkey: publicKey,
-                kind: draft ? .longFormDraft : .longFormContent,
-                rawTags: article.toTags(),
-                content: article.content
-            )
-        )
+        try sign(.longFormContent(pubkey: publicKey, article, draft: draft))
     }
 
     /// Creates and signs a NIP-51 list event, encrypting private items to the signer's own key
     /// (NIP-44). Content is empty when there are no private items.
     public func signList(_ list: NostrList) throws -> Event {
-        let content = try ListItemCipher.encrypt(list.privateItems, using: keyPair)
-        let unsigned = UnsignedEvent(
-            pubkey: publicKey,
-            kind: list.kind,
-            rawTags: list.publicItems.map(\.rawArray),
-            content: content
-        )
-        return try sign(unsigned)
+        try sign(.list(pubkey: publicKey, list, encryptedContent: sealPrivateItems(list.privateItems)))
     }
 
     /// Reads a NIP-51 list authored by this signer, decrypting its private items.
     /// - Throws: when the content cannot be decrypted with this key.
     public func openList(_ event: Event) throws -> NostrList {
         var list = NostrList(event: event)
-        list.privateItems = try ListItemCipher.decrypt(event.content, using: keyPair)
+        list.privateItems = try openPrivateItems(event.content)
         return list
     }
 
@@ -134,27 +85,7 @@ extension EventSigner {
     /// public items as tags, with private items NIP-44-encrypted to the signer's own key in
     /// the content. Content is empty when there are no private items.
     public func signSet(_ set: NostrListSet) throws -> Event {
-        var tags: [Tag] = [.identifier(set.identifier)]
-        if let title = set.title {
-            tags.append(Tag(name: "title", values: [title]))
-        }
-        if let imageURL = set.imageURL {
-            tags.append(Tag(name: "image", values: [imageURL]))
-        }
-        if let description = set.description {
-            tags.append(Tag(name: "description", values: [description]))
-        }
-        // Drop any reserved metadata tags a caller may have left in publicItems so they are
-        // never emitted twice alongside the dedicated properties above.
-        tags.append(contentsOf: set.publicItems.filter { !NostrListSet.reservedTagNames.contains($0.name) })
-        let content = try ListItemCipher.encrypt(set.privateItems, using: keyPair)
-        let unsigned = UnsignedEvent(
-            pubkey: publicKey,
-            kind: set.kind,
-            rawTags: tags.map(\.rawArray),
-            content: content
-        )
-        return try sign(unsigned)
+        try sign(.set(pubkey: publicKey, set, encryptedContent: sealPrivateItems(set.privateItems)))
     }
 
     /// Reads a NIP-51 set authored by this signer, decrypting its private items.
@@ -162,7 +93,20 @@ extension EventSigner {
     ///   with this key.
     public func openSet(_ event: Event) throws -> NostrListSet {
         var set = try NostrListSet(event: event)
-        set.privateItems = try ListItemCipher.decrypt(event.content, using: keyPair)
+        set.privateItems = try openPrivateItems(event.content)
         return set
+    }
+
+    /// Seals a list's or set's private items to this signer's own key, or returns empty content
+    /// when there are none.
+    private func sealPrivateItems(_ items: [Tag]) throws -> String {
+        guard let json = try ListItemCipher.plaintext(items) else { return "" }
+        return try nip44Encrypt(json, to: publicKey)
+    }
+
+    /// Opens the self-encrypted private items of a list or set event (empty content → []).
+    private func openPrivateItems(_ content: String) throws -> [Tag] {
+        guard !content.isEmpty else { return [] }
+        return try ListItemCipher.items(fromJSON: nip44Decrypt(content, from: publicKey))
     }
 }

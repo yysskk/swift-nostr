@@ -14,12 +14,12 @@ struct NIP25DirectMessageReactionTests {
     }
 
     @Test("a built reaction is an unsigned kind-7 rumor referencing the message")
-    func buildReaction() throws {
+    func buildReaction() async throws {
         let sender = try KeyPair()
         let recipient = try KeyPair()
-        let builder = DirectMessageBuilder(keyPair: sender)
+        let builder = DirectMessageBuilder(signer: EventSigner(keyPair: sender))
 
-        let result = try builder.createReactionWithSelfCopy(
+        let result = try await builder.createReactionWithSelfCopy(
             reaction: "🤙", to: "messageid", author: "authorhex", recipientPubkey: recipient.publicKeyHex)
 
         #expect(result.rumor.kind == .reaction)
@@ -32,16 +32,17 @@ struct NIP25DirectMessageReactionTests {
     }
 
     @Test("a reaction round-trips through gift wrap to the recipient")
-    func reactionRoundTrip() throws {
+    func reactionRoundTrip() async throws {
         let sender = try KeyPair()
         let recipient = try KeyPair()
-        let builder = DirectMessageBuilder(keyPair: sender)
+        let builder = DirectMessageBuilder(signer: EventSigner(keyPair: sender))
 
-        let result = try builder.createReactionWithSelfCopy(
+        let result = try await builder.createReactionWithSelfCopy(
             reaction: "+", to: "messageid", author: recipient.publicKeyHex,
             recipientPubkey: recipient.publicKeyHex)
 
-        let reaction = try DirectMessageParser(keyPair: recipient).parseReaction(result.recipientGiftWrap)
+        let reaction = try await DirectMessageParser(signer: EventSigner(keyPair: recipient)).parseReaction(
+            result.recipientGiftWrap)
         #expect(reaction.content == "+")
         #expect(reaction.messageId == "messageid")
         #expect(reaction.messageAuthorPubkey == recipient.publicKeyHex)
@@ -49,7 +50,8 @@ struct NIP25DirectMessageReactionTests {
 
         // The self-copy decrypts with the sender's own key and carries the identical reaction,
         // guarding against a wrong-key regression when wrapping the self-copy.
-        let selfCopy = try DirectMessageParser(keyPair: sender).parseReaction(result.selfGiftWrap)
+        let selfCopy = try await DirectMessageParser(signer: EventSigner(keyPair: sender)).parseReaction(
+            result.selfGiftWrap)
         #expect(selfCopy.rumorId == reaction.rumorId)
         #expect(selfCopy.content == "+")
         #expect(selfCopy.messageId == "messageid")
@@ -57,23 +59,23 @@ struct NIP25DirectMessageReactionTests {
     }
 
     @Test("parsePayload classifies messages and reactions")
-    func parsePayloadDispatch() throws {
+    func parsePayloadDispatch() async throws {
         let sender = try KeyPair()
         let recipient = try KeyPair()
-        let builder = DirectMessageBuilder(keyPair: sender)
-        let parser = DirectMessageParser(keyPair: recipient)
+        let builder = DirectMessageBuilder(signer: EventSigner(keyPair: sender))
+        let parser = DirectMessageParser(signer: EventSigner(keyPair: recipient))
 
-        let message = try builder.createMessageWithSelfCopy(content: "hi", to: recipient.publicKeyHex)
-        guard case .message(let parsedMessage) = try parser.parsePayload(message.recipientGiftWrap) else {
+        let message = try await builder.createMessageWithSelfCopy(content: "hi", to: recipient.publicKeyHex)
+        guard case .message(let parsedMessage) = try await parser.parsePayload(message.recipientGiftWrap) else {
             Issue.record("expected a message payload")
             return
         }
         #expect(parsedMessage.content == "hi")
 
-        let reaction = try builder.createReactionWithSelfCopy(
+        let reaction = try await builder.createReactionWithSelfCopy(
             reaction: "❤️", to: parsedMessage.rumorId, author: sender.publicKeyHex,
             recipientPubkey: recipient.publicKeyHex)
-        guard case .reaction(let parsedReaction) = try parser.parsePayload(reaction.recipientGiftWrap) else {
+        guard case .reaction(let parsedReaction) = try await parser.parsePayload(reaction.recipientGiftWrap) else {
             Issue.record("expected a reaction payload")
             return
         }
@@ -82,22 +84,22 @@ struct NIP25DirectMessageReactionTests {
     }
 
     @Test("parse and parseReaction reject the wrong inner kind")
-    func crossParsingRejected() throws {
+    func crossParsingRejected() async throws {
         let sender = try KeyPair()
         let recipient = try KeyPair()
-        let builder = DirectMessageBuilder(keyPair: sender)
-        let parser = DirectMessageParser(keyPair: recipient)
+        let builder = DirectMessageBuilder(signer: EventSigner(keyPair: sender))
+        let parser = DirectMessageParser(signer: EventSigner(keyPair: recipient))
 
-        let message = try builder.createMessageWithSelfCopy(content: "hi", to: recipient.publicKeyHex)
-        let reaction = try builder.createReactionWithSelfCopy(
+        let message = try await builder.createMessageWithSelfCopy(content: "hi", to: recipient.publicKeyHex)
+        let reaction = try await builder.createReactionWithSelfCopy(
             reaction: "+", to: "mid", author: sender.publicKeyHex, recipientPubkey: recipient.publicKeyHex)
 
-        #expect(throws: NostrError.self) { try parser.parse(reaction.recipientGiftWrap) }
-        #expect(throws: NostrError.self) { try parser.parseReaction(message.recipientGiftWrap) }
+        await #expect(throws: NostrError.self) { try await parser.parse(reaction.recipientGiftWrap) }
+        await #expect(throws: NostrError.self) { try await parser.parseReaction(message.recipientGiftWrap) }
     }
 
     @Test("a reaction without an e tag is rejected")
-    func reactionWithoutEventTagRejected() throws {
+    func reactionWithoutEventTagRejected() async throws {
         let sender = try KeyPair()
         let recipient = try KeyPair()
 
@@ -106,14 +108,15 @@ struct NIP25DirectMessageReactionTests {
             pubkey: sender.publicKeyHex, kind: .reaction,
             tags: [.pubkey(sender.publicKeyHex)], content: "+"
         ).asRumor()
-        let giftWrap = try GiftWrap.wrap(event: rumor, senderKeyPair: sender, recipientPubkey: recipient.publicKeyHex)
+        let giftWrap = try await GiftWrap.wrap(
+            event: rumor, signer: EventSigner(keyPair: sender), recipientPubkey: recipient.publicKeyHex)
 
-        let parser = DirectMessageParser(keyPair: recipient)
-        #expect(throws: NostrError.self) { try parser.parseReaction(giftWrap) }
+        let parser = DirectMessageParser(signer: EventSigner(keyPair: recipient))
+        await #expect(throws: NostrError.self) { try await parser.parseReaction(giftWrap) }
     }
 
     @Test("a reaction without a p tag is rejected")
-    func reactionWithoutAuthorTagRejected() throws {
+    func reactionWithoutAuthorTagRejected() async throws {
         let sender = try KeyPair()
         let recipient = try KeyPair()
 
@@ -122,26 +125,28 @@ struct NIP25DirectMessageReactionTests {
             pubkey: sender.publicKeyHex, kind: .reaction,
             tags: [.event("messageid")], content: "+"
         ).asRumor()
-        let giftWrap = try GiftWrap.wrap(event: rumor, senderKeyPair: sender, recipientPubkey: recipient.publicKeyHex)
+        let giftWrap = try await GiftWrap.wrap(
+            event: rumor, signer: EventSigner(keyPair: sender), recipientPubkey: recipient.publicKeyHex)
 
-        #expect(throws: NostrError.self) {
-            try DirectMessageParser(keyPair: recipient).parseReaction(giftWrap)
+        await #expect(throws: NostrError.self) {
+            try await DirectMessageParser(signer: EventSigner(keyPair: recipient)).parseReaction(giftWrap)
         }
     }
 
     @Test("a disappearing reaction carries the expiration on the gift wrap")
-    func reactionWithExpiration() throws {
+    func reactionWithExpiration() async throws {
         let sender = try KeyPair()
         let recipient = try KeyPair()
-        let builder = DirectMessageBuilder(keyPair: sender)
+        let builder = DirectMessageBuilder(signer: EventSigner(keyPair: sender))
         let expiry = Date(timeIntervalSince1970: 1_700_000_000)
 
-        let result = try builder.createReactionWithSelfCopy(
+        let result = try await builder.createReactionWithSelfCopy(
             reaction: "+", to: "mid", author: sender.publicKeyHex,
             recipientPubkey: recipient.publicKeyHex, expiration: expiry)
 
         #expect(result.recipientGiftWrap.expiration == expiry)
-        let parsed = try DirectMessageParser(keyPair: recipient).parseReaction(result.recipientGiftWrap)
+        let parsed = try await DirectMessageParser(signer: EventSigner(keyPair: recipient)).parseReaction(
+            result.recipientGiftWrap)
         #expect(parsed.expiresAt == expiry)
     }
 

@@ -12,6 +12,33 @@ public struct RelayListMetadata: Codable, Hashable, Sendable {
         self.entries = entries
     }
 
+    /// Builds a list from explicit read and write relay URLs; URLs present in both are marked
+    /// as read+write.
+    ///
+    /// Membership and de-duplication are both decided on the normalized URL, so any spelling of
+    /// the same relay — trailing slash, host case, default port — collapses into a single entry
+    /// carrying every usage the caller asked for. Entries keep the order and spelling of their
+    /// first appearance, matching how a parsed list de-duplicates.
+    package init(read: [String], write: [String]) {
+        let readKeys = Set(read.map(RelayURL.normalize))
+        let writeKeys = Set(write.map(RelayURL.normalize))
+
+        var entries: [RelayListEntry] = []
+        var seen = Set<String>()
+        for url in read + write {
+            let key = RelayURL.normalize(url)
+            guard seen.insert(key).inserted else { continue }
+            let usage: RelayUsage =
+                switch (readKeys.contains(key), writeKeys.contains(key)) {
+                case (true, true): .readWrite
+                case (true, false): .read
+                case (false, _): .write
+                }
+            entries.append(RelayListEntry(url: url, usage: usage))
+        }
+        self.entries = entries
+    }
+
     /// URLs the author reads from (their inbox). Send a user events here so they will see them.
     public var readRelays: [String] {
         entries.filter { $0.usage.canRead }.map { $0.url }

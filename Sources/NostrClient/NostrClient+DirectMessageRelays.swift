@@ -37,11 +37,9 @@ extension NostrClient {
         _ relayList: DirectMessageRelayList,
         strategy: PublishStrategy? = nil
     ) async throws -> PublishedEvent {
-        let (event, authorPubkey) = try withSigner { signer in
-            (try signer.signDirectMessageRelayList(relayList), signer.publicKey)
-        }
+        let event = try await signEvent { .directMessageRelayList(pubkey: $0, relayList) }
         let result = try await relayPool.publish(event, strategy: strategy)
-        await dmRelayListStore.store(relayList, createdAt: event.createdAt, for: authorPubkey)
+        await dmRelayListStore.store(relayList, createdAt: event.createdAt, for: event.pubkey)
         return PublishedEvent(event: event, result: result)
     }
 

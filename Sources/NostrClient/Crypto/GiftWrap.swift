@@ -19,9 +19,13 @@ public struct GiftWrap: Sendable {
     }
 
     /// Creates a gift-wrapped event
+    ///
+    /// Everything the sender's identity is needed for — sealing the rumor and signing the seal —
+    /// goes through ``NostrSigning``, so a remote NIP-46 signer wraps as well as a local
+    /// key does. The outer wrap key is ephemeral by design and is generated here.
     /// - Parameters:
     ///   - event: The event to wrap (will be converted to rumor if signed)
-    ///   - senderKeyPair: The sender's keypair
+    ///   - signer: The sender's signer, local or remote
     ///   - recipientPubkey: The recipient's public key (hex)
     ///   - expiration: Optional NIP-40 expiration. Applied to the outer gift wrap (the stored
     ///     kind-1059 event relays act on) so the message disappears after the given time. The
@@ -29,32 +33,28 @@ public struct GiftWrap: Sendable {
     /// - Returns: The gift-wrapped event ready for publishing
     public static func wrap(
         event: Event,
-        senderKeyPair: KeyPair,
+        signer: any NostrSigning,
         recipientPubkey: String,
         expiration: Date? = nil
-    ) throws -> Event {
+    ) async throws -> Event {
         // 1. Create rumor (unsigned event JSON)
         let rumor = createRumor(from: event)
         let rumorJson = try encodeRumor(rumor)
 
-        // 2. Create seal (encrypt rumor to recipient)
-        let sealedRumor = try SealedMessage.seal(rumorJson, for: recipientPubkey, using: senderKeyPair)
-
+        // 2. Create seal (encrypt rumor to recipient, signed by the sender)
         let sealUnsigned = UnsignedEvent(
-            pubkey: senderKeyPair.publicKeyHex,
+            pubkey: try await signer.publicKey,
             createdAt: randomizedTimestamp(),
             kind: .seal,
             tags: [],
-            content: sealedRumor.payload
+            content: try await signer.nip44Encrypt(rumorJson, to: recipientPubkey)
         )
 
-        let sealSigner = EventSigner(keyPair: senderKeyPair)
-        let seal = try sealSigner.sign(sealUnsigned)
+        let seal = try await signer.sign(sealUnsigned)
         let sealJson = try encodeSeal(seal)
 
-        // 3. Create gift wrap (encrypt seal with ephemeral key)
-        let ephemeralKeyPair = try KeyPair()
-        let sealedMessage = try SealedMessage.seal(sealJson, for: recipientPubkey, using: ephemeralKeyPair)
+        // 3. Create gift wrap (encrypt seal with an ephemeral key, which hides the sender)
+        let ephemeralSigner = EventSigner(keyPair: try KeyPair())
 
         var wrapTags: [Tag] = [.pubkey(recipientPubkey)]
         if let expiration {
@@ -62,32 +62,31 @@ public struct GiftWrap: Sendable {
         }
 
         let wrapUnsigned = UnsignedEvent(
-            pubkey: ephemeralKeyPair.publicKeyHex,
+            pubkey: ephemeralSigner.publicKey,
             createdAt: randomizedTimestamp(),
             kind: .giftWrap,
             tags: wrapTags,
-            content: sealedMessage.payload
+            content: try ephemeralSigner.nip44Encrypt(sealJson, to: recipientPubkey)
         )
 
-        let wrapSigner = EventSigner(keyPair: ephemeralKeyPair)
-        return try wrapSigner.sign(wrapUnsigned)
+        return try ephemeralSigner.sign(wrapUnsigned)
     }
 
     /// Unwraps a gift-wrapped event
     /// - Parameters:
     ///   - giftWrap: The gift-wrapped event
-    ///   - recipientKeyPair: The recipient's keypair
+    ///   - recipient: The recipient's signer, local or remote
     /// - Returns: The unwrapped message containing sender and original event
     public static func unwrap(
         giftWrap: Event,
-        recipientKeyPair: KeyPair
-    ) throws -> UnwrappedMessage {
+        recipient: any NostrSigning
+    ) async throws -> UnwrappedMessage {
         guard giftWrap.kind == .giftWrap else {
             throw NostrError.invalidData
         }
 
         // 1. Open gift wrap to get seal
-        let sealJson = try SealedMessage(payload: giftWrap.content).open(from: giftWrap.pubkey, using: recipientKeyPair)
+        let sealJson = try await recipient.nip44Decrypt(giftWrap.content, from: giftWrap.pubkey)
         let seal = try decodeSeal(sealJson)
 
         guard seal.kind == .seal else {
@@ -100,7 +99,7 @@ public struct GiftWrap: Sendable {
         }
 
         // 2. Open seal to get rumor
-        let rumorJson = try SealedMessage(payload: seal.content).open(from: seal.pubkey, using: recipientKeyPair)
+        let rumorJson = try await recipient.nip44Decrypt(seal.content, from: seal.pubkey)
         let rumor = try decodeRumor(rumorJson)
 
         // 3. Return the unwrapped message

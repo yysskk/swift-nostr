@@ -8,7 +8,7 @@ import NostrCore
 /// Returned by ``NostrClient/directMessagePayloads(limit:)``:
 ///
 /// ```swift
-/// for await payload in try await client.directMessagePayloads() {
+/// for try await payload in try await client.directMessagePayloads() {
 ///     switch payload {
 ///     case .message(let message): print("\(message.senderPubkey): \(message.content)")
 ///     case .reaction(let reaction): print("\(reaction.senderPubkey) reacted \(reaction.content)")
@@ -16,9 +16,12 @@ import NostrCore
 /// }
 /// ```
 ///
-/// Gift wraps that fail to unwrap or parse, or whose inner kind is neither a message nor a
-/// reaction, are skipped. Use ``NostrClient/directMessages(limit:)`` for messages only, or
-/// ``NostrClient/subscribeToDirectMessages(limit:)`` for the raw gift-wrap events.
+/// Gift wraps that are not readable payloads for this signer — sealed to someone else, malformed,
+/// or carrying an inner kind that is none of the three — are skipped. A signer that fails to
+/// *attempt* the read is different: with a remote NIP-46 signer every unwrap is a relay round-trip,
+/// so a timeout, a disconnect, or a refused request throws out of the iteration instead of silently
+/// dropping payloads. Resubscribe to resume. Use ``NostrClient/directMessages(limit:)`` for
+/// messages only, or ``NostrClient/subscribeToDirectMessages(limit:)`` for the raw gift-wrap events.
 ///
 /// Like ``SubscriptionSequence``, ending iteration, cancelling the consuming task, or calling
 /// ``close()`` sends CLOSE to the relays. Single-consumer.
@@ -47,11 +50,12 @@ public struct DirectMessagePayloadSequence: AsyncSequence, Sendable {
         var base: SubscriptionSequence.AsyncIterator
         let parser: DirectMessageParser
 
-        public mutating func next() async -> DirectMessagePayload? {
+        public mutating func next() async throws -> DirectMessagePayload? {
             while let item = await base.next() {
                 guard case .event(_, let event) = item else { continue }
-                guard let payload = try? parser.parsePayload(event) else { continue }
-                return payload
+                if let payload = try await parser.parsePayloadIfReadable(event) {
+                    return payload
+                }
             }
             return nil
         }

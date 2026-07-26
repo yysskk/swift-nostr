@@ -30,11 +30,9 @@ extension NostrClient {
         _ relayList: RelayListMetadata,
         strategy: PublishStrategy? = nil
     ) async throws -> PublishedEvent {
-        let (event, authorPubkey) = try withSigner { signer in
-            (try signer.signRelayListMetadata(relayList), signer.publicKey)
-        }
+        let event = try await signEvent { .relayListMetadata(pubkey: $0, relayList) }
         let result = try await relayPool.publish(event, strategy: strategy)
-        await relayListStore.store(relayList, createdAt: event.createdAt, for: authorPubkey)
+        await relayListStore.store(relayList, createdAt: event.createdAt, for: event.pubkey)
         return PublishedEvent(event: event, result: result)
     }
 
@@ -46,14 +44,7 @@ extension NostrClient {
         write: [String] = [],
         strategy: PublishStrategy? = nil
     ) async throws -> PublishedEvent {
-        let (event, authorPubkey) = try withSigner { signer in
-            (try signer.signRelayListMetadata(read: read, write: write), signer.publicKey)
-        }
-        let result = try await relayPool.publish(event, strategy: strategy)
-        if let list = event.relayListMetadata {
-            await relayListStore.store(list, createdAt: event.createdAt, for: authorPubkey)
-        }
-        return PublishedEvent(event: event, result: result)
+        try await publishRelayList(RelayListMetadata(read: read, write: write), strategy: strategy)
     }
 
     /// Subscribes to events from multiple authors using the NIP-65 outbox model.
