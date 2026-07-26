@@ -30,7 +30,7 @@ struct RequestResponseSessionTests {
 
     /// Starts `session`, resolving each incoming event's request — keyed by its `e` tag — with the
     /// event's content.
-    private func start(_ session: Session, transport: FakeTransport) async throws {
+    private func start(_ session: Session) async throws {
         try await session.ensureStarted(subscriptionID: Self.subscriptionID, filters: [Filter(kinds: [1])]) {
             [weak session] event in
             guard let session, let key = event.firstTagValue(named: "e") else { return }
@@ -52,7 +52,7 @@ struct RequestResponseSessionTests {
     func startsBeforeSending() async throws {
         let transport = FakeTransport()
         let session = makeSession(transport)
-        try await start(session, transport: transport)
+        try await start(session)
 
         async let response = session.perform(request("a"), key: "a", state: [], timeout: 1)
         try await transport.waitForSends(1)
@@ -94,10 +94,10 @@ struct RequestResponseSessionTests {
         let session = makeSession(transport)
 
         await #expect(throws: TestError.connectFailed) {
-            try await self.start(session, transport: transport)
+            try await self.start(session)
         }
 
-        try await start(session, transport: transport)
+        try await start(session)
         #expect(await transport.connectCount == 2)
         #expect(await transport.isConnected == true)
     }
@@ -106,7 +106,7 @@ struct RequestResponseSessionTests {
     func disconnectFailsPending() async throws {
         let transport = FakeTransport()
         let session = makeSession(transport)
-        try await start(session, transport: transport)
+        try await start(session)
 
         let pending = Task { try await session.perform(self.request("a"), key: "a", state: [], timeout: 5) }
         try await transport.waitForSends(1)
@@ -123,7 +123,7 @@ struct RequestResponseSessionTests {
     func concurrentRequestsCorrelateByKey() async throws {
         let transport = FakeTransport()
         let session = makeSession(transport)
-        try await start(session, transport: transport)
+        try await start(session)
 
         async let first = session.perform(request("a"), key: "a", state: [], timeout: 1)
         async let second = session.perform(request("b"), key: "b", state: [], timeout: 1)
@@ -140,7 +140,7 @@ struct RequestResponseSessionTests {
     func unknownKeyIgnored() async throws {
         let transport = FakeTransport()
         let session = makeSession(transport)
-        try await start(session, transport: transport)
+        try await start(session)
 
         let pending = Task { try await session.perform(self.request("a"), key: "a", state: [], timeout: 0.3) }
         try await transport.waitForSends(1)
@@ -153,7 +153,7 @@ struct RequestResponseSessionTests {
     func stateRoundTrips() async throws {
         let transport = FakeTransport()
         let session = makeSession(transport)
-        try await start(session, transport: transport)
+        try await start(session)
 
         let pending = Task { try await session.perform(self.request("a"), key: "a", state: ["one"], timeout: 1) }
         try await transport.waitForSends(1)
@@ -172,7 +172,7 @@ struct RequestResponseSessionTests {
     func failSurfacesError() async throws {
         let transport = FakeTransport()
         let session = makeSession(transport)
-        try await start(session, transport: transport)
+        try await start(session)
 
         let pending = Task { try await session.perform(self.request("a"), key: "a", state: [], timeout: 5) }
         try await transport.waitForSends(1)
@@ -187,7 +187,7 @@ struct RequestResponseSessionTests {
     func requestTimesOut() async throws {
         let transport = FakeTransport()
         let session = makeSession(transport)
-        try await start(session, transport: transport)
+        try await start(session)
 
         await #expect(throws: TestError.timedOut) {
             _ = try await session.perform(self.request("a"), key: "a", state: [], timeout: 0.2)
@@ -198,7 +198,7 @@ struct RequestResponseSessionTests {
     func timeoutResolvesWithPartialResult() async throws {
         let transport = FakeTransport()
         let session = makeSession(transport)
-        try await start(session, transport: transport)
+        try await start(session)
 
         let pending = Task {
             try await session.perform(
@@ -215,7 +215,7 @@ struct RequestResponseSessionTests {
     func extendedTimeoutOutlivesTheOriginal() async throws {
         let transport = FakeTransport()
         let session = makeSession(transport)
-        try await start(session, transport: transport)
+        try await start(session)
 
         let pending = Task { try await session.perform(self.request("a"), key: "a", state: [], timeout: 0.2) }
         try await transport.waitForSends(1)
@@ -229,13 +229,9 @@ struct RequestResponseSessionTests {
 
     // MARK: - Helpers
 
-    /// Starts the session with a handler that answers `key` immediately, then performs that request.
+    /// Starts the session, sends the request under `key`, answers it, and returns what resolved.
     private func perform(_ session: Session, transport: FakeTransport, key: String) async throws -> [String] {
-        try await session.ensureStarted(subscriptionID: Self.subscriptionID, filters: [Filter(kinds: [1])]) {
-            [weak session] event in
-            guard let session, let key = event.firstTagValue(named: "e") else { return }
-            await session.complete(key, with: [event.content])
-        }
+        try await start(session)
         async let response = session.perform(request(key), key: key, state: [], timeout: 2)
         try await transport.waitForSend(key)
         await transport.deliver(self.response(for: key, content: "\(key)-done"))
@@ -343,6 +339,9 @@ private actor FakeTransport: RelayTransport {
             if condition() { return }
             try await Task.sleep(for: .milliseconds(5))
         }
-        throw NostrError.notConnected
+        throw PollTimeout()
     }
 }
+
+/// Thrown when one of ``FakeTransport``'s wait helpers gives up, failing the test that called it.
+private struct PollTimeout: Error {}
