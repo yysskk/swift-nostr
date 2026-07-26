@@ -50,7 +50,7 @@ extension NostrClient {
         await relayPool.disconnectAll()
     }
 
-    /// Clears the event deduplication cache in the relay pool
+    /// Clears every subscription's event deduplication cache in the relay pool
     public func clearDeduplicationCache() async {
         await relayPool.clearDeduplicationCache()
     }
