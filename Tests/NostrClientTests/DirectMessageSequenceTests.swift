@@ -24,7 +24,7 @@ struct DirectMessageSequenceTests {
             stream: stream,
             onClose: {}
         )
-        return DirectMessageSequence(base: base, parser: DirectMessageParser(keyPair: recipient))
+        return DirectMessageSequence(base: base, parser: DirectMessageParser(signer: EventSigner(keyPair: recipient)))
     }
 
     @Test("yields parsed messages and skips unparseable items")
@@ -35,9 +35,9 @@ struct DirectMessageSequenceTests {
 
         // A message addressed to Bob, one addressed to Carol (undecryptable by
         // Bob), a plain text note, and a notice — only Bob's DM should emerge.
-        let toBob = try DirectMessageBuilder(keyPair: alice)
+        let toBob = try await DirectMessageBuilder(signer: EventSigner(keyPair: alice))
             .createMessageWithSelfCopy(content: "hi bob", to: bob.publicKeyHex, subject: "greetings")
-        let toCarol = try DirectMessageBuilder(keyPair: alice)
+        let toCarol = try await DirectMessageBuilder(signer: EventSigner(keyPair: alice))
             .createMessageWithSelfCopy(content: "hi carol", to: carol.publicKeyHex)
         let plainNote = try EventSigner(keyPair: alice).signTextNote(content: "public note")
 

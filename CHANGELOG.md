@@ -83,6 +83,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Breaking**: a remote NIP-46 signer now drives every `NostrClient` feature, not just the
+  generic paths. The convenience `publish*` helpers, NIP-17 direct messages (send, react, file
+  messages, and parsing), and NIP-51 private list/set items previously threw
+  `NostrError.localSignerRequired` for a remote signer, because they reached past `NostrSigning`
+  for a raw private key; they now build their events from the signer's public key and go through
+  `sign`/`nip44Encrypt`/`nip44Decrypt`, which every signer already provides. Nothing in the
+  library needs a local key any more, so `NostrError.localSignerRequired` is removed — a source
+  break for code that switches over `NostrError` exhaustively or matches that case.
+  Gift wrapping is the API this surfaces in: `GiftWrap.wrap(event:signer:recipientPubkey:)` and
+  `GiftWrap.unwrap(giftWrap:recipient:)` take an `any NostrSigning` in place of a `KeyPair` (pass
+  `EventSigner(keyPair:)` for a local key) and are now `async`, as are `DirectMessageBuilder` and
+  `DirectMessageParser`, whose initializers take `signer:` instead of `keyPair:`. The outer gift
+  wrap key stays ephemeral and locally generated; only the seal goes through the signer.
 - **Single import**: `NostrClient`, `NostrWalletConnect`, and `NostrConnect` now re-export
   `NostrCore`; a separate `import NostrCore` is no longer required to use the primitives
   (`Event`, `KeyPair`, `Filter`, …) they surface.

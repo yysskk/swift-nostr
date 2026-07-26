@@ -165,17 +165,18 @@ let plaintext = try sealed.open(
     using: recipientKeyPair
 )
 
-// Gift wrap an event (NIP-59)
-let wrapped = try GiftWrap.wrap(
+// Gift wrap an event (NIP-59). Both sides take any NostrSigning, so a remote
+// NIP-46 signer wraps and unwraps as well as a local key does.
+let wrapped = try await GiftWrap.wrap(
     event: rumorEvent,
-    senderKeyPair: senderKeyPair,
+    signer: EventSigner(keyPair: senderKeyPair),
     recipientPubkey: recipientPubkey
 )
 
 // Unwrap
-let unwrapped = try GiftWrap.unwrap(
+let unwrapped = try await GiftWrap.unwrap(
     giftWrap: wrappedEvent,
-    recipientKeyPair: recipientKeyPair
+    recipient: EventSigner(keyPair: recipientKeyPair)
 )
 ```
 
@@ -371,9 +372,10 @@ library), so the private key can live in a separate "bunker" the app never touch
 public key is resolved once and cached, so ``NostrClient/publicKey`` and ``NostrClient/npub`` stay
 synchronous.
 
-A remote signer drives the generic paths — ``NostrClient/sign(_:)``,
-``NostrClient/publish(_:strategy:)``, and NIP-42 authentication. Build an
-``NostrCore/UnsignedEvent`` under ``NostrClient/publicKey``, sign it, and publish it:
+Every feature runs through the signer, so a remote one is a drop-in for a local key: the generic
+``NostrClient/sign(_:)`` and ``NostrClient/publish(_:strategy:)``, the convenience `publish*`
+helpers, NIP-17 direct messages, NIP-51 private list items, and NIP-42 authentication all work
+unchanged. Set the signer and use the same API you would with an `nsec`:
 
 ```swift
 import NostrConnect
@@ -381,16 +383,23 @@ import NostrConnect
 let signer = try RemoteSigner(bunker: try BunkerURI(string: "bunker://..."))
 try await client.setSigner(signer)   // any NostrSigning
 
+try await client.publishTextNote(content: "Signed by my bunker")
+try await client.sendDirectMessage("and gift-wrapped by it too", to: recipientPubkey)
+```
+
+To author an event this library has no helper for, build an ``NostrCore/UnsignedEvent`` under
+``NostrClient/publicKey``, sign it, and publish it:
+
+```swift
 guard let pubkey = await client.publicKey else { return }
 let signed = try await client.sign(
     UnsignedEvent(pubkey: pubkey, kind: .textNote, content: "Signed by my bunker"))
 try await client.publish(signed)
 ```
 
-The convenience helpers (``NostrClient/publishTextNote(content:tags:strategy:)``, the other
-`publish*` methods, and the direct-message helpers) require a local key and throw
-``NostrCore/NostrError/localSignerRequired`` for a remote signer — a deliberate boundary, since
-they build and sign events internally rather than accepting a pre-signed one.
+NIP-17 is the one place where a remote signer costs an extra round-trip per message: the gift wrap
+seals the rumor and signs the seal through the bunker. The outer wrap key is ephemeral by design
+and is always generated locally.
 
 ## Relay-based Groups (NIP-29)
 
@@ -505,8 +514,8 @@ if let pubkey = await client.publicKey {
 Other clients discover which groups a user is in — and detect a group migrating to another
 relay — from the kind-10009 simple group list, so keep it updated as the user joins and
 leaves. Unlike the group flows, ``NostrClient/publishSimpleGroupList(_:strategy:)`` broadcasts
-to the whole pool, and private entries are NIP-44-encrypted with the local key, so a remote
-signer throws `NostrError.localSignerRequired`:
+to the whole pool; private entries are NIP-44-encrypted to the author's own key through the
+configured signer, local or remote:
 
 ```swift
 var list = try await client.fetchSimpleGroupList() ?? SimpleGroupList()

@@ -40,20 +40,17 @@ extension NostrClient {
         expiration: Date? = nil,
         strategy: PublishStrategy? = nil
     ) async throws -> SendDirectMessageResult {
-        let keyPair = try getKeyPair()
+        let result = try await withSigner { signer, _ in
+            try await DirectMessageBuilder(signer: signer).createMessageWithSelfCopy(
+                content: content,
+                to: recipientPubkey,
+                subject: subject,
+                replyTo: replyTo,
+                expiration: expiration
+            )
+        }
 
-        let builder = DirectMessageBuilder(keyPair: keyPair)
-        let result = try builder.createMessageWithSelfCopy(
-            content: content,
-            to: recipientPubkey,
-            subject: subject,
-            replyTo: replyTo,
-            expiration: expiration
-        )
-
-        return try await deliverDirectMessage(
-            result, to: recipientPubkey, senderPubkey: keyPair.publicKeyHex, strategy: strategy
-        )
+        return try await deliverDirectMessage(result, to: recipientPubkey, strategy: strategy)
     }
 
     /// Sends a NIP-25 reaction to a received direct message, gift-wrapped like the message itself.
@@ -75,20 +72,17 @@ extension NostrClient {
         expiration: Date? = nil,
         strategy: PublishStrategy? = nil
     ) async throws -> SendDirectMessageResult {
-        let keyPair = try getKeyPair()
+        let result = try await withSigner { signer, _ in
+            try await DirectMessageBuilder(signer: signer).createReactionWithSelfCopy(
+                reaction: reaction,
+                to: message.rumorId,
+                author: message.senderPubkey,
+                recipientPubkey: message.senderPubkey,
+                expiration: expiration
+            )
+        }
 
-        let builder = DirectMessageBuilder(keyPair: keyPair)
-        let result = try builder.createReactionWithSelfCopy(
-            reaction: reaction,
-            to: message.rumorId,
-            author: message.senderPubkey,
-            recipientPubkey: message.senderPubkey,
-            expiration: expiration
-        )
-
-        return try await deliverDirectMessage(
-            result, to: message.senderPubkey, senderPubkey: keyPair.publicKeyHex, strategy: strategy
-        )
+        return try await deliverDirectMessage(result, to: message.senderPubkey, strategy: strategy)
     }
 
     /// Sends a NIP-17 kind-15 file message, gift-wrapped and routed like a text message.
@@ -121,23 +115,20 @@ extension NostrClient {
         expiration: Date? = nil,
         strategy: PublishStrategy? = nil
     ) async throws -> SendDirectMessageResult {
-        let keyPair = try getKeyPair()
+        let result = try await withSigner { signer, _ in
+            try await DirectMessageBuilder(signer: signer).createFileMessageWithSelfCopy(
+                url: url,
+                mimeType: mimeType,
+                encryption: encryption,
+                size: size,
+                dimensions: dimensions,
+                blurhash: blurhash,
+                to: recipientPubkey,
+                expiration: expiration
+            )
+        }
 
-        let builder = DirectMessageBuilder(keyPair: keyPair)
-        let result = try builder.createFileMessageWithSelfCopy(
-            url: url,
-            mimeType: mimeType,
-            encryption: encryption,
-            size: size,
-            dimensions: dimensions,
-            blurhash: blurhash,
-            to: recipientPubkey,
-            expiration: expiration
-        )
-
-        return try await deliverDirectMessage(
-            result, to: recipientPubkey, senderPubkey: keyPair.publicKeyHex, strategy: strategy
-        )
+        return try await deliverDirectMessage(result, to: recipientPubkey, strategy: strategy)
     }
 
     /// Routes a built result's gift wraps to the recipient's and sender's kind-10050 DM relays and
@@ -152,11 +143,11 @@ extension NostrClient {
     private func deliverDirectMessage(
         _ result: SendDirectMessageResult,
         to recipientPubkey: String,
-        senderPubkey: String,
         strategy: PublishStrategy?
     ) async throws -> SendDirectMessageResult {
         async let recipientTargetsTask = directMessageInboxTargets(for: recipientPubkey)
-        async let senderTargetsTask = directMessageInboxTargets(for: senderPubkey)
+        // The rumor is authored under the sender's key, so it names the self-copy's addressee.
+        async let senderTargetsTask = directMessageInboxTargets(for: result.rumor.pubkey)
         let recipientTargets = await recipientTargetsTask
         let senderTargets = await senderTargetsTask
 
@@ -196,35 +187,37 @@ extension NostrClient {
     /// Parses a received gift-wrapped direct message
     /// - Parameter giftWrap: The gift-wrapped event
     /// - Returns: The parsed DirectMessage
-    public func parseDirectMessage(_ giftWrap: Event) throws -> DirectMessage {
-        let keyPair = try getKeyPair()
-
-        let parser = DirectMessageParser(keyPair: keyPair)
-        return try parser.parse(giftWrap)
+    public func parseDirectMessage(_ giftWrap: Event) async throws -> DirectMessage {
+        try await withSigner { signer, _ in
+            try await DirectMessageParser(signer: signer).parse(giftWrap)
+        }
     }
 
     /// Parses a received gift-wrapped NIP-25 reaction to a direct message.
     /// - Parameter giftWrap: The gift-wrapped event
     /// - Returns: The parsed reaction
-    public func parseDirectMessageReaction(_ giftWrap: Event) throws -> DirectMessageReaction {
-        let keyPair = try getKeyPair()
-        return try DirectMessageParser(keyPair: keyPair).parseReaction(giftWrap)
+    public func parseDirectMessageReaction(_ giftWrap: Event) async throws -> DirectMessageReaction {
+        try await withSigner { signer, _ in
+            try await DirectMessageParser(signer: signer).parseReaction(giftWrap)
+        }
     }
 
     /// Parses a received gift-wrapped NIP-17 kind-15 file message.
     /// - Parameter giftWrap: The gift-wrapped event
     /// - Returns: The parsed file message
-    public func parseDirectMessageFile(_ giftWrap: Event) throws -> DirectMessageFile {
-        let keyPair = try getKeyPair()
-        return try DirectMessageParser(keyPair: keyPair).parseFileMessage(giftWrap)
+    public func parseDirectMessageFile(_ giftWrap: Event) async throws -> DirectMessageFile {
+        try await withSigner { signer, _ in
+            try await DirectMessageParser(signer: signer).parseFileMessage(giftWrap)
+        }
     }
 
     /// Parses a received gift wrap into a ``DirectMessagePayload`` — a message, a reaction, or a file.
     /// - Parameter giftWrap: The gift-wrapped event
     /// - Returns: The decrypted payload
-    public func parseDirectMessagePayload(_ giftWrap: Event) throws -> DirectMessagePayload {
-        let keyPair = try getKeyPair()
-        return try DirectMessageParser(keyPair: keyPair).parsePayload(giftWrap)
+    public func parseDirectMessagePayload(_ giftWrap: Event) async throws -> DirectMessagePayload {
+        try await withSigner { signer, _ in
+            try await DirectMessageParser(signer: signer).parsePayload(giftWrap)
+        }
     }
 
     /// Subscribes to the current user's private direct messages (NIP-17),
@@ -234,9 +227,9 @@ extension NostrClient {
     /// ``subscribeToDirectMessages(limit:)`` for the raw gift-wrap events.
     /// - Parameter limit: Maximum number of messages to fetch
     public func directMessages(limit: Int = 100) async throws -> DirectMessageSequence {
-        let keyPair = try getKeyPair()
+        let parser = try await directMessageParser()
         let subscription = try await subscribe(filters: [directMessagesFilter(limit: limit)])
-        return DirectMessageSequence(base: subscription, parser: DirectMessageParser(keyPair: keyPair))
+        return DirectMessageSequence(base: subscription, parser: parser)
     }
 
     /// Subscribes to the current user's direct messages **and** reactions (NIP-17 + NIP-25),
@@ -247,9 +240,9 @@ extension NostrClient {
     /// are skipped.
     /// - Parameter limit: Maximum number of gift wraps to fetch
     public func directMessagePayloads(limit: Int = 100) async throws -> DirectMessagePayloadSequence {
-        let keyPair = try getKeyPair()
+        let parser = try await directMessageParser()
         let subscription = try await subscribe(filters: [directMessagesFilter(limit: limit)])
-        return DirectMessagePayloadSequence(base: subscription, parser: DirectMessageParser(keyPair: keyPair))
+        return DirectMessagePayloadSequence(base: subscription, parser: parser)
     }
 
     /// Subscribes to private direct messages (gift-wrapped events) for the current user.
@@ -275,8 +268,10 @@ extension NostrClient {
         )
     }
 
-    /// Helper to get the keypair from the signer
-    private func getKeyPair() throws -> KeyPair {
-        try withSigner { $0.keyPair }
+    /// A parser bound to the active signer, for the sequences that keep unwrapping messages as
+    /// they arrive. Deliberately lets the signer outlive the call: a live sequence needs it for
+    /// the subscription's whole lifetime.
+    private func directMessageParser() async throws -> DirectMessageParser {
+        try await withSigner { signer, _ in DirectMessageParser(signer: signer) }
     }
 }

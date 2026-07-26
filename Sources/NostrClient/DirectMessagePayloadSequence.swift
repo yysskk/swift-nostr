@@ -50,7 +50,7 @@ public struct DirectMessagePayloadSequence: AsyncSequence, Sendable {
         public mutating func next() async -> DirectMessagePayload? {
             while let item = await base.next() {
                 guard case .event(_, let event) = item else { continue }
-                guard let payload = try? parser.parsePayload(event) else { continue }
+                guard let payload = try? await parser.parsePayload(event) else { continue }
                 return payload
             }
             return nil

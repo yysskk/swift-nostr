@@ -36,29 +36,29 @@ public struct NostrList: Sendable, Hashable {
     }
 }
 
-/// Encrypts and decrypts a NIP-51 list's private items as a NIP-44-self-encrypted JSON
-/// tag array.
+/// The plaintext form of a NIP-51 list's private items: a JSON tag array, self-encrypted with
+/// NIP-44 into the event content.
 ///
-/// The private items of both the standard lists and the future 30000-series sets share
-/// this representation, so this helper is deliberately kept independent of ``NostrList``.
+/// Only the encoding lives here; the sealing itself goes through the signer, synchronously for a
+/// local key and over a relay round-trip for a remote one. The private items of both the standard
+/// lists and the 30000-series sets share this representation, so this helper is deliberately kept
+/// independent of ``NostrList``.
 enum ListItemCipher {
-    /// Encrypts tags as a NIP-44-self-encrypted JSON array (empty string when `items` is empty).
-    static func encrypt(_ items: [Tag], using keyPair: KeyPair) throws -> String {
-        // NIP-44 sealing enforces a minimum plaintext size, so an empty item set is
-        // represented by empty content rather than an encrypted empty array.
-        guard !items.isEmpty else { return "" }
+    /// The JSON to seal for `items`, or nil when there is nothing to seal.
+    ///
+    /// NIP-44 sealing enforces a minimum plaintext size, so an empty item set is represented by
+    /// empty event content rather than an encrypted empty array.
+    static func plaintext(_ items: [Tag]) throws -> String? {
+        guard !items.isEmpty else { return nil }
         let data = try JSONSerialization.data(
             withJSONObject: items.map(\.rawArray),
             options: [.withoutEscapingSlashes]
         )
-        let json = String(decoding: data, as: UTF8.self)
-        return try SealedMessage.seal(json, for: keyPair.publicKeyHex, using: keyPair).payload
+        return String(decoding: data, as: UTF8.self)
     }
 
-    /// Decrypts a self-encrypted tag-array payload (empty string → []).
-    static func decrypt(_ payload: String, using keyPair: KeyPair) throws -> [Tag] {
-        guard !payload.isEmpty else { return [] }
-        let json = try SealedMessage(payload: payload).open(from: keyPair.publicKeyHex, using: keyPair)
+    /// The tags encoded in an opened payload.
+    static func items(fromJSON json: String) throws -> [Tag] {
         guard let rawArrays = try JSONSerialization.jsonObject(with: Data(json.utf8)) as? [[String]] else {
             throw NostrError.decryptionFailed
         }

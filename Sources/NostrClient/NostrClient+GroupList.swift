@@ -8,9 +8,8 @@ extension NostrClient {
     /// With no `pubkey` it fetches the current user's list and decrypts private entries;
     /// for another pubkey only public entries are returned. A thin typed wrapper over
     /// ``fetchList(kind:for:timeout:)`` with the same throwing behavior: fetching the
-    /// current user's own list needs the local signer holding the NIP-44 key and throws
-    /// when the list's private content cannot be decrypted (republishing such a list
-    /// would silently drop the private entries).
+    /// current user's own list throws when the list's private content cannot be decrypted
+    /// (republishing such a list would silently drop the private entries).
     ///
     /// https://github.com/nostr-protocol/nips/blob/master/51.md
     ///
@@ -33,10 +32,9 @@ extension NostrClient {
     ///
     /// Unlike the group flows, which target a group's single relay, this broadcasts to
     /// the whole pool — a replaceable list lives everywhere, so every relay carrying the
-    /// user's events receives the fresh copy. Wraps ``publishList(_:strategy:)``,
-    /// inheriting its local-signer requirement: private entries are NIP-44-encrypted with
-    /// the local key, so a remote signer throws ``NostrError/localSignerRequired`` (and no
-    /// signer, ``NostrError/signerNotSet``).
+    /// user's events receives the fresh copy. Wraps ``publishList(_:strategy:)``: private
+    /// entries are NIP-44-encrypted to the user's own key through the configured signer,
+    /// local or remote (with no signer, ``NostrError/signerNotSet``).
     ///
     /// https://github.com/nostr-protocol/nips/blob/master/51.md
     ///

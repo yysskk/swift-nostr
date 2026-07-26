@@ -178,11 +178,11 @@ struct PublishedEventTests {
     }
 
     @Test("SendDirectMessageResult publish results default to nil")
-    func sendDirectMessageResultDefaultsToNilPublishResults() throws {
+    func sendDirectMessageResultDefaultsToNilPublishResults() async throws {
         let alice = try KeyPair()
         let bob = try KeyPair()
-        let builder = DirectMessageBuilder(keyPair: alice)
-        let result = try builder.createMessageWithSelfCopy(content: "hi", to: bob.publicKeyHex)
+        let builder = DirectMessageBuilder(signer: EventSigner(keyPair: alice))
+        let result = try await builder.createMessageWithSelfCopy(content: "hi", to: bob.publicKeyHex)
 
         #expect(result.recipientPublishResult == nil)
         #expect(result.selfCopyPublishResult == nil)
@@ -224,7 +224,7 @@ struct PublishedEventTests {
         let client = NostrClient()
         let alice = try KeyPair()
         let bob = try KeyPair()
-        let giftWrap = try DirectMessageBuilder(keyPair: alice)
+        let giftWrap = try await DirectMessageBuilder(signer: EventSigner(keyPair: alice))
             .createMessageWithSelfCopy(content: "hi", to: bob.publicKeyHex)
             .recipientGiftWrap
 

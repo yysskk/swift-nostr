@@ -46,7 +46,7 @@ public struct DirectMessageSequence: AsyncSequence, Sendable {
         public mutating func next() async -> DirectMessage? {
             while let item = await base.next() {
                 guard case .event(_, let event) = item else { continue }
-                guard let message = try? parser.parse(event) else { continue }
+                guard let message = try? await parser.parse(event) else { continue }
                 return message
             }
             return nil

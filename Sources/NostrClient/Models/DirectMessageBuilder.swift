@@ -1,12 +1,16 @@
 import Foundation
 import NostrCore
 
-/// Builder for creating NIP-17 direct message events
+/// Builder for creating NIP-17 direct message events.
+///
+/// Takes any ``NostrSigning`` — a local key or a remote NIP-46 signer — because
+/// everything it needs from the sender's identity (NIP-44 sealing and signing the seal) is part
+/// of that abstraction.
 public struct DirectMessageBuilder: Sendable {
-    private let senderKeyPair: KeyPair
+    private let signer: any NostrSigning
 
-    public init(keyPair: KeyPair) {
-        self.senderKeyPair = keyPair
+    public init(signer: any NostrSigning) {
+        self.signer = signer
     }
 
     /// Creates the recipient gift wrap and the sender's self-copy from one shared rumor.
@@ -29,12 +33,15 @@ public struct DirectMessageBuilder: Sendable {
         subject: String? = nil,
         replyTo: String? = nil,
         expiration: Date? = nil
-    ) throws -> SendDirectMessageResult {
+    ) async throws -> SendDirectMessageResult {
+        let senderPubkey = try await signer.publicKey
         let rumor = try makeRumor(
+            senderPubkey: senderPubkey,
             content: content,
             tags: directMessageTags(recipientPubkey: recipientPubkey, subject: subject, replyTo: replyTo)
         )
-        return try wrapWithSelfCopy(rumor: rumor, to: recipientPubkey, expiration: expiration)
+        return try await wrapWithSelfCopy(
+            rumor: rumor, senderPubkey: senderPubkey, to: recipientPubkey, expiration: expiration)
     }
 
     /// Creates a gift-wrapped NIP-25 reaction to a direct message, plus the sender's self-copy.
@@ -56,9 +63,12 @@ public struct DirectMessageBuilder: Sendable {
         author: String,
         recipientPubkey: String,
         expiration: Date? = nil
-    ) throws -> SendDirectMessageResult {
-        let rumor = try makeReactionRumor(reaction: reaction, messageId: messageId, author: author)
-        return try wrapWithSelfCopy(rumor: rumor, to: recipientPubkey, expiration: expiration)
+    ) async throws -> SendDirectMessageResult {
+        let senderPubkey = try await signer.publicKey
+        let rumor = try makeReactionRumor(
+            senderPubkey: senderPubkey, reaction: reaction, messageId: messageId, author: author)
+        return try await wrapWithSelfCopy(
+            rumor: rumor, senderPubkey: senderPubkey, to: recipientPubkey, expiration: expiration)
     }
 
     /// Creates a gift-wrapped NIP-17 kind-15 file message, plus the sender's self-copy.
@@ -85,11 +95,13 @@ public struct DirectMessageBuilder: Sendable {
         blurhash: String? = nil,
         to recipientPubkey: String,
         expiration: Date? = nil
-    ) throws -> SendDirectMessageResult {
+    ) async throws -> SendDirectMessageResult {
+        let senderPubkey = try await signer.publicKey
         let rumor = try makeFileRumor(
-            url: url, mimeType: mimeType, encryption: encryption, recipientPubkey: recipientPubkey,
-            size: size, dimensions: dimensions, blurhash: blurhash)
-        return try wrapWithSelfCopy(rumor: rumor, to: recipientPubkey, expiration: expiration)
+            senderPubkey: senderPubkey, url: url, mimeType: mimeType, encryption: encryption,
+            recipientPubkey: recipientPubkey, size: size, dimensions: dimensions, blurhash: blurhash)
+        return try await wrapWithSelfCopy(
+            rumor: rumor, senderPubkey: senderPubkey, to: recipientPubkey, expiration: expiration)
     }
 
     /// Creates gift-wrapped events for a group message (sends to multiple recipients)
@@ -103,7 +115,7 @@ public struct DirectMessageBuilder: Sendable {
         content: String,
         to recipientPubkeys: [String],
         subject: String? = nil
-    ) throws -> [Event] {
+    ) async throws -> [Event] {
         // Build tags with all recipients
         var tags: [Tag] = recipientPubkeys.map { Tag.pubkey($0) }
 
@@ -111,27 +123,20 @@ public struct DirectMessageBuilder: Sendable {
             tags.append(.subject(subject))
         }
 
-        let rumor = try makeRumor(content: content, tags: tags)
+        let senderPubkey = try await signer.publicKey
+        let rumor = try makeRumor(senderPubkey: senderPubkey, content: content, tags: tags)
 
-        // Gift wrap for each recipient (including sender for their copy)
+        // Gift wrap for each recipient, plus a copy for the sender
         var giftWraps: [Event] = []
 
-        for recipientPubkey in recipientPubkeys {
-            let wrapped = try GiftWrap.wrap(
+        for recipientPubkey in recipientPubkeys + [senderPubkey] {
+            let wrapped = try await GiftWrap.wrap(
                 event: rumor,
-                senderKeyPair: senderKeyPair,
+                signer: signer,
                 recipientPubkey: recipientPubkey
             )
             giftWraps.append(wrapped)
         }
-
-        // Also create a copy for the sender
-        let senderCopy = try GiftWrap.wrap(
-            event: rumor,
-            senderKeyPair: senderKeyPair,
-            recipientPubkey: senderKeyPair.publicKeyHex
-        )
-        giftWraps.append(senderCopy)
 
         return giftWraps
     }
@@ -146,19 +151,20 @@ public struct DirectMessageBuilder: Sendable {
     /// together. Any NIP-40 `expiration` is applied to both wraps so the copies expire in lockstep.
     private func wrapWithSelfCopy(
         rumor: Event,
+        senderPubkey: String,
         to recipientPubkey: String,
         expiration: Date?
-    ) throws -> SendDirectMessageResult {
-        let recipientGiftWrap = try GiftWrap.wrap(
+    ) async throws -> SendDirectMessageResult {
+        let recipientGiftWrap = try await GiftWrap.wrap(
             event: rumor,
-            senderKeyPair: senderKeyPair,
+            signer: signer,
             recipientPubkey: recipientPubkey,
             expiration: expiration
         )
-        let selfGiftWrap = try GiftWrap.wrap(
+        let selfGiftWrap = try await GiftWrap.wrap(
             event: rumor,
-            senderKeyPair: senderKeyPair,
-            recipientPubkey: senderKeyPair.publicKeyHex,
+            signer: signer,
+            recipientPubkey: senderPubkey,
             expiration: expiration
         )
 
@@ -193,9 +199,9 @@ public struct DirectMessageBuilder: Sendable {
     /// Creates the unsigned kind-14 rumor with its id computed.
     /// The rumor is deliberately never signed (NIP-17: a leaked signed rumor would
     /// be cryptographic proof of authorship and destroy deniability).
-    private func makeRumor(content: String, tags: [Tag]) throws -> Event {
+    private func makeRumor(senderPubkey: String, content: String, tags: [Tag]) throws -> Event {
         let unsigned = UnsignedEvent(
-            pubkey: senderKeyPair.publicKeyHex,
+            pubkey: senderPubkey,
             kind: .privateDirectMessage,
             tags: tags,
             content: content
@@ -204,14 +210,16 @@ public struct DirectMessageBuilder: Sendable {
     }
 
     /// Creates the unsigned kind-7 reaction rumor. Like the message rumor it is never signed.
-    private func makeReactionRumor(reaction: String, messageId: String, author: String) throws -> Event {
+    private func makeReactionRumor(
+        senderPubkey: String, reaction: String, messageId: String, author: String
+    ) throws -> Event {
         let tags: [Tag] = [
             .event(messageId),
             .pubkey(author),
             .kind(.privateDirectMessage),
         ]
         let unsigned = UnsignedEvent(
-            pubkey: senderKeyPair.publicKeyHex,
+            pubkey: senderPubkey,
             kind: .reaction,
             tags: tags,
             content: reaction
@@ -222,6 +230,7 @@ public struct DirectMessageBuilder: Sendable {
     /// Creates the unsigned kind-15 file-message rumor. Like the message rumor it is never signed.
     /// The content is the file URL; the key, nonce, and hashes are carried as tags.
     private func makeFileRumor(
+        senderPubkey: String,
         url: String,
         mimeType: String,
         encryption: EncryptedFile,
@@ -250,7 +259,7 @@ public struct DirectMessageBuilder: Sendable {
         }
 
         let unsigned = UnsignedEvent(
-            pubkey: senderKeyPair.publicKeyHex,
+            pubkey: senderPubkey,
             kind: .fileMessage,
             tags: tags,
             content: url

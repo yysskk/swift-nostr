@@ -2,23 +2,26 @@ import Foundation
 import NostrCore
 
 /// Parser for received NIP-17 direct messages and NIP-25 reactions to them.
+///
+/// Takes any ``NostrSigning`` — a local key or a remote NIP-46 signer — because opening
+/// a gift wrap needs only NIP-44 decryption, which is part of that abstraction.
 public struct DirectMessageParser: Sendable {
-    private let recipientKeyPair: KeyPair
+    private let signer: any NostrSigning
 
-    public init(keyPair: KeyPair) {
-        self.recipientKeyPair = keyPair
+    public init(signer: any NostrSigning) {
+        self.signer = signer
     }
 
     /// Parses a gift-wrapped event into a DirectMessage.
     /// - Parameter giftWrap: The gift-wrapped event
     /// - Returns: The parsed DirectMessage
     /// - Throws: ``NostrError/invalidData`` if the inner rumor is not a kind-14 message.
-    public func parse(_ giftWrap: Event) throws -> DirectMessage {
-        let unwrapped = try GiftWrap.unwrap(giftWrap: giftWrap, recipientKeyPair: recipientKeyPair)
+    public func parse(_ giftWrap: Event) async throws -> DirectMessage {
+        let unwrapped = try await GiftWrap.unwrap(giftWrap: giftWrap, recipient: signer)
         guard unwrapped.event.kind == .privateDirectMessage else {
             throw NostrError.invalidData
         }
-        return makeMessage(from: unwrapped, giftWrap: giftWrap)
+        return makeMessage(from: unwrapped, giftWrap: giftWrap, ownPubkey: try await signer.publicKey)
     }
 
     /// Parses a gift-wrapped event into a DirectMessageReaction.
@@ -26,8 +29,8 @@ public struct DirectMessageParser: Sendable {
     /// - Returns: The parsed reaction
     /// - Throws: ``NostrError/invalidData`` if the inner rumor is not a kind-7 reaction or
     ///   does not reference a message.
-    public func parseReaction(_ giftWrap: Event) throws -> DirectMessageReaction {
-        let unwrapped = try GiftWrap.unwrap(giftWrap: giftWrap, recipientKeyPair: recipientKeyPair)
+    public func parseReaction(_ giftWrap: Event) async throws -> DirectMessageReaction {
+        let unwrapped = try await GiftWrap.unwrap(giftWrap: giftWrap, recipient: signer)
         guard unwrapped.event.kind == .reaction else {
             throw NostrError.invalidData
         }
@@ -39,12 +42,12 @@ public struct DirectMessageParser: Sendable {
     /// - Returns: The parsed file message
     /// - Throws: ``NostrError/invalidData`` if the inner rumor is not a kind-15 file message or
     ///   is missing a valid decryption key/nonce.
-    public func parseFileMessage(_ giftWrap: Event) throws -> DirectMessageFile {
-        let unwrapped = try GiftWrap.unwrap(giftWrap: giftWrap, recipientKeyPair: recipientKeyPair)
+    public func parseFileMessage(_ giftWrap: Event) async throws -> DirectMessageFile {
+        let unwrapped = try await GiftWrap.unwrap(giftWrap: giftWrap, recipient: signer)
         guard unwrapped.event.kind == .fileMessage else {
             throw NostrError.invalidData
         }
-        return try makeFile(from: unwrapped, giftWrap: giftWrap)
+        return try makeFile(from: unwrapped, giftWrap: giftWrap, ownPubkey: try await signer.publicKey)
     }
 
     /// Unwraps a gift wrap and classifies it as a message (kind 14), reaction (kind 7), or file
@@ -52,15 +55,15 @@ public struct DirectMessageParser: Sendable {
     /// - Parameter giftWrap: The gift-wrapped event
     /// - Returns: The decrypted payload
     /// - Throws: ``NostrError/invalidData`` for any other inner kind.
-    public func parsePayload(_ giftWrap: Event) throws -> DirectMessagePayload {
-        let unwrapped = try GiftWrap.unwrap(giftWrap: giftWrap, recipientKeyPair: recipientKeyPair)
+    public func parsePayload(_ giftWrap: Event) async throws -> DirectMessagePayload {
+        let unwrapped = try await GiftWrap.unwrap(giftWrap: giftWrap, recipient: signer)
         switch unwrapped.event.kind {
         case .privateDirectMessage:
-            return .message(makeMessage(from: unwrapped, giftWrap: giftWrap))
+            return .message(makeMessage(from: unwrapped, giftWrap: giftWrap, ownPubkey: try await signer.publicKey))
         case .reaction:
             return .reaction(try makeReaction(from: unwrapped, giftWrap: giftWrap))
         case .fileMessage:
-            return .file(try makeFile(from: unwrapped, giftWrap: giftWrap))
+            return .file(try makeFile(from: unwrapped, giftWrap: giftWrap, ownPubkey: try await signer.publicKey))
         default:
             throw NostrError.invalidData
         }
@@ -68,10 +71,14 @@ public struct DirectMessageParser: Sendable {
 
     // MARK: - Private builders
 
-    private func makeMessage(from unwrapped: GiftWrap.UnwrappedMessage, giftWrap: Event) -> DirectMessage {
+    /// - Parameter ownPubkey: The signer's own key, standing in as the addressee when the rumor
+    ///   carries no "p" tag.
+    private func makeMessage(
+        from unwrapped: GiftWrap.UnwrappedMessage, giftWrap: Event, ownPubkey: String
+    ) -> DirectMessage {
         let rumor = unwrapped.event
 
-        let recipientPubkey = rumor.firstTagValue(named: "p") ?? recipientKeyPair.publicKeyHex
+        let recipientPubkey = rumor.firstTagValue(named: "p") ?? ownPubkey
         let subject = rumor.firstTagValue(named: "subject")
 
         // A reply is an "e" tag carrying the NIP-10 "reply" marker at its marker position
@@ -118,8 +125,10 @@ public struct DirectMessageParser: Sendable {
         )
     }
 
+    /// - Parameter ownPubkey: The signer's own key, standing in as the addressee when the rumor
+    ///   carries no "p" tag.
     private func makeFile(
-        from unwrapped: GiftWrap.UnwrappedMessage, giftWrap: Event
+        from unwrapped: GiftWrap.UnwrappedMessage, giftWrap: Event, ownPubkey: String
     ) throws -> DirectMessageFile {
         let rumor = unwrapped.event
 
@@ -137,7 +146,7 @@ public struct DirectMessageParser: Sendable {
             throw NostrError.invalidData
         }
 
-        let recipientPubkey = rumor.firstTagValue(named: "p") ?? recipientKeyPair.publicKeyHex
+        let recipientPubkey = rumor.firstTagValue(named: "p") ?? ownPubkey
 
         return DirectMessageFile(
             rumorId: rumor.id,

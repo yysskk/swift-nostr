@@ -14,7 +14,7 @@ extension NostrClient {
         draft: Bool = false,
         strategy: PublishStrategy? = nil
     ) async throws -> PublishedEvent {
-        let event = try withSigner { try $0.signLongFormContent(article, draft: draft) }
+        let event = try await signEvent { .longFormContent(pubkey: $0, article, draft: draft) }
         let result = try await relayPool.publish(event, strategy: strategy)
         return PublishedEvent(event: event, result: result)
     }

@@ -64,13 +64,13 @@ struct NIP40ExpirationTests {
     // MARK: - Disappearing direct messages
 
     @Test("a disappearing DM carries the expiration on the gift wrap, not the rumor")
-    func dmGiftWrapCarriesExpiration() throws {
+    func dmGiftWrapCarriesExpiration() async throws {
         let sender = try KeyPair()
         let recipient = try KeyPair()
         let expiry = Date(timeIntervalSince1970: 1_700_000_000)
 
-        let builder = DirectMessageBuilder(keyPair: sender)
-        let result = try builder.createMessageWithSelfCopy(
+        let builder = DirectMessageBuilder(signer: EventSigner(keyPair: sender))
+        let result = try await builder.createMessageWithSelfCopy(
             content: "self-destructs", to: recipient.publicKeyHex, expiration: expiry)
 
         // The public gift wraps carry the expiration; the encrypted rumor stays untouched
@@ -81,33 +81,33 @@ struct NIP40ExpirationTests {
     }
 
     @Test("a received disappearing DM exposes its expiration")
-    func parsedDMExposesExpiration() throws {
+    func parsedDMExposesExpiration() async throws {
         let sender = try KeyPair()
         let recipient = try KeyPair()
         let expiry = Date(timeIntervalSince1970: 1_700_000_000)
 
-        let builder = DirectMessageBuilder(keyPair: sender)
-        let result = try builder.createMessageWithSelfCopy(
+        let builder = DirectMessageBuilder(signer: EventSigner(keyPair: sender))
+        let result = try await builder.createMessageWithSelfCopy(
             content: "self-destructs", to: recipient.publicKeyHex, expiration: expiry)
 
-        let parser = DirectMessageParser(keyPair: recipient)
-        let message = try parser.parse(result.recipientGiftWrap)
+        let parser = DirectMessageParser(signer: EventSigner(keyPair: recipient))
+        let message = try await parser.parse(result.recipientGiftWrap)
         #expect(message.expiresAt == expiry)
         #expect(message.content == "self-destructs")
     }
 
     @Test("a normal DM has no expiration")
-    func normalDMHasNoExpiration() throws {
+    func normalDMHasNoExpiration() async throws {
         let sender = try KeyPair()
         let recipient = try KeyPair()
 
-        let builder = DirectMessageBuilder(keyPair: sender)
-        let result = try builder.createMessageWithSelfCopy(content: "hi", to: recipient.publicKeyHex)
+        let builder = DirectMessageBuilder(signer: EventSigner(keyPair: sender))
+        let result = try await builder.createMessageWithSelfCopy(content: "hi", to: recipient.publicKeyHex)
 
         #expect(result.recipientGiftWrap.expiration == nil)
 
-        let parser = DirectMessageParser(keyPair: recipient)
-        let message = try parser.parse(result.recipientGiftWrap)
+        let parser = DirectMessageParser(signer: EventSigner(keyPair: recipient))
+        let message = try await parser.parse(result.recipientGiftWrap)
         #expect(message.expiresAt == nil)
     }
 }

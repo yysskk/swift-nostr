@@ -12,6 +12,30 @@ public struct RelayListMetadata: Codable, Hashable, Sendable {
         self.entries = entries
     }
 
+    /// Builds a list from explicit read and write relay URLs; URLs present in both are marked
+    /// as read+write. Repeated URLs collapse into one entry, as they do when parsing.
+    package init(read: [String], write: [String]) {
+        let both = Set(read).intersection(write)
+        var entries: [RelayListEntry] = []
+        var seen = Set<String>()
+
+        func append(_ url: String, usage: RelayUsage) {
+            guard seen.insert(RelayURL.normalize(url)).inserted else { return }
+            entries.append(RelayListEntry(url: url, usage: usage))
+        }
+
+        for url in read where !both.contains(url) {
+            append(url, usage: .read)
+        }
+        for url in write where !both.contains(url) {
+            append(url, usage: .write)
+        }
+        for url in both {
+            append(url, usage: .readWrite)
+        }
+        self.entries = entries
+    }
+
     /// URLs the author reads from (their inbox). Send a user events here so they will see them.
     public var readRelays: [String] {
         entries.filter { $0.usage.canRead }.map { $0.url }
