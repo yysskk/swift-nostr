@@ -3,7 +3,7 @@ import NostrCore
 
 /// One fetch's snapshot of a NIP-29 group's relay-generated state.
 ///
-/// Returned by ``NostrClient/fetchGroupState(for:authorPubkey:timeout:)``. Each field is
+/// Returned by ``NostrGroupsAPI/fetchState(for:authorPubkey:timeout:)``. Each field is
 /// nil when the relay has not published that kind — for example the member list of a
 /// private group, which relays may withhold from non-members.
 ///

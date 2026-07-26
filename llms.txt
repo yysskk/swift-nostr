@@ -4,9 +4,9 @@
 
 The high-level `NostrClient` library provides an actor-based API for the Nostr network, built on the `NostrCore` primitives:
 
-- `NostrClient` actor: relay management, event publishing, subscriptions, fetches, direct messages
+- `NostrClient` actor: relay management, event publishing, subscriptions, fetches, direct messages. Its API is reached through eight feature namespaces — `client.identity`, `client.relays`, `client.events`, `client.subscriptions`, `client.routing`, `client.messages`, `client.groups`, `client.lists` — each a `Sendable` façade conforming to a capability protocol (`NostrIdentityProviding`, `NostrRelayManaging`, `NostrEventPublishing`, `NostrEventFetching`, `NostrSubscribing`, `NostrRelayRouting`, `NostrMessaging`, `NostrGroupManaging`, `NostrListManaging`) so a feature can depend on one slice. `NostrClient` itself exposes only its initializers and these namespaces.
 - `KeyPair` / `PublicKey` / `EventSigner`: key generation, import (hex/nsec/mnemonic), event signing
-- `NostrSigning`: signer abstraction over `EventSigner` (local key) and `RemoteSigner` (NIP-46) for signing + NIP-44; `NostrClient.setSigner(_:)` accepts either, and every client feature runs through it — `sign(_:)`, `publish(_:)`, the convenience `publish*` helpers, NIP-17 direct messages, NIP-51 private list items, and NIP-42 auth all work with either signer
+- `NostrSigning`: signer abstraction over `EventSigner` (local key) and `RemoteSigner` (NIP-46) for signing + NIP-44; `client.identity.setSigner(_:)` accepts either, and every client feature runs through it — `identity.sign(_:)`, `events.publish(_:)`, the convenience `publish*` helpers, NIP-17 direct messages, NIP-51 private list items, and NIP-42 auth all work with either signer
 - `EncryptedPrivateKey`: NIP-49 password-encrypted private keys (`ncryptsec`), scrypt + XChaCha20-Poly1305
 - `Event` / `Filter` / `SubscriptionEvent`: NIP-01 data models
 - `RelayPool` / `RelayConnection`: multi-relay WebSocket management with auto-reconnect

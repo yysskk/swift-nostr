@@ -73,8 +73,8 @@ public struct GroupListEntry: Sendable, Hashable {
 /// A typed view over ``NostrList``: convert with ``init(list:)`` and ``list``, and private
 /// entries ride the existing NIP-44 machinery (``EventSigner/signList(_:)`` /
 /// ``EventSigner/openList(_:)``). Publish and fetch through
-/// ``NostrClient/publishSimpleGroupList(_:strategy:)`` and
-/// ``NostrClient/fetchSimpleGroupList(for:timeout:)``.
+/// ``NostrGroupsAPI/publishSimpleGroupList(_:strategy:)`` and
+/// ``NostrGroupsAPI/fetchSimpleGroupList(for:timeout:)``.
 ///
 /// https://github.com/nostr-protocol/nips/blob/master/51.md
 /// https://github.com/nostr-protocol/nips/blob/master/29.md

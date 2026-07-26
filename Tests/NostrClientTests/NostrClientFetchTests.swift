@@ -63,7 +63,7 @@ struct NostrClientFetchTests {
 
         // Validation precedes targeting, so the invalid string wins over the empty pool.
         await #expect(throws: NostrError.invalidRelayURL("https://relay.example.com")) {
-            _ = try await client.fetch(filters: [Filter()], to: ["https://relay.example.com"])
+            _ = try await client.events.fetch(filters: [Filter()], to: ["https://relay.example.com"])
         }
     }
 
@@ -75,7 +75,7 @@ struct NostrClientFetchTests {
         // start — assert it does not consume the (long) timeout.
         let start = ContinuousClock.now
         await #expect(throws: NostrError.noRelaysInPool) {
-            _ = try await client.fetch(filters: [Filter()], timeout: 10)
+            _ = try await client.events.fetch(filters: [Filter()], timeout: 10)
         }
         #expect(ContinuousClock.now - start < .seconds(5))
     }
@@ -87,7 +87,7 @@ struct NostrClientFetchTests {
         let (client, _) = try await ConnectedClientFixture.make()
 
         let fetchTask = Task {
-            try await client.fetch(filters: [Filter()], timeout: 10)
+            try await client.events.fetch(filters: [Filter()], timeout: 10)
         }
 
         try await Task.sleep(for: .milliseconds(100))
@@ -96,6 +96,6 @@ struct NostrClientFetchTests {
         await #expect(throws: CancellationError.self) {
             _ = try await fetchTask.value
         }
-        await client.disconnect()
+        await client.relays.disconnect()
     }
 }

@@ -252,7 +252,7 @@ struct NIP23LongFormTests {
         try await connection.connect()
 
         let task = Task {
-            try await client.fetchLongFormContent(author: signer.publicKey, identifier: "same-d", timeout: 2)
+            try await client.events.fetchLongFormContent(author: signer.publicKey, identifier: "same-d", timeout: 2)
         }
 
         try await pollUntil { mock.sentTextFrames.contains { $0.hasPrefix("[\"REQ\"") } }
@@ -265,7 +265,7 @@ struct NIP23LongFormTests {
 
         let result = try await task.value
         #expect(result?.title == "New")
-        await client.disconnect()
+        await client.relays.disconnect()
     }
 
     @Test("fetchLongFormContent(naddr:) targets the coordinate and returns the article")
@@ -288,7 +288,7 @@ struct NIP23LongFormTests {
         // A relay hint matching the pooled relay: the fetch targets it (the new `to:` param).
         let naddr = try article.naddr(author: signer.publicKey, relays: [relayURL.absoluteString])
 
-        let task = Task { try await client.fetchLongFormContent(naddr: naddr, timeout: 2) }
+        let task = Task { try await client.events.fetchLongFormContent(naddr: naddr, timeout: 2) }
 
         try await pollUntil { mock.sentTextFrames.contains { $0.hasPrefix("[\"REQ\"") } }
         let reqFrame = try #require(mock.sentTextFrames.first { $0.hasPrefix("[\"REQ\"") })
@@ -300,6 +300,6 @@ struct NIP23LongFormTests {
         let result = try await task.value
         #expect(result?.title == "Coordinated")
         #expect(result?.identifier == "coord-d")
-        await client.disconnect()
+        await client.relays.disconnect()
     }
 }

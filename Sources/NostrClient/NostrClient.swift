@@ -3,17 +3,28 @@ import NostrCore
 
 /// Main entry point for the Nostr client library.
 ///
-/// The client's behavior is organized into feature extensions in adjacent
-/// `NostrClient+*.swift` files (relay management, publishing, direct messages,
-/// subscriptions, fetches, and NIP-65 outbox/gossip). This file holds the stored
-/// state, the initializers, and signer management.
+/// The public API is grouped into feature namespaces reached from the client — ``identity``,
+/// ``relays``, ``events``, ``subscriptions``, ``routing``, ``messages``, ``groups``, and
+/// ``lists``. Each is a lightweight `Sendable` façade defined in the adjacent `API/` directory,
+/// and each conforms to a capability protocol so an app feature can depend on just the slice it
+/// needs.
 ///
-/// The signer stays `private`; feature extensions sign through ``withSigner(_:)``
-/// rather than reading it directly. The remaining shared stored properties are
-/// `internal` so those extensions, which live in separate files, can reach them.
+/// ```swift
+/// let client = NostrClient()
+/// try await client.identity.setPrivateKey(privateKeyHex)
+/// try await client.relays.connect(to: ["wss://relay.damus.io"])
+/// try await client.events.publishTextNote(content: "hello")
+/// ```
+///
+/// This file holds the stored state, the initializers, and the signer primitives the façades
+/// build on. The signer stays `private`; façades sign through `withSigner(_:)` rather than
+/// reading it directly. The remaining shared stored properties are `internal` so those façades,
+/// which live in separate files, can reach them.
 public actor NostrClient {
-    /// The relay pool managing all connections
-    public let relayPool: RelayPool
+    /// The relay pool managing all connections, reached publicly as ``NostrRelaysAPI/pool``.
+    ///
+    /// Immutable and `Sendable`, so the façades read it without hopping onto the actor.
+    let pool: RelayPool
 
     /// The signer (optional, required for signing) — a local ``EventSigner``, which signs
     /// synchronously, or a remote NIP-46 signer, which signs via a relay round-trip. Every
@@ -21,18 +32,19 @@ public actor NostrClient {
     private var activeSigner: (any NostrSigning)?
 
     /// The signer's public key, cached at set-time (a remote signer's `publicKey` is async).
-    private var cachedPublicKey: String?
+    /// Readable module-wide so ``NostrIdentityAPI`` can surface it without a throwing lookup.
+    private(set) var cachedPublicKey: String?
 
-    /// How the client reacts to NIP-42 AUTH challenges. `internal(set)` so
-    /// ``setAuthenticationMode(_:)``, which lives in the authentication
-    /// extension file, can assign it.
-    public internal(set) var authenticationMode: AuthenticationMode = .automatic
+    /// How the client reacts to NIP-42 AUTH challenges, published as
+    /// ``NostrIdentityAPI/authenticationMode``.
+    var currentAuthenticationMode: AuthenticationMode = .automatic
 
     /// Subscription counter for generating unique IDs
     var subscriptionCounter: Int = 0
 
-    /// Active subscriptions
-    var subscriptions: [String: SubscriptionState] = [:]
+    /// Active subscriptions, keyed by subscription id.
+    /// Named for the state it holds rather than the ``subscriptions`` namespace accessor.
+    var openSubscriptions: [String: SubscriptionState] = [:]
 
     /// Per-pubkey NIP-65 relay list cache and outbox/gossip resolver
     let relayListStore: RelayListStore
@@ -67,58 +79,35 @@ public actor NostrClient {
     /// Designated initializer shared by the public initializer and by tests, which inject a
     /// ``RelayPool`` built with a fake transport so the client can be exercised without a network.
     init(relayPool: RelayPool, gossipPolicy: GossipRelayPolicy = .addAndConnect) {
-        self.relayPool = relayPool
+        self.pool = relayPool
         self.relayListStore = RelayListStore(pool: relayPool, policy: gossipPolicy)
         self.dmRelayListStore = DirectMessageRelayListStore(pool: relayPool, policy: gossipPolicy)
     }
 
     // MARK: - Signer
 
-    /// Sets the signer for signing events.
+    /// Installs a local signer, whose public key is available synchronously.
     ///
-    /// While ``authenticationMode`` is ``AuthenticationMode/automatic`` (the
-    /// default), setting a signer also starts answering NIP-42 AUTH challenges
-    /// with it on every relay in the pool.
-    public func setSigner(_ signer: EventSigner) async {
+    /// Backs ``NostrIdentityAPI/setSigner(_:)-(EventSigner)``.
+    func install(_ signer: EventSigner) async {
         activeSigner = signer
         cachedPublicKey = signer.publicKey
         await refreshAuthenticationResponder()
     }
 
-    /// Sets a local or remote signer for signing events.
+    /// Installs a local or remote signer, resolving its public key once so ``cachedPublicKey``
+    /// stays synchronous afterwards.
     ///
-    /// Accepts any ``NostrSigning`` — a local ``EventSigner`` or a remote NIP-46 signer (a
-    /// "bunker"). The signer's ``NostrSigning/publicKey`` is resolved once here and cached, so
-    /// ``publicKey`` and ``npub`` stay synchronous even for a remote signer. Every feature works
-    /// with either kind: signing, publishing, the convenience `publish*` helpers, NIP-17 direct
-    /// messages, NIP-51 private list items, and NIP-42 AUTH challenges.
-    ///
-    /// While ``authenticationMode`` is ``AuthenticationMode/automatic`` (the default), setting a
-    /// signer also starts answering NIP-42 AUTH challenges with it on every relay in the pool.
-    public func setSigner(_ signer: any NostrSigning) async throws {
+    /// Backs ``NostrIdentityAPI/setSigner(_:)-(any NostrSigning)``.
+    func install(_ signer: any NostrSigning) async throws {
         cachedPublicKey = try await signer.publicKey
         activeSigner = signer
         await refreshAuthenticationResponder()
     }
 
-    /// Sets the signer from a private key hex string. See ``setSigner(_:)-(EventSigner)``.
-    public func setPrivateKey(_ privateKeyHex: String) async throws {
-        await setSigner(try EventSigner(privateKeyHex: privateKeyHex))
-    }
-
-    /// Sets the signer from an nsec. See ``setSigner(_:)-(EventSigner)``.
-    public func setNsec(_ nsec: String) async throws {
-        await setSigner(try EventSigner(nsec: nsec))
-    }
-
     /// Whether a signer is configured, without exposing it.
     var hasSigner: Bool {
         activeSigner != nil
-    }
-
-    /// Returns the public key if a signer is set
-    public var publicKey: String? {
-        cachedPublicKey
     }
 
     /// The signer's public key, for the helpers that cannot proceed without one.
@@ -128,12 +117,11 @@ public actor NostrClient {
         return cachedPublicKey
     }
 
-    /// Returns the npub if a signer is set
-    public var npub: String? {
-        get throws {
-            guard let cachedPublicKey else { return nil }
-            return try PublicKey(hex: cachedPublicKey).npub
-        }
+    /// The signer's npub, or nil when no signer is set.
+    /// Backs ``NostrIdentityAPI/npub``.
+    func currentNpub() throws -> String? {
+        guard let cachedPublicKey else { return nil }
+        return try PublicKey(hex: cachedPublicKey).npub
     }
 
     /// Signs `unsignedEvent` with the active signer (local synchronously, remote via relay
@@ -146,32 +134,21 @@ public actor NostrClient {
     ///
     /// The convenience `publish*` helpers all have this shape: they differ only in the event they
     /// build, and every one of them works with a local or a remote signer.
-    func signEvent(_ build: (_ publicKey: String) throws -> UnsignedEvent) async throws -> Event {
+    func signEvent(_ build: @Sendable (_ publicKey: String) throws -> UnsignedEvent) async throws -> Event {
         try await withSigner { signer, publicKey in try await signer.sign(build(publicKey)) }
-    }
-
-    /// Signs an event with the configured signer, local or remote.
-    ///
-    /// Build an ``UnsignedEvent`` with ``publicKey`` as its pubkey; combine with
-    /// ``publish(_:strategy:)`` to author and publish an event this library has no helper for.
-    /// - Parameter unsignedEvent: The event to sign; its `pubkey` should be ``publicKey``.
-    /// - Returns: The signed ``Event``.
-    /// - Throws: ``NostrError/signerNotSet`` if no signer is set, plus anything the signer throws.
-    public func sign(_ unsignedEvent: UnsignedEvent) async throws -> Event {
-        try await activeSign(unsignedEvent)
     }
 
     /// Runs `body` with the configured signer and its cached public key.
     ///
     /// Keeps the signer — and, for a local one, the private key it holds — from escaping into the
-    /// feature extensions, which would otherwise be able to read it directly now that the type is
+    /// feature façades, which would otherwise be able to read it directly now that the API is
     /// split across files. The signer is handed over as ``NostrSigning``, so a helper written
     /// against it works with a local key and a remote NIP-46 signer alike; callers do the network
     /// publish after the closure returns.
     ///
     /// - Throws: ``NostrError/signerNotSet`` when no signer is set.
-    func withSigner<T>(
-        _ body: (_ signer: any NostrSigning, _ publicKey: String) async throws -> T
+    func withSigner<T: Sendable>(
+        _ body: @Sendable (_ signer: any NostrSigning, _ publicKey: String) async throws -> T
     ) async throws -> T {
         guard let activeSigner, let cachedPublicKey else {
             throw NostrError.signerNotSet

@@ -47,7 +47,7 @@ print("Mnemonic: \(mnemonic.phrase)")
 let client = NostrClient()
 
 // Add relays and connect in one step
-try await client.connect(to: [
+try await client.relays.connect(to: [
     "wss://relay.example.com",
     "wss://relay2.example.com",
     "wss://relay3.example.com"
@@ -57,17 +57,17 @@ try await client.connect(to: [
 ## Publish Events
 
 ```swift
-try await client.setNsec("nsec1...")
+try await client.identity.setNsec("nsec1...")
 
 // Text note — returns the signed event plus the per-relay outcome
-let note = try await client.publishTextNote(content: "Hello, Nostr!")
+let note = try await client.events.publishTextNote(content: "Hello, Nostr!")
 print("Accepted by \(note.result.acceptedRelays.count) relay(s)")
 
 // Reaction
-try await client.publishReaction(to: note.event, content: "🤙")
+try await client.events.publishReaction(to: note.event, content: "🤙")
 
 // Reply
-try await client.publishReply(to: note.event, content: "Great post!")
+try await client.events.publishReply(to: note.event, content: "Great post!")
 ```
 
 ## Subscribe to Events
@@ -79,19 +79,19 @@ the subscription automatically.
 
 ```swift
 // User timeline
-let timeline = try await client.subscribeToUserTimeline(pubkey: "...")
+let timeline = try await client.subscriptions.userTimeline(pubkey: "...")
 for await event in timeline.events {
     print("Note: \(event.content)")
 }
 
 // Custom filter, events only
 let filter = Filter(kinds: [1], authors: ["pubkey1"], limit: 100)
-for await event in try await client.events(filters: [filter]) {
+for await event in try await client.subscriptions.events(filters: [filter]) {
     print("Received: \(event.id)")
 }
 
 // Close explicitly when consuming from another task
-let subscription = try await client.subscribe(filters: [filter])
+let subscription = try await client.subscriptions.subscribe(filters: [filter])
 await subscription.close()
 ```
 
@@ -101,14 +101,14 @@ await subscription.close()
 
 ```swift
 // Fetch a specific event by ID
-let event = try await client.fetchEvent(id: "eventid...")
+let event = try await client.events.fetchEvent(id: "eventid...")
 
 // Fetch user metadata
-let metadata = try await client.fetchMetadata(pubkey: "...")
+let metadata = try await client.events.fetchMetadata(pubkey: "...")
 print("Name: \(metadata?.name ?? "Unknown")")
 
 // Fetch with custom filters
-let events = try await client.fetch(filters: [
+let events = try await client.events.fetch(filters: [
     Filter(kinds: [1], authors: ["pubkey1"], limit: 50)
 ])
 ```

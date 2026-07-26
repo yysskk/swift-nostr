@@ -324,7 +324,7 @@ struct NIP45CountTests {
 
         // Target relay A only, spelled differently from its pool key.
         let task = Task {
-            try await client.count(filters: [Filter(kinds: [.textNote])], to: ["WSS://Relay-A.example.com/"])
+            try await client.events.count(filters: [Filter(kinds: [.textNote])], to: ["WSS://Relay-A.example.com/"])
         }
 
         try await pollUntil { mockA.sentTextFrames.contains { $0.hasPrefix("[\"COUNT\"") } }
@@ -335,14 +335,14 @@ struct NIP45CountTests {
         #expect(result == 3)
         // The untargeted relay never saw a COUNT frame.
         #expect(!mockB.sentTextFrames.contains { $0.hasPrefix("[\"COUNT\"") })
-        await client.disconnect()
+        await client.relays.disconnect()
     }
 
     @Test("the client count rejects an invalid target string")
     func clientCountRejectsInvalidTargetString() async throws {
         let client = NostrClient()
         await #expect(throws: NostrError.invalidRelayURL("https://relay.example.com")) {
-            _ = try await client.count(filters: [Filter()], to: ["https://relay.example.com"])
+            _ = try await client.events.count(filters: [Filter()], to: ["https://relay.example.com"])
         }
     }
 
@@ -365,7 +365,7 @@ struct NIP45CountTests {
         try await connectionA.connect()
         try await connectionB.connect()
 
-        let task = Task { try await client.count(filters: [Filter(kinds: [.textNote])]) }
+        let task = Task { try await client.events.count(filters: [Filter(kinds: [.textNote])]) }
 
         try await pollUntil {
             mockA.sentTextFrames.contains { $0.hasPrefix("[\"COUNT\"") }
@@ -378,7 +378,7 @@ struct NIP45CountTests {
 
         let result = try await task.value
         #expect(result == 9)
-        await client.disconnect()
+        await client.relays.disconnect()
     }
 }
 

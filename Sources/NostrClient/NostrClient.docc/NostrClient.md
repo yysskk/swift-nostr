@@ -17,11 +17,41 @@ The lower-level primitives it builds on — the event model, keys and signing, N
 import NostrClient
 
 let client = NostrClient()
-try await client.setNsec("nsec1...")
-try await client.connect(to: ["wss://relay.example.com", "wss://relay2.example.com"])
+try await client.identity.setNsec("nsec1...")
+try await client.relays.connect(to: ["wss://relay.example.com", "wss://relay2.example.com"])
 
-let note = try await client.publishTextNote(content: "Hello, Nostr!")
+let note = try await client.events.publishTextNote(content: "Hello, Nostr!")
 ```
+
+### Feature namespaces
+
+The client's API is reached through eight namespaces rather than as a flat list of methods on
+`NostrClient`, so completion shows the operations of one feature area at a time:
+
+| Namespace | What it covers |
+| --- | --- |
+| ``NostrClient/identity`` | The signer, its public key, and NIP-42 relay authentication |
+| ``NostrClient/relays`` | Pool membership, connection lifecycle, and the underlying ``RelayPool`` |
+| ``NostrClient/events`` | Publishing, one-time fetches, NIP-23 long-form content |
+| ``NostrClient/subscriptions`` | Live subscriptions as async sequences |
+| ``NostrClient/routing`` | NIP-65 outbox/gossip and NIP-17 DM relay lists |
+| ``NostrClient/messages`` | NIP-17 private direct messages |
+| ``NostrClient/groups`` | NIP-29 relay-based groups and the kind-10009 group list |
+| ``NostrClient/lists`` | NIP-51 lists and sets |
+
+Each namespace is a `Sendable` value holding nothing but the client, and each conforms to a
+capability protocol — so a feature can depend on the slice it needs instead of the whole client,
+and be tested against a stub:
+
+```swift
+struct ChatViewModel {
+    let messages: any NostrMessaging
+}
+
+ChatViewModel(messages: client.messages)
+```
+
+`NostrClient` itself exposes only its initializers and these namespaces.
 
 ## Topics
 
@@ -34,6 +64,29 @@ let note = try await client.publishTextNote(content: "Hello, Nostr!")
 > The event model, keys, signing, encryption, encoding, relay protocol messages, and a single
 > `RelayConnection` are defined in `NostrCore`. See its documentation for `Event`, `KeyPair`,
 > `EventSigner`, `Filter`, `Bech32`, and the rest.
+
+### Feature Namespaces
+
+- ``NostrIdentityAPI``
+- ``NostrRelaysAPI``
+- ``NostrEventsAPI``
+- ``NostrSubscriptionsAPI``
+- ``NostrRoutingAPI``
+- ``NostrMessagesAPI``
+- ``NostrGroupsAPI``
+- ``NostrListsAPI``
+
+### Capabilities
+
+- ``NostrIdentityProviding``
+- ``NostrRelayManaging``
+- ``NostrEventPublishing``
+- ``NostrEventFetching``
+- ``NostrSubscribing``
+- ``NostrRelayRouting``
+- ``NostrMessaging``
+- ``NostrGroupManaging``
+- ``NostrListManaging``
 
 ### Profiles and Contacts
 

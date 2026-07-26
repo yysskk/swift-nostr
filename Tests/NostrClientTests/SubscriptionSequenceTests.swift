@@ -98,7 +98,7 @@ struct SubscriptionSequenceTests {
         let client = NostrClient()
 
         await #expect(throws: NostrError.noRelaysInPool) {
-            _ = try await client.subscribe(filters: [Filter()])
+            _ = try await client.subscriptions.subscribe(filters: [Filter()])
         }
         #expect(await client.activeSubscriptionCount == 0)
     }
@@ -108,34 +108,35 @@ struct SubscriptionSequenceTests {
         let (client, _) = try await makeConnectedClient()
 
         await #expect(throws: NostrError.invalidRelayURL("wss:garbage")) {
-            _ = try await client.subscribe(filters: [Filter()], to: ["wss:garbage"])
+            _ = try await client.subscriptions.subscribe(filters: [Filter()], to: ["wss:garbage"])
         }
         await #expect(throws: NostrError.invalidRelayURL("https://relay.example.com")) {
-            _ = try await client.events(filters: [Filter()], to: ["https://relay.example.com"])
+            _ = try await client.subscriptions.events(filters: [Filter()], to: ["https://relay.example.com"])
         }
         // Validation happens before the subscription is registered.
         #expect(await client.activeSubscriptionCount == 0)
-        await client.disconnect()
+        await client.relays.disconnect()
     }
 
     @Test("subscribe reaches the pooled relay via an alternate target spelling")
     func subscribeViaAlternateSpelling() async throws {
         let (client, socket) = try await makeConnectedClient()
 
-        let subscription = try await client.subscribe(filters: [Filter()], to: ["WSS://Relay.Example.COM/"])
+        let subscription = try await client.subscriptions.subscribe(
+            filters: [Filter()], to: ["WSS://Relay.Example.COM/"])
         try await NIP42TestSupport.pollUntil {
             socket.sentTextFrames.contains { $0.hasPrefix("[\"REQ\"") }
         }
         #expect(subscription.expectedRelays == [relayURL])
 
         await subscription.close()
-        await client.disconnect()
+        await client.relays.disconnect()
     }
 
     @Test("close ends iteration and is idempotent")
     func closeEndsIterationAndIsIdempotent() async throws {
         let (client, _) = try await makeConnectedClient()
-        let subscription = try await client.subscribe(filters: [Filter()])
+        let subscription = try await client.subscriptions.subscribe(filters: [Filter()])
 
         let consumer = Task {
             var count = 0
@@ -153,13 +154,13 @@ struct SubscriptionSequenceTests {
         let consumed = await consumer.value
         #expect(consumed == 0)
         #expect(await client.activeSubscriptionCount == 0)
-        await client.disconnect()
+        await client.relays.disconnect()
     }
 
     @Test("cancelling the consuming task tears down the subscription")
     func taskCancellationTearsDownSubscription() async throws {
         let (client, _) = try await makeConnectedClient()
-        let subscription = try await client.subscribe(filters: [Filter()])
+        let subscription = try await client.subscriptions.subscribe(filters: [Filter()])
         #expect(await client.activeSubscriptionCount == 1)
 
         let consumer = Task {
@@ -176,13 +177,13 @@ struct SubscriptionSequenceTests {
             try await Task.sleep(for: .milliseconds(10))
         }
         #expect(await client.activeSubscriptionCount == 0)
-        await client.disconnect()
+        await client.relays.disconnect()
     }
 
     @Test("unsubscribe(subscriptionId:) finishes the stream")
     func unsubscribeFinishesStream() async throws {
         let (client, _) = try await makeConnectedClient()
-        let subscription = try await client.subscribe(filters: [Filter()])
+        let subscription = try await client.subscriptions.subscribe(filters: [Filter()])
 
         let consumer = Task {
             for await _ in subscription {}
@@ -190,19 +191,19 @@ struct SubscriptionSequenceTests {
         }
 
         try await Task.sleep(for: .milliseconds(50))
-        await client.unsubscribe(subscriptionId: subscription.id)
+        await client.subscriptions.unsubscribe(subscriptionId: subscription.id)
 
         let finished = await consumer.value
         #expect(finished)
         #expect(await client.activeSubscriptionCount == 0)
-        await client.disconnect()
+        await client.relays.disconnect()
     }
 
-    @Test("unsubscribeAll finishes every stream")
+    @Test("subscriptions.unsubscribeAll finishes every stream")
     func unsubscribeAllFinishesStreams() async throws {
         let (client, _) = try await makeConnectedClient()
-        let first = try await client.subscribe(filters: [Filter()])
-        let second = try await client.subscribe(filters: [Filter()])
+        let first = try await client.subscriptions.subscribe(filters: [Filter()])
+        let second = try await client.subscriptions.subscribe(filters: [Filter()])
         #expect(await client.activeSubscriptionCount == 2)
 
         let consumers = [first, second].map { subscription in
@@ -213,23 +214,23 @@ struct SubscriptionSequenceTests {
         }
 
         try await Task.sleep(for: .milliseconds(50))
-        await client.unsubscribeAll()
+        await client.subscriptions.unsubscribeAll()
 
         for consumer in consumers {
             #expect(await consumer.value)
         }
         #expect(await client.activeSubscriptionCount == 0)
-        await client.disconnect()
+        await client.relays.disconnect()
     }
 
     @Test("convenience subscriptions return sequences")
     func convenienceSubscriptionsReturnSequences() async throws {
         let (client, _) = try await makeConnectedClient()
 
-        let timeline = try await client.subscribeToUserTimeline(pubkey: "abc")
-        let global = try await client.subscribeToGlobalFeed(limit: 10)
-        let mentions = try await client.subscribeToMentions(pubkey: "abc")
-        let metadata = try await client.subscribeToMetadata(pubkeys: ["abc"])
+        let timeline = try await client.subscriptions.userTimeline(pubkey: "abc")
+        let global = try await client.subscriptions.globalFeed(limit: 10)
+        let mentions = try await client.subscriptions.mentions(pubkey: "abc")
+        let metadata = try await client.subscriptions.metadata(pubkeys: ["abc"])
 
         #expect(await client.activeSubscriptionCount == 4)
 
@@ -237,7 +238,7 @@ struct SubscriptionSequenceTests {
             await subscription.close()
         }
         #expect(await client.activeSubscriptionCount == 0)
-        await client.disconnect()
+        await client.relays.disconnect()
     }
 
     @Test("subscribeOutbox returns a sequence using the cached relay list")
@@ -245,41 +246,41 @@ struct SubscriptionSequenceTests {
         // .requirePresent keeps the gossip resolver from dialing relays that are
         // not already in the pool, so the test stays on the single mock relay.
         let (client, socket) = try await makeConnectedClient(gossipPolicy: .requirePresent)
-        try await client.setPrivateKey(String(repeating: "1", count: 64))
+        try await client.identity.setPrivateKey(String(repeating: "1", count: 64))
         // Publishing our own relay list caches it, so no relay-list fetch is needed.
         try await PublishAckSupport.acknowledgingPublishes(on: socket) {
-            try await client.publishRelayList(write: [self.relayURL.absoluteString])
+            try await client.routing.publishRelayList(write: [self.relayURL.absoluteString])
         }
-        let author = await client.publicKey!
+        let author = await client.identity.publicKey!
 
-        let outbox = try await client.subscribeOutbox(authors: [author])
+        let outbox = try await client.routing.subscribeOutbox(authors: [author])
         #expect(await client.activeSubscriptionCount == 1)
         await outbox.close()
         #expect(await client.activeSubscriptionCount == 0)
-        await client.disconnect()
+        await client.relays.disconnect()
     }
 
     @Test("events(filters:) returns the filtered view directly")
     func eventsConvenienceReturnsFilteredView() async throws {
         let (client, _) = try await makeConnectedClient()
-        let events = try await client.events(filters: [Filter()])
+        let events = try await client.subscriptions.events(filters: [Filter()])
         #expect(await client.activeSubscriptionCount == 1)
         await events.close()
         #expect(await client.activeSubscriptionCount == 0)
-        await client.disconnect()
+        await client.relays.disconnect()
     }
 
-    @Test("subscribeToDirectMessages requires a signer")
+    @Test("messages.giftWraps requires a signer")
     func subscribeToDirectMessagesRequiresSigner() async throws {
         let (client, _) = try await makeConnectedClient()
         await #expect(throws: NostrError.self) {
-            _ = try await client.subscribeToDirectMessages()
+            _ = try await client.messages.giftWraps()
         }
 
-        try await client.setPrivateKey(String(repeating: "1", count: 64))
-        let messages = try await client.subscribeToDirectMessages()
+        try await client.identity.setPrivateKey(String(repeating: "1", count: 64))
+        let messages = try await client.messages.giftWraps()
         #expect(await client.activeSubscriptionCount == 1)
         await messages.close()
-        await client.disconnect()
+        await client.relays.disconnect()
     }
 }
