@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-07-26
+
+An API-shape release: `NostrClient`'s ~70 methods move onto eight feature namespaces backed by
+capability protocols, every client feature runs through the `NostrSigning` abstraction so a remote
+signer drives all of them, and the relay layer consolidates into `NostrCore` with normalized,
+string-based targeting and an injectable WebSocket transport. Two NIPs join the supported set —
+NIP-98 HTTP Auth and NIP-29 relay-based groups — and NIP-44 gains strict padding validation and the
+official vector suite. Upgrading from 0.6.0 requires source changes; see **Changed**.
+
 ### Added
 
 - **Client feature namespaces**: `NostrClient`'s API is now reached through eight namespaces —
@@ -291,7 +300,8 @@ remote signing, a spec-compliance fix to NIP-44 encryption, and expanded test co
 
 - Initial release: NIP-01 events, filters, subscriptions, and single-relay support.
 
-[Unreleased]: https://github.com/yysskk/swift-nostr/compare/0.6.0...HEAD
+[Unreleased]: https://github.com/yysskk/swift-nostr/compare/0.7.0...HEAD
+[0.7.0]: https://github.com/yysskk/swift-nostr/compare/0.6.0...0.7.0
 [0.6.0]: https://github.com/yysskk/swift-nostr/compare/0.5.0...0.6.0
 [0.5.0]: https://github.com/yysskk/swift-nostr/compare/0.4.0...0.5.0
 [0.4.0]: https://github.com/yysskk/swift-nostr/compare/0.3.0...0.4.0
