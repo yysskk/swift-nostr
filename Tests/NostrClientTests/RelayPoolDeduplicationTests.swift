@@ -156,7 +156,7 @@ struct RelayPoolDeduplicationTests {
         await pool.disconnectAll()
     }
 
-    @Test("the sweep expires entries past the TTL and drops emptied subscriptions")
+    @Test("the TTL sweep expires entries and drops emptied subscriptions")
     func sweepExpiresEntriesPastTheTTL() async throws {
         let (pool, sockets) = try await makeConnectedPool(relayURLs: [urlA], deduplicationCacheTTL: 300)
         let socket = sockets[0]
@@ -167,35 +167,31 @@ struct RelayPoolDeduplicationTests {
         try await NIP42TestSupport.pollUntil { collector.recorded == [event] }
 
         // A sweep inside the TTL keeps the entry; one past it clears the subscription.
-        await pool.sweepCaches(now: Date().addingTimeInterval(299))
+        await pool.expireCachedEvents(now: Date().addingTimeInterval(299))
         #expect(await pool.deduplicationCacheSize == 1)
-        await pool.sweepCaches(now: Date().addingTimeInterval(301))
+        await pool.expireCachedEvents(now: Date().addingTimeInterval(301))
         #expect(await pool.deduplicationCacheSize == 0)
         #expect(await pool.deduplicationCacheSize(forSubscription: "sub_1") == 0)
 
         await pool.disconnectAll()
     }
 
-    @Test("the size limit is pool-wide, evicting the oldest entry across subscriptions")
-    func sizeLimitEvictsTheOldestEntryAcrossSubscriptions() async throws {
+    @Test("the size limit holds as events arrive, without waiting for a sweep")
+    func sizeLimitHoldsAsEventsArrive() async throws {
         let (pool, sockets) = try await makeConnectedPool(relayURLs: [urlA], maxDeduplicationCacheSize: 1)
         let socket = sockets[0]
         let first = try await subscribe(pool, subscriptionId: "sub_1", sockets: sockets)
         let second = try await subscribe(pool, subscriptionId: "sub_2", sockets: sockets)
 
-        // One entry per subscription, recorded in a known order.
+        // One event per subscription, delivered in a known order. No sweep runs in between:
+        // the cache is trimmed as each event is recorded.
         let older = try makeEvent(content: "recorded first")
         socket.deliver(.string(try eventFrame(subscriptionId: "sub_1", event: older)))
         try await NIP42TestSupport.pollUntil { first.recorded == [older] }
         let newer = try makeEvent(content: "recorded second")
         socket.deliver(.string(try eventFrame(subscriptionId: "sub_2", event: newer)))
         try await NIP42TestSupport.pollUntil { second.recorded == [newer] }
-        #expect(await pool.deduplicationCacheSize == 2)
 
-        await pool.sweepCaches()
-
-        // Trimmed to the limit by dropping the oldest entry, whose subscription is left out
-        // of the caches entirely.
         #expect(await pool.deduplicationCacheSize == 1)
         #expect(await pool.deduplicationCacheSize(forSubscription: "sub_1") == 0)
         #expect(await pool.deduplicationCacheSize(forSubscription: "sub_2") == 1)

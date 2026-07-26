@@ -757,4 +757,8 @@ To reset every subscription's cache:
 await client.clearDeduplicationCache()
 ```
 
-Cache TTL and the pool-wide entry limit are configurable via ``RelayPoolConfig``.
+``RelayPoolConfig`` configures how much is remembered:
+``RelayPoolConfig/maxDeduplicationCacheSize`` bounds the entries across all subscriptions and
+is enforced as events arrive, evicting the oldest, and
+``RelayPoolConfig/deduplicationCacheTTL`` bounds how long an entry survives. Dropping an entry
+only risks delivering a duplicate later, never losing an event.
