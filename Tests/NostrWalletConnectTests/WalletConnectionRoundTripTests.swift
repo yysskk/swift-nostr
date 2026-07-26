@@ -110,6 +110,38 @@ struct WalletConnectionRoundTripTests {
         _ = try await payment
     }
 
+    @Test("a concurrent command waits for the setup instead of sending before the subscription")
+    func concurrentCommandWaitsForSetup() async throws {
+        let (connection, transport, client, wallet) = try makeConnection()
+        // Hold connect() open so both commands are in flight while the connection is still starting.
+        await transport.closeGate()
+
+        async let balance = connection.getBalance()
+        async let payment = connection.payInvoice("lnbc1")
+
+        try await NWCFixtures.waitForConnectAttempts(transport, count: 1)
+        // A command that raced past the shared setup would send here, before any subscription exists.
+        try await Task.sleep(for: .milliseconds(50))
+        await transport.openGate()
+
+        let requests = try await NWCFixtures.waitForSentEvents(transport, count: 2)
+        #expect(await transport.sendsBeforeSubscribe == 0)
+        #expect(await transport.connectCount == 1)
+
+        for request in requests {
+            let json = try NWCFixtures.decryptRequest(request, client: client, wallet: wallet)
+            let resultJSON =
+                json.contains("get_balance")
+                ? #"{"result_type":"get_balance","result":{"balance":7}}"#
+                : #"{"result_type":"pay_invoice","result":{"preimage":"aa"}}"#
+            await transport.emit(
+                try NWCFixtures.response(
+                    resultJSON: resultJSON, requestID: request.id, client: client, wallet: wallet))
+        }
+        #expect(try await balance.balance == 7)
+        #expect(try await payment.preimage == "aa")
+    }
+
     @Test("a wallet error response is thrown as a typed error")
     func walletErrorResponse() async throws {
         let (connection, transport, client, wallet) = try makeConnection()

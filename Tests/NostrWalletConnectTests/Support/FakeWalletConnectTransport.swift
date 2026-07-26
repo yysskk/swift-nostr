@@ -12,13 +12,21 @@ actor FakeWalletConnectTransport: RelayTransport {
     private(set) var connectCount = 0
     private(set) var sentEvents: [Event] = []
     private(set) var subscriptions: [String: [Filter]] = [:]
+    /// How many events were sent before any subscription existed, so a test can prove that no
+    /// command raced past the connection setup.
+    private(set) var sendsBeforeSubscribe = 0
     private var continuation: AsyncStream<Event>.Continuation?
+    private var isGateOpen = true
+    private var gate: CheckedContinuation<Void, Never>?
 
     init() {}
 
     func connect() async throws {
-        isConnected = true
         connectCount += 1
+        if !isGateOpen {
+            await withCheckedContinuation { gate = $0 }
+        }
+        isConnected = true
     }
 
     func subscribe(id: String, filters: [Filter]) async throws {
@@ -30,6 +38,9 @@ actor FakeWalletConnectTransport: RelayTransport {
     }
 
     func send(_ event: Event) async throws {
+        if subscriptions.isEmpty {
+            sendsBeforeSubscribe += 1
+        }
         sentEvents.append(event)
     }
 
@@ -52,6 +63,18 @@ actor FakeWalletConnectTransport: RelayTransport {
     /// Pushes a simulated incoming event to the ``events()`` stream.
     func emit(_ event: Event) {
         continuation?.yield(event)
+    }
+
+    /// Holds the next `connect()` open until ``openGate()``, so a test can keep the connection
+    /// setup in flight while another command arrives.
+    func closeGate() {
+        isGateOpen = false
+    }
+
+    func openGate() {
+        isGateOpen = true
+        gate?.resume()
+        gate = nil
     }
 
     /// The most recently sent event, if any.
