@@ -21,12 +21,18 @@ struct RelayPoolDeduplicationTests {
     /// A pool holding one connected relay per URL, paired with the socket driving it.
     /// Relays connect one at a time so each pairs with a known socket.
     private func makeConnectedPool(
-        relayURLs: [URL]
+        relayURLs: [URL],
+        maxDeduplicationCacheSize: Int = 10000,
+        deduplicationCacheTTL: TimeInterval = 300
     ) async throws -> (pool: RelayPool, sockets: [MockWebSocketSession]) {
         let sockets = relayURLs.map { _ in MockWebSocketSession() }
         let counter = SocketCounter()
         let pool = RelayPool(
-            config: RelayPoolConfig(defaultRelayConfig: noReconnectConfig),
+            config: RelayPoolConfig(
+                defaultRelayConfig: noReconnectConfig,
+                maxDeduplicationCacheSize: maxDeduplicationCacheSize,
+                deduplicationCacheTTL: deduplicationCacheTTL
+            ),
             webSocketFactory: MockWebSocketSessionFactory(makeSession: { sockets[counter.next()] })
         )
         for url in relayURLs {
@@ -146,6 +152,53 @@ struct RelayPoolDeduplicationTests {
         let second = try await subscribe(pool, subscriptionId: "sub_1", sockets: sockets)
         socket.deliver(.string(try eventFrame(subscriptionId: "sub_1", event: event)))
         try await NIP42TestSupport.pollUntil { second.recorded == [event] }
+
+        await pool.disconnectAll()
+    }
+
+    @Test("the sweep expires entries past the TTL and drops emptied subscriptions")
+    func sweepExpiresEntriesPastTheTTL() async throws {
+        let (pool, sockets) = try await makeConnectedPool(relayURLs: [urlA], deduplicationCacheTTL: 300)
+        let socket = sockets[0]
+        let collector = try await subscribe(pool, subscriptionId: "sub_1", sockets: sockets)
+
+        let event = try makeEvent(content: "cached until the TTL passes")
+        socket.deliver(.string(try eventFrame(subscriptionId: "sub_1", event: event)))
+        try await NIP42TestSupport.pollUntil { collector.recorded == [event] }
+
+        // A sweep inside the TTL keeps the entry; one past it clears the subscription.
+        await pool.sweepCaches(now: Date().addingTimeInterval(299))
+        #expect(await pool.deduplicationCacheSize == 1)
+        await pool.sweepCaches(now: Date().addingTimeInterval(301))
+        #expect(await pool.deduplicationCacheSize == 0)
+        #expect(await pool.deduplicationCacheSize(forSubscription: "sub_1") == 0)
+
+        await pool.disconnectAll()
+    }
+
+    @Test("the size limit is pool-wide, evicting the oldest entry across subscriptions")
+    func sizeLimitEvictsTheOldestEntryAcrossSubscriptions() async throws {
+        let (pool, sockets) = try await makeConnectedPool(relayURLs: [urlA], maxDeduplicationCacheSize: 1)
+        let socket = sockets[0]
+        let first = try await subscribe(pool, subscriptionId: "sub_1", sockets: sockets)
+        let second = try await subscribe(pool, subscriptionId: "sub_2", sockets: sockets)
+
+        // One entry per subscription, recorded in a known order.
+        let older = try makeEvent(content: "recorded first")
+        socket.deliver(.string(try eventFrame(subscriptionId: "sub_1", event: older)))
+        try await NIP42TestSupport.pollUntil { first.recorded == [older] }
+        let newer = try makeEvent(content: "recorded second")
+        socket.deliver(.string(try eventFrame(subscriptionId: "sub_2", event: newer)))
+        try await NIP42TestSupport.pollUntil { second.recorded == [newer] }
+        #expect(await pool.deduplicationCacheSize == 2)
+
+        await pool.sweepCaches()
+
+        // Trimmed to the limit by dropping the oldest entry, whose subscription is left out
+        // of the caches entirely.
+        #expect(await pool.deduplicationCacheSize == 1)
+        #expect(await pool.deduplicationCacheSize(forSubscription: "sub_1") == 0)
+        #expect(await pool.deduplicationCacheSize(forSubscription: "sub_2") == 1)
 
         await pool.disconnectAll()
     }

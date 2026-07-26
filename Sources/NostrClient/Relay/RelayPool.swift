@@ -608,6 +608,15 @@ extension RelayPool {
         guard now.timeIntervalSince(lastCacheCleanup) > 60 else { return }
         lastCacheCleanup = now
 
+        sweepCaches(now: now)
+    }
+
+    /// Expires entries older than ``RelayPoolConfig/deduplicationCacheTTL`` and enforces
+    /// ``RelayPoolConfig/maxDeduplicationCacheSize``.
+    ///
+    /// `cleanupCacheIfNeeded()` runs this at most once a minute; tests call it directly with
+    /// the `now` they want the sweep to see, instead of waiting out that interval.
+    func sweepCaches(now: Date = Date()) {
         let cutoff = now.addingTimeInterval(-config.deduplicationCacheTTL)
 
         // Remove expired entries, dropping any subscription left with none
