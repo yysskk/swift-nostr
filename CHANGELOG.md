@@ -80,6 +80,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`RelayPool.removeRelay` raced a concurrent re-add of the same relay.** The pool entry was
   removed only after the disconnect suspended, so an `addRelay` interleaving with the removal
   could receive a connection about to be torn down; the entry is now removed first.
+- **A relay listed for both reading and writing under different spellings lost a direction.**
+  `EventSigner.signRelayListMetadata(read:write:)` and `NostrClient.publishRelayList(read:write:)`
+  compared the two lists as raw strings, so `wss://relay.example.com/` in `read` and
+  `wss://relay.example.com` in `write` were treated as two relays and emitted as two conflicting
+  `r` tags, which any NIP-65 reader collapses to whichever came first. Membership is now decided
+  on the normalized URL, so equivalent spellings produce a single read+write entry that keeps the
+  spelling and position of its first appearance.
 
 ### Changed
 

@@ -8,6 +8,7 @@ import NostrCore
 public struct DirectMessageParser: Sendable {
     private let signer: any NostrSigning
 
+    /// Creates a parser that opens gift wraps addressed to `signer`'s identity.
     public init(signer: any NostrSigning) {
         self.signer = signer
     }

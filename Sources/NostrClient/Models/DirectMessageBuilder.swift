@@ -9,6 +9,7 @@ import NostrCore
 public struct DirectMessageBuilder: Sendable {
     private let signer: any NostrSigning
 
+    /// Creates a builder that authors and seals messages as `signer`'s identity.
     public init(signer: any NostrSigning) {
         self.signer = signer
     }
