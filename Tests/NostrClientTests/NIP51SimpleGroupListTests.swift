@@ -351,20 +351,20 @@ struct NIP51SimpleGroupListClientTests {
 
     // MARK: - Publishing
 
-    @Test("publishSimpleGroupList broadcasts the kind-10009 event to every relay in the pool")
+    @Test("groups.publishSimpleGroupList broadcasts the kind-10009 event to every relay in the pool")
     func publishBroadcastsToWholePool() async throws {
         let (client, firstSocket, secondSocket) = makeTwoSocketClient()
-        let firstConnection = try await client.relayPool.addRelay(firstRelayURL)
+        let firstConnection = try await client.relays.pool.addRelay(firstRelayURL)
         try await firstConnection.connect()
-        let secondConnection = try await client.relayPool.addRelay(secondRelayURL)
+        let secondConnection = try await client.relays.pool.addRelay(secondRelayURL)
         try await secondConnection.connect()
-        await client.setSigner(EventSigner(keyPair: try KeyPair()))
+        await client.identity.setSigner(EventSigner(keyPair: try KeyPair()))
 
         let typed = SimpleGroupList(
             publicEntries: [GroupListEntry(groupID: groupID, relayURL: groupRelay, name: "Cooking")],
             relayURLs: [groupRelay]
         )
-        let publishTask = Task { try await client.publishSimpleGroupList(typed, strategy: .allSettled) }
+        let publishTask = Task { try await client.groups.publishSimpleGroupList(typed, strategy: .allSettled) }
         let sentFirst = try await acknowledgePublish(on: firstSocket)
         let sentSecond = try await acknowledgePublish(on: secondSocket)
         let published = try await publishTask.value
@@ -382,15 +382,15 @@ struct NIP51SimpleGroupListClientTests {
         #expect(try sentFirst.verify())
         #expect(published.event == sentFirst)
         #expect(Set(published.result.acceptedRelays) == [firstRelayURL, secondRelayURL])
-        await client.disconnect()
+        await client.relays.disconnect()
     }
 
     // MARK: - Fetching
 
-    @Test("fetchSimpleGroupList returns the newest typed list across stale copies")
+    @Test("groups.fetchSimpleGroupList returns the newest typed list across stale copies")
     func fetchPicksNewest() async throws {
         let (client, socket) = makeClient()
-        try await client.connect(to: [firstRelayURL.absoluteString])
+        try await client.relays.connect(to: [firstRelayURL.absoluteString])
         let author = EventSigner(keyPair: try KeyPair())
         let stale = try listEvent(
             entries: [GroupListEntry(groupID: "oldgrp", relayURL: "wss://old.example.com")],
@@ -406,7 +406,7 @@ struct NIP51SimpleGroupListClientTests {
         )
 
         let fetched = try await answering(socket, with: [stale, newer]) {
-            try await client.fetchSimpleGroupList(for: author.publicKey)
+            try await client.groups.fetchSimpleGroupList(for: author.publicKey)
         }
 
         let list = try #require(fetched)
@@ -422,15 +422,15 @@ struct NIP51SimpleGroupListClientTests {
         let (_, filter) = try sentREQ(in: socket)
         #expect(filter["kinds"] as? [Int] == [10009])
         #expect(filter["authors"] as? [String] == [author.publicKey])
-        await client.disconnect()
+        await client.relays.disconnect()
     }
 
     @Test("Fetching the current user's list decrypts private entries")
     func fetchOwnListDecryptsPrivateEntries() async throws {
         let (client, socket) = makeClient()
-        try await client.connect(to: [firstRelayURL.absoluteString])
+        try await client.relays.connect(to: [firstRelayURL.absoluteString])
         let signer = EventSigner(keyPair: try KeyPair())
-        await client.setSigner(signer)
+        await client.identity.setSigner(signer)
         let typed = SimpleGroupList(
             publicEntries: [GroupListEntry(groupID: groupID, relayURL: groupRelay)],
             privateEntries: [GroupListEntry(groupID: "5ec4e7", relayURL: "wss://hidden.example.com")],
@@ -439,11 +439,11 @@ struct NIP51SimpleGroupListClientTests {
         let event = try signer.signList(typed.list)
 
         let fetched = try await answering(socket, with: [event]) {
-            try await client.fetchSimpleGroupList()
+            try await client.groups.fetchSimpleGroupList()
         }
 
         #expect(fetched == typed)
-        await client.disconnect()
+        await client.relays.disconnect()
     }
 }
 

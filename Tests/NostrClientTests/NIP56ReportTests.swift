@@ -78,7 +78,7 @@ struct NIP56ReportTests {
         let client = NostrClient()
 
         await #expect(throws: NostrError.signerNotSet) {
-            _ = try await client.publishReport(pubkey: "deadbeef", type: .spam)
+            _ = try await client.events.publishReport(pubkey: "deadbeef", type: .spam)
         }
     }
 }

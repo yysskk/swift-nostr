@@ -3,11 +3,11 @@ import NostrCore
 
 /// A live relay subscription delivered as an async sequence of relay-aware events.
 ///
-/// Returned by ``NostrClient/subscribe(filters:to:bufferingPolicy:)`` and the
+/// Returned by ``NostrSubscriptionsAPI/subscribe(filters:to:bufferingPolicy:)`` and the
 /// convenience subscription methods. Iterate it with `for await`:
 ///
 /// ```swift
-/// let subscription = try await client.subscribe(filters: [filter])
+/// let subscription = try await client.subscriptions.subscribe(filters: [filter])
 /// for await item in subscription {
 ///     switch item {
 ///     case .event(_, let event): print(event.content)
@@ -29,11 +29,11 @@ import NostrCore
 public struct SubscriptionSequence: AsyncSequence, Sendable {
     public typealias Element = SubscriptionEvent
 
-    /// The subscription ID, usable with ``NostrClient/unsubscribe(subscriptionId:)``.
+    /// The subscription ID, usable with ``NostrSubscriptionsAPI/unsubscribe(subscriptionId:)``.
     public let id: String
 
     /// The relays that accepted the REQ. EOSE completion is measured against
-    /// this set (see ``NostrClient/fetch(filters:timeout:)``).
+    /// this set (see ``NostrEventsAPI/fetch(filters:to:timeout:)``).
     public let expectedRelays: Set<URL>
 
     let stream: AsyncStream<SubscriptionEvent>
@@ -70,7 +70,7 @@ public struct SubscriptionSequence: AsyncSequence, Sendable {
 
         let base: SubscriptionSequence
 
-        /// The subscription ID, usable with ``NostrClient/unsubscribe(subscriptionId:)``.
+        /// The subscription ID, usable with ``NostrSubscriptionsAPI/unsubscribe(subscriptionId:)``.
         public var id: String { base.id }
 
         /// The relays that accepted the REQ.

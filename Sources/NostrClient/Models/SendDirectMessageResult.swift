@@ -22,7 +22,7 @@ public struct SendDirectMessageResult: Sendable {
 
     /// Per-relay outcome of publishing the recipient gift wrap.
     /// Always present when returned from a send such as
-    /// ``NostrClient/sendDirectMessage(_:to:subject:replyTo:expiration:strategy:)``;
+    /// ``NostrMessagesAPI/send(_:to:subject:replyTo:expiration:strategy:)``;
     /// `nil` when the result was built without publishing (e.g. by ``DirectMessageBuilder``).
     public let recipientPublishResult: PublishResult?
 

@@ -13,7 +13,8 @@ import NostrCore
 /// ```swift
 /// let encrypted = try EncryptedFile.encrypt(imageData)
 /// let url = try await upload(encrypted.ciphertext)            // your host, out of scope here
-/// try await client.sendFileMessage(url: url, mimeType: "image/jpeg", encryption: encrypted, to: pubkey)
+/// try await client.messages.sendFile(
+///     url: url, mimeType: "image/jpeg", encryption: encrypted, to: pubkey)
 ///
 /// // On the receiving side, after downloading the blob at `file.url`:
 /// let imageData = try EncryptedFile.decrypt(blob, key: file.decryptionKey, nonce: file.decryptionNonce)

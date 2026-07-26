@@ -39,13 +39,13 @@ struct DependencyInjectionTests {
         let pool = RelayPool(config: noReconnectConfig, webSocketFactory: fakeFactory())
         let client = NostrClient(relayPool: pool)
 
-        try await client.connect(to: ["wss://relay.example.com", "wss://relay2.example.com"])
+        try await client.relays.connect(to: ["wss://relay.example.com", "wss://relay2.example.com"])
 
-        #expect(await client.relayPool.count == 2)
+        #expect(await client.relays.pool.count == 2)
         // connect(to:) only throws when *every* relay fails, so assert both sockets
         // actually reached `.connected` rather than just being registered.
-        #expect(await client.relayPool.connectedCount() == 2)
-        await client.disconnect()
+        #expect(await client.relays.pool.connectedCount() == 2)
+        await client.relays.disconnect()
     }
 
     @Test("client connects through the public transport-factory initializer")
@@ -54,9 +54,9 @@ struct DependencyInjectionTests {
         // seam a host (e.g. Android) uses to supply a non-URLSession transport.
         let client = NostrClient(relayPoolConfig: noReconnectConfig, webSocketFactory: fakeFactory())
 
-        try await client.connect(to: ["wss://relay.example.com", "wss://relay2.example.com"])
+        try await client.relays.connect(to: ["wss://relay.example.com", "wss://relay2.example.com"])
 
-        #expect(await client.relayPool.connectedCount() == 2)
-        await client.disconnect()
+        #expect(await client.relays.pool.connectedCount() == 2)
+        await client.relays.disconnect()
     }
 }

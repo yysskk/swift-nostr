@@ -62,12 +62,12 @@ struct NostrSigningClientTests {
         let (client, _) = makeClient()
         let keyPair = try KeyPair()
 
-        await #expect(client.publicKey == nil)
-        try await client.setSigner(MockRemoteSigner(keyPair: keyPair) as any NostrSigning)
+        await #expect(client.identity.publicKey == nil)
+        try await client.identity.setSigner(MockRemoteSigner(keyPair: keyPair) as any NostrSigning)
 
-        #expect(await client.publicKey == keyPair.publicKeyHex)
+        #expect(await client.identity.publicKey == keyPair.publicKeyHex)
         #expect(await client.hasSigner)
-        #expect(try await client.npub == keyPair.npub)
+        #expect(try await client.identity.npub == keyPair.npub)
     }
 
     // MARK: - sign(_:) through both paths
@@ -76,9 +76,9 @@ struct NostrSigningClientTests {
     func remoteSignerSigns() async throws {
         let (client, _) = makeClient()
         let keyPair = try KeyPair()
-        try await client.setSigner(MockRemoteSigner(keyPair: keyPair) as any NostrSigning)
+        try await client.identity.setSigner(MockRemoteSigner(keyPair: keyPair) as any NostrSigning)
 
-        let signed = try await client.sign(unsignedNote(pubkey: keyPair.publicKeyHex, content: "hello"))
+        let signed = try await client.identity.sign(unsignedNote(pubkey: keyPair.publicKeyHex, content: "hello"))
 
         #expect(signed.pubkey == keyPair.publicKeyHex)
         #expect(signed.kind == .textNote)
@@ -90,9 +90,9 @@ struct NostrSigningClientTests {
     func localSignerSigns() async throws {
         let (client, _) = makeClient()
         let keyPair = try KeyPair()
-        await client.setSigner(EventSigner(keyPair: keyPair))
+        await client.identity.setSigner(EventSigner(keyPair: keyPair))
 
-        let signed = try await client.sign(unsignedNote(pubkey: keyPair.publicKeyHex, content: "hi"))
+        let signed = try await client.identity.sign(unsignedNote(pubkey: keyPair.publicKeyHex, content: "hi"))
 
         #expect(signed.pubkey == keyPair.publicKeyHex)
         #expect(signed.content == "hi")
@@ -105,7 +105,7 @@ struct NostrSigningClientTests {
         let pubkey = try KeyPair().publicKeyHex
 
         await #expect(throws: NostrError.signerNotSet) {
-            try await client.sign(self.unsignedNote(pubkey: pubkey, content: "x"))
+            try await client.identity.sign(self.unsignedNote(pubkey: pubkey, content: "x"))
         }
     }
 
@@ -115,17 +115,17 @@ struct NostrSigningClientTests {
     func remoteSignerDrivesConvenienceHelper() async throws {
         let (client, socket) = try await ConnectedClientFixture.make()
         let keyPair = try KeyPair()
-        try await client.setSigner(MockRemoteSigner(keyPair: keyPair) as any NostrSigning)
+        try await client.identity.setSigner(MockRemoteSigner(keyPair: keyPair) as any NostrSigning)
 
         let published = try await PublishAckSupport.acknowledgingPublishes(on: socket) {
-            try await client.publishTextNote(content: "signed by my bunker")
+            try await client.events.publishTextNote(content: "signed by my bunker")
         }
 
         #expect(published.event.kind == .textNote)
         #expect(published.event.pubkey == keyPair.publicKeyHex)
         #expect(published.event.content == "signed by my bunker")
         #expect(try published.event.verify())
-        await client.disconnect()
+        await client.relays.disconnect()
     }
 
     @Test("a direct-message helper gift-wraps and delivers with a remote signer")
@@ -133,7 +133,7 @@ struct NostrSigningClientTests {
         let (client, socket) = try await ConnectedClientFixture.make()
         let sender = try KeyPair()
         let recipient = try KeyPair()
-        try await client.setSigner(MockRemoteSigner(keyPair: sender) as any NostrSigning)
+        try await client.identity.setSigner(MockRemoteSigner(keyPair: sender) as any NostrSigning)
         // Confirmed-absent DM relay lists: both copies fall back to the pool's relay
         // without a discovery fetch.
         await client.dmRelayListStore.markNoList(for: sender.publicKeyHex)
@@ -141,7 +141,7 @@ struct NostrSigningClientTests {
 
         // Two EVENT frames: the recipient gift wrap and the self-copy gift wrap.
         let result = try await PublishAckSupport.acknowledgingPublishes(2, on: socket) {
-            try await client.sendDirectMessage("wrapped by my bunker", to: recipient.publicKeyHex)
+            try await client.messages.send("wrapped by my bunker", to: recipient.publicKeyHex)
         }
 
         #expect(result.recipientGiftWrap.kind == .giftWrap)
@@ -151,14 +151,14 @@ struct NostrSigningClientTests {
             .parse(result.recipientGiftWrap)
         #expect(message.content == "wrapped by my bunker")
         #expect(message.senderPubkey == sender.publicKeyHex)
-        await client.disconnect()
+        await client.relays.disconnect()
     }
 
     @Test("a NIP-51 list round-trips its private items through a remote signer")
     func remoteSignerSealsPrivateListItems() async throws {
         let (client, socket) = try await ConnectedClientFixture.make()
         let keyPair = try KeyPair()
-        try await client.setSigner(MockRemoteSigner(keyPair: keyPair) as any NostrSigning)
+        try await client.identity.setSigner(MockRemoteSigner(keyPair: keyPair) as any NostrSigning)
 
         let list = NostrList(
             kind: .muteList,
@@ -167,7 +167,7 @@ struct NostrSigningClientTests {
         )
 
         let published = try await PublishAckSupport.acknowledgingPublishes(on: socket) {
-            try await client.publishList(list)
+            try await client.lists.publish(list)
         }
 
         #expect(published.event.kind == .muteList)
@@ -176,20 +176,20 @@ struct NostrSigningClientTests {
         let opened = try EventSigner(keyPair: keyPair).openList(published.event)
         #expect(opened.privateItems == list.privateItems)
         #expect(opened.publicItems == list.publicItems)
-        await client.disconnect()
+        await client.relays.disconnect()
     }
 
     // MARK: - The local path is unchanged
 
-    @Test("setSigner(EventSigner) still reports the right public key and npub")
+    @Test("identity.setSigner(EventSigner) still reports the right public key and npub")
     func localSignerSmokeTest() async throws {
         let (client, _) = makeClient()
         let keyPair = try KeyPair()
-        await client.setSigner(EventSigner(keyPair: keyPair))
+        await client.identity.setSigner(EventSigner(keyPair: keyPair))
 
         #expect(await client.hasSigner)
-        #expect(await client.publicKey == keyPair.publicKeyHex)
-        #expect(try await client.npub == keyPair.npub)
+        #expect(await client.identity.publicKey == keyPair.publicKeyHex)
+        #expect(try await client.identity.npub == keyPair.npub)
     }
 
     // MARK: - Remote signer answers a NIP-42 AUTH challenge
@@ -207,12 +207,12 @@ struct NostrSigningClientTests {
     func remoteSignerAnswersAuthChallenge() async throws {
         let (client, mock) = makeClient()
         let keyPair = try KeyPair()
-        try await client.setSigner(MockRemoteSigner(keyPair: keyPair) as any NostrSigning)
-        try await client.connect(to: [relayURL.absoluteString])
+        try await client.identity.setSigner(MockRemoteSigner(keyPair: keyPair) as any NostrSigning)
+        try await client.relays.connect(to: [relayURL.absoluteString])
 
         mock.deliver(.string(#"["AUTH","remote-challenge"]"#))
 
-        let connection = try #require(await client.relayPool.relay(for: relayURL))
+        let connection = try #require(await client.relays.pool.relay(for: relayURL))
         try await pollUntil { mock.sentTextFrames.contains { $0.hasPrefix("[\"AUTH\"") } }
         let sent = try NIP42TestSupport.sentAuthEvent(in: mock)
 
@@ -224,24 +224,24 @@ struct NostrSigningClientTests {
 
         mock.deliver(.string("[\"OK\",\"\(sent.id)\",true,\"\"]"))
         try await pollUntil { await connection.isAuthenticated }
-        await client.disconnect()
+        await client.relays.disconnect()
     }
 
     @Test("manual authenticate(relayURL:) works with a remote signer")
     func remoteSignerManualAuthenticate() async throws {
         let (client, mock) = makeClient()
         let keyPair = try KeyPair()
-        await client.setAuthenticationMode(.manual)
-        try await client.setSigner(MockRemoteSigner(keyPair: keyPair) as any NostrSigning)
-        try await client.connect(to: [relayURL.absoluteString])
+        await client.identity.setAuthenticationMode(.manual)
+        try await client.identity.setSigner(MockRemoteSigner(keyPair: keyPair) as any NostrSigning)
+        try await client.relays.connect(to: [relayURL.absoluteString])
 
         mock.deliver(.string(#"["AUTH","manual-challenge"]"#))
-        let connection = try #require(await client.relayPool.relay(for: relayURL))
+        let connection = try #require(await client.relays.pool.relay(for: relayURL))
         try await pollUntil { await connection.authenticationChallenge != nil }
 
         // Manual mode: the remote signer must still be able to answer via activeSign.
         // authenticate(relayURL:) awaits the relay's OK, so drive it concurrently and settle it.
-        let authTask = Task { try await client.authenticate(relayURL: relayURL) }
+        let authTask = Task { try await client.identity.authenticate(relayURL: relayURL) }
         try await pollUntil { mock.sentTextFrames.contains { $0.hasPrefix("[\"AUTH\"") } }
         let sent = try NIP42TestSupport.sentAuthEvent(in: mock)
         #expect(sent.kind == .clientAuthentication)
@@ -251,6 +251,6 @@ struct NostrSigningClientTests {
 
         mock.deliver(.string("[\"OK\",\"\(sent.id)\",true,\"\"]"))
         try await authTask.value
-        await client.disconnect()
+        await client.relays.disconnect()
     }
 }

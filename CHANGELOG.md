@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Client feature namespaces**: `NostrClient`'s API is now reached through eight namespaces —
+  `identity`, `relays`, `events`, `subscriptions`, `routing`, `messages`, `groups`, and `lists` —
+  instead of ~70 methods on the client itself, so completion shows one feature area at a time and
+  adding a NIP no longer widens the root type. Each namespace is a `Sendable` value holding only
+  the client, free to read, store, or hand to a background task.
+- **Capability protocols**: each namespace conforms to a protocol describing just that slice —
+  `NostrIdentityProviding`, `NostrRelayManaging`, `NostrEventPublishing`, `NostrEventFetching`,
+  `NostrSubscribing`, `NostrRelayRouting`, `NostrMessaging`, `NostrGroupManaging`, and
+  `NostrListManaging` — so an app feature can declare `any NostrMessaging` rather than the whole
+  client and be tested against a stub. Swift forbids default arguments on protocol requirements,
+  so the protocols spell out every parameter; the concrete namespaces still supply the defaults.
 - **NIP-98 HTTP Auth**: `HTTPAuth` builds and signs kind-27235 authorization events and encodes
   them as `Authorization: Nostr <base64>` header values, with a
   `URLRequest.setNostrAuthorization(signer:)` convenience that signs the request's URL, method,
@@ -29,12 +40,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   delete-group, create-invite, update-pin-list) and `Groups.ModerationRequest` parsing for
   admin and audit views.
 - **NIP-29 Relay-based groups (client)**: `GroupReference` (naddr share links with invite codes),
-  `GroupState` snapshots, and `NostrClient` flows — `joinGroup`, `leaveGroup`,
-  `publishGroupMessage`, `publishGroupModeration`, `fetchGroupMetadata`/`fetchGroupState` with
-  relay-author validation, and `subscribeToGroupTimeline` — all scoped to the group's relay.
+  `GroupState` snapshots, and `NostrClient` flows — `groups.join`, `groups.leave`,
+  `groups.publishMessage`, `groups.publishModeration`, `groups.fetchMetadata`/`groups.fetchState`
+  with relay-author validation, and `groups.timeline` — all scoped to the group's relay.
 - **NIP-29 Relay-based groups (group list)**: the NIP-51 kind-10009 simple group list as a typed
   `SimpleGroupList`/`GroupListEntry` view over `NostrList` — including NIP-44 private entries —
-  with `fetchSimpleGroupList` and `publishSimpleGroupList` on `NostrClient`.
+  with `groups.fetchSimpleGroupList` and `groups.publishSimpleGroupList` on `NostrClient`.
 - **Official NIP-44 vectors**: the canonical vector file from
   [paulmillr/nip44](https://github.com/paulmillr/nip44) is bundled as a test resource and run in
   full — conversation keys, message-key derivation, the padding table, every `encrypt_decrypt`
@@ -50,9 +61,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   run its relays on a platform-native socket or an in-memory fake and tune their timeouts, keepalive,
   and reconnection. Neither was reachable before: the per-module transports it replaces hard-coded
   `URLSession` and `RelayConnectionConfig.default`.
-- **String-based relay conveniences**: `NostrClient.count(filters:to:timeout:)` scopes a NIP-45
-  count to a subset of relays; `NostrClient.removeRelay(_:)` removes a relay by URL string;
-  `NostrClient.addRelay(_:config:)` accepts a per-relay `RelayConnectionConfig`; and
+- **String-based relay conveniences**: `client.events.count(filters:to:timeout:)` scopes a NIP-45
+  count to a subset of relays; `client.relays.remove(_:)` removes a relay by URL string;
+  `client.relays.add(_:config:)` accepts a per-relay `RelayConnectionConfig`; and
   `PublishResult.status(for:)` looks up a relay's publish status from any spelling of its URL
   string, resolved against the result's canonical keys.
 
@@ -88,10 +99,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   between and settled one entry above the limit even right after a sweep. It is now enforced as
   each event is recorded, evicting the oldest entries, so the bound holds at all times.
 - **`RelayPool.removeRelay` raced a concurrent re-add of the same relay.** The pool entry was
-  removed only after the disconnect suspended, so an `addRelay` interleaving with the removal
+  removed only after the disconnect suspended, so an add interleaving with the removal
   could receive a connection about to be torn down; the entry is now removed first.
 - **A relay listed for both reading and writing under different spellings lost a direction.**
-  `EventSigner.signRelayListMetadata(read:write:)` and `NostrClient.publishRelayList(read:write:)`
+  `EventSigner.signRelayListMetadata(read:write:)` and `client.routing.publishRelayList(read:write:)`
   compared the two lists as raw strings, so `wss://relay.example.com/` in `read` and
   `wss://relay.example.com` in `write` were treated as two relays and emitted as two conflicting
   `r` tags, which any NIP-65 reader collapses to whichever came first. Membership is now decided
@@ -107,6 +118,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Breaking**: every pre-namespace method and property on `NostrClient` — `publishTextNote`,
+  `subscribe`, `fetch`, `sendDirectMessage`, `joinGroup`, `publishList`, `setSigner`, `connect`,
+  `relayPool`, and the rest — is removed; each moves onto its namespace. Most keep their name
+  (`client.publishTextNote(…)` → `client.events.publishTextNote(…)`). The renames that drop a
+  prefix the namespace now supplies are: `sendDirectMessage` → `messages.send`,
+  `reactToDirectMessage` → `messages.react(to:…)`, `sendFileMessage` → `messages.sendFile`,
+  `parseDirectMessage`/`…Reaction`/`…File`/`…Payload` →
+  `messages.parse`/`parseReaction`/`parseFile`/`parsePayload`, `directMessages` →
+  `messages.subscribe`, `directMessagePayloads` → `messages.payloads`,
+  `subscribeToDirectMessages` → `messages.giftWraps`, `joinGroup`/`leaveGroup` →
+  `groups.join`/`groups.leave`, `publishGroupMessage`/`publishGroupModeration` →
+  `groups.publishMessage`/`groups.publishModeration`, `fetchGroupMetadata`/`fetchGroupState` →
+  `groups.fetchMetadata`/`groups.fetchState`, `subscribeToGroupTimeline` → `groups.timeline`,
+  `publishList`/`fetchList` → `lists.publish`/`lists.fetch`, `addRelay`/`addRelays` →
+  `relays.add`, `removeRelay` → `relays.remove`, and
+  `subscribeToUserTimeline`/`…GlobalFeed`/`…Mentions`/`…Metadata` →
+  `subscriptions.userTimeline`/`globalFeed`/`mentions`/`metadata`.
+- **Breaking**: `NostrClient.relayPool` is now reached as `client.relays.pool`, which resolves
+  the duplicate relay surface the client carried — the pool was public *and* the client forwarded
+  `addRelay`/`connect`/`disconnect` alongside it. `client.relays` is the single relay entry point:
+  it covers membership, the connection lifecycle, and pool inspection (`connections`, `count`,
+  `connectedCount()`, `relay(for:)`), with `relays.pool` as the escape hatch for the per-relay
+  detail it flattens. The pool is deliberately absent from `NostrRelayManaging`: it carries
+  publish, subscribe, and count too, which a relay-management dependency has no business
+  reaching, and requiring it would force every stub to stand up a real `RelayPool`.
 - **Breaking**: a remote NIP-46 signer now drives every `NostrClient` feature, not just the
   generic paths. The convenience `publish*` helpers, NIP-17 direct messages (send, react, file
   messages, and parsing), and NIP-51 private list/set items previously threw
@@ -143,8 +179,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   renamed to `relayURL:` as well. Because `Contact` is `Codable`, its JSON key changes from
   `relayUrl` to `relayURL`; clients that persist encoded contacts need to migrate stored data.
 - **Breaking**: the `relayUrl:` argument label is now `relayURL:` on
-  `EventSigner.signRepost(of:relayURL:)`, `NostrClient.publishReply(to:content:relayURL:strategy:)`,
-  and `NostrClient.publishRepost(of:relayURL:strategy:)`, completing the `relayURL` spelling across
+  `EventSigner.signRepost(of:relayURL:)`, `client.events.publishReply(to:content:relayURL:strategy:)`,
+  and `client.events.publishRepost(of:relayURL:strategy:)`, completing the `relayURL` spelling across
   the package.
 - **Breaking**: relay-targeted operations now throw instead of silently succeeding against zero
   relays. `RelayPool.publish`/`subscribe`/`count` — and the `NostrClient` publish, subscribe,

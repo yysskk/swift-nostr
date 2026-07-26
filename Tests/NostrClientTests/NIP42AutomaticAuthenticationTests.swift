@@ -329,121 +329,121 @@ struct NIP42AutomaticAuthenticationTests {
     func clientAutomaticByDefault() async throws {
         let (client, mock) = makeClient()
         let keyPair = try KeyPair()
-        await client.setSigner(EventSigner(keyPair: keyPair))
-        try await client.connect(to: [relayURL.absoluteString])
+        await client.identity.setSigner(EventSigner(keyPair: keyPair))
+        try await client.relays.connect(to: [relayURL.absoluteString])
 
         mock.deliver(.string(#"["AUTH","challengestringhere"]"#))
 
-        let connection = try #require(await client.relayPool.relay(for: relayURL))
+        let connection = try #require(await client.relays.pool.relay(for: relayURL))
         let sent = try await acknowledgeAuth(on: connection, mock: mock)
         #expect(sent.pubkey == keyPair.publicKeyHex)
         #expect(sent.firstTagValue(named: "relay") == relayURL.absoluteString)
         #expect(sent.firstTagValue(named: "challenge") == "challengestringhere")
-        await client.disconnect()
+        await client.relays.disconnect()
     }
 
     @Test("a signer set before relays are added still answers their challenges")
     func clientSignerBeforeRelays() async throws {
         let (client, mock) = makeClient()
-        await client.setSigner(EventSigner(keyPair: try KeyPair()))
-        try await client.connect(to: [relayURL.absoluteString])
+        await client.identity.setSigner(EventSigner(keyPair: try KeyPair()))
+        try await client.relays.connect(to: [relayURL.absoluteString])
 
         mock.deliver(.string(#"["AUTH","early-signer"]"#))
 
-        let connection = try #require(await client.relayPool.relay(for: relayURL))
+        let connection = try #require(await client.relays.pool.relay(for: relayURL))
         let sent = try await acknowledgeAuth(on: connection, mock: mock)
         #expect(sent.firstTagValue(named: "challenge") == "early-signer")
-        await client.disconnect()
+        await client.relays.disconnect()
     }
 
     @Test("manual mode does not answer challenges until authenticate is called")
     func clientManualMode() async throws {
         let (client, mock) = makeClient()
-        await client.setSigner(EventSigner(keyPair: try KeyPair()))
-        await client.setAuthenticationMode(.manual)
-        try await client.connect(to: [relayURL.absoluteString])
+        await client.identity.setSigner(EventSigner(keyPair: try KeyPair()))
+        await client.identity.setAuthenticationMode(.manual)
+        try await client.relays.connect(to: [relayURL.absoluteString])
 
         mock.deliver(.string(#"["AUTH","challengestringhere"]"#))
-        let connection = try #require(await client.relayPool.relay(for: relayURL))
+        let connection = try #require(await client.relays.pool.relay(for: relayURL))
         try await pollUntil { await connection.authenticationChallenge != nil }
 
         try await Task.sleep(for: .milliseconds(50))
         #expect(!mock.sentTextFrames.contains { $0.hasPrefix("[\"AUTH\"") })
 
-        async let authentication: Void = client.authenticate(relayURL: relayURL)
+        async let authentication: Void = client.identity.authenticate(relayURL: relayURL)
         let sent = try await acknowledgeAuth(on: connection, mock: mock)
         try await authentication
         #expect(sent.firstTagValue(named: "challenge") == "challengestringhere")
         #expect(await connection.isAuthenticated)
-        await client.disconnect()
+        await client.relays.disconnect()
     }
 
     @Test("switching back to automatic answers a pending challenge")
     func clientSwitchToAutomaticAnswersPendingChallenge() async throws {
         let (client, mock) = makeClient()
-        await client.setSigner(EventSigner(keyPair: try KeyPair()))
-        await client.setAuthenticationMode(.manual)
-        try await client.connect(to: [relayURL.absoluteString])
+        await client.identity.setSigner(EventSigner(keyPair: try KeyPair()))
+        await client.identity.setAuthenticationMode(.manual)
+        try await client.relays.connect(to: [relayURL.absoluteString])
 
         mock.deliver(.string(#"["AUTH","challengestringhere"]"#))
-        let connection = try #require(await client.relayPool.relay(for: relayURL))
+        let connection = try #require(await client.relays.pool.relay(for: relayURL))
         try await pollUntil { await connection.authenticationChallenge != nil }
 
-        await client.setAuthenticationMode(.automatic)
+        await client.identity.setAuthenticationMode(.automatic)
 
         _ = try await acknowledgeAuth(on: connection, mock: mock)
-        await client.disconnect()
+        await client.relays.disconnect()
     }
 
     @Test("authenticate(relayURL:) requires the relay to be in the pool")
     func clientAuthenticateUnknownRelay() async throws {
         let (client, _) = makeClient()
-        await client.setSigner(EventSigner(keyPair: try KeyPair()))
+        await client.identity.setSigner(EventSigner(keyPair: try KeyPair()))
 
         await #expect(throws: NostrError.noMatchingRelays(["wss://unknown.example.com"])) {
-            try await client.authenticate(relayURL: URL(string: "wss://Unknown.Example.com/")!)
+            try await client.identity.authenticate(relayURL: URL(string: "wss://Unknown.Example.com/")!)
         }
     }
 
     @Test("authenticate(relayURL:) requires a challenge")
     func clientAuthenticateWithoutChallenge() async throws {
         let (client, _) = makeClient()
-        await client.setSigner(EventSigner(keyPair: try KeyPair()))
-        try await client.connect(to: [relayURL.absoluteString])
+        await client.identity.setSigner(EventSigner(keyPair: try KeyPair()))
+        try await client.relays.connect(to: [relayURL.absoluteString])
 
         await #expect(throws: NostrError.authenticationFailed("The relay has not sent an AUTH challenge")) {
-            try await client.authenticate(relayURL: relayURL)
+            try await client.identity.authenticate(relayURL: relayURL)
         }
-        await client.disconnect()
+        await client.relays.disconnect()
     }
 
     @Test("authenticate(relayURL:) requires a signer")
     func clientAuthenticateWithoutSigner() async throws {
         let (client, mock) = makeClient()
-        try await client.connect(to: [relayURL.absoluteString])
+        try await client.relays.connect(to: [relayURL.absoluteString])
 
         mock.deliver(.string(#"["AUTH","challengestringhere"]"#))
-        let connection = try #require(await client.relayPool.relay(for: relayURL))
+        let connection = try #require(await client.relays.pool.relay(for: relayURL))
         try await pollUntil { await connection.authenticationChallenge != nil }
 
         await #expect(throws: NostrError.signerNotSet) {
-            try await client.authenticate(relayURL: relayURL)
+            try await client.identity.authenticate(relayURL: relayURL)
         }
-        await client.disconnect()
+        await client.relays.disconnect()
     }
 
     @Test("without a signer, challenges go unanswered")
     func clientWithoutSignerDoesNotAnswer() async throws {
         let (client, mock) = makeClient()
-        try await client.connect(to: [relayURL.absoluteString])
+        try await client.relays.connect(to: [relayURL.absoluteString])
 
         mock.deliver(.string(#"["AUTH","challengestringhere"]"#))
-        let connection = try #require(await client.relayPool.relay(for: relayURL))
+        let connection = try #require(await client.relays.pool.relay(for: relayURL))
         try await pollUntil { await connection.authenticationChallenge != nil }
 
         try await Task.sleep(for: .milliseconds(50))
         #expect(!mock.sentTextFrames.contains { $0.hasPrefix("[\"AUTH\"") })
-        await client.disconnect()
+        await client.relays.disconnect()
     }
 }
 

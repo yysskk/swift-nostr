@@ -150,13 +150,13 @@ struct NIP25DirectMessageReactionTests {
         #expect(parsed.expiresAt == expiry)
     }
 
-    @Test("reactToDirectMessage targets the message author and falls back to the pool")
+    @Test("messages.react targets the message author and falls back to the pool")
     func reactRoutingFallsBackToPool() async throws {
         let (client, socket) = try await ConnectedClientFixture.make()
-        try await client.setPrivateKey(String(repeating: "1", count: 64))
+        try await client.identity.setPrivateKey(String(repeating: "1", count: 64))
         let author = try KeyPair()
 
-        let myPubkey = await client.publicKey ?? ""
+        let myPubkey = await client.identity.publicKey ?? ""
         let message = DirectMessage(
             rumorId: "mid", senderPubkey: author.publicKeyHex,
             recipientPubkey: myPubkey, content: "hi", createdAt: Date())
@@ -167,11 +167,11 @@ struct NIP25DirectMessageReactionTests {
         await client.dmRelayListStore.markNoList(for: myPubkey)
 
         let result = try await PublishAckSupport.acknowledgingPublishes(2, on: socket) {
-            try await client.reactToDirectMessage(message, reaction: "+")
+            try await client.messages.react(to: message, reaction: "+")
         }
         #expect(result.rumor.kind == .reaction)
         #expect(result.rumor.referencedEventIds == ["mid"])
         #expect(result.recipientPublishResult?.acceptedRelays == [ConnectedClientFixture.defaultRelayURL])
-        await client.disconnect()
+        await client.relays.disconnect()
     }
 }

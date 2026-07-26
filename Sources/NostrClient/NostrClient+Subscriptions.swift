@@ -1,37 +1,16 @@
 import Foundation
 import NostrCore
 
-// MARK: - Subscriptions
+// MARK: - Subscriptions — actor-isolated internals
+//
+// The public surface lives on ``NostrSubscriptionsAPI``. Registering and tearing down a
+// subscription mutates ``subscriptionCounter`` and ``openSubscriptions``, so unlike the other
+// feature areas the work itself stays on the actor and the façade only forwards.
 extension NostrClient {
-    /// Opens a subscription and returns it as an async sequence of relay-aware events.
+    /// Opens a subscription and returns it as an async sequence of relay-aware events, taking
+    /// pre-validated canonical URLs; nil subscribes on the whole pool.
     ///
-    /// Pass relay URL strings to scope the subscription to a subset of relays (NIP-65
-    /// outbox routing); the default `nil` subscribes on all relays in the pool. Targets
-    /// de-duplicate by their normalized routing key; an empty array always throws.
-    ///
-    /// Iteration termination (breaking out of the loop, task cancellation, or
-    /// discarding the sequence) automatically sends CLOSE to the relays.
-    /// - Parameter bufferingPolicy: How items are buffered while the consumer is
-    ///   slower than the relays (default: `.unbounded`). Use
-    ///   `.bufferingNewest(n)` for firehose subscriptions where memory matters.
-    /// - Throws: ``NostrError/invalidRelayURL(_:)`` for an invalid target string,
-    ///   ``NostrError/noRelaysInPool`` when the pool is empty,
-    ///   ``NostrError/noMatchingRelays(_:)`` when none of the targeted URLs are in the
-    ///   pool, or ``NostrError/relayError(_:)`` when every relay fails to subscribe.
-    public func subscribe(
-        filters: [Filter],
-        to relayURLs: [String]? = nil,
-        bufferingPolicy: AsyncStream<SubscriptionEvent>.Continuation.BufferingPolicy = .unbounded
-    ) async throws -> SubscriptionSequence {
-        try await subscribe(
-            filters: filters,
-            toURLs: relayURLs.map(RelayURL.requireTargets),
-            bufferingPolicy: bufferingPolicy
-        )
-    }
-
-    /// Core of ``subscribe(filters:to:bufferingPolicy:)`` taking pre-validated canonical
-    /// URLs; nil subscribes on the whole pool.
+    /// Backs ``NostrSubscriptionsAPI/subscribe(filters:to:bufferingPolicy:)``.
     func subscribe(
         filters: [Filter],
         toURLs relayURLs: Set<URL>?,
@@ -53,16 +32,16 @@ extension NostrClient {
         }
 
         // The actor was free during the await above: if the subscription was
-        // already torn down (e.g. unsubscribeAll), end the stream immediately.
-        if subscriptions[opened.id] != nil {
-            subscriptions[opened.id]?.continuation = continuation
+        // already torn down (e.g. closeAllSubscriptions), end the stream immediately.
+        if openSubscriptions[opened.id] != nil {
+            openSubscriptions[opened.id]?.continuation = continuation
         } else {
             continuation.finish()
         }
 
         let subscriptionId = opened.id
         continuation.onTermination = { [weak self] _ in
-            Task { await self?.unsubscribe(subscriptionId: subscriptionId) }
+            Task { await self?.closeSubscription(id: subscriptionId) }
         }
 
         return SubscriptionSequence(
@@ -70,35 +49,13 @@ extension NostrClient {
             expectedRelays: opened.expectedRelays,
             stream: stream,
             onClose: { [weak self] in
-                await self?.unsubscribe(subscriptionId: subscriptionId)
+                await self?.closeSubscription(id: subscriptionId)
             }
         )
     }
 
-    /// Opens a subscription and returns only its event payloads as an async sequence.
-    ///
-    /// ```swift
-    /// for await event in try await client.events(filters: [filter]) {
-    ///     print(event.content)
-    /// }
-    /// ```
-    /// - Throws: ``NostrError/invalidRelayURL(_:)``, ``NostrError/noRelaysInPool``,
-    ///   ``NostrError/noMatchingRelays(_:)``, or ``NostrError/relayError(_:)`` — see
-    ///   ``subscribe(filters:to:bufferingPolicy:)``.
-    public func events(
-        filters: [Filter],
-        to relayURLs: [String]? = nil,
-        bufferingPolicy: AsyncStream<SubscriptionEvent>.Continuation.BufferingPolicy = .unbounded
-    ) async throws -> SubscriptionSequence.Events {
-        try await subscribe(
-            filters: filters,
-            toURLs: relayURLs.map(RelayURL.requireTargets),
-            bufferingPolicy: bufferingPolicy
-        ).events
-    }
-
     /// Registers a subscription with the relay pool and routes its messages to `handler`.
-    /// Backs the stream-based ``subscribe(filters:to:bufferingPolicy:)``.
+    /// Backs the stream-based ``subscribe(filters:toURLs:bufferingPolicy:)``.
     func openSubscription(
         filters: [Filter],
         toURLs relayURLs: Set<URL>?,
@@ -107,14 +64,14 @@ extension NostrClient {
         subscriptionCounter += 1
         let subscriptionId = "sub_\(subscriptionCounter)"
 
-        subscriptions[subscriptionId] = SubscriptionState(
+        openSubscriptions[subscriptionId] = SubscriptionState(
             id: subscriptionId,
             filters: filters,
             handler: handler
         )
 
         do {
-            let expectedRelayURLs = try await relayPool.subscribeWithRelayContext(
+            let expectedRelayURLs = try await pool.subscribeWithRelayContext(
                 subscriptionId: subscriptionId,
                 filters: filters,
                 toURLs: relayURLs
@@ -128,66 +85,37 @@ extension NostrClient {
             }
             return (subscriptionId, expectedRelayURLs)
         } catch {
-            subscriptions.removeValue(forKey: subscriptionId)
+            openSubscriptions.removeValue(forKey: subscriptionId)
             // Drop the pool-side handler and message tasks registered before the failure.
-            await relayPool.unsubscribe(subscriptionId: subscriptionId)
+            await pool.unsubscribe(subscriptionId: subscriptionId)
             throw error
         }
     }
 
-    /// Unsubscribes from a subscription.
+    /// Closes one subscription.
     /// No-op for unknown IDs, so the re-entrant call triggered by finishing the
-    /// continuation (onTermination → unsubscribe) cannot send a second CLOSE.
-    public func unsubscribe(subscriptionId: String) async {
-        guard let subscription = subscriptions.removeValue(forKey: subscriptionId) else { return }
+    /// continuation (onTermination → close) cannot send a second CLOSE.
+    ///
+    /// Backs ``NostrSubscriptionsAPI/unsubscribe(subscriptionId:)``.
+    func closeSubscription(id subscriptionId: String) async {
+        guard let subscription = openSubscriptions.removeValue(forKey: subscriptionId) else { return }
         subscription.continuation?.finish()
-        await relayPool.unsubscribe(subscriptionId: subscriptionId)
+        await pool.unsubscribe(subscriptionId: subscriptionId)
     }
 
-    /// Unsubscribes from all subscriptions
-    public func unsubscribeAll() async {
-        let active = subscriptions
-        subscriptions.removeAll()
+    /// Closes every open subscription.
+    /// Backs ``NostrSubscriptionsAPI/unsubscribeAll()``.
+    func closeAllSubscriptions() async {
+        let active = openSubscriptions
+        openSubscriptions.removeAll()
         for (subscriptionId, subscription) in active {
             subscription.continuation?.finish()
-            await relayPool.unsubscribe(subscriptionId: subscriptionId)
+            await pool.unsubscribe(subscriptionId: subscriptionId)
         }
     }
 
-    // MARK: - Convenience Subscriptions
-
-    /// Subscribes to a user's timeline
-    public func subscribeToUserTimeline(
-        pubkey: String,
-        limit: Int = 100
-    ) async throws -> SubscriptionSequence {
-        try await subscribe(filters: [.userNotes(pubkey: pubkey, limit: limit)])
-    }
-
-    /// Subscribes to the global feed
-    public func subscribeToGlobalFeed(
-        limit: Int = 100
-    ) async throws -> SubscriptionSequence {
-        try await subscribe(filters: [.globalFeed(limit: limit)])
-    }
-
-    /// Subscribes to mentions of a user
-    public func subscribeToMentions(
-        pubkey: String,
-        limit: Int = 100
-    ) async throws -> SubscriptionSequence {
-        try await subscribe(filters: [.mentions(pubkey: pubkey, limit: limit)])
-    }
-
-    /// Subscribes to metadata updates for a list of pubkeys
-    public func subscribeToMetadata(
-        pubkeys: [String]
-    ) async throws -> SubscriptionSequence {
-        try await subscribe(filters: [.metadata(pubkeys: pubkeys)])
-    }
-
     private func handleMessage(_ message: RelayMessage, from relayURL: URL, subscriptionId: String) {
-        guard let subscription = subscriptions[subscriptionId] else { return }
+        guard let subscription = openSubscriptions[subscriptionId] else { return }
 
         switch message {
         case .event(_, let event):
@@ -213,13 +141,13 @@ extension NostrClient {
 
     /// The number of currently registered subscriptions (for tests).
     var activeSubscriptionCount: Int {
-        subscriptions.count
+        openSubscriptions.count
     }
 }
 
 /// Per-subscription state held by ``NostrClient``.
 ///
-/// `internal` (not `private`) because ``NostrClient``'s `subscriptions` storage and the
+/// `internal` (not `private`) because ``NostrClient``'s `openSubscriptions` storage and the
 /// subscribe/unsubscribe logic now live in separate files. The continuation is
 /// `fileprivate(set)` so only this file — where the subscribe/unsubscribe logic lives —
 /// can wire or clear it; other module files can read it but not reassign it.

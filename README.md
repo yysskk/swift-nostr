@@ -62,7 +62,30 @@ The package vends four libraries:
 - **`NostrWalletConnect`** — NIP-47 wallet payments. Built on `NostrCore`, which it re-exports.
 - **`NostrConnect`** — NIP-46 remote signing (`bunker://` and `nostrconnect://` flows). Built on `NostrCore`, which it re-exports.
 
-> **Migrating from an earlier release:** the protocol primitives (`Event`, `KeyPair`, `EventSigner`, `Filter`, `RelayConnection`, `Bech32`, `NostrError`, …) moved out of `NostrClient` into the new `NostrCore` module, but `NostrClient` re-exports it — existing `import NostrClient` code keeps compiling without changes. Depend on the `NostrCore` product and `import NostrCore` directly only when you use the primitives without the high-level client.
+### Client namespaces
+
+`NostrClient`'s API is reached through eight feature namespaces, so completion shows one feature area at a time instead of every operation the client can perform:
+
+| Namespace | What it covers |
+| --- | --- |
+| `client.identity` | The signer, its public key, and NIP-42 relay authentication |
+| `client.relays` | Pool membership, connection lifecycle, and the underlying `RelayPool` |
+| `client.events` | Publishing, one-time fetches, NIP-23 long-form content |
+| `client.subscriptions` | Live subscriptions as async sequences |
+| `client.routing` | NIP-65 outbox/gossip and NIP-17 DM relay lists |
+| `client.messages` | NIP-17 private direct messages |
+| `client.groups` | NIP-29 relay-based groups and the kind-10009 group list |
+| `client.lists` | NIP-51 lists and sets |
+
+Each namespace is a `Sendable` value holding nothing but the client — free to read, store, or pass to a view model — and each conforms to a capability protocol, so a feature depends on the slice it uses instead of the whole client and can be tested against a stub:
+
+```swift
+struct ChatViewModel {
+    let messages: any NostrMessaging
+}
+
+ChatViewModel(messages: client.messages)
+```
 
 ## Quick Start
 
@@ -85,14 +108,14 @@ print(mnemonic.phrase, try derived.npub)
 
 ```swift
 let client = NostrClient()
-try await client.connect(to: ["wss://relay.example.com", "wss://relay2.example.com"])
-try await client.setNsec("nsec1...")
+try await client.relays.connect(to: ["wss://relay.example.com", "wss://relay2.example.com"])
+try await client.identity.setNsec("nsec1...")
 
 // Publish a text note — returns the signed event plus the per-relay outcome.
-let note = try await client.publishTextNote(content: "Hello, Nostr!")
+let note = try await client.events.publishTextNote(content: "Hello, Nostr!")
 print("Accepted by \(note.result.acceptedRelays.count) relay(s)")
 
-try await client.publishReaction(to: note.event, content: "🤙")
+try await client.events.publishReaction(to: note.event, content: "🤙")
 ```
 
 `PublishStrategy` controls how many acknowledgments a publish waits for (`.firstAck`, `.quorum(n)`, `.allSettled`); the returned `PublishResult` reports the per-relay outcome.
@@ -103,39 +126,39 @@ Subscriptions are async sequences — iterate them with `for await`. The subscri
 
 ```swift
 // Live timeline
-let timeline = try await client.subscribeToUserTimeline(pubkey: "...")
+let timeline = try await client.subscriptions.userTimeline(pubkey: "...")
 for await event in timeline.events {
     print(event.content)
 }
 
 // Custom filter
 let filter = Filter(kinds: [1], authors: ["pubkey1"], limit: 100)
-for await event in try await client.events(filters: [filter]) {
+for await event in try await client.subscriptions.events(filters: [filter]) {
     print(event.id)
 }
 
 // One-shot fetch
-let metadata = try await client.fetchMetadata(pubkey: "...")
+let metadata = try await client.events.fetchMetadata(pubkey: "...")
 print(metadata?.name ?? "Unknown")
 ```
 
-Need per-relay EOSE, notices, and auth challenges? Iterate `client.subscribe(filters:)` directly — see [Advanced Usage](https://yysskk.github.io/swift-nostr/documentation/nostrclient/advancedusage).
+Need per-relay EOSE, notices, and auth challenges? Iterate `client.subscriptions.subscribe(filters:)` directly — see [Advanced Usage](https://yysskk.github.io/swift-nostr/documentation/nostrclient/advancedusage).
 
 ### Private direct messages (NIP-17)
 
 ```swift
 // Advertise where you receive DMs (kind 10050; NIP-17 suggests 1–3 relays), then connect your inbox.
-try await client.publishDirectMessageRelayList(relays: ["wss://inbox.example.com"])
-try await client.connectDirectMessageInboxRelays()
+try await client.routing.publishDirectMessageRelayList(relays: ["wss://inbox.example.com"])
+try await client.routing.connectDirectMessageInboxRelays()
 
 // Receive — already decrypted and parsed. Wraps meant for someone else are skipped;
 // a signer that cannot be reached throws, so a failure is never mistaken for silence.
-for try await message in try await client.directMessages() {
+for try await message in try await client.messages.subscribe() {
     print("\(message.senderPubkey): \(message.content)")
 }
 
 // Send (encrypted, gift-wrapped, routed to each party's DM relays).
-try await client.sendDirectMessage("Hello privately!", to: "recipientPubkeyHex")
+try await client.messages.send("Hello privately!", to: "recipientPubkeyHex")
 ```
 
 Reactions (NIP-25), encrypted file messages (kind 15), and disappearing messages (NIP-40) build on the same flow — see [Advanced Usage](https://yysskk.github.io/swift-nostr/documentation/nostrclient/advancedusage).
@@ -193,14 +216,14 @@ let remotePubkey = try await signer.awaitConnection()   // resolves once the sig
 
 `ping`, NIP-44/NIP-04 encrypt and decrypt, `switch_relays`, and `logout` are available too, along with an `authChallenges()` stream for `auth_url` approvals.
 
-A `RemoteSigner` can also drive a `NostrClient`: `NostrClient.setSigner(_:)` accepts any `NostrSigning`, and every feature runs through that abstraction — `sign(_:)`, `publish(_:)`, the convenience `publish*` helpers, NIP-17 direct messages, NIP-51 private list items, and NIP-42 authentication all work with a remote signer exactly as they do with a local key.
+A `RemoteSigner` can also drive a `NostrClient`: `client.identity.setSigner(_:)` accepts any `NostrSigning`, and every feature runs through that abstraction — `identity.sign(_:)`, `events.publish(_:)`, the convenience `publish*` helpers, NIP-17 direct messages, NIP-51 private list items, and NIP-42 authentication all work with a remote signer exactly as they do with a local key.
 
 ```swift
-try await client.setSigner(signer)   // any NostrSigning — a RemoteSigner or a local EventSigner
-guard let userPubkey = await client.publicKey else { return }
-let signed = try await client.sign(
+try await client.identity.setSigner(signer)   // any NostrSigning — a RemoteSigner or a local EventSigner
+guard let userPubkey = await client.identity.publicKey else { return }
+let signed = try await client.identity.sign(
     UnsignedEvent(pubkey: userPubkey, kind: .textNote, content: "Signed by my bunker"))
-try await client.publish(signed)
+try await client.events.publish(signed)
 ```
 
 ### Authorize an HTTP request (NIP-98)
@@ -233,21 +256,21 @@ import NostrClient
 
 // Parse a share link and join (kind 9021) — the invite code is applied automatically.
 let group = try GroupReference(naddrString: "naddr1...?invite=A7fjq2")
-try await client.joinGroup(group)
+try await client.groups.join(group)
 
 // Follow the live timeline, keeping recent events for timeline references.
 var recent: [Event] = []
-let timeline = try await client.subscribeToGroupTimeline(group)
+let timeline = try await client.groups.timeline(group)
 for await event in timeline.events {
     recent.append(event)
     print(event.content)
 }
 
 // Chat (NIP-C7 kind 9 by default), referencing recent events so rebroadcasts are detectable.
-try await client.publishGroupMessage(
+try await client.groups.publishMessage(
     "Hello, group!",
     in: group,
-    previous: Groups.previousReferences(from: recent, excludingAuthor: await client.publicKey)
+    previous: Groups.previousReferences(from: recent, excludingAuthor: await client.identity.publicKey)
 )
 ```
 
@@ -258,10 +281,10 @@ Private groups require NIP-42 AUTH, which the client answers automatically once 
 Each of these is covered in depth, with worked examples, in the [documentation](https://yysskk.github.io/swift-nostr/documentation/nostrclient):
 
 - **Lightning Zaps (NIP-57)** — resolve an LNURL-pay endpoint, sign a zap request, fetch the bolt11 invoice, and verify the kind-9735 receipt.
-- **Outbox model (NIP-65)** — publish your read/write relay list and route reads/writes to each user's declared relays with `subscribeOutbox` / `publishGossip`.
+- **Outbox model (NIP-65)** — publish your read/write relay list and route reads/writes to each user's declared relays with `routing.subscribeOutbox` / `routing.publishGossip`.
 - **Client authentication (NIP-42)** — AUTH challenges are answered automatically once a signer is set, with auth-required publish retry; an opt-in manual mode is available.
 - **HTTP authorization (NIP-98)** — sign requests with `URLRequest.setNostrAuthorization(signer:)` or `HTTPAuth`, and validate incoming headers with `HTTPAuth.validate`.
-- **Relay-based groups (NIP-29)** — parse `naddr` share links with `GroupReference`, join and leave, chat with timeline references, moderate with `Groups.ModerationAction`, fetch validated relay-signed state with `fetchGroupState`, and keep the kind-10009 simple group list fresh.
+- **Relay-based groups (NIP-29)** — parse `naddr` share links with `GroupReference`, join and leave, chat with timeline references, moderate with `Groups.ModerationAction`, fetch validated relay-signed state with `groups.fetchState`, and keep the kind-10009 simple group list fresh.
 - **Relay information (NIP-11)** — fetch a relay's capabilities with `RelayInformation.fetch(fromRelayURLString:)`.
 - **NIP-19 entities** — encode/decode `npub`/`nsec`/`note`/`nprofile`/`nevent`/`naddr` via `NIP19Entity`, `NProfile`, `NEvent`, and `NAddr`.
 - **Low-level APIs** — drive a single `RelayConnection` directly, or sign events by hand with `EventSigner`.

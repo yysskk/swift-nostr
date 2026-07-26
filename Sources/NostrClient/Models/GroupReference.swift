@@ -10,7 +10,7 @@ import NostrCore
 ///
 /// ```swift
 /// let group = try GroupReference(naddrString: "naddr1...?invite=A7fjq2")
-/// try await client.joinGroup(group)  // the invite code is applied automatically
+/// try await client.groups.join(group)  // the invite code is applied automatically
 /// ```
 ///
 /// https://github.com/nostr-protocol/nips/blob/master/29.md

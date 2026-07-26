@@ -179,23 +179,23 @@ struct DirectMessageSequenceTests {
         await sequence.close()
     }
 
-    @Test("directMessages(limit:) requires a signer")
+    @Test("messages.subscribe(limit:) requires a signer")
     func directMessagesRequiresSigner() async throws {
         let client = NostrClient()
         await #expect(throws: NostrError.self) {
-            _ = try await client.directMessages()
+            _ = try await client.messages.subscribe()
         }
     }
 
-    @Test("directMessages(limit:) opens and closes a subscription")
+    @Test("messages.subscribe(limit:) opens and closes a subscription")
     func directMessagesOpensAndClosesSubscription() async throws {
         let (client, _) = try await ConnectedClientFixture.make()
-        try await client.setPrivateKey(String(repeating: "1", count: 64))
+        try await client.identity.setPrivateKey(String(repeating: "1", count: 64))
 
-        let messages = try await client.directMessages()
+        let messages = try await client.messages.subscribe()
         #expect(await client.activeSubscriptionCount == 1)
         await messages.close()
         #expect(await client.activeSubscriptionCount == 0)
-        await client.disconnect()
+        await client.relays.disconnect()
     }
 }

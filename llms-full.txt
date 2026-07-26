@@ -36,17 +36,17 @@ import NostrClient
 let client = NostrClient()
 
 // Set signer
-try await client.setNsec("nsec1...")
+try await client.identity.setNsec("nsec1...")
 
 // Add relays and connect in one step
-try await client.connect(to: ["wss://relay.example.com", "wss://relay2.example.com"])
+try await client.relays.connect(to: ["wss://relay.example.com", "wss://relay2.example.com"])
 
 // Publish a text note — returns the signed event plus the per-relay outcome
-let note = try await client.publishTextNote(content: "Hello, Nostr!")
+let note = try await client.events.publishTextNote(content: "Hello, Nostr!")
 print("Accepted by \(note.result.acceptedRelays.count) relay(s)")
 
 // Subscribe to events (async sequence)
-let feed = try await client.subscribeToGlobalFeed(limit: 50)
+let feed = try await client.subscriptions.globalFeed(limit: 50)
 for await item in feed {
     switch item {
     case .event(let relayURL, let event):
@@ -67,24 +67,53 @@ for await item in feed {
 
 The main entry point for the library. Manages relays, publishing, and subscriptions.
 
-### Properties
+### Feature namespaces
 
-- `relayPool: RelayPool` -- the underlying relay pool
-- `publicKey: String?` -- hex public key if signer is set
-- `npub: String?` -- npub if signer is set
+Every operation is reached through one of eight namespaces on the client, not as a flat method
+list. Each is a `Sendable` value holding only the client, so reading one is free and it can be
+stored or passed to a view model.
+
+- `client.identity` -- signer setup, `publicKey`, `npub`, `sign(_:)`, NIP-42 authentication
+- `client.relays` -- `add`, `remove`, `connect`, `disconnect`, pool inspection, and `pool: RelayPool`
+- `client.events` -- the `publish*` helpers, `publish(_:)`, `fetch`, `count`, NIP-23 long-form content
+- `client.subscriptions` -- `subscribe`, `events`, `unsubscribe`, and the convenience feeds
+- `client.routing` -- NIP-65 relay lists with outbox/gossip, NIP-17 DM relay lists
+- `client.messages` -- NIP-17 private direct messages
+- `client.groups` -- NIP-29 groups and the kind-10009 simple group list
+- `client.lists` -- NIP-51 lists and sets
+
+Each conforms to a capability protocol -- `NostrIdentityProviding`, `NostrRelayManaging`,
+`NostrEventPublishing`, `NostrEventFetching`, `NostrSubscribing`, `NostrRelayRouting`,
+`NostrMessaging`, `NostrGroupManaging`, `NostrListManaging` -- so a feature depends on the slice
+it uses and can be tested against a stub:
+
+```swift
+struct ChatViewModel {
+    let messages: any NostrMessaging
+}
+
+ChatViewModel(messages: client.messages)
+```
+
+Swift forbids default arguments on protocol requirements, so the protocols spell out every
+parameter; the concrete namespaces still supply the defaults, and only calls made through the
+protocol pass the full argument list. `NostrRelayManaging` deliberately omits `pool`: the pool
+carries publish, subscribe, and count too, so it stays on the concrete `NostrRelaysAPI`.
+
+`NostrClient` itself exposes only its initializers and these namespaces.
 
 ### Signer Setup
 
 ```swift
-await client.setSigner(eventSigner)              // local EventSigner (async, non-throwing)
-try await client.setSigner(remoteSigner)         // any NostrSigning, e.g. a NIP-46 RemoteSigner
-try await client.setPrivateKey("hex...")         // hex private key
-try await client.setNsec("nsec1...")             // bech32 nsec
+await client.identity.setSigner(eventSigner)              // local EventSigner (async, non-throwing)
+try await client.identity.setSigner(remoteSigner)         // any NostrSigning, e.g. a NIP-46 RemoteSigner
+try await client.identity.setPrivateKey("hex...")         // hex private key
+try await client.identity.setNsec("nsec1...")             // bech32 nsec
 ```
 
-`setSigner(_:)` is overloaded: it takes a local `EventSigner` or any `NostrSigning` (including a
+`identity.setSigner(_:)` is overloaded: it takes a local `EventSigner` or any `NostrSigning` (including a
 NIP-46 `RemoteSigner` from the `NostrConnect` library). The signer's `publicKey` is resolved once
-and cached, so `publicKey`/`npub` stay synchronous even for a remote signer.
+and cached, so `identity.publicKey`/`identity.npub` stay a single actor hop even for a remote signer.
 
 Setting a signer also starts answering NIP-42 AUTH challenges automatically (see Authentication).
 
@@ -93,15 +122,15 @@ Every feature runs through the signer, so a remote one is a drop-in for a local 
 list items, and NIP-42 authentication all work unchanged:
 
 ```swift
-try await client.setSigner(remoteSigner)   // a RemoteSigner or any NostrSigning
-try await client.publishTextNote(content: "Signed remotely")
-try await client.sendDirectMessage("gift-wrapped by the bunker", to: recipientPubkey)
+try await client.identity.setSigner(remoteSigner)   // a RemoteSigner or any NostrSigning
+try await client.events.publishTextNote(content: "Signed remotely")
+try await client.messages.send("gift-wrapped by the bunker", to: recipientPubkey)
 
 // Or author an event with no helper: build it under the signer's pubkey and sign it.
-let pubkey = await client.publicKey!
-let signed = try await client.sign(
+let pubkey = await client.identity.publicKey!
+let signed = try await client.identity.sign(
     UnsignedEvent(pubkey: pubkey, kind: .textNote, content: "Signed remotely"))
-try await client.publish(signed)           // generic publish of a pre-signed event
+try await client.events.publish(signed)           // generic publish of a pre-signed event
 ```
 
 ### Authentication (NIP-42)
@@ -111,8 +140,8 @@ with `auth-required:` retry once after the AUTH round-trip, and subscriptions cl
 `auth-required:` are re-requested. Opt out with `.manual` and answer challenges explicitly:
 
 ```swift
-await client.setAuthenticationMode(.manual)   // or .automatic (default)
-try await client.authenticate(relayURL: url)  // answer a pending challenge explicitly
+await client.identity.setAuthenticationMode(.manual)   // or .automatic (default)
+try await client.identity.authenticate(relayURL: url)  // answer a pending challenge explicitly
 ```
 
 ### Relay Management
@@ -123,13 +152,13 @@ non-`ws(s)` scheme, a missing host, or a fragment/userinfo throws
 default port) routes to one pooled connection.
 
 ```swift
-try await client.addRelay("wss://relay.example.com")
-try await client.addRelay("wss://relay.example.com", config: customConfig)
-try await client.addRelays(["wss://relay1.example.com", "wss://relay2.example.com"])
-try await client.removeRelay("wss://relay.example.com")  // absent relay: no-op
-try await client.connect()
-try await client.connect(to: ["wss://relay.example.com"])  // addRelays + connect in one step
-await client.disconnect()
+try await client.relays.add("wss://relay.example.com")
+try await client.relays.add("wss://relay.example.com", config: customConfig)
+try await client.relays.add(["wss://relay1.example.com", "wss://relay2.example.com"])
+try await client.relays.remove("wss://relay.example.com")  // absent relay: no-op
+try await client.relays.connect()
+try await client.relays.connect(to: ["wss://relay.example.com"])  // add + connect in one step
+await client.relays.disconnect()
 ```
 
 ### Publishing
@@ -142,17 +171,17 @@ wait for before returning. Publishing with zero resolved relays throws —
 URL is in the pool.
 
 ```swift
-let note = try await client.publishTextNote(content: "Hello!", tags: [.hashtag("nostr")])
+let note = try await client.events.publishTextNote(content: "Hello!", tags: [.hashtag("nostr")])
 print(note.event.id, note.result.acceptedRelays)
-try await client.publishReply(to: parentEvent, content: "Nice post!")
-try await client.publishMetadata(UserMetadata(name: "Alice", about: "Nostr user"))
-try await client.publishReaction(to: note.event, content: "🤙")
-try await client.publishRepost(of: note.event, relayURL: "wss://relay.example.com")
-try await client.publishDeletion(eventIds: ["eventId1"], reason: "posted by mistake")
-try await client.publishReport(pubkey: "authorHex", type: .impersonation)  // report a pubkey (NIP-56)
-try await client.publishReport(event: note.event, type: .spam, reason: "unsolicited")  // report an event and its author
-try await client.publishTextNote(content: "Important!", strategy: .quorum(2))
-try await client.publish(signedEvent)  // publish any pre-signed event
+try await client.events.publishReply(to: parentEvent, content: "Nice post!")
+try await client.events.publishMetadata(UserMetadata(name: "Alice", about: "Nostr user"))
+try await client.events.publishReaction(to: note.event, content: "🤙")
+try await client.events.publishRepost(of: note.event, relayURL: "wss://relay.example.com")
+try await client.events.publishDeletion(eventIds: ["eventId1"], reason: "posted by mistake")
+try await client.events.publishReport(pubkey: "authorHex", type: .impersonation)  // report a pubkey (NIP-56)
+try await client.events.publishReport(event: note.event, type: .spam, reason: "unsolicited")  // report an event and its author
+try await client.events.publishTextNote(content: "Important!", strategy: .quorum(2))
+try await client.events.publish(signedEvent)  // publish any pre-signed event
 ```
 
 ### Subscriptions
@@ -164,19 +193,19 @@ or calling `close()` sends CLOSE to the relays automatically.
 
 ```swift
 // Convenience subscriptions
-let timeline = try await client.subscribeToUserTimeline(pubkey: "...")  // SubscriptionSequence
+let timeline = try await client.subscriptions.userTimeline(pubkey: "...")  // SubscriptionSequence
 for await event in timeline.events { print(event.content) }
 
-let feed = try await client.subscribeToGlobalFeed(limit: 50)
-let mentions = try await client.subscribeToMentions(pubkey: "...")
-let metadata = try await client.subscribeToMetadata(pubkeys: ["..."])
+let feed = try await client.subscriptions.globalFeed(limit: 50)
+let mentions = try await client.subscriptions.mentions(pubkey: "...")
+let metadata = try await client.subscriptions.metadata(pubkeys: ["..."])
 
 // Custom filter subscription, events only
 let filter = Filter(kinds: [1], authors: ["pubkey1", "pubkey2"], limit: 100)
-for await event in try await client.events(filters: [filter]) { print(event.id) }
+for await event in try await client.subscriptions.events(filters: [filter]) { print(event.id) }
 
 // Relay-aware iteration
-let subscription = try await client.subscribe(filters: [filter])
+let subscription = try await client.subscriptions.subscribe(filters: [filter])
 for await item in subscription {
     switch item {
     case .event(let relayURL, let event): print(relayURL, event.content)
@@ -187,12 +216,9 @@ for await item in subscription {
 
 // subscription.id / subscription.expectedRelays are available;
 // close explicitly with await subscription.close(), or:
-await client.unsubscribe(subscriptionId: subscription.id)
-await client.unsubscribeAll()
+await client.subscriptions.unsubscribe(subscriptionId: subscription.id)
+await client.subscriptions.unsubscribeAll()
 ```
-
-The closure-based subscribe APIs (`subscribe(filters:handler:)`, `subscribe(filters:to:eventHandler:)`,
-and the closure convenience variants) are deprecated in favor of the async sequences above.
 
 ### One-Shot Fetches
 
@@ -201,12 +227,12 @@ results. With zero resolved relays they throw (`NostrError.noRelaysInPool` /
 `.noMatchingRelays`) instead of idling until the timeout:
 
 ```swift
-let events = try await client.fetch(filters: [filter])
-let event = try await client.fetchEvent(id: "eventId...")
-let metadata = try await client.fetchMetadata(pubkey: "...")
+let events = try await client.events.fetch(filters: [filter])
+let event = try await client.events.fetchEvent(id: "eventId...")
+let metadata = try await client.events.fetchMetadata(pubkey: "...")
 // Scope a fetch to a subset of relays (e.g. naddr relay hints); nil (default) uses the
 // whole pool, [] throws, and an invalid string throws NostrError.invalidRelayURL.
-let scoped = try await client.fetch(filters: [filter], to: ["wss://relay.example"])
+let scoped = try await client.events.fetch(filters: [filter], to: ["wss://relay.example"])
 ```
 
 ### Event Counts (NIP-45)
@@ -217,35 +243,35 @@ count fails fast.
 
 ```swift
 // Max count across relays (each relay's count is a lower bound):
-let total = try await client.count(filters: [filter])
+let total = try await client.events.count(filters: [filter])
 // Scope to a subset of relays (same to: semantics as fetch):
-let scoped = try await client.count(filters: [filter], to: ["wss://relay.example"])
+let scoped = try await client.events.count(filters: [filter], to: ["wss://relay.example"])
 // Per-relay counts:
-let byRelay = try await client.relayPool.count(filters: [filter])  // [URL: EventCount]
+let byRelay = try await client.relays.pool.count(filters: [filter])  // [URL: EventCount]
 ```
 
 ### Direct Messages (NIP-17)
 
 ```swift
 // Send
-try await client.sendDirectMessage("Hello!", to: "recipientPubkey")
+try await client.messages.send("Hello!", to: "recipientPubkey")
 
 // Subscribe to incoming DMs, parsed automatically. Wraps sealed to someone else and malformed
 // ones are skipped; a signer that cannot be reached (a remote NIP-46 timeout/disconnect) throws,
 // so a transient failure never passes for an empty inbox. Resubscribe to resume.
-for try await message in try await client.directMessages() {
+for try await message in try await client.messages.subscribe() {
     print("From: \(message.senderPubkey), Content: \(message.content)")
 }
 
 // Or receive raw gift wraps and parse manually
-let giftWraps = try await client.subscribeToDirectMessages()
+let giftWraps = try await client.messages.giftWraps()
 for await giftWrap in giftWraps.events {
-    let dm = try await client.parseDirectMessage(giftWrap)
+    let dm = try await client.messages.parse(giftWrap)
     print("From: \(dm.senderPubkey): \(dm.content)")
 }
 
 // Parse a received gift wrap event
-let dm = try await client.parseDirectMessage(giftWrapEvent)
+let dm = try await client.messages.parse(giftWrapEvent)
 ```
 
 ### Relay-based Groups (NIP-29)
@@ -258,31 +284,31 @@ signer is set.
 ```swift
 // Parse an naddr share link (optionally with ?invite=<code>) and join / leave.
 let group = try GroupReference(naddrString: "naddr1...?invite=A7fjq2")
-try await client.joinGroup(group)              // kind 9021; applies group.inviteCode
-try await client.leaveGroup(group)             // kind 9022; relay answers with a kind-9001 removal
+try await client.groups.join(group)              // kind 9021; applies group.inviteCode
+try await client.groups.leave(group)             // kind 9022; relay answers with a kind-9001 removal
 
 // Live timeline of the group's content (events carrying its "h" tag).
 var recent: [Event] = []
-let timeline = try await client.subscribeToGroupTimeline(group)
+let timeline = try await client.groups.timeline(group)
 for await event in timeline.events { recent.append(event) }
 
 // Chat (kind 9, NIP-C7, by default; any kind allowed) with "previous" timeline references.
-try await client.publishGroupMessage(
+try await client.groups.publishMessage(
     "hello", in: group,
-    previous: Groups.previousReferences(from: recent, excludingAuthor: await client.publicKey))
+    previous: Groups.previousReferences(from: recent, excludingAuthor: await client.identity.publicKey))
 
 // Moderation (kinds 9000-9002, 9005, 9007-9010): the relay checks the author's role and answers with OK.
-try await client.publishGroupModeration(
+try await client.groups.publishModeration(
     .putUser(pubkey: memberPubkey, roles: ["moderator"]), in: group, reason: "welcome")
 
 // Relay-signed state, newest event per kind. With a known relay pubkey (group.relayPubkey,
 // the naddr coordinate's author), wrong-author and invalid-signature events are dropped.
-let metadata = try await client.fetchGroupMetadata(for: group)   // Groups.Metadata?
-let state = try await client.fetchGroupState(for: group)         // GroupState snapshot
+let metadata = try await client.groups.fetchMetadata(for: group)   // Groups.Metadata?
+let state = try await client.groups.fetchState(for: group)         // GroupState snapshot
 
 // The user's kind-10009 simple group list (see SimpleGroupList below).
-let list = try await client.fetchSimpleGroupList()               // SimpleGroupList?
-try await client.publishSimpleGroupList(list ?? SimpleGroupList())
+let list = try await client.groups.fetchSimpleGroupList()               // SimpleGroupList?
+try await client.groups.publishSimpleGroupList(list ?? SimpleGroupList())
 ```
 
 ## Event
@@ -302,7 +328,7 @@ NIP-01 Nostr Event (struct: Codable, Identifiable, Hashable, Sendable).
 ### Tag
 
 Typed tag value (`Event.Tag`, top-level alias `Tag`). Event-construction APIs
-(`UnsignedEvent`, `signTextNote`, `publishTextNote`) take `[Tag]`; `Event.tags`
+(`UnsignedEvent`, `signTextNote`, `events.publishTextNote`) take `[Tag]`; `Event.tags`
 stays `[[String]]` (the hashed wire form). `Tag` is array-literal expressible, so
 `tags: [["t", "nostr"]]` still compiles.
 
@@ -383,7 +409,7 @@ lookup (`published.id`, `published.content`); use `.event` where an `Event` valu
 itself is required.
 
 ```swift
-let published = try await client.publishTextNote(content: "hi")
+let published = try await client.events.publishTextNote(content: "hi")
 published.event          // Event
 published.result         // PublishResult (statuses keyed by canonical relay URL)
 published.id             // forwarded from Event
@@ -474,7 +500,7 @@ sequence automatically sends CLOSE to the relays.
 
 A live subscription to the current user's NIP-17 DMs, delivered already unwrapped
 and parsed as `DirectMessage` values (struct: Sendable). Returned by
-`directMessages(limit:)`. Gift wraps that fail to unwrap or parse are skipped.
+`messages.subscribe(limit:)`. Gift wraps that fail to unwrap or parse are skipped.
 Same lifecycle surface as `SubscriptionSequence` (`id`, `expectedRelays`, `close()`).
 
 ## RelayMessage
@@ -882,17 +908,17 @@ var list = NostrList(
     publicItems: [.event(noteId), .reference("https://example.com")],
     privateItems: [.hashtag("private-topic")]
 )
-try await client.publishList(list)
+try await client.lists.publish(list)
 
 // Read-modify-write: start from the fetched list so nothing is dropped.
 // No pubkey -> the current user's list, with private items decrypted (throws if undecryptable).
-if var mine = try await client.fetchList(kind: .bookmarkList) {
+if var mine = try await client.lists.fetch(kind: .bookmarkList) {
     mine.publicItems.append(.reference("https://another.example"))
-    try await client.publishList(mine)
+    try await client.lists.publish(mine)
 }
 
 // Another user's list returns public items only.
-let theirs = try await client.fetchList(kind: .muteList, for: pubkey)
+let theirs = try await client.lists.fetch(kind: .muteList, for: pubkey)
 
 // Public-only view of any list event (private items stay empty).
 let publicView = NostrList(event: event)
@@ -928,22 +954,22 @@ let set = try NostrListSet(
     publicItems: [.event(noteId), .reference("https://example.com")],
     privateItems: [.hashtag("private-topic")]
 )
-try await client.publishSet(set)
+try await client.lists.publishSet(set)
 
 // Read-modify-write: start from the fetched set so nothing is dropped.
 // No pubkey -> the current user's set, with private items decrypted (throws if undecryptable).
-if var mine = try await client.fetchSet(kind: .bookmarkSet, identifier: "reading") {
+if var mine = try await client.lists.fetchSet(kind: .bookmarkSet, identifier: "reading") {
     mine.publicItems.append(.reference("https://another.example"))
-    try await client.publishSet(mine)
+    try await client.lists.publishSet(mine)
 }
 
 // All sets of a kind, newest per identifier.
-let all = try await client.fetchSets(kind: .bookmarkSet)
+let all = try await client.lists.fetchSets(kind: .bookmarkSet)
 
 // Another user's set, or a set addressed by naddr: public items only.
-let theirs = try await client.fetchSet(kind: .bookmarkSet, identifier: "reading", for: pubkey)
+let theirs = try await client.lists.fetchSet(kind: .bookmarkSet, identifier: "reading", for: pubkey)
 let addr = try set.naddr(author: authorPubkey)     // NIP-19 naddr coordinate
-let byAddr = try await client.fetchSet(naddr: addr)
+let byAddr = try await client.lists.fetchSet(naddr: addr)
 
 // Public-only view of any set event (private items stay empty).
 let publicView = try NostrListSet(event: event)
@@ -982,14 +1008,14 @@ let article = LongFormContent(
     hashtags: ["nostr", "swift"],
     content: "# Hello\n\nBody in **Markdown**."
 )
-try await client.publishLongFormContent(article)
+try await client.events.publishLongFormContent(article)
 
 // Fetch by author + identifier (newest version wins across relays)
-let fetched = try await client.fetchLongFormContent(author: pubkey, identifier: "my-first-article")
+let fetched = try await client.events.fetchLongFormContent(author: pubkey, identifier: "my-first-article")
 
 // Fetch by naddr coordinate (relay hints are used when already in the pool)
 let naddr = try article.naddr(author: pubkey, relays: ["wss://relay.example"])
-let byCoord = try await client.fetchLongFormContent(naddr: naddr)
+let byCoord = try await client.events.fetchLongFormContent(naddr: naddr)
 
 // Sign without publishing
 let event = try signer.signLongFormContent(article, draft: false)
@@ -1102,7 +1128,7 @@ let coord = try group.naddr()           // throws without relayPubkey
 ## GroupState
 
 One fetch's snapshot of a NIP-29 group's relay-generated state (struct: Sendable, Hashable;
-NostrClient library). Returned by `fetchGroupState(for:authorPubkey:timeout:)`; each field is
+NostrClient library). Returned by `groups.fetchState(for:authorPubkey:timeout:)`; each field is
 nil when the relay published nothing for that kind (e.g. the member list of a private group):
 
 - `metadata: Groups.Metadata?` -- kind 39000
@@ -1130,12 +1156,12 @@ convert back via `.reference` (relay pubkey and invite code are not part of the 
 // Keep the list fresh as the user joins and leaves. Unlike the group flows this broadcasts to
 // the whole pool; private entries are NIP-44-encrypted to the user's own key through the
 // configured signer, local or remote.
-var list = try await client.fetchSimpleGroupList() ?? SimpleGroupList()
+var list = try await client.groups.fetchSimpleGroupList() ?? SimpleGroupList()
 list.publicEntries.append(GroupListEntry(group, name: "Cool Group"))
 if !list.relayURLs.contains(group.relayURL) { list.relayURLs.append(group.relayURL) }
-try await client.publishSimpleGroupList(list)
+try await client.groups.publishSimpleGroupList(list)
 
-let theirs = try await client.fetchSimpleGroupList(for: pubkey)  // public entries only
+let theirs = try await client.groups.fetchSimpleGroupList(for: pubkey)  // public entries only
 ```
 
 ## ReportType
@@ -1151,11 +1177,11 @@ The reason category of a NIP-56 report, kind 1984 (enum: String, Sendable, Hasha
 ```swift
 // Report a pubkey: the type rides on the "p" tag.
 let report = try signer.signReport(pubkey: "authorHex", type: .impersonation, reason: "")
-try await client.publishReport(pubkey: "authorHex", type: .impersonation)
+try await client.events.publishReport(pubkey: "authorHex", type: .impersonation)
 
 // Report an event: the type rides on the "e" tag, plus a bare "p" tag naming the author.
 let eventReport = try signer.signReport(event: note, type: .illegal, reason: "against the law")
-try await client.publishReport(event: note, type: .spam, reason: "unsolicited")
+try await client.events.publishReport(event: note, type: .spam, reason: "unsolicited")
 ```
 
 ## InternetIdentifier
@@ -1371,7 +1397,7 @@ let tags = NostrContentReference.tags(for: content)  // [["p", ...], ["q", ...]]
 
 ## RemoteSigner
 
-NIP-46 remote signing over a relay transport (actor, `NostrConnect` library). Delegates signing to a remote signer (a "bunker") that holds the user's private key. The client holds a separate identity, encrypts each request to the signer, signs a kind-24133 event, and awaits the matching response — correlated by the `id` inside the decrypted JSON body (not by any event tag). Two connection flows are supported: the signer-initiated `bunker://` token and the client-initiated `nostrconnect://` invitation. Conforms to `NostrSigning` (its `publicKey` is the user key from `get_public_key`), so it is usable anywhere a local `EventSigner` is — including `NostrClient.setSigner(_:)`, after which every client feature runs through the bunker: `sign(_:)`, `publish(_:)`, the convenience `publish*` helpers, NIP-17 direct messages, NIP-51 private list items, and NIP-42 auth.
+NIP-46 remote signing over a relay transport (actor, `NostrConnect` library). Delegates signing to a remote signer (a "bunker") that holds the user's private key. The client holds a separate identity, encrypts each request to the signer, signs a kind-24133 event, and awaits the matching response — correlated by the `id` inside the decrypted JSON body (not by any event tag). Two connection flows are supported: the signer-initiated `bunker://` token and the client-initiated `nostrconnect://` invitation. Conforms to `NostrSigning` (its `publicKey` is the user key from `get_public_key`), so it is usable anywhere a local `EventSigner` is — including `client.identity.setSigner(_:)`, after which every client feature runs through the bunker: `identity.sign(_:)`, `events.publish(_:)`, the convenience `publish*` helpers, NIP-17 direct messages, NIP-51 private list items, and NIP-42 auth.
 
 ```swift
 import NostrConnect
