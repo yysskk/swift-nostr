@@ -13,25 +13,28 @@ public struct RelayListMetadata: Codable, Hashable, Sendable {
     }
 
     /// Builds a list from explicit read and write relay URLs; URLs present in both are marked
-    /// as read+write. Repeated URLs collapse into one entry, as they do when parsing.
+    /// as read+write.
+    ///
+    /// Membership and de-duplication are both decided on the normalized URL, so any spelling of
+    /// the same relay — trailing slash, host case, default port — collapses into a single entry
+    /// carrying every usage the caller asked for. Entries keep the order and spelling of their
+    /// first appearance, matching how a parsed list de-duplicates.
     package init(read: [String], write: [String]) {
-        let both = Set(read).intersection(write)
+        let readKeys = Set(read.map(RelayURL.normalize))
+        let writeKeys = Set(write.map(RelayURL.normalize))
+
         var entries: [RelayListEntry] = []
         var seen = Set<String>()
-
-        func append(_ url: String, usage: RelayUsage) {
-            guard seen.insert(RelayURL.normalize(url)).inserted else { return }
+        for url in read + write {
+            let key = RelayURL.normalize(url)
+            guard seen.insert(key).inserted else { continue }
+            let usage: RelayUsage =
+                switch (readKeys.contains(key), writeKeys.contains(key)) {
+                case (true, true): .readWrite
+                case (true, false): .read
+                case (false, _): .write
+                }
             entries.append(RelayListEntry(url: url, usage: usage))
-        }
-
-        for url in read where !both.contains(url) {
-            append(url, usage: .read)
-        }
-        for url in write where !both.contains(url) {
-            append(url, usage: .write)
-        }
-        for url in both {
-            append(url, usage: .readWrite)
         }
         self.entries = entries
     }

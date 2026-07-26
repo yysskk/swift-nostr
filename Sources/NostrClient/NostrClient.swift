@@ -146,7 +146,7 @@ public actor NostrClient {
     ///
     /// The convenience `publish*` helpers all have this shape: they differ only in the event they
     /// build, and every one of them works with a local or a remote signer.
-    func signEvent(_ build: (String) throws -> UnsignedEvent) async throws -> Event {
+    func signEvent(_ build: (_ publicKey: String) throws -> UnsignedEvent) async throws -> Event {
         try await withSigner { signer, publicKey in try await signer.sign(build(publicKey)) }
     }
 
@@ -170,7 +170,9 @@ public actor NostrClient {
     /// publish after the closure returns.
     ///
     /// - Throws: ``NostrError/signerNotSet`` when no signer is set.
-    func withSigner<T>(_ body: (any NostrSigning, String) async throws -> T) async throws -> T {
+    func withSigner<T>(
+        _ body: (_ signer: any NostrSigning, _ publicKey: String) async throws -> T
+    ) async throws -> T {
         guard let activeSigner, let cachedPublicKey else {
             throw NostrError.signerNotSet
         }

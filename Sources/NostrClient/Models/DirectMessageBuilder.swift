@@ -126,19 +126,24 @@ public struct DirectMessageBuilder: Sendable {
         let senderPubkey = try await signer.publicKey
         let rumor = try makeRumor(senderPubkey: senderPubkey, content: content, tags: tags)
 
-        // Gift wrap for each recipient, plus a copy for the sender
-        var giftWraps: [Event] = []
-
-        for recipientPubkey in recipientPubkeys + [senderPubkey] {
-            let wrapped = try await GiftWrap.wrap(
-                event: rumor,
-                signer: signer,
-                recipientPubkey: recipientPubkey
-            )
-            giftWraps.append(wrapped)
+        // One wrap per recipient, plus a copy for the sender. Each is an independent seal — a
+        // relay round-trip apiece for a remote signer — so they run concurrently and are put back
+        // in `recipientPubkeys` order, which callers index into.
+        let addressees = recipientPubkeys + [senderPubkey]
+        let signer = self.signer
+        return try await withThrowingTaskGroup(of: (offset: Int, wrap: Event).self) { group in
+            for (offset, addressee) in addressees.enumerated() {
+                group.addTask {
+                    (offset, try await GiftWrap.wrap(event: rumor, signer: signer, recipientPubkey: addressee))
+                }
+            }
+            var wraps: [(offset: Int, wrap: Event)] = []
+            wraps.reserveCapacity(addressees.count)
+            for try await wrap in group {
+                wraps.append(wrap)
+            }
+            return wraps.sorted { $0.offset < $1.offset }.map(\.wrap)
         }
-
-        return giftWraps
     }
 
     // MARK: - Private Helpers
@@ -149,19 +154,22 @@ public struct DirectMessageBuilder: Sendable {
     /// NIP-17 delivers every message to both parties so the sender's other devices can reconstruct
     /// the conversation; both wraps carry the identical rumor, whose `id` keys the two copies
     /// together. Any NIP-40 `expiration` is applied to both wraps so the copies expire in lockstep.
+    ///
+    /// The two wraps are independent seals, so they are built concurrently — with a remote signer
+    /// that halves the round-trips a send costs.
     private func wrapWithSelfCopy(
         rumor: Event,
         senderPubkey: String,
         to recipientPubkey: String,
         expiration: Date?
     ) async throws -> SendDirectMessageResult {
-        let recipientGiftWrap = try await GiftWrap.wrap(
+        async let recipientGiftWrap = GiftWrap.wrap(
             event: rumor,
             signer: signer,
             recipientPubkey: recipientPubkey,
             expiration: expiration
         )
-        let selfGiftWrap = try await GiftWrap.wrap(
+        async let selfGiftWrap = GiftWrap.wrap(
             event: rumor,
             signer: signer,
             recipientPubkey: senderPubkey,
@@ -170,8 +178,8 @@ public struct DirectMessageBuilder: Sendable {
 
         return SendDirectMessageResult(
             rumor: rumor,
-            recipientGiftWrap: recipientGiftWrap,
-            selfGiftWrap: selfGiftWrap
+            recipientGiftWrap: try await recipientGiftWrap,
+            selfGiftWrap: try await selfGiftWrap
         )
     }
 

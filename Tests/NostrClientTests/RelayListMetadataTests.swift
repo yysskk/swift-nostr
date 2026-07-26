@@ -215,6 +215,42 @@ struct RelayListMetadataEventTests {
         #expect(Set(list?.writeRelays ?? []) == ["wss://write.example.com", "wss://both.example.com"])
     }
 
+    @Test("Sign relay list from read/write URLs collapses repeated URLs into one entry")
+    func signRelayListFromReadWriteDeduplicates() throws {
+        let signer = EventSigner(keyPair: try KeyPair())
+
+        let event = try signer.signRelayListMetadata(
+            read: ["wss://a.example.com", "wss://a.example.com/"],
+            write: ["wss://b.example.com", "wss://B.example.com"]
+        )
+
+        // Repeats — including alternate spellings of the same relay — must not become
+        // duplicate `r` tags, matching how a parsed list de-duplicates.
+        #expect(event.tags.count == 2)
+        let list = event.relayListMetadata
+        #expect(list?.readRelays == ["wss://a.example.com"])
+        #expect(list?.writeRelays == ["wss://b.example.com"])
+    }
+
+    @Test("A relay spelled differently in read and write is still marked read+write")
+    func signRelayListMergesEquivalentReadAndWriteSpellings() throws {
+        let signer = EventSigner(keyPair: try KeyPair())
+
+        // The same relay, spelled with a trailing slash on one side and mixed case on the other.
+        // Both usages must survive: dropping one would silently demote the relay.
+        let event = try signer.signRelayListMetadata(
+            read: ["wss://Relay.example.com/"],
+            write: ["wss://relay.example.com"]
+        )
+
+        #expect(event.tags == [["r", "wss://Relay.example.com/"]])
+        let list = try #require(event.relayListMetadata)
+        #expect(list.entries.count == 1)
+        #expect(list.entries[0].usage == .readWrite)
+        #expect(list.readRelays == ["wss://Relay.example.com/"])
+        #expect(list.writeRelays == ["wss://Relay.example.com/"])
+    }
+
     @Test("Extract relay list from event")
     func extractRelayListFromEvent() throws {
         let keyPair = try KeyPair()

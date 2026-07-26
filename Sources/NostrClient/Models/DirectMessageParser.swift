@@ -21,7 +21,7 @@ public struct DirectMessageParser: Sendable {
         guard unwrapped.event.kind == .privateDirectMessage else {
             throw NostrError.invalidData
         }
-        return makeMessage(from: unwrapped, giftWrap: giftWrap, ownPubkey: try await signer.publicKey)
+        return try await makeMessage(from: unwrapped, giftWrap: giftWrap)
     }
 
     /// Parses a gift-wrapped event into a DirectMessageReaction.
@@ -47,7 +47,7 @@ public struct DirectMessageParser: Sendable {
         guard unwrapped.event.kind == .fileMessage else {
             throw NostrError.invalidData
         }
-        return try makeFile(from: unwrapped, giftWrap: giftWrap, ownPubkey: try await signer.publicKey)
+        return try await makeFile(from: unwrapped, giftWrap: giftWrap)
     }
 
     /// Unwraps a gift wrap and classifies it as a message (kind 14), reaction (kind 7), or file
@@ -59,11 +59,11 @@ public struct DirectMessageParser: Sendable {
         let unwrapped = try await GiftWrap.unwrap(giftWrap: giftWrap, recipient: signer)
         switch unwrapped.event.kind {
         case .privateDirectMessage:
-            return .message(makeMessage(from: unwrapped, giftWrap: giftWrap, ownPubkey: try await signer.publicKey))
+            return .message(try await makeMessage(from: unwrapped, giftWrap: giftWrap))
         case .reaction:
             return .reaction(try makeReaction(from: unwrapped, giftWrap: giftWrap))
         case .fileMessage:
-            return .file(try makeFile(from: unwrapped, giftWrap: giftWrap, ownPubkey: try await signer.publicKey))
+            return .file(try await makeFile(from: unwrapped, giftWrap: giftWrap))
         default:
             throw NostrError.invalidData
         }
@@ -71,14 +71,12 @@ public struct DirectMessageParser: Sendable {
 
     // MARK: - Private builders
 
-    /// - Parameter ownPubkey: The signer's own key, standing in as the addressee when the rumor
-    ///   carries no "p" tag.
     private func makeMessage(
-        from unwrapped: GiftWrap.UnwrappedMessage, giftWrap: Event, ownPubkey: String
-    ) -> DirectMessage {
+        from unwrapped: GiftWrap.UnwrappedMessage, giftWrap: Event
+    ) async throws -> DirectMessage {
         let rumor = unwrapped.event
 
-        let recipientPubkey = rumor.firstTagValue(named: "p") ?? ownPubkey
+        let recipientPubkey = try await addressee(of: rumor)
         let subject = rumor.firstTagValue(named: "subject")
 
         // A reply is an "e" tag carrying the NIP-10 "reply" marker at its marker position
@@ -125,11 +123,9 @@ public struct DirectMessageParser: Sendable {
         )
     }
 
-    /// - Parameter ownPubkey: The signer's own key, standing in as the addressee when the rumor
-    ///   carries no "p" tag.
     private func makeFile(
-        from unwrapped: GiftWrap.UnwrappedMessage, giftWrap: Event, ownPubkey: String
-    ) throws -> DirectMessageFile {
+        from unwrapped: GiftWrap.UnwrappedMessage, giftWrap: Event
+    ) async throws -> DirectMessageFile {
         let rumor = unwrapped.event
 
         // A file message must carry a non-empty URL plus a decodable AES-256 key (32 bytes) and
@@ -146,7 +142,7 @@ public struct DirectMessageParser: Sendable {
             throw NostrError.invalidData
         }
 
-        let recipientPubkey = rumor.firstTagValue(named: "p") ?? ownPubkey
+        let recipientPubkey = try await addressee(of: rumor)
 
         return DirectMessageFile(
             rumorId: rumor.id,
@@ -164,5 +160,16 @@ public struct DirectMessageParser: Sendable {
             createdAt: Date(timeIntervalSince1970: TimeInterval(rumor.createdAt)),
             expiresAt: giftWrap.expiration
         )
+    }
+
+    /// The rumor's addressee: its "p" tag, or this signer's own key when the tag is absent.
+    ///
+    /// The gift wrap only reached us because it was sealed to us, so our own key is the right
+    /// stand-in — and resolving it lazily keeps a remote signer off the wire for the common case.
+    private func addressee(of rumor: Event) async throws -> String {
+        if let tagged = rumor.firstTagValue(named: "p") {
+            return tagged
+        }
+        return try await signer.publicKey
     }
 }
