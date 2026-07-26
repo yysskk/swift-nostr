@@ -34,18 +34,17 @@ public actor WalletConnection {
     private static let responseSubscriptionID = "nwc-responses"
     private static let infoSubscriptionID = "nwc-info"
 
-    private let transport: any RelayTransport
+    /// The shared relay session, correlating each request by its event id (which responses echo in
+    /// their `e` tag) and holding the parts collected for it so far.
+    private typealias Session = RequestResponseSession<String, RequestState, [ResponsePart]>
+
+    private let session: Session
     private let config: Config
     private let keyPair: KeyPair
     private let signer: EventSigner
     private let walletPubkey: String
     private let clientPubkey: String
 
-    private var isStarted = false
-    private var readerTask: Task<Void, Never>?
-
-    /// In-flight requests keyed by request event id (responses reference it in their `e` tag).
-    private var pending: [String: PendingRequest] = [:]
     /// Open notification streams, keyed so each can deregister on termination.
     private var notificationStreams: [UUID: AsyncStream<WalletConnectNotification>.Continuation] = [:]
     /// The current ``fetchInfo()`` waiter, if any.
@@ -67,7 +66,10 @@ public actor WalletConnection {
         self.signer = EventSigner(keyPair: keyPair)
         self.walletPubkey = uri.walletPubkey
         self.clientPubkey = keyPair.publicKeyHex
-        self.transport = transport ?? RelayConnectionTransport(relayURLs: uri.relays)
+        self.session = Session(
+            transport: transport ?? RelayConnectionTransport(relayURLs: uri.relays),
+            timedOut: WalletConnectError.timedOut,
+            notConnected: WalletConnectError.notConnected)
     }
 
     // MARK: - Lifecycle
@@ -80,15 +82,6 @@ public actor WalletConnection {
 
     /// Disconnects, failing any in-flight requests and ending the notification streams.
     public func disconnect() async {
-        readerTask?.cancel()
-        readerTask = nil
-        isStarted = false
-
-        for request in pending.values {
-            request.continuation.finish(throwing: WalletConnectError.notConnected)
-        }
-        pending.removeAll()
-
         pendingInfo?.finish(throwing: WalletConnectError.notConnected)
         pendingInfo = nil
 
@@ -97,26 +90,17 @@ public actor WalletConnection {
         }
         notificationStreams.removeAll()
 
-        await transport.disconnect()
+        await session.disconnect()
     }
 
+    /// Connects, subscribes for responses and notifications, and starts reading them — once per
+    /// connection.
     private func ensureStarted() async throws {
-        guard !isStarted else { return }
-        // Set before the first await so a concurrent caller can't race through this setup a second
-        // time (actor reentrancy). Reset on failure so a later attempt can retry.
-        isStarted = true
-        do {
-            try await transport.connect()
-            try await transport.subscribe(id: Self.responseSubscriptionID, filters: [responseFilter])
-            let events = await transport.events()
-            readerTask = Task { [weak self] in
-                for await event in events {
-                    await self?.handle(event)
-                }
-            }
-        } catch {
-            isStarted = false
-            throw error
+        try await session.ensureStarted(
+            subscriptionID: Self.responseSubscriptionID,
+            filters: [responseFilter]
+        ) { [weak self] event in
+            await self?.handle(event)
         }
     }
 
@@ -137,13 +121,13 @@ public actor WalletConnection {
         pendingInfo?.finish(throwing: WalletConnectError.superseded)
         pendingInfo = continuation
 
-        try await transport.subscribe(id: Self.infoSubscriptionID, filters: [infoFilter])
+        try await session.subscribe(id: Self.infoSubscriptionID, filters: [infoFilter])
         defer {
-            Task { [weak self, transport] in
+            Task { [weak self, session] in
                 // If a concurrent fetchInfo() superseded this one and is still waiting, it owns the
                 // subscription — don't close it out from under the survivor.
                 if await self?.isFetchingInfo == true { return }
-                await transport.unsubscribe(id: Self.infoSubscriptionID)
+                await session.unsubscribe(id: Self.infoSubscriptionID)
             }
         }
 
@@ -215,28 +199,14 @@ public actor WalletConnection {
 
         let scheme = activeEncryption
         let event = try buildRequestEvent(method: method, params: params, scheme: scheme)
-        let requestID = event.id
-
-        let (stream, continuation) = AsyncThrowingStream<[ResponsePart], any Error>.makeStream()
-        pending[requestID] = PendingRequest(
-            scheme: scheme, collected: [], receivedCount: 0, expected: expectedResponses, continuation: continuation)
-
-        let timeout = config.requestTimeout
-        let timeoutTask = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(timeout))
-            await self?.timeoutRequest(requestID, partial: partialOnTimeout)
-        }
-        defer {
-            timeoutTask.cancel()
-            pending.removeValue(forKey: requestID)
-        }
-
-        try await transport.send(event)
-
-        for try await parts in stream {
-            return parts
-        }
-        throw WalletConnectError.timedOut
+        // A timed-out multi_pay_* resolves with the responses that did arrive rather than failing.
+        let collected: Session.PartialResult = { $0.collected }
+        return try await session.perform(
+            event,
+            key: event.id,
+            state: RequestState(scheme: scheme, expected: expectedResponses),
+            timeout: config.requestTimeout,
+            partialResult: partialOnTimeout ? collected : nil)
     }
 
     /// Sends a request expecting exactly one response and returns its decrypted content.
@@ -263,16 +233,6 @@ public actor WalletConnection {
             throw WalletConnectError.missingResult
         }
         return result
-    }
-
-    private func timeoutRequest(_ requestID: String, partial: Bool) {
-        guard let request = pending.removeValue(forKey: requestID) else { return }
-        if partial {
-            request.continuation.yield(request.collected)
-            request.continuation.finish()
-        } else {
-            request.continuation.finish(throwing: WalletConnectError.timedOut)
-        }
     }
 
     private var activeEncryption: WalletConnectEncryption {
@@ -308,12 +268,12 @@ public actor WalletConnection {
 
     // MARK: - Incoming events
 
-    private func handle(_ event: Event) {
+    private func handle(_ event: Event) async {
         // The relay filter already restricts authors, but enforce it here too as defense in depth.
         guard event.pubkey == walletPubkey else { return }
         switch event.kind {
         case .walletConnectResponse:
-            handleResponse(event)
+            await handleResponse(event)
         case .walletConnectNotification:
             handleNotification(event, scheme: .nip44)
         case .walletConnectNotificationLegacy:
@@ -325,29 +285,26 @@ public actor WalletConnection {
         }
     }
 
-    private func handleResponse(_ event: Event) {
-        guard let requestID = event.firstTagValue(named: "e"), var request = pending[requestID] else { return }
-        request.receivedCount += 1
+    private func handleResponse(_ event: Event) async {
+        guard let requestID = event.firstTagValue(named: "e") else { return }
+        let walletPubkey = walletPubkey
+        let keyPair = keyPair
 
-        if let content = try? WalletConnectCipher(request.scheme).decrypt(
-            event.content, senderPubkey: walletPubkey, recipient: keyPair)
-        {
-            request.collected.append(ResponsePart(dTag: event.firstTagValue(named: "d"), content: content))
-        } else if request.expected == 1 {
-            // Nothing to preserve for a single-response request, so fail fast.
-            pending.removeValue(forKey: requestID)
-            request.continuation.finish(throwing: WalletConnectError.responseDecodingFailed)
-            return
-        }
+        await session.withPendingRequest(requestID) { request in
+            request.receivedCount += 1
 
-        // Count undecryptable responses toward completion so a multi-response request finishes as
-        // soon as every response has arrived, rather than waiting out the timeout.
-        if request.receivedCount >= request.expected {
-            pending.removeValue(forKey: requestID)
-            request.continuation.yield(request.collected)
-            request.continuation.finish()
-        } else {
-            pending[requestID] = request
+            if let content = try? WalletConnectCipher(request.scheme).decrypt(
+                event.content, senderPubkey: walletPubkey, recipient: keyPair)
+            {
+                request.collected.append(ResponsePart(dTag: event.firstTagValue(named: "d"), content: content))
+            } else if request.expected == 1 {
+                // Nothing to preserve for a single-response request, so fail fast.
+                return .failed(WalletConnectError.responseDecodingFailed)
+            }
+
+            // Count undecryptable responses toward completion so a multi-response request finishes
+            // as soon as every response has arrived, rather than waiting out the timeout.
+            return request.receivedCount >= request.expected ? .resolved(request.collected) : .pending
         }
     }
 
@@ -392,13 +349,13 @@ struct ResponsePart: Sendable {
     let content: String
 }
 
-/// State for an in-flight request awaiting one or more responses.
-private struct PendingRequest {
+/// What an in-flight request needs from its own responses: the scheme they are encrypted with, how
+/// many to expect, and the ones that have arrived.
+private struct RequestState: Sendable {
     let scheme: WalletConnectEncryption
-    /// The successfully decrypted response parts.
-    var collected: [ResponsePart]
-    /// Total responses seen (including undecryptable ones), used for the completion check.
-    var receivedCount: Int
     let expected: Int
-    let continuation: AsyncThrowingStream<[ResponsePart], any Error>.Continuation
+    /// The successfully decrypted response parts.
+    var collected: [ResponsePart] = []
+    /// Total responses seen (including undecryptable ones), used for the completion check.
+    var receivedCount = 0
 }

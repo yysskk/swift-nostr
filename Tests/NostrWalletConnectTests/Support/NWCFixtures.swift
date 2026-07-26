@@ -79,4 +79,13 @@ enum NWCFixtures {
         }
         throw WalletConnectError.timedOut
     }
+
+    /// Polls until `transport` has entered `connect()` at least `count` times.
+    static func waitForConnectAttempts(_ transport: FakeWalletConnectTransport, count: Int) async throws {
+        for _ in 0..<400 {
+            if await transport.connectCount >= count { return }
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        throw WalletConnectError.timedOut
+    }
 }

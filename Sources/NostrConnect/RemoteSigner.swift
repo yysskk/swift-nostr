@@ -41,7 +41,11 @@ public actor RemoteSigner {
 
     private static let responseSubscriptionID = "nip46-responses"
 
-    private let transport: any RelayTransport
+    /// The shared relay session, correlating each request by the `id` in its JSON body and holding
+    /// the request's method so an `auth_url` challenge can be labeled with it.
+    private typealias Session = RequestResponseSession<String, RemoteSignerMethod, RemoteSignerResponse>
+
+    private let session: Session
     private let config: Config
     private let clientKeyPair: KeyPair
     private let signer: EventSigner
@@ -59,13 +63,8 @@ public actor RemoteSigner {
     /// authenticate the signer before its pubkey is pinned. `nil` for a `bunker://` session.
     private let expectedInvitationSecret: String?
 
-    private var startTask: Task<Void, any Error>?
-    private var isStarted: Bool { startTask != nil }
     private var didConnect = false
-    private var readerTask: Task<Void, Never>?
 
-    /// In-flight requests keyed by the JSON request `id` (echoed back in the response's `id`).
-    private var pending: [String: PendingRequest] = [:]
     /// Open auth-challenge streams, keyed so each can deregister on termination.
     private var authChallengeStreams: [UUID: AsyncStream<RemoteSignerAuthChallenge>.Continuation] = [:]
     /// The user's public key (`get_public_key`), cached after the first fetch.
@@ -105,7 +104,10 @@ public actor RemoteSigner {
         self.secret = bunker.secret
         self.expectedInvitationSecret = nil
         self.config = config
-        self.transport = transport ?? RelayConnectionTransport(relayURLs: bunker.relays)
+        self.session = Session(
+            transport: transport ?? RelayConnectionTransport(relayURLs: bunker.relays),
+            timedOut: RemoteSignerError.timedOut,
+            notConnected: RemoteSignerError.notConnected)
     }
 
     /// Creates a client-initiated session, without validating anything at this layer.
@@ -125,7 +127,10 @@ public actor RemoteSigner {
         self.secret = nil
         self.expectedInvitationSecret = expectedInvitationSecret
         self.config = config
-        self.transport = transport
+        self.session = Session(
+            transport: transport,
+            timedOut: RemoteSignerError.timedOut,
+            notConnected: RemoteSignerError.notConnected)
     }
 
     /// The remote signer's public key (hex), or `nil` for a client-initiated `nostrconnect://`
@@ -161,7 +166,7 @@ public actor RemoteSigner {
 
     /// Sends `logout` (best effort) and disconnects.
     public func logout() async {
-        if isStarted {
+        if await session.isStarted {
             _ = try? await sendRequest(method: .logout, params: [])
         }
         await disconnect()
@@ -170,18 +175,8 @@ public actor RemoteSigner {
     /// Disconnects without notifying the signer, failing any in-flight requests with
     /// ``RemoteSignerError/notConnected`` and ending the auth-challenge streams.
     public func disconnect() async {
-        readerTask?.cancel()
-        readerTask = nil
-        startTask?.cancel()
-        startTask = nil
         didConnect = false
         bufferedDiscovery = nil
-
-        for request in pending.values {
-            request.timeoutTask?.cancel()
-            request.continuation.finish(throwing: RemoteSignerError.notConnected)
-        }
-        pending.removeAll()
 
         // Fail a pending awaitConnection() waiter, if any.
         failConnection(with: .notConnected)
@@ -191,43 +186,16 @@ public actor RemoteSigner {
         }
         authChallengeStreams.removeAll()
 
-        await transport.disconnect()
+        await session.disconnect()
     }
 
+    /// Connects, subscribes for responses, and starts reading them — once per session.
     private func ensureStarted() async throws {
-        // Track the in-flight setup as a shared task so a concurrent caller on first use awaits the
-        // same connect/subscribe work, rather than racing past a bool guard and sending before the
-        // transport is connected and the response subscription/reader task exist.
-        if let startTask {
-            try await startTask.value
-            return
-        }
-        let task = Task { [weak self] in
-            guard let self else { return }
-            try await self.performStart()
-        }
-        startTask = task
-        do {
-            try await task.value
-        } catch {
-            // Clear on failure so a later attempt can retry the setup.
-            startTask = nil
-            throw error
-        }
-    }
-
-    /// Connects the transport, subscribes for responses, and starts the reader task. Runs once per
-    /// session via the shared ``startTask``.
-    private func performStart() async throws {
-        try await transport.connect()
-        // Subscribe before sending anything so a response delivered during the subscribe
-        // round-trip is not missed.
-        try await transport.subscribe(id: Self.responseSubscriptionID, filters: [responseFilter])
-        let events = await transport.events()
-        readerTask = Task { [weak self] in
-            for await event in events {
-                await self?.handle(event: event)
-            }
+        try await session.ensureStarted(
+            subscriptionID: Self.responseSubscriptionID,
+            filters: [responseFilter]
+        ) { [weak self] event in
+            await self?.handle(event: event)
         }
     }
 
@@ -268,41 +236,13 @@ public actor RemoteSigner {
 
         let request = RemoteSignerRequest(method: method, params: params)
         let event = try buildRequestEvent(request)
+        let response = try await session.perform(
+            event, key: request.id, state: method, timeout: config.requestTimeout)
 
-        let (stream, continuation) = AsyncThrowingStream<RemoteSignerResponse, any Error>.makeStream()
-        let timeoutTask = makeTimeoutTask(requestID: request.id, timeout: config.requestTimeout)
-        pending[request.id] = PendingRequest(
-            method: method, continuation: continuation, timeoutTask: timeoutTask)
-
-        defer {
-            if let removed = pending.removeValue(forKey: request.id) {
-                removed.timeoutTask?.cancel()
-            }
+        if let message = response.error, !response.isAuthChallenge {
+            throw RemoteSignerError.signerError(message: message)
         }
-
-        try await transport.send(event)
-
-        for try await response in stream {
-            if let message = response.error, !response.isAuthChallenge {
-                throw RemoteSignerError.signerError(message: message)
-            }
-            return response
-        }
-        throw RemoteSignerError.timedOut
-    }
-
-    /// A task that fails the pending request with the given `id` after `timeout` seconds.
-    private func makeTimeoutTask(requestID: String, timeout: TimeInterval) -> Task<Void, Never> {
-        Task { [weak self] in
-            try? await Task.sleep(for: .seconds(timeout))
-            guard !Task.isCancelled else { return }
-            await self?.timeoutRequest(requestID)
-        }
-    }
-
-    private func timeoutRequest(_ requestID: String) {
-        guard let request = pending.removeValue(forKey: requestID) else { return }
-        request.continuation.finish(throwing: RemoteSignerError.timedOut)
+        return response
     }
 
     private func buildRequestEvent(_ request: RemoteSignerRequest) throws -> Event {
@@ -325,7 +265,7 @@ public actor RemoteSigner {
 
     // MARK: - Incoming events
 
-    private func handle(event: Event) {
+    private func handle(event: Event) async {
         // A client-initiated (nostrconnect://) session does not yet know the signer's pubkey: the
         // first valid response echoing the invitation secret both authenticates the signer and
         // reveals it. Route such events to the connection waiter instead of the request path.
@@ -344,27 +284,22 @@ public actor RemoteSigner {
             return
         }
 
-        guard let request = pending[response.id] else { return }
-
-        if response.isAuthChallenge, let error = response.error, let url = URL(string: error) {
-            // Keep the request pending — the real response arrives later with the same id. Extend
-            // its timeout so the user has time to authorize, and surface the challenge.
-            request.timeoutTask?.cancel()
-            var updated = request
-            updated.timeoutTask = makeTimeoutTask(requestID: response.id, timeout: config.authChallengeTimeout)
-            pending[response.id] = updated
-
-            let challenge = RemoteSignerAuthChallenge(url: url, method: request.method, requestID: response.id)
-            for stream in authChallengeStreams.values {
-                stream.yield(challenge)
-            }
-            return
+        // An `auth_url` challenge does not answer the request: it stays pending until the signer
+        // sends the real response with the same id, on a timeout long enough for the user to
+        // authorize. Anything else resolves it.
+        let challengeURL = response.isAuthChallenge ? response.error.flatMap(URL.init(string:)) : nil
+        let authChallengeTimeout = config.authChallengeTimeout
+        let method = await session.withPendingRequest(response.id) { _ in
+            challengeURL == nil ? .resolved(response) : .pendingFor(authChallengeTimeout)
         }
 
-        pending.removeValue(forKey: response.id)
-        request.timeoutTask?.cancel()
-        request.continuation.yield(response)
-        request.continuation.finish()
+        // No pending request (an unknown or already-resolved id), or the response resolved it.
+        guard let method, let challengeURL else { return }
+
+        let challenge = RemoteSignerAuthChallenge(url: challengeURL, method: method, requestID: response.id)
+        for stream in authChallengeStreams.values {
+            stream.yield(challenge)
+        }
     }
 
     // MARK: - Client-initiated connection
@@ -402,7 +337,7 @@ public actor RemoteSigner {
         // Pin subsequent traffic to the now-known signer (defense in depth) and mark connected.
         self.signerPubkey = signerPubkey
         didConnect = true
-        try? await transport.subscribe(id: Self.responseSubscriptionID, filters: [responseFilter])
+        try? await session.subscribe(id: Self.responseSubscriptionID, filters: [responseFilter])
         return signerPubkey
     }
 
@@ -495,14 +430,4 @@ public actor RemoteSigner {
     var isAwaitingConnectionForTesting: Bool {
         connectionWaiter != nil
     }
-}
-
-/// State for an in-flight request awaiting its response.
-private struct PendingRequest {
-    /// The method whose request this is, used to label an `auth_url` challenge.
-    let method: RemoteSignerMethod
-    let continuation: AsyncThrowingStream<RemoteSignerResponse, any Error>.Continuation
-    /// The task that fails the request on timeout; replaced with a longer one on an `auth_url`
-    /// challenge, and cancelled once the request resolves.
-    var timeoutTask: Task<Void, Never>?
 }

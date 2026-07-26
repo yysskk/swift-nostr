@@ -87,6 +87,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `r` tags, which any NIP-65 reader collapses to whichever came first. Membership is now decided
   on the normalized URL, so equivalent spellings produce a single read+write entry that keeps the
   spelling and position of its first appearance.
+- **A concurrent NIP-47 command could publish before the wallet connection was subscribed.**
+  `WalletConnection` guarded its lazy setup with a bool set before the first `await`, so a command
+  issued while the first one was still connecting fell straight through the guard and sent its
+  request — before the connection was established and the response subscription existed, losing
+  any response the wallet sent in that window. Both NIP-46 and NIP-47 sessions now run that setup
+  as one shared task, so a concurrent caller awaits the same connect/subscribe work instead of
+  racing past it.
 
 ### Changed
 
