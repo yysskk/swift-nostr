@@ -223,7 +223,8 @@ extension NostrClient {
     /// Subscribes to the current user's private direct messages (NIP-17),
     /// delivering each message already unwrapped and parsed.
     ///
-    /// Gift wraps that fail to unwrap or parse are skipped; use
+    /// Gift wraps that are not readable messages for the signer are skipped, while a signer that
+    /// could not attempt the read throws out of the iteration — see ``DirectMessageSequence``. Use
     /// ``subscribeToDirectMessages(limit:)`` for the raw gift-wrap events.
     /// - Parameter limit: Maximum number of messages to fetch
     public func directMessages(limit: Int = 100) async throws -> DirectMessageSequence {
@@ -236,8 +237,8 @@ extension NostrClient {
     /// delivering each gift wrap already unwrapped and classified as a ``DirectMessagePayload``.
     ///
     /// Use this instead of ``directMessages(limit:)`` when you also want reactions; messages and
-    /// reactions share the same kind-1059 gift-wrap stream. Gift wraps that fail to unwrap or parse
-    /// are skipped.
+    /// reactions share the same kind-1059 gift-wrap stream. Unreadable gift wraps are skipped and
+    /// signer failures throw, as in ``DirectMessageSequence``.
     /// - Parameter limit: Maximum number of gift wraps to fetch
     public func directMessagePayloads(limit: Int = 100) async throws -> DirectMessagePayloadSequence {
         let parser = try await directMessageParser()
