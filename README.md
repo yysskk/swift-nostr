@@ -1,3 +1,5 @@
+
+
 # Swift Nostr
 
 Swift library for Nostr protocol
@@ -126,7 +128,7 @@ Subscriptions are async sequences — iterate them with `for await`. The subscri
 
 ```swift
 // Live timeline
-let timeline = try await client.subscriptions.userTimeline(pubkey: "...")
+let timeline = try await client.subscriptions.userTimeline(pubkey: "...", limit: 100)
 for await event in timeline.events {
     print(event.content)
 }
