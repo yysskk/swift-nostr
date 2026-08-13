@@ -13,6 +13,11 @@ extension RelayConnection {
     static func pingSocket(_ task: any WebSocketSession, timeout: TimeInterval) async throws {
         let resumeGuard = ResumeOnceGuard()
         let cancellationBox = PingCancellationBox()
+        // Held outside the continuation so the cancellation handler can stop the watchdog too.
+        // Left running, it sleeps out the full timeout after the wait is already over — so
+        // cancelling a connect did not actually release its resources for up to that long.
+        let watchdogBox = PingWatchdogBox()
+        defer { watchdogBox.cancel() }
         try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
                 guard cancellationBox.register(continuation) else {
@@ -22,14 +27,15 @@ extension RelayConnection {
                     continuation.resume(throwing: CancellationError())
                     return
                 }
-                let watchdog = Task {
-                    try? await Task.sleep(for: .seconds(timeout))
-                    guard resumeGuard.claim() else { return }
-                    continuation.resume(throwing: NostrError.timeout)
-                }
+                watchdogBox.store(
+                    Task {
+                        try? await Task.sleep(for: .seconds(timeout))
+                        guard resumeGuard.claim() else { return }
+                        continuation.resume(throwing: NostrError.timeout)
+                    })
                 task.sendPing { error in
                     guard resumeGuard.claim() else { return }
-                    watchdog.cancel()
+                    watchdogBox.cancel()
                     if let error = error {
                         continuation.resume(throwing: error)
                     } else {
@@ -38,6 +44,7 @@ extension RelayConnection {
                 }
             }
         } onCancel: {
+            watchdogBox.cancel()
             guard let continuation = cancellationBox.cancel() else { return }
             guard resumeGuard.claim() else { return }
             continuation.resume(throwing: CancellationError())
@@ -79,6 +86,36 @@ extension RelayConnection {
         // Cancel the socket so the receive loop's pending receive() exits promptly.
         discardSocket()
         scheduleReconnectIfNeeded()
+    }
+}
+
+/// Holds the ping's timeout watchdog so every exit — pong, cancellation, or returning normally —
+/// can stop it, whichever happens first.
+private final class PingWatchdogBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var task: Task<Void, Never>?
+    private var isCancelled = false
+
+    /// Stores the watchdog, cancelling it immediately if this box was already cancelled.
+    func store(_ task: Task<Void, Never>) {
+        lock.lock()
+        if isCancelled {
+            lock.unlock()
+            task.cancel()
+            return
+        }
+        self.task = task
+        lock.unlock()
+    }
+
+    /// Cancels the watchdog, and marks the box so a later `store` cancels on arrival.
+    func cancel() {
+        lock.lock()
+        isCancelled = true
+        let task = self.task
+        self.task = nil
+        lock.unlock()
+        task?.cancel()
     }
 }
 

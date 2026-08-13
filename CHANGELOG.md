@@ -41,6 +41,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   sends compare before touching shared state, so work belonging to a superseded socket stops
   instead of landing on the live session. Reachable from ordinary use — `RelayPool.disconnectAll()`
   or `removeRelay` overlapping `connectAll()`.
+- **Reconnection backoff is bounded and jittered**: `initialReconnectDelay: 0` reads like "reconnect
+  immediately", but zero multiplied by any backoff stays zero — and with the default of unlimited
+  attempts that was an unbounded loop with no pause at all, reaching over 16,000 connection attempts
+  in 300 ms in a test. A negative delay behaved the same, since `Task.sleep` of one returns at once,
+  as did a multiplier at or below zero. Delays are now floored and capped where they are read rather
+  than validated in the initializer, since every configuration field is a `var` and a value assigned
+  afterwards would bypass validation done at init time. Each wait is also scaled by a random factor
+  between a half and one, so relays behind one failing uplink no longer retry in lockstep.
 - **Disconnecting a failed connection runs the full teardown**: `.failed` is the state a connection
   sits in after any dropped connection, and `disconnect()` returned early from it before doing any
   cleanup. In-flight `publish` and `count` callers were left waiting out their timeouts — up to 30
