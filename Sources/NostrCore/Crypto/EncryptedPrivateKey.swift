@@ -107,7 +107,10 @@ public struct EncryptedPrivateKey: Sendable, Hashable {
         guard privateKey.count == 32 else {
             throw NostrError.invalidPrivateKey
         }
-        guard maximumLogN <= specMaximumLogN else {
+        // The whole range, as on the reading side: a `maximumLogN` of 0 clears an upper-bound-only
+        // guard and then makes the `1...maximumLogN` below an invalid range, trapping on the very
+        // input this bound exists to check.
+        guard 1...specMaximumLogN ~= maximumLogN else {
             throw NostrError.unsupportedScryptCost(maximumLogN)
         }
         // Bounded by the same default the reader applies, so this library never writes a payload it

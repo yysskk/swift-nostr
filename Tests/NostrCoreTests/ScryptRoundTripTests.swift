@@ -41,6 +41,21 @@ struct ScryptRoundTripTests {
         #expect(try encrypted.decrypt(password: password, maxLogN: 19) == privateKey)
     }
 
+    /// The writing side needs the same whole-range check as the reading side: an upper-bound-only
+    /// guard let a zero cap through, and `1...0` is not a valid range.
+    @Test("a cap below the range NIP-49 defines is refused on both sides")
+    func capBelowSpecRangeIsRefused() throws {
+        #expect(throws: NostrError.unsupportedScryptCost(0)) {
+            _ = try EncryptedPrivateKey.encrypt(
+                privateKey: privateKey, password: password, logN: 14, maximumLogN: 0)
+        }
+
+        let keyPair = try KeyPair()
+        #expect(throws: NostrError.unsupportedScryptCost(0)) {
+            _ = try keyPair.encryptedPrivateKey(password: password, logN: 14, maximumLogN: 0)
+        }
+    }
+
     @Test("a cap beyond the range NIP-49 defines is refused on both sides")
     func capBeyondSpecIsRefused() throws {
         #expect(throws: NostrError.unsupportedScryptCost(23)) {
