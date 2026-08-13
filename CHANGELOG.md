@@ -41,6 +41,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   sends compare before touching shared state, so work belonging to a superseded socket stops
   instead of landing on the live session. Reachable from ordinary use — `RelayPool.disconnectAll()`
   or `removeRelay` overlapping `connectAll()`.
+- **Disconnecting a failed connection runs the full teardown**: `.failed` is the state a connection
+  sits in after any dropped connection, and `disconnect()` returned early from it before doing any
+  cleanup. In-flight `publish` and `count` callers were left waiting out their timeouts — up to 30
+  seconds on a connection already gone — instead of failing immediately with
+  `NostrError.notConnected`; tracked subscriptions survived to be replayed on the next `connect()`,
+  resurrecting subscriptions the caller believed were closed; and NIP-42 state persisted, so
+  `isAuthenticated` reported `true` for a session that no longer existed. The teardown is now the
+  same from every state. Disconnecting an already-disconnected connection also no longer announces
+  a second `.disconnected` transition to `stateChanges()` consumers.
 - **Sockets are closed when replaced, and receive loops stop with their socket**: a failed send left
   its socket installed, so the next connection attempt overwrote a live connection nobody closed and
   its receive loop kept running beside the new one — both loops then reporting the same session's
