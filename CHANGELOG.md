@@ -53,6 +53,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A hostile timestamp no longer crashes the process**: a `published_at` or NIP-40 `expiration`
+  tag is parsed from the full `Int64` range, but `Date` stores a `Double` and converting one back
+  with `Int64(_:)` traps on a value it cannot represent. Reading a long-form article or a direct
+  message with an extreme timestamp and then re-emitting it — the documented edit-and-republish
+  flow — killed the process. Timestamps are clamped to the range that round-trips, so a nonsense
+  value stays nonsense instead of becoming a crash.
+- **Relay URLs from a wallet URI and from `switch_relays` are checked for a WebSocket scheme**: a
+  `nostr+walletconnect://` URI accepted `https://` or `file://` relays, and `RelayConnection`'s
+  URL-taking initializer does not validate the scheme the way its string form does, so they were
+  connected to as written. NIP-46's `switch_relays` response had the same gap, and silently dropped
+  unparseable entries rather than reporting a malformed response. Both now match the validation
+  `bunker://` and `nostrconnect://` URIs already applied.
 - **A terminal drop ends the message streams even when nothing will reconnect**: with
   `autoReconnect` disabled, a keepalive or send failure discards the socket, which retires the
   generation the receive loop runs under — so the loop exited without finishing the streams and
