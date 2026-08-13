@@ -41,6 +41,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   sends compare before touching shared state, so work belonging to a superseded socket stops
   instead of landing on the live session. Reachable from ordinary use — `RelayPool.disconnectAll()`
   or `removeRelay` overlapping `connectAll()`.
+- **Disconnecting ends every open subscription instead of hanging its consumer**:
+  `client.relays.disconnect()` cancelled the pool's listener tasks but left the client's
+  subscription sequences open, so a `for await` over one never ended and never received anything
+  again — nothing recreates the listeners, and each connection clears its own tracked subscriptions
+  on disconnect, so reconnecting restored the sockets but not the delivery. Disconnecting now ends
+  the sequences first, from the client layer that owns them. The pool's handler and deduplication
+  state are dropped with the listener tasks as well; retained, they grew on every
+  connect/disconnect cycle while naming subscriptions the pool could no longer serve.
+- **Re-subscribing under an id already in use no longer double-delivers**: cancelling the previous
+  listener tasks does not stop a frame already in flight, and the listener resolved the handler at
+  delivery time — so a straggler from the old generation was handed to the *new* handler, and every
+  EOSE, CLOSED, NOTICE, and AUTH arrived twice. Each listener now carries the generation it belongs
+  to and delivers only while it is current.
+- **A subscription can no longer miss the events that answer it**: the listener was started in a
+  detached task and the REQ was sent after a bare `Task.yield()`, which does not guarantee the
+  listener had registered its stream. Anything the relay sent immediately — including the EOSE a
+  fetch waits for — could be dropped, leaving the fetch to wait out its whole timeout. The stream is
+  now obtained before the REQ is sent, so registration is complete rather than merely likely.
 - **A duplicate request key is refused instead of hanging its first caller**: registering a request
   under a key already in flight overwrote the entry, dropping the first request's continuation
   without resolving it and leaving its timeout running. That caller stayed suspended forever — its

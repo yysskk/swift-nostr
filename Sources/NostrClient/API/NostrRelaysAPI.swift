@@ -65,9 +65,15 @@ public struct NostrRelaysAPI: NostrRelayManaging {
         try await connect()
     }
 
-    /// Disconnects from all relays.
+    /// Disconnects from all relays, ending every open subscription.
+    ///
+    /// A subscription cannot outlive the connections that feed it: disconnecting drops the pool's
+    /// listener tasks and nothing recreates them. Every open ``SubscriptionSequence`` therefore
+    /// finishes, so a `for await` over one ends here rather than waiting on events that can no
+    /// longer arrive. Reconnecting with ``connect()`` restores the relays; the subscriptions have
+    /// to be opened again.
     public func disconnect() async {
-        await client.pool.disconnectAll()
+        await client.disconnectAllRelays()
     }
 
     // MARK: - Inspection
