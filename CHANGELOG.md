@@ -22,6 +22,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `UInt8(_:radix:)`, which accepts a leading `+` or `-`, so `"+1"` decoded to `0x01`. Distinct
   strings could decode to the same identity, desynchronizing any cache, mute list, or comparison
   keyed on the hex spelling. Only ASCII hexadecimal digits are accepted now.
+- **Bech32 decoding enforces the canonical spelling (BIP-173)**: `Bech32.decode(_:)` discarded the
+  bits left over after regrouping without checking them, so every `npub`, `nsec`, `note`, or
+  `ncryptsec` had sixteen checksum-valid spellings that all decoded to the same payload. It now
+  rejects a payload whose leftover bits number five or more or are not zero. `Bech32.decodeToWords`
+  and `Bech32.wordsToBytes` keep their lenient regrouping for formats sliced into fields that are
+  not individually byte-aligned, such as BOLT-11 invoices.
+- **Bech32 decoding rejects mixed case**: BIP-173 forbids mixing upper and lower case in one string;
+  the case was folded before any check, so mixed-case input decoded. All-lowercase and all-uppercase
+  input — the latter common in QR codes — remain valid on both `decode(_:)` and `decodeToWords(_:)`.
+- **Bech32 encoding validates the human-readable part**: `Bech32.encode(hrp:data:)` accepted an
+  empty or uppercase prefix and produced a string that `decode(_:)` could never accept, since the
+  checksum covered the prefix as written while decoding recomputes it lowercased. The prefix must
+  now be non-empty lowercase printable ASCII.
 
 ## [0.7.0] - 2026-07-26
 
