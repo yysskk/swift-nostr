@@ -307,8 +307,15 @@ public actor RelayConnection {
 
     /// Disconnects from the relay.
     ///
+    /// The teardown is the same from every state, including
+    /// ``RelayConnectionState/failed(_:)`` — the state a connection sits in after any dropped
+    /// connection. Callers waiting on a publish or a count are failed with
+    /// ``NostrError/notConnected`` rather than left to their timeouts, tracked subscriptions are
+    /// dropped so a later ``connect()`` does not replay them, and NIP-42 session state is cleared.
+    ///
     /// Terminal for ``messages()`` streams: every open stream finishes so
-    /// `for await` consumers end. ``stateChanges()`` streams stay open — they
+    /// `for await` consumers end. A stream taken after this point belongs to the next session and
+    /// stays open until it arrives. ``stateChanges()`` streams stay open — they
     /// observe the transition to ``RelayConnectionState/disconnected`` and any
     /// later ``connect()``.
     public func disconnect() {
@@ -332,18 +339,23 @@ public actor RelayConnection {
         // established at all.
         finishMessageStreams()
 
-        guard state == .connected || state == .connecting else {
-            // Retire the socket's generation even on this path, so an attempt suspended in its
-            // ping cannot resume and install itself over a connection that was torn down.
+        // `.disconnecting` describes closing a live socket, so it is only announced when there is
+        // one. Everything below runs from every state: a connection that dropped sits in `.failed`,
+        // and skipping the teardown there left publish callers waiting out the full ack timeout,
+        // subscriptions ready to be replayed on the next connect, and `isAuthenticated` reporting
+        // true for a session that no longer existed.
+        let wasLive = state == .connected || state == .connecting
+        if wasLive {
+            updateState(.disconnecting)
+            webSocketTask?.cancel(with: .normalClosure, reason: nil)
+            webSocketTask = nil
+            socketGeneration &+= 1
+        } else {
+            // Retire the socket's generation on this path too, so an attempt suspended in its ping
+            // cannot resume and install itself over a connection that was torn down.
             discardSocket()
-            updateState(.disconnected)
-            return
         }
 
-        updateState(.disconnecting)
-        webSocketTask?.cancel(with: .normalClosure, reason: nil)
-        webSocketTask = nil
-        socketGeneration &+= 1
         subscriptions.removeAll()
         for waiters in pendingPublishWaiters.values {
             for waiter in waiters.values {
@@ -356,7 +368,12 @@ public actor RelayConnection {
         }
         pendingCountWaiters.removeAll()
         resetAuthenticationState()
-        updateState(.disconnected)
+
+        // Announcing `.disconnected` again for a connection already in that state would report a
+        // transition that did not happen to every `stateChanges()` consumer.
+        if state != .disconnected {
+            updateState(.disconnected)
+        }
     }
 
     /// Clears all NIP-42 session state. Challenges, authenticated pubkeys, and
@@ -809,14 +826,18 @@ public actor RelayConnection {
     /// Returns an async stream of messages from this relay.
     /// Each call creates a new stream that receives all future messages.
     ///
-    /// The stream survives automatic reconnections and keeps delivering
-    /// messages from the new session. It finishes when the connection is torn
-    /// down for good: on ``disconnect()``, when auto-reconnect gives up after
-    /// ``RelayConnectionConfig/maxReconnectAttempts`` failed attempts, or when
-    /// the connection drops with ``RelayConnectionConfig/autoReconnect``
-    /// disabled. With the default configuration (unlimited reconnect attempts)
-    /// only an explicit ``disconnect()`` finishes it. After reconnecting
-    /// manually, call ``messages()`` again for a fresh stream.
+    /// A stream is bound to the connection, not to one socket: it survives automatic reconnections
+    /// and keeps delivering from the new session. Taking a stream before connecting is the normal
+    /// way to use it — register first, then ``connect()`` and ``subscribe(subscriptionId:filters:)``
+    /// — so a stream taken while disconnected stays open and begins delivering when the next
+    /// session arrives, rather than finishing on the spot.
+    ///
+    /// It finishes when the connection is torn down for good: on ``disconnect()``, when
+    /// auto-reconnect gives up after ``RelayConnectionConfig/maxReconnectAttempts`` failed
+    /// attempts, or when the connection drops with ``RelayConnectionConfig/autoReconnect``
+    /// disabled. With the default configuration (unlimited reconnect attempts) only an explicit
+    /// ``disconnect()`` finishes it. Streams open at that point end; a stream taken afterwards
+    /// belongs to the next session, so call ``messages()`` again after reconnecting manually.
     public func messages() -> AsyncStream<RelayMessage> {
         let id = UUID()
         return AsyncStream { continuation in
