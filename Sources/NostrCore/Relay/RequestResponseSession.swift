@@ -1,5 +1,15 @@
 import Foundation
 
+/// A failure in the session machinery itself, distinct from the protocol errors an owner supplies.
+package enum RequestResponseSessionError: Error, Equatable, Sendable {
+    /// A request was made under a key that already identifies one in flight.
+    ///
+    /// Correlation keys are expected to be unique — NIP-46 uses 16 random bytes, NIP-47 an event id
+    /// whose content carries a random nonce — so this reports a defect in how they are generated
+    /// rather than anything a relay or peer did.
+    case duplicateRequestKey
+}
+
 /// The request/response machinery a NIP-46 remote-signer session and a NIP-47 wallet connection
 /// share, on top of a ``RelayTransport``.
 ///
@@ -194,7 +204,8 @@ package actor RequestResponseSession<Key: Hashable & Sendable, State: Sendable, 
     ///     that did arrive.
     /// - Returns: The response the owner delivered with ``complete(_:with:)``.
     /// - Throws: The session's `timedOut` error if no response arrives in time, the error passed to
-    ///   ``fail(_:with:)``, or a transport error from the send.
+    ///   ``fail(_:with:)``, a transport error from the send, or
+    ///   ``RequestResponseSessionError/duplicateRequestKey`` when `key` is already in flight.
     package func perform(
         _ event: Event,
         key: Key,
@@ -202,6 +213,15 @@ package actor RequestResponseSession<Key: Hashable & Sendable, State: Sendable, 
         timeout: TimeInterval,
         partialResult: PartialResult? = nil
     ) async throws -> Response {
+        // Overwriting an entry would drop the first request's continuation without resolving it and
+        // leave its timeout running: that caller would stay suspended forever — its own cleanup
+        // never runs, because it never returns — while the orphaned timeout resolved this request
+        // on the first one's schedule. The newcomer is refused instead, since it has not sent
+        // anything yet and the request already in flight may be about to be answered.
+        guard pending[key] == nil else {
+            throw RequestResponseSessionError.duplicateRequestKey
+        }
+
         let (stream, continuation) = AsyncThrowingStream<Response, any Error>.makeStream()
         // Scheduling the timeout as part of the registration is safe: its task cannot re-enter the
         // actor until this call suspends, by which point the entry it looks for exists.
