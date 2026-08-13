@@ -135,6 +135,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `"root"` was carried over as the thread root. A parent written in NIP-10's deprecated positional
   form — no markers at all — looked rootless, and the reply started a second thread beside the one
   it was answering; its first `e` tag is now used as the root, as the spec says.
+- **Derived key material is zeroed once it is no longer needed**: the NIP-44 conversation and
+  message keys, the ECDH shared point they come from, the padded plaintext buffers, and the NIP-49
+  scrypt key are scrubbed on the way out of the operations that derive them, narrowing the window in
+  which freed memory still holds a usable key. This is defense in depth, not a guarantee: `Data` is
+  copy-on-write, so a copy that has already diverged is untouched, and `String`-typed secrets such as
+  a mnemonic or a decrypted `nsec` cannot be scrubbed at all. Both limits are documented on the
+  helper rather than left implied.
 - **Repeated NIP-46 auth challenges cannot extend a request without end**: each `auth_url` replaced
   the request's timeout, so a signer that kept sending them held the caller suspended indefinitely.
   The first challenge now fixes a deadline and later ones may only postpone up to it, keeping the

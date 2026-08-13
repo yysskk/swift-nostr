@@ -106,7 +106,10 @@ public struct EncryptedPrivateKey: Sendable, Hashable {
 
         let salt = try SecureRandom.generateBytes(count: saltByteCount)
         let nonce = try SecureRandom.generateBytes(count: nonceByteCount)
-        let symmetricKey = try deriveSymmetricKey(password: password, salt: salt, logN: logN)
+        // Scrubbed once the payload is sealed: the key is re-derived from the password on every
+        // decrypt, so nothing needs this copy afterwards.
+        var symmetricKey = try deriveSymmetricKey(password: password, salt: salt, logN: logN)
+        defer { symmetricKey.secureScrub() }
 
         let associatedData = Data([keySecurity.rawValue])
         let ciphertext = try XChaCha20Poly1305.seal(
@@ -162,7 +165,8 @@ public struct EncryptedPrivateKey: Sendable, Hashable {
         let associatedData = Data(payload[(base + 42)..<(base + 43)])
         let ciphertext = Data(payload[(base + 43)..<(base + 91)])
 
-        let symmetricKey = try Self.deriveSymmetricKey(password: password, salt: salt, logN: logN)
+        var symmetricKey = try Self.deriveSymmetricKey(password: password, salt: salt, logN: logN)
+        defer { symmetricKey.secureScrub() }
         return try XChaCha20Poly1305.open(
             ciphertext,
             key: symmetricKey,
