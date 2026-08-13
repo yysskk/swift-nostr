@@ -7,7 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.7.0] - 2026-07-26
+### Fixed
+
+- **Event verification rejects malformed keys and signatures**: `Event.verify()` now checks that the
+  `pubkey` decodes to 32 bytes and the `sig` to 64 before handing them to libsecp256k1, which parses
+  both as fixed-width buffers without validating their length. A short `pubkey` previously caused a
+  read past the end of the decoded buffer, and a long one was silently truncated to its first 32
+  bytes, so a single key could be spelled many ways and slip past checks keyed on the pubkey string.
+  Both fields arrive straight from a relay, so the mismatch is remotely reachable on any verification
+  path — NIP-98 HTTP auth, gift-wrap seals, zap receipts, group state, and NIP-46 responses. Wrong
+  lengths now throw `NostrError.invalidPublicKey` / `.invalidSignature` instead of returning `false`
+  or surfacing the underlying secp256k1 error type.
+- **Hex decoding rejects sign characters**: `Data(hexString:)` delegated each byte to
+  `UInt8(_:radix:)`, which accepts a leading `+` or `-`, so `"+1"` decoded to `0x01`. Distinct
+  strings could decode to the same identity, desynchronizing any cache, mute list, or comparison
+  keyed on the hex spelling. Only ASCII hexadecimal digits are accepted now.
 
 An API-shape release: `NostrClient`'s ~70 methods move onto eight feature namespaces backed by
 capability protocols, every client feature runs through the `NostrSigning` abstraction so a remote

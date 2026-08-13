@@ -212,6 +212,19 @@ extension Event {
             throw NostrError.invalidHex
         }
 
+        // libsecp256k1 parses these as fixed-width buffers: `XonlyKey` forwards the bytes to
+        // `secp256k1_xonly_pubkey_parse`, which reads 32 bytes unconditionally and neither checks
+        // nor reports the length. A short pubkey would read past the end of the allocation, and a
+        // long one would be truncated to its first 32 bytes — letting a single key be spelled many
+        // ways and slip past anything keyed on the pubkey string. Both fields come straight off the
+        // wire, so the lengths are checked here rather than trusted.
+        guard pubkeyData.count == 32 else {
+            throw NostrError.invalidPublicKey
+        }
+        guard sigData.count == 64 else {
+            throw NostrError.invalidSignature
+        }
+
         let xonlyKey = P256K.Schnorr.XonlyKey(dataRepresentation: pubkeyData, keyParity: 0)
         let signature = try P256K.Schnorr.SchnorrSignature(dataRepresentation: sigData)
 
