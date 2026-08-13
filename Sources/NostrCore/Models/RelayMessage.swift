@@ -174,8 +174,13 @@ public enum RelayMessage: Sendable {
 // MARK: - Codable Helpers
 extension Encodable {
     fileprivate func toDictionary() throws -> [String: Any] {
+        // No key strategy: every declared key already carries its NIP-01 wire spelling
+        // (`created_at`, `#e`, `#p`), so converting would be a no-op for them — while corrupting
+        // the dynamic keys `Filter` emits for generic tag queries. Converting to snake case turns
+        // the uppercase tags NIP-22 uses for root scope (`#A`, `#E`, `#I`, `#K`, `#P`) into `#_a`
+        // and friends, which a relay does not recognize: it drops the unknown key and answers the
+        // rest of the filter, silently returning more than was asked for.
         let encoder = JSONEncoder()
-        encoder.keyEncodingStrategy = .convertToSnakeCase
         let data = try encoder.encode(self)
         guard let dict = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             throw NostrError.serializationFailed

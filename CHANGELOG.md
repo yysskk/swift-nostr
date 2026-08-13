@@ -35,6 +35,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   empty or uppercase prefix and produced a string that `decode(_:)` could never accept, since the
   checksum covered the prefix as written while decoding recomputes it lowercased. The prefix must
   now be non-empty lowercase printable ASCII.
+- **Uppercase filter tag queries reach the relay intact**: `REQ` and `COUNT` messages were encoded
+  with a snake-case key strategy that rewrote the dynamic keys behind `Filter.addTagQuery(_:values:)`
+  — the uppercase single-letter tags NIP-22 uses for root scope became `#_k` and friends. A relay
+  drops a tag-query key it does not recognize and answers the rest of the filter, so the query
+  silently returned more events than it asked for rather than failing. The strategy was a no-op for
+  every declared key, which already spells itself as it appears on the wire, and is gone.
 
 ## [0.7.0] - 2026-07-26
 
