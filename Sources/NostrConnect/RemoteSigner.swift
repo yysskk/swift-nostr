@@ -100,6 +100,10 @@ public actor RemoteSigner {
     ///   - bunker: The parsed token.
     ///   - clientKeyPair: The local client identity; a fresh random keypair by default. Pass a
     ///     persisted one to resume an authorized session.
+    ///   - permissions: The operations to ask the signer to grant during ``connect()``, so it can
+    ///     authorize them once rather than challenging the user for each. Empty by default, which
+    ///     leaves them out of the request entirely. Granting and enforcing them is the signer's
+    ///     side of the exchange.
     ///   - transport: The relay transport. Defaults to a `RelayConnectionTransport` over the
     ///     token's relays; inject a custom one (e.g. for tests).
     ///   - config: Session behavior.
