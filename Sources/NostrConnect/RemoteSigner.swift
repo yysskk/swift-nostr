@@ -81,6 +81,9 @@ public actor RemoteSigner {
     /// When each challenged request stops being extendable, keyed by request id. Set by the first
     /// `auth_url` for a request so that repeats cannot postpone it indefinitely.
     private var authChallengeDeadlines: [String: Date] = [:]
+
+    /// The number of challenged requests still holding a deadline (for tests).
+    var authChallengeDeadlineCount: Int { authChallengeDeadlines.count }
     /// The user's public key (`get_public_key`), cached after the first fetch.
     private var cachedUserPublicKey: String?
 
@@ -286,6 +289,12 @@ public actor RemoteSigner {
         try await ensureStarted()
 
         let request = RemoteSignerRequest(method: method, params: params)
+        // Cleared where the request's life actually ends, whatever ends it. Removing it only when a
+        // later non-challenge response arrives missed the common case — a signer that sends one
+        // `auth_url` and never follows up, leaving the session's own timer to end the request — so
+        // a long-lived signer accumulated an entry per abandoned prompt.
+        defer { authChallengeDeadlines.removeValue(forKey: request.id) }
+
         let event = try buildRequestEvent(request)
         let response = try await session.perform(
             event, key: request.id, state: method, timeout: config.requestTimeout)

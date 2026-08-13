@@ -181,5 +181,10 @@ struct RemoteSignerPermissionRequestTests {
         // challenges pushed the deadline out again and it would survive the full ~2 s of them and
         // then some, so the bound sits between the two.
         #expect(elapsed < .seconds(1.5))
+
+        // The deadline is cleared when the request ends, however it ends. Tracked only until a
+        // later non-channel response arrived, an abandoned prompt like this one left it behind for
+        // the signer's lifetime.
+        #expect(await remote.authChallengeDeadlineCount == 0)
     }
 }
