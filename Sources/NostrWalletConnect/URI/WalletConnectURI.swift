@@ -92,7 +92,12 @@ public struct WalletConnectURI: Sendable, Hashable {
 
         let relayValues = queryItems.filter { $0.name == "relay" }.compactMap { $0.value }
         let relays = relayValues.compactMap { URL(string: $0) }
-        guard !relayValues.isEmpty, relays.count == relayValues.count else {
+        // The scheme is checked here rather than left to the transport: `RelayConnection`'s
+        // URL-taking initializer does not validate, unlike its string form, so an `https://` relay
+        // in a pasted URI would be connected to as written.
+        guard !relayValues.isEmpty, relays.count == relayValues.count,
+            relays.allSatisfy({ ["ws", "wss"].contains($0.scheme?.lowercased() ?? "") })
+        else {
             throw WalletConnectError.invalidURI(reason: "missing or malformed relay")
         }
 

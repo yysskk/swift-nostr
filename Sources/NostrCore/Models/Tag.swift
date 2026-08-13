@@ -184,7 +184,7 @@ extension Tag {
     /// After this moment a relay should no longer return the event and may delete it.
     /// https://github.com/nostr-protocol/nips/blob/master/40.md
     public static func expiration(_ date: Date) -> Tag {
-        Tag(name: "expiration", values: [String(Int64(date.timeIntervalSince1970))])
+        Tag(name: "expiration", values: [String(UnixTimestamp.seconds(from: date))])
     }
 
     /// A "k" tag denoting the kind of a referenced event, e.g. on a NIP-25 reaction
@@ -343,7 +343,7 @@ extension Event {
         guard let value = firstTagValue(named: "expiration"), let seconds = Int64(value) else {
             return nil
         }
-        return Date(timeIntervalSince1970: TimeInterval(seconds))
+        return UnixTimestamp.date(fromSeconds: seconds)
     }
 
     /// Whether the event has a NIP-40 ``expiration`` at or before `date` (default: now).

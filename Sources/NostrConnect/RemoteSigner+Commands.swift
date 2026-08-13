@@ -110,7 +110,15 @@ extension RemoteSigner {
         guard let strings = try? JSONDecoder().decode([String].self, from: Data(result.utf8)) else {
             throw RemoteSignerError.responseDecodingFailed
         }
-        return strings.compactMap { URL(string: $0) }
+        // The signer chose these, and it is the same untrusted party whose relays are
+        // scheme-checked on both URI paths. A compromised one could otherwise point the session at
+        // `http://` or `file://`. An unparseable or non-WebSocket entry is reported rather than
+        // quietly dropped, so a malformed response does not look like a shorter relay list.
+        let urls = strings.compactMap { URL(string: $0) }
+        guard urls.count == strings.count, urls.allSatisfy(URIQuery.isWebSocketURL) else {
+            throw RemoteSignerError.responseDecodingFailed
+        }
+        return urls
     }
 
     /// JSON-stringifies an unsigned event as `{kind, content, tags, created_at}` for `sign_event`.
