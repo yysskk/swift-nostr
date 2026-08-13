@@ -23,6 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   strings could decode to the same identity, desynchronizing any cache, mute list, or comparison
   keyed on the hex spelling. Only ASCII hexadecimal digits are accepted now.
 
+## [0.7.0] - 2026-07-26
+
 An API-shape release: `NostrClient`'s ~70 methods move onto eight feature namespaces backed by
 capability protocols, every client feature runs through the `NostrSigning` abstraction so a remote
 signer drives all of them, and the relay layer consolidates into `NostrCore` with normalized,
