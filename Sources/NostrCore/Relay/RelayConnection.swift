@@ -53,6 +53,9 @@ public actor RelayConnection {
     /// Current reconnect delay
     var currentReconnectDelay: TimeInterval = 1
 
+    /// Draws the random factor each reconnect delay is scaled by. Injectable so tests can pin it.
+    var jitter: ReconnectJitter = { range in Double.random(in: range) }
+
     /// Whether reconnection is in progress
     var isReconnecting: Bool = false
 
@@ -195,7 +198,22 @@ public actor RelayConnection {
         self.url = url
         self.webSocketFactory = webSocketFactory
         self.config = config
-        self.currentReconnectDelay = config.initialReconnectDelay
+        self.currentReconnectDelay = config.resolvedInitialReconnectDelay
+    }
+
+    /// Creates a connection whose reconnect delays are randomized by `jitter` instead of the
+    /// system generator, so a test can assert the backoff bounds without depending on chance.
+    init(
+        url: URL,
+        webSocketFactory: any WebSocketSessionFactory,
+        config: RelayConnectionConfig,
+        jitter: @escaping ReconnectJitter
+    ) {
+        self.url = url
+        self.webSocketFactory = webSocketFactory
+        self.config = config
+        self.currentReconnectDelay = config.resolvedInitialReconnectDelay
+        self.jitter = jitter
     }
 
     /// Connects to the relay.

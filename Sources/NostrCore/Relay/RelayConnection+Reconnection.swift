@@ -1,11 +1,23 @@
 import Foundation
 
+/// Draws the random factor a reconnect delay is scaled by, given the range to draw from.
+///
+/// Exists so the backoff can be tested for its bounds rather than for a particular random draw.
+typealias ReconnectJitter = @Sendable (ClosedRange<Double>) -> Double
+
 // MARK: - Reconnection
 extension RelayConnection {
+    /// How much of a reconnect delay is randomized.
+    ///
+    /// Every relay behind one flaky uplink fails at the same moment and would otherwise retry in
+    /// lockstep at 1 s, 2 s, 4 s… — a thundering herd that arrives together and fails together.
+    /// Scaling by half to one keeps the backoff's shape while spreading the attempts out.
+    private static let jitterRange: ClosedRange<Double> = 0.5...1.0
+
     /// Resets reconnect state after successful connection
     func resetReconnectState() {
         reconnectAttempts = 0
-        currentReconnectDelay = config.initialReconnectDelay
+        currentReconnectDelay = config.resolvedInitialReconnectDelay
         isReconnecting = false
     }
 
@@ -25,17 +37,22 @@ extension RelayConnection {
 
         isReconnecting = true
 
+        // A previous task can still be alive here if `isReconnecting` was cleared by a concurrent
+        // path; overwriting the slot would leave it running and racing this one.
+        reconnectTask?.cancel()
+
         reconnectTask = Task {
-            // Wait with exponential backoff
-            let delay = currentReconnectDelay
-            try? await Task.sleep(for: .seconds(delay))
+            // Wait with exponential backoff. The delay is bounded where it is read, not where it
+            // was configured: the fields are mutable, so a zero or negative delay set after init
+            // would otherwise turn the unlimited-attempt default into a loop with no pause at all.
+            let delay = config.boundedReconnectDelay(currentReconnectDelay)
+            try? await Task.sleep(for: .seconds(delay * jitter(Self.jitterRange)))
 
             guard !Task.isCancelled else { return }
 
             // Calculate next delay with exponential backoff
-            currentReconnectDelay = min(
-                currentReconnectDelay * config.reconnectBackoffMultiplier,
-                config.maxReconnectDelay
+            currentReconnectDelay = config.boundedReconnectDelay(
+                delay * config.resolvedBackoffMultiplier
             )
             reconnectAttempts += 1
 
