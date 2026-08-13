@@ -31,6 +31,16 @@ public actor RelayConnection {
     /// The active WebSocket transport
     var webSocketTask: (any WebSocketSession)?
 
+    /// Identifies the socket currently in ``webSocketTask``, incremented on every install.
+    ///
+    /// Everything that outlives a socket — the connect attempt waiting on its ping, the receive
+    /// loop, the keepalive, an in-flight send — captures this value and compares it before touching
+    /// shared state. Without it, work belonging to a socket that has since been replaced or torn
+    /// down lands on whatever session is current: an attempt could report `.connected` for a socket
+    /// `disconnect()` had already discarded, leaving the connection wedged in a state that reports
+    /// healthy while nothing is listening and no reconnect is pending.
+    private var socketGeneration: UInt64 = 0
+
     /// Creates the WebSocket transport for each connection attempt
     private let webSocketFactory: any WebSocketSessionFactory
 
@@ -52,8 +62,16 @@ public actor RelayConnection {
     /// Keepalive ping task; non-nil only while the connection is believed healthy
     var keepaliveTask: Task<Void, Never>?
 
+    /// Receive loop for the current socket. Held so teardown can cancel it: the loop otherwise
+    /// stays parked in `receive()` keeping the connection alive through its own capture of `self`.
+    var receiveTask: Task<Void, Never>?
+
     /// In-flight connection attempt, shared by concurrent connect() callers
     private var connectTask: Task<Void, any Error>?
+
+    /// Identifies the in-flight connect attempt, so a finishing attempt only clears
+    /// ``connectTask`` if it is still the one stored there.
+    private var connectAttempt: UInt64 = 0
 
     /// Continuations for async message receiving (supports multiple consumers)
     var messageContinuations: [UUID: AsyncStream<RelayMessage>.Continuation] = [:]
@@ -206,12 +224,33 @@ public actor RelayConnection {
         // attempt other callers are waiting on. The slot is cleared inside the
         // task itself so it lives exactly as long as the attempt — clearing it
         // from the caller would be tied to the caller's lifetime instead.
+        connectAttempt &+= 1
+        let attempt = connectAttempt
         let task = Task {
-            defer { connectTask = nil }
+            // Only clear the slot if it still holds this attempt: a `disconnect()` during the
+            // attempt may already have replaced or cleared it.
+            defer { if connectAttempt == attempt { connectTask = nil } }
             try await performConnect()
         }
         connectTask = task
         try await task.value
+    }
+
+    /// Installs `socket` as the live transport, returning the generation that identifies it.
+    ///
+    /// Any socket already installed is cancelled rather than dropped: overwriting it would leave a
+    /// live connection nobody closes, and its receive loop would keep running against a relay that
+    /// still believes the session is open.
+    private func installSocket(_ socket: any WebSocketSession) -> UInt64 {
+        webSocketTask?.cancel(with: .abnormalClosure, reason: nil)
+        socketGeneration &+= 1
+        webSocketTask = socket
+        return socketGeneration
+    }
+
+    /// Whether `generation` still identifies the installed socket.
+    func isCurrentSocket(_ generation: UInt64) -> Bool {
+        socketGeneration == generation
     }
 
     /// Establishes the WebSocket connection and verifies it with a ping.
@@ -227,22 +266,43 @@ public actor RelayConnection {
         request.timeoutInterval = config.connectionTimeout
 
         let task = webSocketFactory.makeWebSocket(with: request)
-        webSocketTask = task
+        let generation = installSocket(task)
         task.resume()
 
         // Verify connection with ping before marking as connected (with timeout)
         do {
             try await Self.pingSocket(task, timeout: config.connectionTimeout)
+
+            // The ping suspended this attempt, and a `disconnect()` or a later attempt may have
+            // discarded the socket meanwhile. Reporting `.connected` for it now would describe a
+            // session that no longer exists — and, since `connect()` returns early while the state
+            // says connected, nothing would ever repair it.
+            guard isCurrentSocket(generation) else {
+                throw NostrError.notConnected
+            }
+
             updateState(.connected)
             resetReconnectState()
-            startReceiving()
-            startKeepalive()
+            startReceiving(generation: generation)
+            startKeepalive(generation: generation)
         } catch {
+            // A superseded attempt reports its own failure without touching the session that
+            // replaced it.
+            guard isCurrentSocket(generation) else {
+                throw NostrError.notConnected
+            }
             updateState(.failed(error.localizedDescription))
-            webSocketTask?.cancel(with: .abnormalClosure, reason: nil)
-            webSocketTask = nil
+            discardSocket()
             throw NostrError.connectionFailed(error.localizedDescription)
         }
+    }
+
+    /// Cancels and clears the installed socket, retiring its generation so anything still holding
+    /// the old one stops short instead of acting on the next session.
+    func discardSocket() {
+        webSocketTask?.cancel(with: .abnormalClosure, reason: nil)
+        webSocketTask = nil
+        socketGeneration &+= 1
     }
 
     /// Disconnects from the relay.
@@ -258,6 +318,13 @@ public actor RelayConnection {
         isReconnecting = false
         keepaliveTask?.cancel()
         keepaliveTask = nil
+        // The receive loop holds `self` while parked in receive(), so leaving it running keeps the
+        // whole connection — socket included — alive after the last reference is gone.
+        receiveTask?.cancel()
+        receiveTask = nil
+        // An attempt still waiting on its ping must not resume into `.connected` after this.
+        connectTask?.cancel()
+        connectTask = nil
 
         // Terminal for message streams regardless of the current state: a
         // consumer's `for await` must end even when the receive loop already
@@ -266,6 +333,9 @@ public actor RelayConnection {
         finishMessageStreams()
 
         guard state == .connected || state == .connecting else {
+            // Retire the socket's generation even on this path, so an attempt suspended in its
+            // ping cannot resume and install itself over a connection that was torn down.
+            discardSocket()
             updateState(.disconnected)
             return
         }
@@ -273,6 +343,7 @@ public actor RelayConnection {
         updateState(.disconnecting)
         webSocketTask?.cancel(with: .normalClosure, reason: nil)
         webSocketTask = nil
+        socketGeneration &+= 1
         subscriptions.removeAll()
         for waiters in pendingPublishWaiters.values {
             for waiter in waiters.values {
@@ -356,6 +427,7 @@ public actor RelayConnection {
         guard let task = webSocketTask else {
             throw NostrError.notConnected
         }
+        let generation = socketGeneration
 
         let text = try message.serialize()
         do {
@@ -374,9 +446,16 @@ public actor RelayConnection {
                 group.cancelAll()
             }
         } catch {
-            // Update state on send failure
-            updateState(.failed(error.localizedDescription))
-            scheduleReconnectIfNeeded()
+            // Update state on send failure, but only for the session this send belonged to: the
+            // send timeout fires on a merely slow relay, and by the time it does the socket may
+            // already have been replaced. The socket is discarded rather than left installed —
+            // otherwise the next connect would overwrite a live connection nobody closes, and its
+            // receive loop would go on running beside the new one.
+            if isCurrentSocket(generation) {
+                updateState(.failed(error.localizedDescription))
+                discardSocket()
+                scheduleReconnectIfNeeded()
+            }
             if let nostrError = error as? NostrError {
                 throw nostrError
             } else {

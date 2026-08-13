@@ -44,9 +44,9 @@ extension RelayConnection {
         }
     }
 
-    /// Starts the periodic keepalive ping loop for the current connection.
+    /// Starts the periodic keepalive ping loop for the socket identified by `generation`.
     /// Replaces any previous keepalive so at most one runs per connection.
-    func startKeepalive() {
+    func startKeepalive(generation: UInt64) {
         keepaliveTask?.cancel()
         let interval = config.pingInterval
         let pongTimeout = config.connectionTimeout
@@ -55,12 +55,17 @@ extension RelayConnection {
                 try? await Task.sleep(for: .seconds(interval))
                 // Re-check after every suspension: the connection may have been
                 // disconnected, failed, or replaced while this task slept.
-                guard !Task.isCancelled, state == .connected, let task = webSocketTask else { return }
+                guard !Task.isCancelled, state == .connected, isCurrentSocket(generation),
+                    let task = webSocketTask
+                else { return }
                 do {
                     try await Self.pingSocket(task, timeout: pongTimeout)
                 } catch {
-                    // A ping that raced a deliberate disconnect or reconnect is not a failure.
-                    guard !Task.isCancelled, state == .connected else { return }
+                    // A ping that raced a deliberate disconnect or reconnect is not a failure, and
+                    // a ping belonging to a superseded socket says nothing about the live one.
+                    guard !Task.isCancelled, state == .connected, isCurrentSocket(generation) else {
+                        return
+                    }
                     handleKeepaliveFailure(error)
                     return
                 }
@@ -72,8 +77,7 @@ extension RelayConnection {
     private func handleKeepaliveFailure(_ error: any Error) {
         updateState(.failed(error.localizedDescription))
         // Cancel the socket so the receive loop's pending receive() exits promptly.
-        webSocketTask?.cancel(with: .abnormalClosure, reason: nil)
-        webSocketTask = nil
+        discardSocket()
         scheduleReconnectIfNeeded()
     }
 }
