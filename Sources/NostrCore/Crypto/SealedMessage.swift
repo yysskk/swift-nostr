@@ -303,10 +303,11 @@ public struct SealedMessage: Sendable {
 
     /// HKDF-Expand
     private static func hkdfExpand(prk: Data, info: Data, length: Int) -> Data {
-        // RFC 5869 caps the output at 255 blocks, which is also where the `UInt8` block counter
-        // below would overflow and trap. `length` is a fixed 76 at the only call site, so this
-        // pins an internal invariant rather than validating input.
-        precondition(length <= 255 * 32, "HKDF-Expand output is limited to 255 blocks")
+        // RFC 5869 caps the output at 255 blocks. The bound here is one block lower: `counter`
+        // is incremented at the end of every iteration, so producing the 255th block would take it
+        // to 256 and trap before the loop could exit. `length` is a fixed 76 at the only call site,
+        // so this pins an internal invariant rather than validating input.
+        precondition(length <= 254 * 32, "HKDF-Expand output is limited to 254 blocks here")
 
         let key = SymmetricKey(data: prk)
         var output = Data()

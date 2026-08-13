@@ -73,6 +73,10 @@ struct ReplyThreadingTests {
 
     /// NIP-10's deprecated positional form carries no markers, and there the first `e` tag is the
     /// root. Treated as rootless, the reply started a second thread beside the one it answered.
+    ///
+    /// The recovered root is re-emitted with an explicit marker rather than copied through:
+    /// appending it unmarked next to a `reply`-marked tag would leave a mixed set, which
+    /// marked-scheme readers take to mean a mention — losing the thread this recovery preserves.
     @Test("the first e tag is the root when no markers are present")
     func positionalRootIsCarriedOver() async throws {
         let parentID = String(repeating: "22", count: 32)
@@ -81,8 +85,21 @@ struct ReplyThreadingTests {
             ["e", parentID],
         ])
 
-        #expect(tags.contains(["e", rootID]))
-        #expect(tags.contains { $0.count >= 4 && $0[3] == "reply" })
+        #expect(tags.contains { $0.count >= 4 && $0[1] == rootID && $0[3] == "root" })
+        // The reply points at the parent event itself, not at the id in one of its tags.
+        #expect(tags.contains { $0.count >= 4 && $0[1] != rootID && $0[3] == "reply" })
+    }
+
+    /// A relay hint on the positional root is preserved when the tag is re-emitted.
+    @Test("a positional root keeps its relay hint")
+    func positionalRootKeepsRelayHint() async throws {
+        let parentID = String(repeating: "22", count: 32)
+        let tags = try await replyEventTags(toParentWith: [
+            ["e", rootID, "wss://hint.example.com"],
+            ["e", parentID, "wss://hint.example.com"],
+        ])
+
+        #expect(tags.contains(["e", rootID, "wss://hint.example.com", "root"]))
     }
 
     @Test("an event with no e tags is its own root")

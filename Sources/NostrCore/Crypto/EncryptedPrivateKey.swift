@@ -35,7 +35,7 @@ public struct EncryptedPrivateKey: Sendable, Hashable {
     /// The largest scrypt cost exponent NIP-49 defines. A payload may record any cost up to this,
     /// and ``init(ncryptsec:)`` parses all of them — but see ``defaultMaximumLogN`` for what
     /// ``decrypt(password:maxLogN:)`` is willing to spend without being asked.
-    private static let maximumLogN: UInt8 = 22
+    private static let specMaximumLogN: UInt8 = 22
 
     /// The largest scrypt cost ``decrypt(password:maxLogN:)`` accepts unless the caller raises it.
     ///
@@ -86,20 +86,32 @@ public struct EncryptedPrivateKey: Sendable, Hashable {
     /// - Parameters:
     ///   - privateKey: The raw 32-byte private key to encrypt.
     ///   - password: The password protecting the key. It is NFKC-normalized before key derivation.
-    ///   - logN: The scrypt cost exponent, `1...22` (default 16). Higher is slower and stronger.
+    ///   - logN: The scrypt cost exponent (default 16, the value NIP-49 recommends). Capped at
+    ///     ``defaultMaximumLogN`` so a key written here always opens with the matching default on
+    ///     ``decrypt(password:maxLogN:)``; to write a costlier one deliberately, raise `maxLogN`
+    ///     with `maximumLogN`, keeping in mind that every reader needs the same allowance.
     ///   - keySecurity: How the key was handled before encryption (default ``KeySecurity/unknown``).
+    ///   - maximumLogN: The largest cost this call will write, defaulting to
+    ///     ``defaultMaximumLogN``. NIP-49 permits up to 22.
     /// - Returns: The resulting ``EncryptedPrivateKey``.
     /// - Throws: ``NostrError/invalidPrivateKey`` if `privateKey` is not 32 bytes, or
-    ///   ``NostrError/unsupportedScryptCost(_:)`` if `logN` is outside `1...22`.
+    ///   ``NostrError/unsupportedScryptCost(_:)`` if `logN` exceeds `maximumLogN`, or `maximumLogN`
+    ///   exceeds the `22` NIP-49 defines.
     public static func encrypt(
         privateKey: Data,
         password: String,
         logN: UInt8 = 16,
-        keySecurity: KeySecurity = .unknown
+        keySecurity: KeySecurity = .unknown,
+        maximumLogN: UInt8 = defaultMaximumLogN
     ) throws -> EncryptedPrivateKey {
         guard privateKey.count == 32 else {
             throw NostrError.invalidPrivateKey
         }
+        guard maximumLogN <= specMaximumLogN else {
+            throw NostrError.unsupportedScryptCost(maximumLogN)
+        }
+        // Bounded by the same default the reader applies, so this library never writes a payload it
+        // would then refuse to open — a round trip that failed inside one module.
         guard 1...maximumLogN ~= logN else {
             throw NostrError.unsupportedScryptCost(logN)
         }
@@ -146,7 +158,7 @@ public struct EncryptedPrivateKey: Sendable, Hashable {
         // The whole range, not just the ceiling: a `maxLogN` of 0 would clear an upper-bound-only
         // guard and then make the `1...maxLogN` below an invalid range, trapping on exactly the
         // caller-supplied input this bound exists to make safe.
-        guard 1...Self.maximumLogN ~= maxLogN else {
+        guard 1...Self.specMaximumLogN ~= maxLogN else {
             throw NostrError.unsupportedScryptCost(maxLogN)
         }
 
@@ -216,21 +228,25 @@ extension KeyPair {
     /// Encrypts this keypair's private key to a NIP-49 `ncryptsec` string.
     /// - Parameters:
     ///   - password: The password protecting the key. It is NFKC-normalized before key derivation.
-    ///   - logN: The scrypt cost exponent, `1...22` (default 16). Higher is slower and stronger.
+    ///   - logN: The scrypt cost exponent (default 16). Capped at `maximumLogN`.
     ///   - keySecurity: How the key was handled before encryption (default
     ///     ``EncryptedPrivateKey/KeySecurity/unknown``).
+    ///   - maximumLogN: The largest cost to write, defaulting to
+    ///     ``EncryptedPrivateKey/defaultMaximumLogN``.
     /// - Returns: The resulting ``EncryptedPrivateKey``.
-    /// - Throws: ``NostrError/unsupportedScryptCost(_:)`` if `logN` is outside `1...22`.
+    /// - Throws: ``NostrError/unsupportedScryptCost(_:)`` if `logN` exceeds `maximumLogN`.
     public func encryptedPrivateKey(
         password: String,
         logN: UInt8 = 16,
-        keySecurity: EncryptedPrivateKey.KeySecurity = .unknown
+        keySecurity: EncryptedPrivateKey.KeySecurity = .unknown,
+        maximumLogN: UInt8 = EncryptedPrivateKey.defaultMaximumLogN
     ) throws -> EncryptedPrivateKey {
         try EncryptedPrivateKey.encrypt(
             privateKey: privateKey,
             password: password,
             logN: logN,
-            keySecurity: keySecurity
+            keySecurity: keySecurity,
+            maximumLogN: maximumLogN
         )
     }
 

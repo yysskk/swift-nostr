@@ -39,18 +39,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `requiringDescriptionHash` parameter (default `true`) relaxes that for a provider known to omit
   it. Four new `ValidationError` cases accompany this: `missingDescriptionHash`, `missingAmount`,
   `invalidAmount`, and `missingRecipient`.
-- **NIP-49 decryption bounds its scrypt cost**: `EncryptedPrivateKey.decrypt(password:)` and
-  `KeyPair(ncryptsec:password:)` take a new `maxLogN` parameter, defaulting to
+- **NIP-49 bounds its scrypt cost on both sides**: `EncryptedPrivateKey.encrypt(…)` takes a
+  `maximumLogN` and `decrypt(password:)` / `KeyPair(ncryptsec:password:)` take a `maxLogN`, both
+  defaulting to
   `EncryptedPrivateKey.defaultMaximumLogN` (18, or 256 MiB). scrypt's memory cost is `128 · N · r`
   and NIP-49 fixes `r` at 8, so the cost byte a payload records decides the allocation on its own —
   4 GiB at the spec's maximum of 22, which the system terminates before the password is even
   checked. The default sits two doublings above the 16 the spec recommends, so ordinary keys are
-  unaffected; a caller who must open a deliberately costlier key raises `maxLogN` and accepts the
-  allocation. A parsed payload's `logN` is readable beforehand, so that choice can be made with the
-  real number in hand.
+  unaffected; a caller who must write or open a deliberately costlier key raises the corresponding
+  bound and accepts the allocation. The writer is capped by the same default as the reader, so this
+  library never mints an `ncryptsec` it would then refuse to open. A parsed payload's `logN` is
+  readable beforehand, so that choice can be made with the real number in hand.
 
 ### Fixed
 
+- **A terminal drop ends the message streams even when nothing will reconnect**: with
+  `autoReconnect` disabled, a keepalive or send failure discards the socket, which retires the
+  generation the receive loop runs under — so the loop exited without finishing the streams and
+  nothing else did either, leaving a `for await` over `messages()` waiting forever. The drop is now
+  recognized as terminal where the reconnect is declined, matching what already happened when
+  auto-reconnect gave up after its last attempt.
 - **A disconnected relay connection can no longer wedge as "connected"**: a connection attempt
   suspends while it waits for the pong that proves its socket works, and `disconnect()` (or a later
   attempt) could discard that socket meanwhile. The attempt resumed regardless and marked the

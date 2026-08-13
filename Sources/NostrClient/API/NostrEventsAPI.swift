@@ -61,8 +61,16 @@ public struct NostrEventsAPI: NostrEventPublishing, NostrEventFetching {
             let positionalRoot =
                 parentEventTags.allSatisfy { $0.values.count < 3 } ? parentEventTags.first : nil
 
-            if let rootTag = markedRoot ?? positionalRoot {
-                tags.append(rootTag)
+            if let markedRoot {
+                tags.append(markedRoot)
+                tags.append(.event(event.id, relayURL: relayURL, marker: .reply))
+            } else if let positionalRoot, let rootID = positionalRoot.primaryValue {
+                // Re-emitted with an explicit "root" marker rather than copied through. Appending
+                // the unmarked tag verbatim would leave a mixed set — one marked "reply", one with
+                // no marker — which marked-scheme readers take to mean a mention, losing the very
+                // thread this recovery exists to preserve.
+                let hint = positionalRoot.values.count >= 2 ? positionalRoot.values[1] : nil
+                tags.append(.event(rootID, relayURL: hint, marker: .root))
                 tags.append(.event(event.id, relayURL: relayURL, marker: .reply))
             } else {
                 // This is a reply to a root event
