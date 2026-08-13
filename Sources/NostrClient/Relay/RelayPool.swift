@@ -615,6 +615,16 @@ public actor RelayPool {
     /// The number of registered subscription handlers (test hook).
     var subscriptionHandlerCount: Int { subscriptionHandlers.count }
 
+    /// The listener generation currently serving `subscriptionId` (for tests).
+    func subscriptionGeneration(for subscriptionId: String) -> UInt64? {
+        subscriptionGeneration[subscriptionId]
+    }
+
+    /// The number of listener tasks registered for `subscriptionId` (for tests).
+    func listenerTaskCount(for subscriptionId: String) -> Int {
+        subscriptionTasks[subscriptionId]?.count ?? 0
+    }
+
     /// The number of subscriptions with live listener tasks (test hook).
     var subscriptionTaskCount: Int { subscriptionTasks.count }
 
