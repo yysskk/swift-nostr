@@ -40,6 +40,9 @@ struct NIP57ZapReceiptTests {
 
     // MARK: - Success
 
+    /// The canonical BOLT-11 vectors used here carry a plain `d` description rather than the
+    /// description hash a real LNURL-pay invoice commits to, so the binding check is relaxed for
+    /// them. `descriptionHashRequiredByDefault` below covers the default.
     @Test("a valid receipt passes validation and exposes its fields")
     func validReceipt() throws {
         let payee = try KeyPair()
@@ -55,7 +58,9 @@ struct NIP57ZapReceiptTests {
 
         let zapReceipt = try #require(ZapReceipt(event: receipt))
         try zapReceipt.validate(
-            lnurlProviderPubkey: payee.publicKeyHex, expectedAmountMillisats: coffeeAmountMillisats)
+            lnurlProviderPubkey: payee.publicKeyHex,
+            expectedAmountMillisats: coffeeAmountMillisats,
+            requiringDescriptionHash: false)
 
         #expect(zapReceipt.bolt11 == coffeeInvoice)
         #expect(zapReceipt.recipientPubkey == recipient)
@@ -63,7 +68,7 @@ struct NIP57ZapReceiptTests {
         #expect(zapReceipt.zapRequest?.kind == .zapRequest)
     }
 
-    @Test("an amountless invoice does not fail the amount check")
+    @Test("an amountless invoice passes when no amount is asserted")
     func amountlessReceipt() throws {
         let payee = try KeyPair()
         let recipient = try KeyPair().publicKeyHex
@@ -76,9 +81,101 @@ struct NIP57ZapReceiptTests {
                 ["p", recipient],
             ])
 
-        // Even with an expected amount, an amountless invoice is advisory and must not fail.
         try ZapReceipt(event: receipt)!.validate(
-            lnurlProviderPubkey: payee.publicKeyHex, expectedAmountMillisats: 999_999)
+            lnurlProviderPubkey: payee.publicKeyHex, requiringDescriptionHash: false)
+    }
+
+    /// Asking for an amount that the invoice never names is a check that cannot be made. Passing
+    /// silently told the caller their assertion held when nothing had been compared.
+    @Test("an expected amount against an amountless invoice fails")
+    func amountlessReceiptRejectsExpectedAmount() throws {
+        let payee = try KeyPair()
+        let recipient = try KeyPair().publicKeyHex
+        let description = try zapRequestJSON(recipient: recipient, amountMillisats: nil)
+        let receipt = try makeReceipt(
+            signedBy: payee,
+            tags: [
+                ["bolt11", amountlessInvoice],
+                ["description", description],
+                ["p", recipient],
+            ])
+
+        #expect(throws: ZapReceipt.ValidationError.missingAmount) {
+            try ZapReceipt(event: receipt)!.validate(
+                lnurlProviderPubkey: payee.publicKeyHex,
+                expectedAmountMillisats: 999_999,
+                requiringDescriptionHash: false)
+        }
+    }
+
+    /// LUD-06 and LUD-12 make the description hash part of the LNURL-pay flow every zap goes
+    /// through. Without it the receipt pairs an invoice and a zap request that need have nothing to
+    /// do with each other, so `validate` no longer passes over its absence by default.
+    @Test("an invoice with no description hash fails by default")
+    func descriptionHashRequiredByDefault() throws {
+        let payee = try KeyPair()
+        let recipient = try KeyPair().publicKeyHex
+        let description = try zapRequestJSON(recipient: recipient, amountMillisats: coffeeAmountMillisats)
+        let receipt = try makeReceipt(
+            signedBy: payee,
+            tags: [
+                ["bolt11", coffeeInvoice],
+                ["description", description],
+                ["p", recipient],
+            ])
+
+        #expect(throws: ZapReceipt.ValidationError.missingDescriptionHash) {
+            try ZapReceipt(event: receipt)!.validate(lnurlProviderPubkey: payee.publicKeyHex)
+        }
+    }
+
+    /// NIP-57 requires the receipt to carry a `p` tag. Without one it never says who was zapped, so
+    /// a receipt that passed validation proved only that the provider had signed something.
+    @Test("a receipt without a p tag fails missingRecipient")
+    func missingRecipient() throws {
+        let payee = try KeyPair()
+        let recipient = try KeyPair().publicKeyHex
+        let description = try zapRequestJSON(recipient: recipient, amountMillisats: coffeeAmountMillisats)
+        let receipt = try makeReceipt(
+            signedBy: payee,
+            tags: [
+                ["bolt11", coffeeInvoice],
+                ["description", description],
+            ])
+
+        #expect(throws: ZapReceipt.ValidationError.missingRecipient) {
+            try ZapReceipt(event: receipt)!.validate(
+                lnurlProviderPubkey: payee.publicKeyHex, requiringDescriptionHash: false)
+        }
+    }
+
+    /// A non-numeric amount read as "no amount at all", quietly dropping the comparison against the
+    /// invoice instead of reporting that the request was malformed.
+    @Test("a non-numeric zap request amount fails invalidAmount")
+    func invalidRequestAmount() throws {
+        let payee = try KeyPair()
+        let recipient = try KeyPair().publicKeyHex
+        let sender = EventSigner(keyPair: try KeyPair())
+        let request = try sender.sign(
+            UnsignedEvent(
+                pubkey: sender.publicKey,
+                kind: .zapRequest,
+                rawTags: [["p", recipient], ["amount", "not-a-number"]],
+                content: ""
+            ))
+        let description = String(decoding: try JSONEncoder().encode(request), as: UTF8.self)
+        let receipt = try makeReceipt(
+            signedBy: payee,
+            tags: [
+                ["bolt11", coffeeInvoice],
+                ["description", description],
+                ["p", recipient],
+            ])
+
+        #expect(throws: ZapReceipt.ValidationError.invalidAmount) {
+            try ZapReceipt(event: receipt)!.validate(
+                lnurlProviderPubkey: payee.publicKeyHex, requiringDescriptionHash: false)
+        }
     }
 
     // MARK: - Structural failures
@@ -210,7 +307,8 @@ struct NIP57ZapReceiptTests {
             ])
 
         #expect(throws: ZapReceipt.ValidationError.amountMismatch) {
-            try ZapReceipt(event: receipt)!.validate(lnurlProviderPubkey: payee.publicKeyHex)
+            try ZapReceipt(event: receipt)!.validate(
+                lnurlProviderPubkey: payee.publicKeyHex, requiringDescriptionHash: false)
         }
     }
 
@@ -229,7 +327,9 @@ struct NIP57ZapReceiptTests {
 
         #expect(throws: ZapReceipt.ValidationError.amountMismatch) {
             try ZapReceipt(event: receipt)!.validate(
-                lnurlProviderPubkey: payee.publicKeyHex, expectedAmountMillisats: 1)
+                lnurlProviderPubkey: payee.publicKeyHex,
+                expectedAmountMillisats: 1,
+                requiringDescriptionHash: false)
         }
     }
 
@@ -248,7 +348,8 @@ struct NIP57ZapReceiptTests {
             ])
 
         #expect(throws: ZapReceipt.ValidationError.recipientMismatch) {
-            try ZapReceipt(event: receipt)!.validate(lnurlProviderPubkey: payee.publicKeyHex)
+            try ZapReceipt(event: receipt)!.validate(
+                lnurlProviderPubkey: payee.publicKeyHex, requiringDescriptionHash: false)
         }
     }
 
@@ -268,7 +369,8 @@ struct NIP57ZapReceiptTests {
             ])
 
         #expect(throws: ZapReceipt.ValidationError.zappedEventMismatch) {
-            try ZapReceipt(event: receipt)!.validate(lnurlProviderPubkey: payee.publicKeyHex)
+            try ZapReceipt(event: receipt)!.validate(
+                lnurlProviderPubkey: payee.publicKeyHex, requiringDescriptionHash: false)
         }
     }
 
@@ -310,7 +412,8 @@ struct NIP57ZapReceiptTests {
             ])
 
         #expect(throws: ZapReceipt.ValidationError.preimageMismatch) {
-            try ZapReceipt(event: receipt)!.validate(lnurlProviderPubkey: payee.publicKeyHex)
+            try ZapReceipt(event: receipt)!.validate(
+                lnurlProviderPubkey: payee.publicKeyHex, requiringDescriptionHash: false)
         }
     }
 }

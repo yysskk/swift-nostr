@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **NIP-57 zap receipt validation reports checks it cannot make**: `ZapReceipt.validate` skipped a
+  check whenever the tag it needed was absent, so a receipt could pass having established only that
+  the provider's key signed something. It now requires the `p` tag NIP-57 mandates, rejects a
+  non-numeric `amount` instead of reading it as absent, and fails when `expectedAmountMillisats` is
+  given for an invoice that names no amount — the assertion the caller asked for cannot be made
+  against one. It also requires the invoice to commit to the zap request through its description
+  hash, the binding that ties the invoice paid to the zap requested; a new
+  `requiringDescriptionHash` parameter (default `true`) relaxes that for a provider known to omit
+  it. Four new `ValidationError` cases accompany this: `missingDescriptionHash`, `missingAmount`,
+  `invalidAmount`, and `missingRecipient`.
 - **NIP-49 decryption bounds its scrypt cost**: `EncryptedPrivateKey.decrypt(password:)` and
   `KeyPair(ncryptsec:password:)` take a new `maxLogN` parameter, defaulting to
   `EncryptedPrivateKey.defaultMaximumLogN` (18, or 256 MiB). scrypt's memory cost is `128 · N · r`
