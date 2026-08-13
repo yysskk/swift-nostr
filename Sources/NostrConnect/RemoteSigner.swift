@@ -353,17 +353,11 @@ public actor RemoteSigner {
         // hold a caller suspended with no end. The first one fixes a deadline for the request, and
         // later ones may only postpone it up to that — the window stays the one the caller
         // configured however many challenges arrive.
-        let remainingAfterChallenge: TimeInterval
-        if challengeURL != nil {
-            let deadline =
-                authChallengeDeadlines[response.id]
+        let deadline = challengeURL.map { _ in
+            authChallengeDeadlines[response.id]
                 ?? Date().addingTimeInterval(config.authChallengeTimeout)
-            authChallengeDeadlines[response.id] = deadline
-            remainingAfterChallenge = deadline.timeIntervalSinceNow
-        } else {
-            authChallengeDeadlines.removeValue(forKey: response.id)
-            remainingAfterChallenge = 0
         }
+        let remainingAfterChallenge = deadline?.timeIntervalSinceNow ?? 0
 
         let method = await session.withPendingRequest(response.id) { _ in
             guard challengeURL != nil else { return .resolved(response) }
@@ -371,6 +365,16 @@ public actor RemoteSigner {
                 return .failed(RemoteSignerError.timedOut)
             }
             return .pendingFor(remainingAfterChallenge)
+        }
+
+        // Recorded only once a request is known to be waiting on it. Writing before that check let
+        // a stray or duplicate `auth_url` — one whose id matches nothing in flight, or whose
+        // request has already finished and run its cleanup — leave behind an entry with no
+        // `sendRequest` left to remove it.
+        if method != nil, let deadline, remainingAfterChallenge > 0 {
+            authChallengeDeadlines[response.id] = deadline
+        } else {
+            authChallengeDeadlines.removeValue(forKey: response.id)
         }
 
         // No pending request (an unknown or already-resolved id), or the response resolved it.

@@ -187,4 +187,33 @@ struct RemoteSignerPermissionRequestTests {
         // the signer's lifetime.
         #expect(await remote.authChallengeDeadlineCount == 0)
     }
+
+    /// A challenge whose id matches nothing in flight has no request to clean up after it, so
+    /// recording a deadline for it would leave an entry nothing ever removes.
+    @Test("a challenge for an unknown request records no deadline")
+    func strayChallengeRecordsNoDeadline() async throws {
+        let transport = FakeRemoteSignerTransport()
+        let remote = try RemoteSigner(
+            bunker: RemoteSignerFixtures.bunker(signer: signer),
+            clientKeyPair: client,
+            transport: transport,
+            config: .init(requestTimeout: 0.3, authChallengeTimeout: 5))
+
+        let connectTask = Task { try await remote.connect() }
+        let sent = try await RemoteSignerFixtures.waitForSentEvents(transport, count: 1)
+        let request = try RemoteSignerFixtures.decryptRequest(sent[0], client: client, signer: signer)
+        await transport.deliver(
+            try RemoteSignerFixtures.response(
+                requestID: request.id, result: "ack", client: client, signer: signer))
+        try await connectTask.value
+
+        // An auth_url naming a request that was never made.
+        await transport.deliver(
+            try RemoteSignerFixtures.response(
+                requestID: "no-such-request", result: "auth_url", error: "https://auth.example",
+                client: client, signer: signer))
+        try await Task.sleep(for: .milliseconds(100))
+
+        #expect(await remote.authChallengeDeadlineCount == 0)
+    }
 }
