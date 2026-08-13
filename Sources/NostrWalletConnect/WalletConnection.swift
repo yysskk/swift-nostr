@@ -269,8 +269,10 @@ public actor WalletConnection {
     // MARK: - Incoming events
 
     private func handle(_ event: Event) async {
-        // The relay filter already restricts authors, but enforce it here too as defense in depth.
-        guard event.pubkey == walletPubkey else { return }
+        // The relay filter already restricts authors, but enforce it here too as defense in depth —
+        // and require the event to say what it was signed to say, so nothing downstream reads a
+        // payload whose author has not actually vouched for it.
+        guard event.pubkey == walletPubkey, (try? event.verify()) == true else { return }
         switch event.kind {
         case .walletConnectResponse:
             await handleResponse(event)
@@ -290,6 +292,14 @@ public actor WalletConnection {
         let walletPubkey = walletPubkey
         let keyPair = keyPair
 
+        // The response names the scheme it was encrypted with; the request's own scheme is only a
+        // fallback for a wallet that sends no tag. Assuming the request's scheme meant a NIP-04
+        // wallet's reply — including the `UNSUPPORTED_ENCRYPTION` error explaining the mismatch —
+        // failed to decrypt and surfaced as a generic decoding failure, with nothing pointing at
+        // the cause.
+        let declaredScheme = event.firstTagValue(named: "encryption")
+        let responseScheme = declaredScheme.map { WalletConnectEncryption(rawValue: $0) }
+
         await session.withPendingRequest(requestID) { request in
             // A connection URI may list several relays, and the transport merges them without
             // deduplicating — that only happens in `RelayPool`, which this path does not use. One
@@ -299,8 +309,19 @@ public actor WalletConnection {
             guard request.seenResponseIDs.insert(event.id).inserted else { return .pending }
             request.receivedCount += 1
 
+            // A tag naming a scheme this package does not implement is reported as such: the
+            // payload cannot be read, and saying so beats a decoding failure that suggests the
+            // wallet sent something malformed.
+            guard let scheme = responseScheme ?? request.scheme else {
+                if request.expected == 1 {
+                    return .failed(
+                        WalletConnectError.unsupportedEncryption(declaredScheme ?? ""))
+                }
+                return request.receivedCount >= request.expected ? .resolved(request.collected) : .pending
+            }
+
             guard
-                let content = try? WalletConnectCipher(request.scheme).decrypt(
+                let content = try? WalletConnectCipher(scheme).decrypt(
                     event.content, senderPubkey: walletPubkey, recipient: keyPair)
             else {
                 // Nothing to preserve for a single-response request, so fail fast.

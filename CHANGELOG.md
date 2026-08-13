@@ -126,6 +126,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `"root"` was carried over as the thread root. A parent written in NIP-10's deprecated positional
   form — no markers at all — looked rootless, and the reply started a second thread beside the one
   it was answering; its first `e` tag is now used as the root, as the spec says.
+- **Wallet events are verified, and responses decrypted by the scheme they declare**: every event
+  from the wallet is now checked against its signature before anything in it is read — the author
+  was already checked, but a response carrying the wallet's pubkey and no valid signature was
+  accepted outright. Responses are also decrypted with the scheme named in their own `encryption`
+  tag rather than the one the request happened to use, so a wallet answering in NIP-04 can be read
+  at all. That includes its `UNSUPPORTED_ENCRYPTION` error, which previously could not be decrypted
+  and surfaced as a generic `responseDecodingFailed` with nothing pointing at the cause. A response
+  with no tag still falls back to the request's scheme, and one naming a scheme this package does
+  not implement reports `WalletConnectError.unsupportedEncryption`.
 - **A wallet response delivered over several relays is counted once**: a NIP-47 connection URI may
   list several relays, and this path merges them without deduplicating — that only happens in
   `RelayPool`, which the wallet transport bypasses. One response arriving over two relays counted

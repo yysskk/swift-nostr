@@ -26,21 +26,34 @@ enum NWCFixtures {
         try WalletConnectCipher(scheme).decrypt(event.content, senderPubkey: client.publicKeyHex, recipient: wallet)
     }
 
-    /// Builds a kind-23195 response event for a request, encrypting `resultJSON` to the client.
+    /// Builds a signed kind-23195 response event for a request, encrypting `resultJSON` to the
+    /// client.
+    ///
+    /// Signed by the wallet key, as a real response is: the connection verifies a response before
+    /// reading anything in it, so an unsigned fixture would not stand in for one.
     static func response(
         resultJSON: String, requestID: String, client: KeyPair, wallet: KeyPair,
-        scheme: WalletConnectEncryption = .nip44, dTag: String? = nil
+        scheme: WalletConnectEncryption = .nip44, dTag: String? = nil,
+        declaringEncryption: Bool = false
     ) throws -> Event {
         var tags = [["e", requestID], ["p", client.publicKeyHex]]
         if let dTag { tags.append(["d", dTag]) }
-        return Event(
-            id: "resp-\(requestID)-\(dTag ?? "")",
-            pubkey: wallet.publicKeyHex,
-            createdAt: 0,
+        if declaringEncryption { tags.append(["encryption", scheme.rawValue]) }
+        return try signed(
             kind: .walletConnectResponse,
             tags: tags,
             content: try encrypt(resultJSON, to: client, from: wallet, scheme: scheme),
-            sig: "")
+            wallet: wallet)
+    }
+
+    /// Signs `content` as `wallet`, so the event carries the id and signature the connection checks.
+    static func signed(
+        kind: Event.Kind, tags: [[String]], content: String, wallet: KeyPair, createdAt: Int64 = 0
+    ) throws -> Event {
+        try EventSigner(keyPair: wallet).sign(
+            UnsignedEvent(
+                pubkey: wallet.publicKeyHex, createdAt: createdAt, kind: kind, rawTags: tags,
+                content: content))
     }
 
     /// Builds a notification event of the given kind, encrypting `notificationJSON` to the client.
@@ -48,26 +61,16 @@ enum NWCFixtures {
         notificationJSON: String, kind: Event.Kind, client: KeyPair, wallet: KeyPair,
         scheme: WalletConnectEncryption
     ) throws -> Event {
-        Event(
-            id: "notif-\(kind.rawValue)",
-            pubkey: wallet.publicKeyHex,
-            createdAt: 0,
+        try signed(
             kind: kind,
             tags: [["p", client.publicKeyHex]],
             content: try encrypt(notificationJSON, to: client, from: wallet, scheme: scheme),
-            sig: "")
+            wallet: wallet)
     }
 
-    /// Builds a kind-13194 info event.
-    static func info(content: String, tags: [[String]], wallet: KeyPair) -> Event {
-        Event(
-            id: "info",
-            pubkey: wallet.publicKeyHex,
-            createdAt: 0,
-            kind: .walletConnectInfo,
-            tags: tags,
-            content: content,
-            sig: "")
+    /// Builds a signed kind-13194 info event.
+    static func info(content: String, tags: [[String]], wallet: KeyPair) throws -> Event {
+        try signed(kind: .walletConnectInfo, tags: tags, content: content, wallet: wallet)
     }
 
     /// Polls until `transport` has recorded at least `count` sent events, returning them.

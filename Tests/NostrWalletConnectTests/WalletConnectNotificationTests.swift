@@ -50,7 +50,7 @@ struct WalletConnectNotificationTests {
             try await Task.sleep(for: .milliseconds(5))
         }
         await transport.emit(
-            NWCFixtures.info(
+            try NWCFixtures.info(
                 content: "pay_invoice get_balance",
                 tags: [["encryption", "nip44_v2 nip04"], ["notifications", "payment_received"]],
                 wallet: wallet))
