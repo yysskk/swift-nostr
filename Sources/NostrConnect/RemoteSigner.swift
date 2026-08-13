@@ -63,10 +63,27 @@ public actor RemoteSigner {
     /// authenticate the signer before its pubkey is pinned. `nil` for a `bunker://` session.
     private let expectedInvitationSecret: String?
 
+    /// The permissions this client asks the signer to grant in its `connect` call.
+    ///
+    /// Only the `bunker://` flow sends these: it is the client that initiates the handshake there.
+    /// A `nostrconnect://` session carries its permissions in the invitation URI the signer reads,
+    /// and the client never sends `connect` at all — so the two are kept apart rather than folded
+    /// into one list that would be sent in the wrong place.
+    ///
+    /// Granting and enforcing them is the remote signer's job; this is the request.
+    private let requestedPermissions: [RemoteSignerPermission]
+
     private var didConnect = false
 
     /// Open auth-challenge streams, keyed so each can deregister on termination.
     private var authChallengeStreams: [UUID: AsyncStream<RemoteSignerAuthChallenge>.Continuation] = [:]
+
+    /// When each challenged request stops being extendable, keyed by request id. Set by the first
+    /// `auth_url` for a request so that repeats cannot postpone it indefinitely.
+    private var authChallengeDeadlines: [String: Date] = [:]
+
+    /// The number of challenged requests still holding a deadline (for tests).
+    var authChallengeDeadlineCount: Int { authChallengeDeadlines.count }
     /// The user's public key (`get_public_key`), cached after the first fetch.
     private var cachedUserPublicKey: String?
 
@@ -86,6 +103,10 @@ public actor RemoteSigner {
     ///   - bunker: The parsed token.
     ///   - clientKeyPair: The local client identity; a fresh random keypair by default. Pass a
     ///     persisted one to resume an authorized session.
+    ///   - permissions: The operations to ask the signer to grant during ``connect()``, so it can
+    ///     authorize them once rather than challenging the user for each. Empty by default, which
+    ///     leaves them out of the request entirely. Granting and enforcing them is the signer's
+    ///     side of the exchange.
     ///   - transport: The relay transport. Defaults to a `RelayConnectionTransport` over the
     ///     token's relays; inject a custom one (e.g. for tests).
     ///   - config: Session behavior.
@@ -93,6 +114,7 @@ public actor RemoteSigner {
     public init(
         bunker: BunkerURI,
         clientKeyPair: KeyPair? = nil,
+        requesting permissions: [RemoteSignerPermission] = [],
         transport: (any RelayTransport)? = nil,
         config: Config = Config()
     ) throws {
@@ -103,6 +125,7 @@ public actor RemoteSigner {
         self.signerPubkey = bunker.remoteSignerPubkey
         self.secret = bunker.secret
         self.expectedInvitationSecret = nil
+        self.requestedPermissions = permissions
         self.config = config
         self.session = Session(
             transport: transport ?? RelayConnectionTransport(relayURLs: bunker.relays),
@@ -126,6 +149,9 @@ public actor RemoteSigner {
         self.signerPubkey = nil
         self.secret = nil
         self.expectedInvitationSecret = expectedInvitationSecret
+        // The invitation URI already carries this flow's permissions, and the client never sends
+        // `connect` here, so there is nothing for this list to be sent in.
+        self.requestedPermissions = []
         self.config = config
         self.session = Session(
             transport: transport,
@@ -153,15 +179,43 @@ public actor RemoteSigner {
         guard !didConnect else { return }
 
         let signerPubkey = try requireSignerPubkey()
-        // Include the secret only when the token carries one; an older signer may echo it back
-        // instead of "ack", so accept either.
-        let params = secret.map { [signerPubkey, $0] } ?? [signerPubkey]
+        // NIP-46's connect takes `[signerPubkey, secret, perms]`. The secret is included only when
+        // the token carries one; an older signer may echo it back instead of "ack", so accept
+        // either. The permissions go in the third slot, which is positional — so an empty secret
+        // still has to be sent when there are permissions to name after it. Without them every
+        // operation had to be authorized interactively, one `auth_url` round-trip at a time.
+        var params = [signerPubkey]
+        if secret != nil || !requestedPermissions.isEmpty {
+            params.append(secret ?? "")
+        }
+        if !requestedPermissions.isEmpty {
+            params.append(requestedPermissions.map(\.rawValue).joined(separator: ","))
+        }
+
         let response = try await sendRequest(method: .connect, params: params)
         let result = response.result
-        guard result == "ack" || (secret != nil && result == secret) else {
+        guard result == "ack" || (secret != nil && result.map({ Self.constantTimeEquals($0, secret!) }) == true)
+        else {
             throw RemoteSignerError.connectionRejected(message: result ?? "")
         }
         didConnect = true
+    }
+
+    /// Compares two secrets without letting the comparison's duration depend on how much of them
+    /// matched.
+    ///
+    /// These are short-lived connection secrets carried over a relay, so a timing attack is not
+    /// practical — but a secret comparison is the wrong place to keep a shortcut, and the correct
+    /// primitive costs nothing here.
+    static func constantTimeEquals(_ lhs: String, _ rhs: String) -> Bool {
+        let left = Array(lhs.utf8)
+        let right = Array(rhs.utf8)
+        guard left.count == right.count else { return false }
+        var difference: UInt8 = 0
+        for index in left.indices {
+            difference |= left[index] ^ right[index]
+        }
+        return difference == 0
     }
 
     /// Sends `logout` (best effort) and disconnects.
@@ -235,6 +289,12 @@ public actor RemoteSigner {
         try await ensureStarted()
 
         let request = RemoteSignerRequest(method: method, params: params)
+        // Cleared where the request's life actually ends, whatever ends it. Removing it only when a
+        // later non-challenge response arrives missed the common case — a signer that sends one
+        // `auth_url` and never follows up, leaving the session's own timer to end the request — so
+        // a long-lived signer accumulated an entry per abandoned prompt.
+        defer { authChallengeDeadlines.removeValue(forKey: request.id) }
+
         let event = try buildRequestEvent(request)
         let response = try await session.perform(
             event, key: request.id, state: method, timeout: config.requestTimeout)
@@ -288,9 +348,33 @@ public actor RemoteSigner {
         // sends the real response with the same id, on a timeout long enough for the user to
         // authorize. Anything else resolves it.
         let challengeURL = response.isAuthChallenge ? response.error.flatMap(URL.init(string:)) : nil
-        let authChallengeTimeout = config.authChallengeTimeout
+
+        // Every challenge replaces the request's timeout, so a signer that keeps sending them could
+        // hold a caller suspended with no end. The first one fixes a deadline for the request, and
+        // later ones may only postpone it up to that — the window stays the one the caller
+        // configured however many challenges arrive.
+        let deadline = challengeURL.map { _ in
+            authChallengeDeadlines[response.id]
+                ?? Date().addingTimeInterval(config.authChallengeTimeout)
+        }
+        let remainingAfterChallenge = deadline?.timeIntervalSinceNow ?? 0
+
         let method = await session.withPendingRequest(response.id) { _ in
-            challengeURL == nil ? .resolved(response) : .pendingFor(authChallengeTimeout)
+            guard challengeURL != nil else { return .resolved(response) }
+            guard remainingAfterChallenge > 0 else {
+                return .failed(RemoteSignerError.timedOut)
+            }
+            return .pendingFor(remainingAfterChallenge)
+        }
+
+        // Recorded only once a request is known to be waiting on it. Writing before that check let
+        // a stray or duplicate `auth_url` — one whose id matches nothing in flight, or whose
+        // request has already finished and run its cleanup — leave behind an entry with no
+        // `sendRequest` left to remove it.
+        if method != nil, let deadline, remainingAfterChallenge > 0 {
+            authChallengeDeadlines[response.id] = deadline
+        } else {
+            authChallengeDeadlines.removeValue(forKey: response.id)
         }
 
         // No pending request (an unknown or already-resolved id), or the response resolved it.
@@ -350,7 +434,7 @@ public actor RemoteSigner {
 
         guard let content = try? SealedMessage(payload: event.content).open(from: event.pubkey, using: clientKeyPair),
             let response = try? JSONDecoder().decode(RemoteSignerResponse.self, from: Data(content.utf8)),
-            response.result == expectedInvitationSecret
+            response.result.map({ Self.constantTimeEquals($0, expectedInvitationSecret) }) == true
         else {
             return
         }
