@@ -32,8 +32,31 @@ public struct EncryptedPrivateKey: Sendable, Hashable {
     private static let saltByteCount = 16
     /// The length in bytes of the XChaCha20-Poly1305 nonce.
     private static let nonceByteCount = 24
-    /// The largest scrypt cost exponent accepted, guarding against denial-of-service payloads.
+    /// The largest scrypt cost exponent NIP-49 defines. A payload may record any cost up to this,
+    /// and ``init(ncryptsec:)`` parses all of them — but see ``defaultMaximumLogN`` for what
+    /// ``decrypt(password:maxLogN:)`` is willing to spend without being asked.
     private static let maximumLogN: UInt8 = 22
+
+    /// The largest scrypt cost ``decrypt(password:maxLogN:)`` accepts unless the caller raises it.
+    ///
+    /// scrypt's memory cost is `128 · N · r`, and NIP-49 fixes `r` at 8, so the recorded `logN`
+    /// alone determines the allocation — 2^logN KiB:
+    ///
+    /// | logN | Memory  |
+    /// |------|---------|
+    /// | 16   | 64 MiB  |
+    /// | 18   | 256 MiB |
+    /// | 20   | 1 GiB   |
+    /// | 22   | 4 GiB   |
+    ///
+    /// The cost byte is chosen by whoever wrote the payload, so an unbounded cap hands a stranger
+    /// a 4 GiB allocation on an iPhone or a watch — terminated by the system before the password is
+    /// even checked. 18 sits two doublings above the 16 that NIP-49 recommends and that clients
+    /// emit in practice, so ordinary keys open untouched while the worst case stays survivable.
+    /// A caller who must open a deliberately costlier key passes a higher `maxLogN` and accepts
+    /// the allocation; ``logN`` is readable from a parsed payload beforehand, so that decision can
+    /// be made with the real number in hand.
+    public static let defaultMaximumLogN: UInt8 = 18
 
     /// The bech32 `ncryptsec` string.
     public let ncryptsec: String
@@ -107,17 +130,30 @@ public struct EncryptedPrivateKey: Sendable, Hashable {
 
     /// Decrypts the private key. Returns the raw 32 bytes without validating them as a secp256k1
     /// scalar (NIP-49 must round-trip even invalid keys).
-    /// - Parameter password: The password protecting the key. It is NFKC-normalized before key
-    ///   derivation.
+    /// - Parameters:
+    ///   - password: The password protecting the key. It is NFKC-normalized before key derivation.
+    ///   - maxLogN: The largest scrypt cost to spend on this payload, defaulting to
+    ///     ``defaultMaximumLogN``. Raise it to open a deliberately costly key, keeping in mind that
+    ///     the derivation allocates 2^logN KiB; ``logN`` reports what a given payload asks for.
     /// - Returns: The decrypted 32-byte private key.
-    /// - Throws: ``NostrError/unsupportedScryptCost(_:)`` if the recorded cost is outside `1...22`,
-    ///   or ``NostrError/decryptionFailed`` if authentication fails (almost always a wrong password).
-    public func decrypt(password: String) throws -> Data {
+    /// - Throws: ``NostrError/unsupportedScryptCost(_:)`` if the recorded cost is outside
+    ///   `1...maxLogN`, or if `maxLogN` itself exceeds the `22` NIP-49 defines;
+    ///   ``NostrError/decryptionFailed`` if authentication fails (almost always a wrong password).
+    public func decrypt(password: String, maxLogN: UInt8 = defaultMaximumLogN) throws -> Data {
+        // The whole range, not just the ceiling: a `maxLogN` of 0 would clear an upper-bound-only
+        // guard and then make the `1...maxLogN` below an invalid range, trapping on exactly the
+        // caller-supplied input this bound exists to make safe.
+        guard 1...Self.maximumLogN ~= maxLogN else {
+            throw NostrError.unsupportedScryptCost(maxLogN)
+        }
+
         let payload = try Self.decodePayload(ncryptsec)
         let base = payload.startIndex
 
+        // Checked before deriving anything: the cost byte is attacker-supplied, and the memory it
+        // asks for is committed the moment scrypt starts.
         let logN = payload[base + 1]
-        guard 1...Self.maximumLogN ~= logN else {
+        guard 1...maxLogN ~= logN else {
             throw NostrError.unsupportedScryptCost(logN)
         }
 
@@ -198,11 +234,19 @@ extension KeyPair {
     /// - Parameters:
     ///   - ncryptsec: The bech32 `ncryptsec1...` string.
     ///   - password: The password protecting the key. It is NFKC-normalized before key derivation.
+    ///   - maxLogN: The largest scrypt cost to spend on this payload, defaulting to
+    ///     ``EncryptedPrivateKey/defaultMaximumLogN``.
     /// - Throws: ``NostrError/invalidNcryptsec`` if the payload is malformed,
+    ///   ``NostrError/unsupportedScryptCost(_:)`` if the recorded cost exceeds `maxLogN`,
     ///   ``NostrError/decryptionFailed`` if the password is wrong, or
     ///   ``NostrError/invalidPrivateKey`` if the decrypted bytes are not a valid secp256k1 scalar.
-    public init(ncryptsec: String, password: String) throws {
-        let privateKey = try EncryptedPrivateKey(ncryptsec: ncryptsec).decrypt(password: password)
+    public init(
+        ncryptsec: String,
+        password: String,
+        maxLogN: UInt8 = EncryptedPrivateKey.defaultMaximumLogN
+    ) throws {
+        let privateKey = try EncryptedPrivateKey(ncryptsec: ncryptsec)
+            .decrypt(password: password, maxLogN: maxLogN)
         try self.init(privateKey: privateKey)
     }
 }
