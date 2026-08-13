@@ -74,14 +74,14 @@ struct MultiPayMatchingTests {
                 resultJSON: #"{"result_type":"multi_pay_invoice","result":{"preimage":"first"}}"#,
                 requestID: request.id, client: client, wallet: wallet, dTag: "a"))
         await transport.emit(
-            Event(
-                id: "resp-second-a", pubkey: wallet.publicKeyHex, createdAt: 0,
+            try NWCFixtures.signed(
                 kind: .walletConnectResponse,
                 tags: [["e", request.id], ["p", client.publicKeyHex], ["d", "a"]],
                 content: try NWCFixtures.encrypt(
                     #"{"result_type":"multi_pay_invoice","result":{"preimage":"second"}}"#,
                     to: client, from: wallet, scheme: .nip44),
-                sig: ""))
+                wallet: wallet,
+                createdAt: 1))
 
         let mapped = try await results
 

@@ -26,6 +26,9 @@ public enum WalletConnectError: Error, LocalizedError, Sendable, Equatable {
     /// The wallet answered with a `result_type` naming a different command than the one requested.
     case unexpectedResultType(expected: String, received: String)
 
+    /// The wallet encrypted its response with a scheme this package does not implement.
+    case unsupportedEncryption(String)
+
     /// The wallet returned an explicit error for the request.
     case walletError(code: WalletConnectErrorCode, message: String)
 
@@ -47,6 +50,8 @@ public enum WalletConnectError: Error, LocalizedError, Sendable, Equatable {
             return "The wallet response contained neither a result nor an error"
         case .unexpectedResultType(let expected, let received):
             return "The wallet answered a \(expected) request with a \(received) response"
+        case .unsupportedEncryption(let scheme):
+            return "The wallet response uses an unsupported encryption scheme: \(scheme)"
         case .walletError(let code, let message):
             return "Wallet error (\(code.rawValue)): \(message)"
         }

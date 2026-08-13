@@ -209,13 +209,14 @@ struct WalletConnectionRoundTripTests {
             try NWCFixtures.response(
                 resultJSON: #"{"result_type":"multi_pay_invoice","result":{"preimage":"pa"}}"#,
                 requestID: request.id, client: client, wallet: wallet, dTag: "a"))
-        // A second response that cannot be decrypted must still count toward completion.
+        // A second response — genuinely from the wallet, but with content that cannot be
+        // decrypted — must still count toward completion.
         await transport.emit(
-            Event(
-                id: "resp-garbage", pubkey: wallet.publicKeyHex, createdAt: 0,
+            try NWCFixtures.signed(
                 kind: .walletConnectResponse,
                 tags: [["e", request.id], ["p", client.publicKeyHex], ["d", "b"]],
-                content: "not-decryptable", sig: ""))
+                content: "not-decryptable",
+                wallet: wallet))
 
         let clock = ContinuousClock()
         let start = clock.now
