@@ -13,18 +13,26 @@ extension WalletConnection {
 
     /// Pays several invoices in one request (`multi_pay_invoice`). The wallet replies with one
     /// response per invoice.
+    ///
+    /// Give each invoice an `id` to have its response matched back to it: NIP-47 correlates a
+    /// response by the item's `id` when one was supplied, and otherwise by the payment hash, which
+    /// this package cannot derive from an invoice. A response that cannot be tied to a requested
+    /// invoice is reported in ``MultiPayResults/unmatched`` rather than dropped.
     /// - Parameter invoices: The invoices to pay.
-    /// - Returns: Per-invoice results keyed by the response's `d` tag (the invoice `id` if provided,
-    ///   otherwise the payment hash). Invoices with no response (e.g. on timeout) are absent.
+    /// - Returns: One outcome per invoice, in the order requested, plus any responses that could
+    ///   not be tied back. Invoices with no response — on timeout, say — are ``MultiPayOutcome/noResponse``.
     public func multiPayInvoice(
         _ invoices: [MultiPayInvoiceParams.Invoice]
-    ) async throws -> [String: Result<MultiPayInvoiceItemResult, WalletConnectError>] {
+    ) async throws -> MultiPayResults<MultiPayInvoiceItemResult> {
+        // Nothing to wait for, and a waiter no response can satisfy would sit out the whole timeout.
+        guard !invoices.isEmpty else { return MultiPayResults(outcomes: []) }
+
         let parts = try await performRequest(
             method: .multiPayInvoice,
             params: MultiPayInvoiceParams(invoices: invoices),
             expectedResponses: invoices.count,
             partialOnTimeout: true)
-        return mapItems(parts, as: MultiPayInvoiceItemResult.self)
+        return mapItems(parts, identifiers: invoices.map(\.id), as: MultiPayInvoiceItemResult.self)
     }
 
     /// Sends a spontaneous (keysend) payment (`pay_keysend`).
@@ -35,16 +43,22 @@ extension WalletConnection {
     }
 
     /// Sends several keysend payments in one request (`multi_pay_keysend`).
-    /// - Returns: Per-keysend results keyed by the response's `d` tag.
+    ///
+    /// Give each keysend an `id` to have its response matched back to it; see
+    /// ``multiPayInvoice(_:)`` for why.
+    /// - Returns: One outcome per keysend, in the order requested, plus any responses that could
+    ///   not be tied back.
     public func multiPayKeysend(
         _ keysends: [MultiPayKeysendParams.Keysend]
-    ) async throws -> [String: Result<MultiPayKeysendItemResult, WalletConnectError>] {
+    ) async throws -> MultiPayResults<MultiPayKeysendItemResult> {
+        guard !keysends.isEmpty else { return MultiPayResults(outcomes: []) }
+
         let parts = try await performRequest(
             method: .multiPayKeysend,
             params: MultiPayKeysendParams(keysends: keysends),
             expectedResponses: keysends.count,
             partialOnTimeout: true)
-        return mapItems(parts, as: MultiPayKeysendItemResult.self)
+        return mapItems(parts, identifiers: keysends.map(\.id), as: MultiPayKeysendItemResult.self)
     }
 
     /// Creates an invoice (`make_invoice`).
@@ -80,22 +94,46 @@ extension WalletConnection {
         return try decodeResult(content, as: GetInfoResult.self)
     }
 
-    /// Decodes each response part of a `multi_pay_*` reply, keyed by its `d` tag (falling back to the
-    /// part's index when absent).
-    private func mapItems<Item: Decodable>(
-        _ parts: [ResponsePart], as _: Item.Type
-    ) -> [String: Result<Item, WalletConnectError>] {
-        var results: [String: Result<Item, WalletConnectError>] = [:]
-        for (index, part) in parts.enumerated() {
-            let key = part.dTag ?? String(index)
-            do {
-                results[key] = .success(try decodeResult(part.content, as: Item.self))
-            } catch let error as WalletConnectError {
-                results[key] = .failure(error)
-            } catch {
-                results[key] = .failure(.responseDecodingFailed)
-            }
+    /// Lines each response part of a `multi_pay_*` reply up with the item it answers.
+    ///
+    /// A response is matched to the item whose `id` its `d` tag names, each item taking at most one
+    /// — a second response under the same tag has no item left to claim and goes to `unmatched`
+    /// rather than overwriting the first, which is what a dictionary keyed on the tag did.
+    private func mapItems<Item: Decodable & Sendable>(
+        _ parts: [ResponsePart], identifiers: [String?], as _: Item.Type
+    ) -> MultiPayResults<Item> {
+        var outcomes = [MultiPayOutcome<Item>](repeating: .noResponse, count: identifiers.count)
+        var unmatched: [UnmatchedMultiPayResponse<Item>] = []
+
+        // Only items given an `id` can be addressed by a `d` tag; the rest stay unclaimable, and
+        // their responses are reported as unmatched rather than guessed at by arrival order.
+        var indexByIdentifier: [String: [Int]] = [:]
+        for (index, identifier) in identifiers.enumerated() {
+            guard let identifier else { continue }
+            indexByIdentifier[identifier, default: []].append(index)
         }
-        return results
+
+        for part in parts {
+            let result: Result<Item, WalletConnectError>
+            do {
+                result = .success(try decodeResult(part.content, as: Item.self))
+            } catch let error as WalletConnectError {
+                result = .failure(error)
+            } catch {
+                result = .failure(.responseDecodingFailed)
+            }
+
+            guard let dTag = part.dTag, var candidates = indexByIdentifier[dTag],
+                let index = candidates.first
+            else {
+                unmatched.append(UnmatchedMultiPayResponse(dTag: part.dTag, result: result))
+                continue
+            }
+            candidates.removeFirst()
+            indexByIdentifier[dTag] = candidates.isEmpty ? nil : candidates
+            outcomes[index] = .answered(result)
+        }
+
+        return MultiPayResults(outcomes: outcomes, unmatched: unmatched)
     }
 }

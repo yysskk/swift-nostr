@@ -104,25 +104,33 @@ print(result.preimage)
 ## Multi-Payments
 
 ``WalletConnection/multiPayInvoice(_:)`` and ``WalletConnection/multiPayKeysend(_:)`` send several
-payments in one request. The wallet replies with one response per item, so results come back as a
-dictionary keyed by each item's `id` (falling back to the payment hash). Items that never get a
-response — for example on a partial timeout — are simply absent, so inspect each entry's `Result`:
+payments in one request. The wallet replies with one response per item, and the results come back as
+``MultiPayResults`` — one outcome per item, in the order you requested them:
 
 ```swift
 let results = try await connection.multiPayInvoice([
     .init(id: "rent", invoice: "lnbc1..."),
     .init(id: "coffee", invoice: "lnbc2..."),
 ])
-for (id, outcome) in results {
+for (index, outcome) in results.outcomes.enumerated() {
     switch outcome {
-    case .success(let payment): print("\(id): paid, preimage \(payment.preimage)")
-    case .failure(let error):   print("\(id): \(error.localizedDescription)")
+    case .answered(.success(let payment)): print("\(index): paid, preimage \(payment.preimage)")
+    case .answered(.failure(let error)):   print("\(index): \(error.localizedDescription)")
+    case .noResponse:                      print("\(index): no response")
     }
 }
 ```
 
+Give every item an `id`. NIP-47 correlates a response by the item's `id` when one was supplied, and
+otherwise by the payment hash — which this package cannot derive from an invoice, so a response for
+an item sent without an `id` cannot be tied back to it. Anything that cannot be matched, including a
+second response under a `d` tag already claimed, is reported in ``MultiPayResults/unmatched`` rather
+than dropped: those payments still happened.
+
 Unlike single commands, a multi-payment does not throw on timeout — it returns whatever responses
-arrived, so a slow or unreachable item does not lose the payments that already settled.
+arrived, so a slow or unreachable item does not lose the payments that already settled. Items that
+never got a response are ``MultiPayOutcome/noResponse``, and
+``MultiPayResults/indicesWithoutResponse`` lists them.
 
 ## Notifications
 
