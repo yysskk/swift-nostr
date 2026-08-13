@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **A `bunker://` session can request permissions**: `RemoteSigner(bunker:clientKeyPair:requesting:…)`
+  takes the `[RemoteSignerPermission]` to ask for, and sends them in NIP-46's `connect` call. They
+  were modeled but never sent, so a session could not pre-authorize anything and every operation drew
+  its own interactive `auth_url` round-trip. A `nostrconnect://` session is unchanged: its permissions
+  travel in the invitation URI the signer reads, and the client sends no `connect` at all, so the two
+  flows stay separate. Requesting nothing keeps the previous wire shape.
+
 ### Changed
 
 - **`multiPayInvoice` and `multiPayKeysend` return `MultiPayResults` instead of a dictionary**
@@ -126,6 +135,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `"root"` was carried over as the thread root. A parent written in NIP-10's deprecated positional
   form — no markers at all — looked rootless, and the reply started a second thread beside the one
   it was answering; its first `e` tag is now used as the root, as the spec says.
+- **Repeated NIP-46 auth challenges cannot extend a request without end**: each `auth_url` replaced
+  the request's timeout, so a signer that kept sending them held the caller suspended indefinitely.
+  The first challenge now fixes a deadline and later ones may only postpone up to it, keeping the
+  wait within the configured `authChallengeTimeout` however many arrive.
+- **NIP-46 connection secrets are compared in constant time**: both the `bunker://` acknowledgement
+  and the `nostrconnect://` invitation echo used `==`. These are short-lived secrets carried over a
+  relay so exploitation was impractical, but a secret comparison is the wrong place for a shortcut.
 - **Wallet events are verified, and responses decrypted by the scheme they declare**: every event
   from the wallet is now checked against its signature before anything in it is read — the author
   was already checked, but a response carrying the wallet's pubkey and no valid signature was
