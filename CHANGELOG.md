@@ -21,6 +21,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **NIP-05 identifiers split on the last `@` and validate the local part**: `alice@evil.com@example.com`
+  split on the first `@` and resolved against the host `evil.com@example.com` rather than being
+  rejected, disagreeing with `LNURL`, which already split on the last one. NIP-05 allows only
+  `a-z0-9-_.` in a local part, so an identifier carrying a second `@` is malformed however it is
+  split, and is now refused along with local parts and domains that could not appear in a URL.
+- **NIP-19 bare entities validate their payload when encoding**: `npub`, `nsec`, and `note` hold a
+  hex string that nothing checks on the way in, and encoding substituted an empty payload for
+  invalid hex — so `try NIP19Entity.npub("not-hex").encoded` returned a checksum-valid `npub1…`
+  naming nobody, which reads as a real key wherever it is shown or stored. It now throws
+  `NostrError.invalidNIP19Entity`.
+- **Replies find the thread root by its NIP-10 marker position**: `publishReply` compared every
+  element of an `e` tag against `"root"`, so a tag explicitly marked `"reply"` whose relay hint read
+  `"root"` was carried over as the thread root. A parent written in NIP-10's deprecated positional
+  form — no markers at all — looked rootless, and the reply started a second thread beside the one
+  it was answering; its first `e` tag is now used as the root, as the spec says.
 - **Gift-wrapped messages authenticate their sender (NIP-17)**: `GiftWrap.unwrap` verified the
   seal's signature but never checked that the rumor inside named the same author, which NIP-17
   requires precisely because "any sender can impersonate others by simply changing the pubkey on

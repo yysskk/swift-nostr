@@ -44,15 +44,20 @@ public enum NIP19Entity: Sendable, Hashable {
     }
 
     /// The canonical bech32-encoded string for this entity.
+    ///
+    /// The bare cases hold a hex string that nothing validated on the way in — unlike
+    /// ``nprofile(_:)``, ``nevent(_:)``, and ``naddr(_:)``, whose payloads are built by validating
+    /// initializers — so the payload is checked here.
+    /// - Throws: ``NostrError/invalidNIP19Entity`` if a bare case does not hold 32 bytes of hex.
     public var encoded: String {
         get throws {
             switch self {
             case .npub(let hex):
-                return try Bech32.encode(hrp: "npub", data: Data(hexString: hex) ?? Data())
+                return try Bech32.encode(hrp: "npub", data: bareData32(hex))
             case .nsec(let hex):
-                return try Bech32.encode(hrp: "nsec", data: Data(hexString: hex) ?? Data())
+                return try Bech32.encode(hrp: "nsec", data: bareData32(hex))
             case .note(let hex):
-                return try Bech32.encode(hrp: "note", data: Data(hexString: hex) ?? Data())
+                return try Bech32.encode(hrp: "note", data: bareData32(hex))
             case .nprofile(let profile):
                 return try profile.encoded
             case .nevent(let event):
@@ -70,4 +75,16 @@ private func bareHex32(_ data: Data) throws -> String {
         throw NostrError.invalidNIP19Entity
     }
     return data.hexEncodedString()
+}
+
+/// Validates a bare 32-byte hex string (npub/nsec/note) and returns its bytes.
+///
+/// Without this, invalid hex encoded as an empty payload: `NIP19Entity.npub("not-hex").encoded`
+/// returned a checksum-valid `npub1…` naming nobody, which reads as a real key everywhere it is
+/// shown or stored.
+private func bareData32(_ hex: String) throws -> Data {
+    guard let data = Data(hexString: hex), data.count == 32 else {
+        throw NostrError.invalidNIP19Entity
+    }
+    return data
 }

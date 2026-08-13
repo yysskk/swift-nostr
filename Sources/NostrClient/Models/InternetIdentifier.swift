@@ -53,20 +53,54 @@ public struct InternetIdentifier: Sendable {
         }
     }
 
-    /// Parses an internet identifier into name and domain components
+    /// Parses an internet identifier into name and domain components.
+    ///
+    /// The separator is the *last* `@`, matching how `LNURL` resolves the same identifier shape, and
+    /// the local part must be the `a-z0-9-_.` NIP-05 allows (uppercase included, since
+    /// ``verify(_:)`` looks the name up in both cases). A string carrying more than one `@` is
+    /// therefore rejected rather than resolved: splitting on the first one made
+    /// `alice@evil.com@example.com` look like the host `evil.com@example.com`, which names a
+    /// different server than a reader of that identifier would expect.
     /// - Parameter identifier: The identifier (e.g., "alice@example.com" or "_@example.com")
-    /// - Returns: Tuple of (name, domain)
+    /// - Returns: Tuple of (name, domain), or nil if the identifier is not well formed.
     public static func parse(_ identifier: String) -> (name: String, domain: String)? {
-        let parts = identifier.split(separator: "@", maxSplits: 1)
+        let name: String
+        let domain: String
 
-        if parts.count == 2 {
-            return (String(parts[0]), String(parts[1]))
-        } else if parts.count == 1 && !identifier.contains("@") {
+        if let separator = identifier.lastIndex(of: "@") {
+            name = String(identifier[identifier.startIndex..<separator])
+            domain = String(identifier[identifier.index(after: separator)...])
+        } else {
             // Domain only, use "_" as name
-            return ("_", String(parts[0]))
+            name = "_"
+            domain = identifier
         }
 
-        return nil
+        guard isValidLocalPart(name), isValidDomain(domain) else {
+            return nil
+        }
+
+        return (name, domain)
+    }
+
+    /// NIP-05 restricts the local part to `a-z0-9-_.`; uppercase is tolerated here because
+    /// ``verify(_:)`` looks the name up both as written and lowercased.
+    private static func isValidLocalPart(_ name: String) -> Bool {
+        !name.isEmpty
+            && name.allSatisfy { character in
+                character.isASCII
+                    && (character.isLetter || character.isNumber || "-_.".contains(character))
+            }
+    }
+
+    /// Rejects anything that would not survive being placed in a URL's host component, so a
+    /// malformed identifier fails here rather than by silently querying the wrong server.
+    private static func isValidDomain(_ domain: String) -> Bool {
+        !domain.isEmpty
+            && !domain.contains("@")
+            && !domain.contains("/")
+            && !domain.contains(":")
+            && domain.allSatisfy { $0.isASCII && !$0.isWhitespace }
     }
 
     /// Constructs the well-known URL for verification
