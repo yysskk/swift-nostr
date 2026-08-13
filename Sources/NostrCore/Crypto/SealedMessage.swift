@@ -14,6 +14,10 @@ public struct SealedMessage: Sendable {
     /// Minimum padded length
     private static let minPlaintextSize = 1
     private static let maxPlaintextSize = 65535
+    /// The length of a NIP-44 conversation key, the HKDF-Extract output the message keys expand from.
+    private static let conversationKeyByteCount = 32
+    /// The length of the per-message nonce NIP-44 expands the message keys over.
+    private static let nonceByteCount = 32
 
     // MARK: - Initializers
 
@@ -90,6 +94,15 @@ public struct SealedMessage: Sendable {
             throw NostrError.encryptionFailed
         }
 
+        // HKDF accepts inputs of any length, so a wrong-length key or nonce would expand into a
+        // payload that is well-formed and undecryptable by anyone — a failure that surfaces only on
+        // the recipient's side, if at all.
+        guard conversationKey.count == conversationKeyByteCount,
+            nonce.count == nonceByteCount
+        else {
+            throw NostrError.encryptionFailed
+        }
+
         let plaintextData = Data(plaintext.utf8)
 
         // 1. Derive message keys from conversation key and nonce
@@ -143,6 +156,10 @@ public struct SealedMessage: Sendable {
     ///   - conversationKey: The 32-byte conversation key.
     /// - Returns: The decrypted plaintext message.
     static func decrypt(payload: String, conversationKey: Data) throws -> String {
+        guard conversationKey.count == conversationKeyByteCount else {
+            throw NostrError.decryptionFailed
+        }
+
         guard let payloadData = Data(base64Encoded: payload) else {
             throw NostrError.invalidPayloadFormat
         }
@@ -271,6 +288,11 @@ public struct SealedMessage: Sendable {
 
     /// HKDF-Expand
     private static func hkdfExpand(prk: Data, info: Data, length: Int) -> Data {
+        // RFC 5869 caps the output at 255 blocks, which is also where the `UInt8` block counter
+        // below would overflow and trap. `length` is a fixed 76 at the only call site, so this
+        // pins an internal invariant rather than validating input.
+        precondition(length <= 255 * 32, "HKDF-Expand output is limited to 255 blocks")
+
         let key = SymmetricKey(data: prk)
         var output = Data()
         var t = Data()

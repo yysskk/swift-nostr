@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **NIP-49 decryption bounds its scrypt cost**: `EncryptedPrivateKey.decrypt(password:)` and
+  `KeyPair(ncryptsec:password:)` take a new `maxLogN` parameter, defaulting to
+  `EncryptedPrivateKey.defaultMaximumLogN` (18, or 256 MiB). scrypt's memory cost is `128 · N · r`
+  and NIP-49 fixes `r` at 8, so the cost byte a payload records decides the allocation on its own —
+  4 GiB at the spec's maximum of 22, which the system terminates before the password is even
+  checked. The default sits two doublings above the 16 the spec recommends, so ordinary keys are
+  unaffected; a caller who must open a deliberately costlier key raises `maxLogN` and accepts the
+  allocation. A parsed payload's `logN` is readable beforehand, so that choice can be made with the
+  real number in hand.
+
 ### Fixed
 
 - **Event verification rejects malformed keys and signatures**: `Event.verify()` now checks that the
@@ -35,6 +47,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   empty or uppercase prefix and produced a string that `decode(_:)` could never accept, since the
   checksum covered the prefix as written while decoding recomputes it lowercased. The prefix must
   now be non-empty lowercase printable ASCII.
+- **NIP-44 rejects a wrong-length conversation key or nonce**: HKDF accepts inputs of any length, so
+  `SealedMessage.encrypt`/`decrypt` would expand a malformed key or nonce into a well-formed payload
+  that nobody could decrypt — a failure surfacing only on the recipient's side. Both now throw.
 - **Uppercase filter tag queries reach the relay intact**: `REQ` and `COUNT` messages were encoded
   with a snake-case key strategy that rewrote the dynamic keys behind `Filter.addTagQuery(_:values:)`
   — the uppercase single-letter tags NIP-22 uses for root scope became `#_k` and friends. A relay
