@@ -37,6 +37,14 @@ package actor RequestResponseSession<Key: Hashable & Sendable, State: Sendable, 
     private var startTask: Task<Void, any Error>?
     private var readerTask: Task<Void, Never>?
 
+    /// Identifies the current session, incremented on every start.
+    ///
+    /// A reader loop outlives the stream it drains: `disconnect()` finishes the stream
+    /// synchronously, but the loop only wakes up afterwards. By then a new session may already be
+    /// running, and without this the stale loop's completion would retire it — clearing a healthy
+    /// `readerTask`/`startTask` and failing requests that session had legitimately in flight.
+    private var sessionGeneration: UInt64 = 0
+
     /// In-flight requests, keyed by whatever correlates a response back to its request.
     private var pending: [Key: PendingRequest] = [:]
 
@@ -76,9 +84,18 @@ package actor RequestResponseSession<Key: Hashable & Sendable, State: Sendable, 
             try await startTask.value
             return
         }
+        // Claimed here rather than inside `performStart`: that runs in a task that must first hop
+        // onto the actor, and a previous session's reader waking during that hop would still match
+        // the old generation — retiring the session being built by clearing the very `startTask`
+        // assigned just below.
+        sessionGeneration &+= 1
+        let generation = sessionGeneration
+
         let task = Task { [weak self] in
             guard let self else { return }
-            try await self.performStart(subscriptionID: subscriptionID, filters: filters, handler: handler)
+            try await self.performStart(
+                subscriptionID: subscriptionID, filters: filters, handler: handler,
+                generation: generation)
         }
         startTask = task
         do {
@@ -93,12 +110,14 @@ package actor RequestResponseSession<Key: Hashable & Sendable, State: Sendable, 
     private func performStart(
         subscriptionID: String,
         filters: [Filter],
-        handler: @escaping EventHandler
+        handler: @escaping EventHandler,
+        generation: UInt64
     ) async throws {
         try await transport.connect()
         // Subscribe before sending anything so a response delivered during the subscribe
         // round-trip is not missed.
         try await transport.subscribe(id: subscriptionID, filters: filters)
+
         let events = await transport.events()
         readerTask = Task { [weak self] in
             for await event in events {
@@ -109,14 +128,18 @@ package actor RequestResponseSession<Key: Hashable & Sendable, State: Sendable, 
             // session has to notice: left as it was, `isStarted` stayed true, `ensureStarted`
             // short-circuited, and every later request sent into a dead transport and waited out
             // its whole timeout with no error explaining why.
-            await self?.handleEventStreamEnded()
+            await self?.handleEventStreamEnded(generation: generation)
         }
     }
 
     /// Retires a session whose event stream has ended, failing anything in flight and clearing the
     /// started state so the next request reconnects rather than sending into a transport that can
     /// no longer answer.
-    private func handleEventStreamEnded() {
+    ///
+    /// Ignored when `generation` is no longer current: the loop reporting the end belongs to a
+    /// session that has already been replaced, and the one running now is healthy.
+    private func handleEventStreamEnded(generation: UInt64) {
+        guard generation == sessionGeneration else { return }
         readerTask = nil
         startTask = nil
 

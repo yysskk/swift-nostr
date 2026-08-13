@@ -293,6 +293,37 @@ struct RequestResponseSessionTests {
         #expect(try await response == ["b-done"])
     }
 
+    /// A reader loop outlives the stream it drains: `disconnect()` finishes the stream
+    /// synchronously, but the loop only wakes afterwards. By then a replacement session may already
+    /// be starting, and the stale loop's completion must not retire it — clearing the new session's
+    /// tasks and failing the requests it legitimately has in flight.
+    ///
+    /// Reproducing it needs the stale reader to wake *during* the replacement's setup, which is a
+    /// matter of scheduling: this fails reliably in a full-suite run, where the reader is delayed
+    /// behind other work, and not when run alone.
+    @Test("a reader loop from a replaced session does not retire the current one")
+    func staleReaderDoesNotRetireCurrentSession() async throws {
+        let transport = FakeTransport()
+        let session = makeSession(transport)
+        try await start(session)
+
+        // Tear the first session down; its reader is still suspended on the finished stream.
+        await session.disconnect()
+        // Start a replacement before the stale reader has been rescheduled.
+        try await start(session)
+        #expect(await session.isStarted)
+
+        let pending = Task { try await session.perform(self.request("a"), key: "a", state: [], timeout: 5) }
+        try await transport.waitForSend("a")
+
+        // Give the stale reader every chance to wake up and clobber this session.
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(await session.isStarted)
+
+        await transport.deliver(self.response(for: "a", content: "a-done"))
+        #expect(try await pending.value == ["a-done"])
+    }
+
     private func pollUntil(_ condition: @Sendable () async -> Bool) async throws {
         for _ in 0..<400 {
             if await condition() { return }
