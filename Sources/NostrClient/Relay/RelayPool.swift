@@ -31,6 +31,11 @@ public actor RelayPool {
     /// flight when the id was re-subscribed is dropped instead of reaching the new handler.
     private var subscriptionGeneration: [String: UInt64] = [:]
 
+    /// Hands out listener generations. Pool-wide and never reset, so a number is never reused:
+    /// counting per id from zero meant an unsubscribe followed by a fresh subscribe produced
+    /// generation 1 both times, and a straggler from the first set matched the second.
+    private var nextSubscriptionGeneration: UInt64 = 0
+
     /// The automatic AUTH-challenge responder applied to every relay (NIP-42)
     private var authenticationResponder: RelayConnection.AuthenticationResponder?
 
@@ -418,8 +423,9 @@ public actor RelayPool {
         // handler and every control message delivered twice. The generation is what a straggler
         // fails, so only the current one delivers.
         cancelListenerTasks(for: subscriptionId)
-        subscriptionGeneration[subscriptionId, default: 0] &+= 1
-        let generation = subscriptionGeneration[subscriptionId] ?? 0
+        nextSubscriptionGeneration &+= 1
+        let generation = nextSubscriptionGeneration
+        subscriptionGeneration[subscriptionId] = generation
         subscriptionHandlers[subscriptionId] = handler
         // The dedup cache is scoped to the id, not the generation, and a fresh REQ makes the relay
         // resend its stored events. Left in place, everything the previous generation already saw
@@ -492,6 +498,14 @@ public actor RelayPool {
             }
             tasks.append(task)
         }
+
+        // Registering the stream suspends, so another subscribe on this id may have run to
+        // completion in between. Publishing these tasks then would strand its listeners with no
+        // way to cancel them; this generation is finished instead.
+        guard subscriptionGeneration[subscriptionId] == generation else {
+            for task in tasks { task.cancel() }
+            throw NostrError.relayError("The subscription was superseded before it was established")
+        }
         subscriptionTasks[subscriptionId] = tasks
 
         // Now send subscription requests to all relays, tolerating failures
@@ -518,11 +532,15 @@ public actor RelayPool {
 
         // A failed subscribe must not leak handler/listener/cache state when the pool is
         // used directly.
+        // Only tear down what this generation registered: a newer subscribe on the same id may
+        // have replaced it while the REQs were in flight, and its state is not ours to remove.
         if successfulRelayURLs.isEmpty {
-            subscriptionHandlers.removeValue(forKey: subscriptionId)
-            cancelListenerTasks(for: subscriptionId)
-            subscriptionGeneration.removeValue(forKey: subscriptionId)
-            eventCache.removeSubscription(subscriptionId)
+            if subscriptionGeneration[subscriptionId] == generation {
+                subscriptionHandlers.removeValue(forKey: subscriptionId)
+                cancelListenerTasks(for: subscriptionId)
+                subscriptionGeneration.removeValue(forKey: subscriptionId)
+                eventCache.removeSubscription(subscriptionId)
+            }
             throw NostrError.relayError("Failed to subscribe on any relay")
         }
 
@@ -596,6 +614,16 @@ public actor RelayPool {
 
     /// The number of registered subscription handlers (test hook).
     var subscriptionHandlerCount: Int { subscriptionHandlers.count }
+
+    /// The listener generation currently serving `subscriptionId` (for tests).
+    func subscriptionGeneration(for subscriptionId: String) -> UInt64? {
+        subscriptionGeneration[subscriptionId]
+    }
+
+    /// The number of listener tasks registered for `subscriptionId` (for tests).
+    func listenerTaskCount(for subscriptionId: String) -> Int {
+        subscriptionTasks[subscriptionId]?.count ?? 0
+    }
 
     /// The number of subscriptions with live listener tasks (test hook).
     var subscriptionTaskCount: Int { subscriptionTasks.count }

@@ -23,7 +23,14 @@ extension RelayConnection {
 
     /// Schedules a reconnection attempt if auto-reconnect is enabled
     func scheduleReconnectIfNeeded() {
-        guard config.autoReconnect else { return }
+        guard config.autoReconnect else {
+            // Equally terminal: nothing will reconnect, so the drop that brought us here ends the
+            // message streams. The receive loop cannot be relied on to do it — a drop that goes
+            // through `discardSocket()` retires the loop's generation first, so the loop exits
+            // knowing it no longer speaks for the connection.
+            finishMessageStreams()
+            return
+        }
         guard !isReconnecting else { return }
 
         // Check if we've exceeded max attempts

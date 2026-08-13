@@ -239,6 +239,10 @@ public actor RemoteSigner {
             stream.finish()
         }
         authChallengeStreams.removeAll()
+        // Every in-flight request is failed below, so no deadline is still owed an answer. Left
+        // behind, these accumulate one entry per request that ended any way other than the signer
+        // eventually replying — an abandoned `auth_url` prompt, a timeout, a teardown.
+        authChallengeDeadlines.removeAll()
 
         await session.disconnect()
     }

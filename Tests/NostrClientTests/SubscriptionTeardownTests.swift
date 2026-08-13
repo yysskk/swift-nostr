@@ -154,3 +154,95 @@ private final class MessageCounts: @unchecked Sendable {
         return count
     }
 }
+
+/// The generation token guards two distinct races, and both are subtle enough to deserve their own
+/// coverage: a number reused after an unsubscribe, and two subscribes on one id overlapping across
+/// the suspension that registers their message streams.
+@Suite("Subscription Generation Tests")
+struct SubscriptionGenerationTests {
+
+    private func makeClient() async throws -> (NostrClient, MockWebSocketSession) {
+        try await ConnectedClientFixture.make()
+    }
+
+    /// Counting per id from zero and dropping the entry on unsubscribe issued generation 1 twice,
+    /// so a straggler from the first set matched the second and delivered into it.
+    @Test("a reused subscription id never reuses its generation")
+    func reusedIdGetsAFreshGeneration() async throws {
+        let (client, _) = try await makeClient()
+        let pool = await client.pool
+
+        _ = try await pool.subscribe(subscriptionId: "sub", filters: [Filter(kinds: [1])]) { _ in }
+        let first = await pool.subscriptionGeneration(for: "sub")
+
+        await pool.unsubscribe(subscriptionId: "sub")
+        #expect(await pool.subscriptionGeneration(for: "sub") == nil)
+
+        _ = try await pool.subscribe(subscriptionId: "sub", filters: [Filter(kinds: [1])]) { _ in }
+        let second = await pool.subscriptionGeneration(for: "sub")
+
+        #expect(first != nil)
+        #expect(second != nil)
+        #expect(first != second)
+
+        await client.relays.disconnect()
+    }
+
+    /// Distinct ids draw from the same counter, so no two live subscriptions share a generation.
+    @Test("generations are unique across subscriptions")
+    func generationsAreUniqueAcrossSubscriptions() async throws {
+        let (client, _) = try await makeClient()
+        let pool = await client.pool
+
+        _ = try await pool.subscribe(subscriptionId: "a", filters: [Filter(kinds: [1])]) { _ in }
+        _ = try await pool.subscribe(subscriptionId: "b", filters: [Filter(kinds: [1])]) { _ in }
+
+        let a = await pool.subscriptionGeneration(for: "a")
+        let b = await pool.subscriptionGeneration(for: "b")
+        #expect(a != b)
+
+        await client.relays.disconnect()
+    }
+
+    /// Registering the message stream suspends, so two subscribes on one id can interleave. Each
+    /// used to find nothing to cancel and then overwrite the other's entry, stranding a set of
+    /// listeners that nothing could cancel and that held a stream open on the connection.
+    @Test("overlapping subscribes on one id leave a single set of listeners")
+    func overlappingSubscribesLeaveOneListenerSet() async throws {
+        let (client, socket) = try await makeClient()
+        let pool = await client.pool
+
+        let deliveries = MessageCounts()
+        async let first: Void = {
+            _ = try? await pool.subscribe(subscriptionId: "sub", filters: [Filter(kinds: [1])]) { message in
+                if case .endOfStoredEvents = message { deliveries.bump() }
+            }
+        }()
+        async let second: Void = {
+            _ = try? await pool.subscribe(subscriptionId: "sub", filters: [Filter(kinds: [1])]) { message in
+                if case .endOfStoredEvents = message { deliveries.bump() }
+            }
+        }()
+        _ = await (first, second)
+
+        // One winner holds the id: a single generation and one set of listener tasks.
+        #expect(await pool.subscriptionGeneration(for: "sub") != nil)
+        #expect(await pool.listenerTaskCount(for: "sub") == 1)
+
+        // And a stranded set from the loser would deliver alongside it.
+        socket.deliver(.string(#"["EOSE","sub"]"#))
+        try await pollUntil { deliveries.value >= 1 }
+        try await Task.sleep(for: .milliseconds(80))
+        #expect(deliveries.value == 1)
+
+        await client.relays.disconnect()
+    }
+
+    private func pollUntil(_ condition: @Sendable () async -> Bool) async throws {
+        for _ in 0..<200 {
+            if await condition() { return }
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        throw NostrError.timeout
+    }
+}

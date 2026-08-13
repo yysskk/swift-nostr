@@ -50,7 +50,7 @@ enum VerifiedEventSelection {
     /// A relay that ignores an id filter can substitute any event; without this the caller believes
     /// it holds the event it asked for.
     static func event(withID id: String, in events: [Event]) -> Event? {
-        events.first { $0.id == id && (try? $0.verify()) == true }
+        events.first { $0.id.lowercased() == id.lowercased() && (try? $0.verify()) == true }
     }
 
     private static func matches(
@@ -60,8 +60,12 @@ enum VerifiedEventSelection {
         identifier: String?
     ) -> Bool {
         if let kind, event.kind != kind { return false }
-        if let author, event.pubkey != author { return false }
-        if let identifier, event.firstTagValue(named: "d") != identifier { return false }
+        // Hex identities are compared case-insensitively: a caller may hold an uppercase spelling,
+        // and the same key written either way names the same person.
+        if let author, event.pubkey.lowercased() != author.lowercased() { return false }
+        // NIP-01 treats a missing `d` tag as an empty one, so an addressable event published
+        // without it is still addressed by `""` — dropping it would lose a legitimate event.
+        if let identifier, (event.firstTagValue(named: "d") ?? "") != identifier { return false }
         return true
     }
 }
