@@ -50,6 +50,10 @@ public struct ZapReceipt: Sendable, Hashable {
     public var zappedEventCoordinate: String? { event.firstTagValue(named: "a") }
 
     /// The zapped amount in millisatoshis, taken from the embedded zap request's `amount` tag.
+    ///
+    /// Nil when the request carries no `amount` tag *or* when its value is not a number; use
+    /// ``validate(lnurlProviderPubkey:expectedAmountMillisats:requiringDescriptionHash:)`` to tell
+    /// those apart, since it rejects a malformed amount rather than treating it as absent.
     public var amountMillisats: Int64? {
         guard let value = zapRequest?.firstTagValue(named: "amount") else { return nil }
         return Int64(value)
@@ -73,8 +77,16 @@ extension ZapReceipt {
         case invalidBolt11
         /// The invoice's description hash does not match the receipt's description.
         case descriptionHashMismatch
+        /// The invoice carries no description hash, so nothing ties it to the receipt's zap request.
+        case missingDescriptionHash
         /// The invoice amount does not match the zap request or the expected amount.
         case amountMismatch
+        /// An amount was expected, but the invoice names none to check it against.
+        case missingAmount
+        /// The zap request's `amount` tag is not a number.
+        case invalidAmount
+        /// The receipt has no `p` tag, so it does not say who was zapped (NIP-57 requires one).
+        case missingRecipient
         /// The receipt's `p` tag does not match the zap request's recipient.
         case recipientMismatch
         /// The receipt's `e` tag does not match the event the zap request zapped.
@@ -96,8 +108,16 @@ extension ZapReceipt {
                 return "The zap receipt's bolt11 invoice could not be parsed"
             case .descriptionHashMismatch:
                 return "The invoice description hash does not match the zap request"
+            case .missingDescriptionHash:
+                return "The invoice does not commit to a description hash, so it is not bound to the zap request"
             case .amountMismatch:
                 return "The invoice amount does not match the zap request"
+            case .missingAmount:
+                return "An amount was expected but the invoice does not name one"
+            case .invalidAmount:
+                return "The zap request's amount is not a number"
+            case .missingRecipient:
+                return "The zap receipt has no p tag naming who was zapped"
             case .recipientMismatch:
                 return "The zap receipt recipient does not match the zap request"
             case .zappedEventMismatch:
@@ -111,17 +131,33 @@ extension ZapReceipt {
     /// Validates the zap receipt against the recipient's LNURL provider and, optionally, the amount
     /// you requested.
     ///
-    /// The trust anchor is the receipt's own signature by the provider's key: once that is verified,
-    /// the bolt11 amount, description hash, and preimage are cross-checked when the invoice carries
-    /// them. The embedded zap request's own signature is intentionally not required — some providers
-    /// re-serialize it — so authenticity rests on the provider's signature, not the sender's.
+    /// The trust anchor is the receipt's own signature by the provider's key. Once that is verified,
+    /// the invoice is required to commit to the receipt's zap request through its description hash,
+    /// which is what ties the invoice actually paid to the zap that was asked for; the amounts,
+    /// recipient, zapped event, and preimage are then cross-checked. The embedded zap request's own
+    /// signature is intentionally not required — some providers re-serialize it — so authenticity
+    /// rests on the provider's signature, not the sender's.
+    ///
+    /// A check that cannot be made is reported rather than skipped: passing
+    /// `expectedAmountMillisats` for an invoice that names no amount fails, because the assertion
+    /// the caller asked for cannot be established.
     /// https://github.com/nostr-protocol/nips/blob/master/57.md
     /// - Parameters:
     ///   - lnurlProviderPubkey: The `nostrPubkey` from the recipient's ``LNURLPayResponse`` — the key
     ///     the provider signs receipts with.
-    ///   - expectedAmountMillisats: The amount you requested, checked against the invoice when given.
+    ///   - expectedAmountMillisats: The amount you requested. When given, the invoice must name an
+    ///     amount and it must match.
+    ///   - requiringDescriptionHash: Whether the invoice must commit to the zap request through its
+    ///     description hash (default `true`). LUD-06 and LUD-12 make that hash part of the
+    ///     LNURL-pay flow every zap goes through, so a receipt lacking it proves only that the
+    ///     provider signed *some* invoice alongside *some* zap request. Pass `false` only when a
+    ///     provider is known to omit it and you accept losing that binding.
     /// - Throws: ``ValidationError`` if any check fails.
-    public func validate(lnurlProviderPubkey: String, expectedAmountMillisats: Int64? = nil) throws {
+    public func validate(
+        lnurlProviderPubkey: String,
+        expectedAmountMillisats: Int64? = nil,
+        requiringDescriptionHash: Bool = true
+    ) throws {
         // 1. The receipt must claim to come from the provider's key.
         guard event.pubkey.lowercased() == lnurlProviderPubkey.lowercased() else {
             throw ValidationError.payeePubkeyMismatch
@@ -138,29 +174,45 @@ extension ZapReceipt {
         // 4. The invoice must parse.
         guard let invoice = Bolt11Invoice(bolt11) else { throw ValidationError.invalidBolt11 }
 
-        // 5. If the invoice commits to a description hash, it must be the hash of the receipt's
-        //    description (the exact tag string, hashed as-is).
+        // 5. The invoice's description hash is what binds it to this zap request — without it the
+        //    receipt pairs an invoice and a request that need have nothing to do with each other.
         if let descriptionHash = invoice.descriptionHash {
             guard descriptionHash == Data(SHA256.hash(data: Data(descriptionJSON.utf8))) else {
                 throw ValidationError.descriptionHashMismatch
             }
+        } else if requiringDescriptionHash {
+            throw ValidationError.missingDescriptionHash
         }
 
-        // 6. Amounts must agree where present. An amountless invoice is advisory and never fails.
+        // 6. Amounts must agree. A malformed `amount` is rejected rather than read as absent, and an
+        //    amount the caller asked us to confirm cannot be confirmed against an amountless invoice.
+        let requestAmount: Int64?
+        if let rawAmount = zapRequest?.firstTagValue(named: "amount") {
+            guard let parsed = Int64(rawAmount) else { throw ValidationError.invalidAmount }
+            requestAmount = parsed
+        } else {
+            requestAmount = nil
+        }
+
         if let invoiceAmount = invoice.amountMillisats {
-            if let requestAmount = amountMillisats, requestAmount != invoiceAmount {
+            if let requestAmount, requestAmount != invoiceAmount {
                 throw ValidationError.amountMismatch
             }
             if let expectedAmountMillisats, expectedAmountMillisats != invoiceAmount {
                 throw ValidationError.amountMismatch
             }
+        } else if expectedAmountMillisats != nil {
+            throw ValidationError.missingAmount
         }
 
-        // 7. The receipt must zap the same recipient and event as the request (NIP-57), so a provider
-        //    cannot redirect a zap to a different `p`/`e` than the sender asked for.
+        // 7. NIP-57 requires the receipt to name who was zapped, and it must be the same recipient
+        //    and event the request named, so a provider cannot redirect a zap to a different
+        //    `p`/`e` than the sender asked for.
+        guard let receiptRecipient = recipientPubkey else {
+            throw ValidationError.missingRecipient
+        }
         if let zapRequest {
-            if let receiptRecipient = recipientPubkey,
-                let requestRecipient = zapRequest.firstTagValue(named: "p"),
+            if let requestRecipient = zapRequest.firstTagValue(named: "p"),
                 receiptRecipient != requestRecipient
             {
                 throw ValidationError.recipientMismatch
