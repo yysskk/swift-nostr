@@ -47,12 +47,36 @@ struct InternetIdentifierTests {
         #expect(result == nil)
     }
 
-    @Test("Parse identifier with multiple @ uses first as separator")
+    /// Splitting on the first `@` made this resolve against the host `domain@example.com`, which is
+    /// not the domain a reader of the identifier would expect. NIP-05 allows only `a-z0-9-_.` in the
+    /// local part, so an identifier carrying a second `@` is malformed however it is split.
+    @Test("Parse identifier with multiple @ is rejected")
     func parseMultipleAt() {
-        let result = InternetIdentifier.parse("user@domain@example.com")
+        #expect(InternetIdentifier.parse("user@domain@example.com") == nil)
+        #expect(!"user@domain@example.com".isValidInternetIdentifier)
+    }
 
-        #expect(result?.name == "user")
-        #expect(result?.domain == "domain@example.com")
+    @Test(
+        "Parse rejects a local part outside the NIP-05 character set",
+        arguments: ["al ice@example.com", "al/ice@example.com", "@example.com", "ali:ce@example.com"]
+    )
+    func parseRejectsInvalidLocalPart(identifier: String) {
+        #expect(InternetIdentifier.parse(identifier) == nil)
+    }
+
+    @Test(
+        "Parse rejects a domain that could not be a URL host",
+        arguments: ["alice@", "alice@exa mple.com", "alice@example.com/path", "alice@example.com:8080"]
+    )
+    func parseRejectsInvalidDomain(identifier: String) {
+        #expect(InternetIdentifier.parse(identifier) == nil)
+    }
+
+    @Test("Parse accepts the characters NIP-05 allows in a local part")
+    func parseAcceptsAllowedLocalPart() {
+        #expect(InternetIdentifier.parse("a-b_c.d@example.com")?.name == "a-b_c.d")
+        #expect(InternetIdentifier.parse("Alice@example.com")?.name == "Alice")
+        #expect(InternetIdentifier.parse("bob123@example.com")?.name == "bob123")
     }
 
     // MARK: - URL Construction Tests

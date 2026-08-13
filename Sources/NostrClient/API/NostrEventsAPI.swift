@@ -47,8 +47,21 @@ public struct NostrEventsAPI: NostrEventPublishing, NostrEventFetching {
         try await signAndPublish(strategy: strategy) { publicKey in
             var tags: [Tag] = []
 
-            // Add root and reply markers (NIP-10)
-            if let rootTag = event.tags(named: "e").first(where: { $0.values.contains("root") }) {
+            // Carry over the thread root (NIP-10). The marker lives at a fixed position —
+            // ["e", id, relay, marker] — so it is read there rather than searched for anywhere in
+            // the tag: a relay hint or pubkey that happens to read "root" is not a marker.
+            let parentEventTags = event.tags(named: "e")
+            let markedRoot = parentEventTags.first {
+                $0.values.count >= 3 && $0.values[2] == Tag.EventMarker.root.rawValue
+            }
+
+            // NIP-10's deprecated positional form carries no markers, and there the first "e" tag
+            // is the root. Without this the parent looked rootless and the reply started a second
+            // thread alongside the one it was answering.
+            let positionalRoot =
+                parentEventTags.allSatisfy { $0.values.count < 3 } ? parentEventTags.first : nil
+
+            if let rootTag = markedRoot ?? positionalRoot {
                 tags.append(rootTag)
                 tags.append(.event(event.id, relayURL: relayURL, marker: .reply))
             } else {
