@@ -7,12 +7,16 @@ public enum ProofOfWork {
     ///
     /// Each leading `0` hex character contributes four zero bits; the first non-zero nibble
     /// contributes its own leading zeros (`1` → 3, `2`–`3` → 2, `4`–`7` → 1, `8`–`f` → 0) and then
-    /// counting stops. Counting also stops at the first non-hex character, so a fully-zero id of
-    /// length `n` returns `n * 4`.
+    /// counting stops. Counting also stops at the first character that is not an ASCII hex digit,
+    /// so a fully-zero id of length `n` returns `n * 4`.
     public static func difficulty(ofHexId id: String) -> Int {
         var count = 0
         for character in id {
-            guard let nibble = character.hexDigitValue else { break }
+            // Only ASCII counts. `hexDigitValue` also resolves the Halfwidth and Fullwidth Forms
+            // of the same digits, so an id written in fullwidth zeros would otherwise report a
+            // fully-mined 256 — free difficulty for anything that filters on proof of work before
+            // checking that the id is the real hash.
+            guard character.isASCII, let nibble = character.hexDigitValue else { break }
             if nibble == 0 {
                 count += 4
             } else {

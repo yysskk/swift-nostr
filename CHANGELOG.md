@@ -47,6 +47,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   empty or uppercase prefix and produced a string that `decode(_:)` could never accept, since the
   checksum covered the prefix as written while decoding recomputes it lowercased. The prefix must
   now be non-empty lowercase printable ASCII.
+- **NIP-13 difficulty counts only ASCII hex digits**: `Character.hexDigitValue` also resolves the
+  Halfwidth and Fullwidth Forms of the hex digits, so an id written in fullwidth zeros reported the
+  maximum difficulty of 256 and satisfied `ProofOfWork.validate(event:minimumDifficulty:)`. A client
+  that filters on proof of work before verifying the id — the natural order, since the hash is the
+  cheap check — accepted such an event as maximally mined. Counting now stops at the first character
+  that is not an ASCII hex digit.
 - **NIP-44 rejects a wrong-length conversation key or nonce**: HKDF accepts inputs of any length, so
   `SealedMessage.encrypt`/`decrypt` would expand a malformed key or nonce into a well-formed payload
   that nobody could decrypt — a failure surfacing only on the recipient's side. Both now throw.

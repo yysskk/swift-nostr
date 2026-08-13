@@ -68,6 +68,43 @@ struct ProofOfWorkTests {
         #expect(ProofOfWork.difficulty(ofHexId: "00zz") == 8)
     }
 
+    /// `Character.hexDigitValue` is non-nil for the Halfwidth and Fullwidth Forms of the hex
+    /// digits, so an id of fullwidth zeros counted as a fully-mined one. A real event id is
+    /// ASCII — the fullwidth spelling can only come from something crafted to look mined.
+    @Test("fullwidth digits are not hex digits")
+    func difficultyRejectsFullwidthDigits() {
+        // U+FF10 FULLWIDTH DIGIT ZERO, 64 of them: the shape of a maximally-mined id.
+        #expect(ProofOfWork.difficulty(ofHexId: String(repeating: "０", count: 64)) == 0)
+        // Counting stops there rather than continuing past it.
+        #expect(ProofOfWork.difficulty(ofHexId: "00０0") == 8)
+        // U+FF41 FULLWIDTH LATIN SMALL LETTER A and U+FF21 its uppercase.
+        #expect(ProofOfWork.difficulty(ofHexId: "00ａ") == 8)
+        #expect(ProofOfWork.difficulty(ofHexId: "00Ａ") == 8)
+    }
+
+    /// A client that filters on proof of work before verifying — the natural order, since the
+    /// hash is the cheap check — would otherwise accept a crafted event as maximally mined.
+    @Test("an event whose id is fullwidth zeros does not validate")
+    func validateRejectsFullwidthDigits() {
+        let event = Event(
+            id: String(repeating: "０", count: 64),
+            pubkey: "a48380f4cfcc1ad5378294fcac36439770f9c878dd880ffa94bb74ea54a6f243",
+            createdAt: 1_651_794_653,
+            kind: 1,
+            tags: [["nonce", "1", "256"]],
+            content: "not actually mined",
+            sig: String(repeating: "ab", count: 64)
+        )
+
+        #expect(!ProofOfWork.validate(event: event, minimumDifficulty: 1))
+    }
+
+    @Test("uppercase ASCII hex is still counted")
+    func difficultyAcceptsUppercaseASCII() {
+        #expect(ProofOfWork.difficulty(ofHexId: "00F0") == 8)
+        #expect(ProofOfWork.difficulty(ofHexId: "000A") == 12)
+    }
+
     // MARK: - Mining
 
     private func testSigner() throws -> EventSigner {
