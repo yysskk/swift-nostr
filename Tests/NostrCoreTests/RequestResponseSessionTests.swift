@@ -252,6 +252,86 @@ struct RequestResponseSessionTests {
         #expect(try await pending.value == ["late"])
     }
 
+    // MARK: - A transport that stops delivering
+
+    /// The merged event stream ends when every relay's has — automatic reconnection gave up, or the
+    /// connections went away. Nothing can answer a request after that, so a session that kept
+    /// reporting itself started would send each new request into a dead transport and let it wait
+    /// out the whole timeout, with no error saying why.
+    @Test("a request in flight when the event stream ends fails at once")
+    func inFlightRequestFailsWhenEventStreamEnds() async throws {
+        let transport = FakeTransport()
+        let session = makeSession(transport)
+        try await start(session)
+
+        let pending = Task { try await session.perform(self.request("a"), key: "a", state: [], timeout: 60) }
+        try await transport.waitForSend("a")
+
+        await transport.endEvents()
+
+        await #expect(throws: TestError.notConnected) { try await pending.value }
+    }
+
+    @Test("the session restarts after its event stream ends")
+    func sessionRestartsAfterEventStreamEnds() async throws {
+        let transport = FakeTransport()
+        let session = makeSession(transport)
+        try await start(session)
+        #expect(await session.isStarted)
+
+        await transport.endEvents()
+        try await pollUntil { await !session.isStarted }
+
+        // A later request reconnects and subscribes again rather than sending into the void.
+        let connectsBefore = await transport.connectCount
+        try await start(session)
+        #expect(await transport.connectCount == connectsBefore + 1)
+
+        async let response = session.perform(request("b"), key: "b", state: [], timeout: 2)
+        try await transport.waitForSend("b")
+        await transport.deliver(self.response(for: "b", content: "b-done"))
+        #expect(try await response == ["b-done"])
+    }
+
+    /// A reader loop outlives the stream it drains: `disconnect()` finishes the stream
+    /// synchronously, but the loop only wakes afterwards. By then a replacement session may already
+    /// be starting, and the stale loop's completion must not retire it — clearing the new session's
+    /// tasks and failing the requests it legitimately has in flight.
+    ///
+    /// Reproducing it needs the stale reader to wake *during* the replacement's setup, which is a
+    /// matter of scheduling: this fails reliably in a full-suite run, where the reader is delayed
+    /// behind other work, and not when run alone.
+    @Test("a reader loop from a replaced session does not retire the current one")
+    func staleReaderDoesNotRetireCurrentSession() async throws {
+        let transport = FakeTransport()
+        let session = makeSession(transport)
+        try await start(session)
+
+        // Tear the first session down; its reader is still suspended on the finished stream.
+        await session.disconnect()
+        // Start a replacement before the stale reader has been rescheduled.
+        try await start(session)
+        #expect(await session.isStarted)
+
+        let pending = Task { try await session.perform(self.request("a"), key: "a", state: [], timeout: 5) }
+        try await transport.waitForSend("a")
+
+        // Give the stale reader every chance to wake up and clobber this session.
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(await session.isStarted)
+
+        await transport.deliver(self.response(for: "a", content: "a-done"))
+        #expect(try await pending.value == ["a-done"])
+    }
+
+    private func pollUntil(_ condition: @Sendable () async -> Bool) async throws {
+        for _ in 0..<400 {
+            if await condition() { return }
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        throw TestError.timedOut
+    }
+
     // MARK: - Helpers
 
     /// Starts the session, sends the request under `key`, answers it, and returns what resolved.
@@ -326,6 +406,13 @@ private actor FakeTransport: RelayTransport {
     /// Pushes a simulated incoming event to the ``events()`` stream.
     func deliver(_ event: Event) {
         continuation?.yield(event)
+    }
+
+    /// Ends the ``events()`` stream without disconnecting, standing in for every relay's message
+    /// stream finishing because automatic reconnection gave up.
+    func endEvents() {
+        continuation?.finish()
+        continuation = nil
     }
 
     /// Holds the next `connect()` open until ``openGate()``.

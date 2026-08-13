@@ -686,11 +686,19 @@ public actor RelayConnection {
         authenticationResponder = responder
         guard let responder,
             let challenge = authenticationChallenge,
-            !isAuthenticated,
-            !isAnsweringChallenge,
-            pendingAuthentications.isEmpty
+            shouldAnswerChallenge
         else { return }
         respondToChallenge(challenge, with: responder)
+    }
+
+    /// Whether a challenge should be answered now.
+    ///
+    /// An answer already under way, or an authentication already established for this session,
+    /// makes another redundant. It is also unsafe: ``isAnsweringChallenge`` is a single flag that
+    /// whichever answer finishes first clears, so overlapping answers leave it reading `false`
+    /// while one is still running.
+    var shouldAnswerChallenge: Bool {
+        !isAuthenticated && !isAnsweringChallenge && pendingAuthentications.isEmpty
     }
 
     /// Asks `responder` to answer `challenge` and authenticates with the result.

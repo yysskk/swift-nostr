@@ -41,6 +41,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   sends compare before touching shared state, so work belonging to a superseded socket stops
   instead of landing on the live session. Reachable from ordinary use — `RelayPool.disconnectAll()`
   or `removeRelay` overlapping `connectAll()`.
+- **A NIP-46 or NIP-47 session recovers when its relays stop delivering**: the session's event stream
+  ends once every relay's has — automatic reconnection giving up, or the connections going away —
+  but the session went on reporting itself started. Requests already in flight waited out their
+  whole timeout instead of failing, and every later request was sent into a transport that could not
+  answer, timing out in turn with nothing to say why. In a test an in-flight request took its full
+  60-second timeout and then reported a timeout rather than a disconnection. The session now fails
+  what is pending with its `notConnected` error and clears its started state, so the next request
+  reconnects. `RelayTransport` is unchanged — its `events()` stays a non-throwing `AsyncStream`.
+- **A re-challenging relay no longer triggers overlapping AUTH answers**: the receive loop answered
+  every NIP-42 `AUTH` frame, without the checks `setAuthenticationResponder` applies before starting
+  an answer of its own. A relay that challenges again — on reconnect, on a policy change, or simply
+  repeatedly — produced a second signed AUTH for an already-authenticated session, and concurrent
+  answers made `isAnsweringChallenge` unreliable, since whichever finished first cleared it for all.
 - **Reconnection backoff is bounded and jittered**: `initialReconnectDelay: 0` reads like "reconnect
   immediately", but zero multiplied by any backoff stays zero — and with the default of unlimited
   attempts that was an unbounded loop with no pause at all, reaching over 16,000 connection attempts
