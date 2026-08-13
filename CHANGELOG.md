@@ -31,6 +31,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A disconnected relay connection can no longer wedge as "connected"**: a connection attempt
+  suspends while it waits for the pong that proves its socket works, and `disconnect()` (or a later
+  attempt) could discard that socket meanwhile. The attempt resumed regardless and marked the
+  connection `.connected` with no socket installed, no receive loop, no keepalive, and no reconnect
+  pending. Since `connect()` returns early while the state says connected, the connection could
+  never be revived: every later `send` and `publish` threw for the lifetime of the object. Each
+  socket now carries a generation that the connect attempt, receive loop, keepalive, and in-flight
+  sends compare before touching shared state, so work belonging to a superseded socket stops
+  instead of landing on the live session. Reachable from ordinary use — `RelayPool.disconnectAll()`
+  or `removeRelay` overlapping `connectAll()`.
+- **Sockets are closed when replaced, and receive loops stop with their socket**: a failed send left
+  its socket installed, so the next connection attempt overwrote a live connection nobody closed and
+  its receive loop kept running beside the new one — both loops then reporting the same session's
+  death. The receive loop is also held and cancelled on teardown; it previously kept the connection
+  object alive indefinitely by capturing it while parked in `receive()`.
 - **NIP-05 identifiers split on the last `@` and validate the local part**: `alice@evil.com@example.com`
   split on the first `@` and resolved against the host `evil.com@example.com` rather than being
   rejected, disagreeing with `LNURL`, which already split on the last one. NIP-05 allows only

@@ -2,9 +2,15 @@ import Foundation
 
 // MARK: - Message Receiving
 extension RelayConnection {
-    func startReceiving() {
-        Task {
-            while state == .connected {
+    /// Starts the receive loop for the socket identified by `generation`.
+    ///
+    /// The loop is stored so teardown can cancel it, and it stops as soon as its socket is no
+    /// longer the installed one — a loop that outlived its session must not report that session's
+    /// death as the current one's.
+    func startReceiving(generation: UInt64) {
+        receiveTask?.cancel()
+        receiveTask = Task {
+            while state == .connected, isCurrentSocket(generation) {
                 do {
                     guard let task = webSocketTask else { break }
 
@@ -64,6 +70,11 @@ extension RelayConnection {
                         break
                     }
                 } catch {
+                    // A socket that has already been replaced or discarded fails on its own time,
+                    // often long after the fact. Tearing down here would cancel the live session's
+                    // keepalive and fail a connection that is working.
+                    guard isCurrentSocket(generation) else { break }
+
                     // The keepalive has no work to do once the receive loop is gone.
                     keepaliveTask?.cancel()
                     keepaliveTask = nil
@@ -78,8 +89,9 @@ extension RelayConnection {
             // Streams survive an in-flight auto-reconnect and resume on the
             // new session; otherwise this exit is terminal for them. After an
             // explicit disconnect() this is a no-op — disconnect already
-            // finished them.
-            if !isReconnecting {
+            // finished them. A loop whose socket was superseded leaves the
+            // streams to the session that replaced it.
+            if !isReconnecting, isCurrentSocket(generation) {
                 finishMessageStreams()
             }
         }
