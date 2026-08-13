@@ -70,6 +70,17 @@ struct EncryptedPrivateKeyCostTests {
         #expect(try encrypted.decrypt(password: password, maxLogN: 22) == privateKey)
     }
 
+    /// An upper-bound-only guard let a zero cap through, and `1...0` is not a valid range — so the
+    /// bound meant to make a caller's input safe trapped on it instead.
+    @Test("a cap below the range NIP-49 defines is rejected")
+    func capBelowSpecRangeIsRejected() throws {
+        let encrypted = try makeEncrypted()
+
+        #expect(throws: NostrError.unsupportedScryptCost(0)) {
+            _ = try encrypted.decrypt(password: password, maxLogN: 0)
+        }
+    }
+
     @Test("a cap above the range NIP-49 defines is rejected")
     func capAboveSpecRangeIsRejected() throws {
         let encrypted = try makeEncrypted()

@@ -140,7 +140,10 @@ public struct EncryptedPrivateKey: Sendable, Hashable {
     ///   `1...maxLogN`, or if `maxLogN` itself exceeds the `22` NIP-49 defines;
     ///   ``NostrError/decryptionFailed`` if authentication fails (almost always a wrong password).
     public func decrypt(password: String, maxLogN: UInt8 = defaultMaximumLogN) throws -> Data {
-        guard maxLogN <= Self.maximumLogN else {
+        // The whole range, not just the ceiling: a `maxLogN` of 0 would clear an upper-bound-only
+        // guard and then make the `1...maxLogN` below an invalid range, trapping on exactly the
+        // caller-supplied input this bound exists to make safe.
+        guard 1...Self.maximumLogN ~= maxLogN else {
             throw NostrError.unsupportedScryptCost(maxLogN)
         }
 
