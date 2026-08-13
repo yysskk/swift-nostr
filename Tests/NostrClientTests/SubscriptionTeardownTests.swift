@@ -77,6 +77,37 @@ struct SubscriptionTeardownTests {
         await client.relays.disconnect()
     }
 
+    /// A fresh REQ makes the relay resend its stored events. The dedup cache is scoped to the
+    /// subscription id, not the generation, so anything the previous generation had already seen
+    /// would be discarded before the new handler — which never received it — could.
+    @Test("re-subscribing under an id in use still receives the relay's stored events")
+    func resubscribingReceivesStoredEvents() async throws {
+        let (client, socket) = try await makeClient()
+        let pool = await client.pool
+
+        let signer = EventSigner(keyPair: try KeyPair())
+        let stored = try signer.signTextNote(content: "stored")
+        let storedJSON = String(decoding: try JSONEncoder().encode(stored), as: UTF8.self)
+
+        let firstSeen = MessageCounts()
+        _ = try await pool.subscribe(subscriptionId: "sub", filters: [Filter(kinds: [1])]) { message in
+            if case .event = message { firstSeen.bump() }
+        }
+        socket.deliver(.string("[\"EVENT\",\"sub\",\(storedJSON)]"))
+        try await pollUntil { firstSeen.value == 1 }
+
+        // Re-subscribe under the same id; the relay resends the same stored event.
+        let secondSeen = MessageCounts()
+        _ = try await pool.subscribe(subscriptionId: "sub", filters: [Filter(kinds: [1])]) { message in
+            if case .event = message { secondSeen.bump() }
+        }
+        socket.deliver(.string("[\"EVENT\",\"sub\",\(storedJSON)]"))
+        try await pollUntil { secondSeen.value == 1 }
+
+        #expect(secondSeen.value == 1)
+        await client.relays.disconnect()
+    }
+
     /// The listener has to be registered on the connection before the REQ goes out, or the events
     /// and the EOSE that answer it are dropped — and a fetch then waits out its whole timeout.
     @Test("a subscription receives an EOSE that follows its REQ immediately")

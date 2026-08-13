@@ -421,6 +421,11 @@ public actor RelayPool {
         subscriptionGeneration[subscriptionId, default: 0] &+= 1
         let generation = subscriptionGeneration[subscriptionId] ?? 0
         subscriptionHandlers[subscriptionId] = handler
+        // The dedup cache is scoped to the id, not the generation, and a fresh REQ makes the relay
+        // resend its stored events. Left in place, everything the previous generation already saw
+        // would be discarded as a duplicate before the new handler — which never received it — had
+        // a chance to.
+        eventCache.removeSubscription(subscriptionId)
 
         // Start listening for messages BEFORE sending the subscription request, so nothing that
         // arrives immediately after it is missed. `messages()` is awaited here rather than inside
