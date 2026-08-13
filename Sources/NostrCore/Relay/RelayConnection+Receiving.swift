@@ -38,7 +38,11 @@ extension RelayConnection {
                                 }
                             case .auth(let challenge):
                                 authenticationChallenge = challenge
-                                if let responder = authenticationResponder {
+                                // Guarded exactly as `setAuthenticationResponder` guards its own
+                                // call: a relay that re-challenges an already-authenticated or
+                                // mid-answer session would otherwise start an overlapping answer
+                                // for every frame it sends.
+                                if let responder = authenticationResponder, shouldAnswerChallenge {
                                     respondToChallenge(challenge, with: responder)
                                 }
                             case .closed(let subscriptionId, let message):

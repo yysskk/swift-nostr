@@ -100,11 +100,31 @@ package actor RequestResponseSession<Key: Hashable & Sendable, State: Sendable, 
         // round-trip is not missed.
         try await transport.subscribe(id: subscriptionID, filters: filters)
         let events = await transport.events()
-        readerTask = Task {
+        readerTask = Task { [weak self] in
             for await event in events {
                 await handler(event)
             }
+            // The merged stream ends when every relay's has — auto-reconnect gave up, or the
+            // connections were torn down. Nothing will deliver a response after this, so the
+            // session has to notice: left as it was, `isStarted` stayed true, `ensureStarted`
+            // short-circuited, and every later request sent into a dead transport and waited out
+            // its whole timeout with no error explaining why.
+            await self?.handleEventStreamEnded()
         }
+    }
+
+    /// Retires a session whose event stream has ended, failing anything in flight and clearing the
+    /// started state so the next request reconnects rather than sending into a transport that can
+    /// no longer answer.
+    private func handleEventStreamEnded() {
+        readerTask = nil
+        startTask = nil
+
+        for request in pending.values {
+            request.timeoutTask?.cancel()
+            request.continuation.finish(throwing: notConnected)
+        }
+        pending.removeAll()
     }
 
     /// Opens an additional subscription, or replaces one under an id already in use.
