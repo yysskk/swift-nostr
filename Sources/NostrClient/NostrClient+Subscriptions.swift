@@ -114,6 +114,22 @@ extension NostrClient {
         }
     }
 
+    /// Ends every subscription and then disconnects every relay.
+    ///
+    /// Disconnecting drops the pool's listener tasks, and nothing recreates them, so a subscription
+    /// cannot outlive it — the sequences are finished here rather than left waiting on a delivery
+    /// that can no longer arrive. Ending them is this layer's job: the pool has no reach into the
+    /// client's ``SubscriptionSequence`` continuations, and reversing that would invert the
+    /// dependency between them.
+    ///
+    /// Backs ``NostrRelaysAPI/disconnect()``.
+    func disconnectAllRelays() async {
+        // Finishes the client-facing sequences and sends CLOSE for each subscription while the
+        // connections are still up.
+        await closeAllSubscriptions()
+        await pool.disconnectAll()
+    }
+
     private func handleMessage(_ message: RelayMessage, from relayURL: URL, subscriptionId: String) {
         guard let subscription = openSubscriptions[subscriptionId] else { return }
 
