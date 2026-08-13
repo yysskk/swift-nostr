@@ -106,10 +106,17 @@ public struct SealedMessage: Sendable {
         let plaintextData = Data(plaintext.utf8)
 
         // 1. Derive message keys from conversation key and nonce
-        let (chachaKey, chachaNonce, hmacKey) = deriveMessageKeys(conversationKey: conversationKey, nonce: nonce)
+        var (chachaKey, chachaNonce, hmacKey) = deriveMessageKeys(conversationKey: conversationKey, nonce: nonce)
+        // Zeroed once the payload is assembled: these are per-message keys with no use afterwards.
+        defer {
+            chachaKey.secureScrub()
+            chachaNonce.secureScrub()
+            hmacKey.secureScrub()
+        }
 
         // 2. Pad the plaintext
-        let padded = try pad(plaintextData)
+        var padded = try pad(plaintextData)
+        defer { padded.secureScrub() }
 
         // 3. Encrypt with ChaCha20
         let ciphertext = try chacha20(padded, key: chachaKey, nonce: chachaNonce)
@@ -182,8 +189,13 @@ public struct SealedMessage: Sendable {
         let ciphertext = payloadData[33..<(payloadData.count - 32)]
 
         // 2. Derive message keys
-        let (chachaKey, chachaNonce, hmacKey) = Self.deriveMessageKeys(
+        var (chachaKey, chachaNonce, hmacKey) = Self.deriveMessageKeys(
             conversationKey: conversationKey, nonce: Data(nonce))
+        defer {
+            chachaKey.secureScrub()
+            chachaNonce.secureScrub()
+            hmacKey.secureScrub()
+        }
 
         // 3. Verify HMAC using timing-safe comparison
         let hmacInput = Data(nonce) + Data(ciphertext)
@@ -194,7 +206,8 @@ public struct SealedMessage: Sendable {
         }
 
         // 4. Decrypt with ChaCha20
-        let padded = try Self.chacha20(Data(ciphertext), key: chachaKey, nonce: chachaNonce)
+        var padded = try Self.chacha20(Data(ciphertext), key: chachaKey, nonce: chachaNonce)
+        defer { padded.secureScrub() }
 
         // 5. Unpad
         let plaintext = try Self.unpad(padded)
@@ -251,9 +264,11 @@ public struct SealedMessage: Sendable {
         // The sharedSecret in compressed format is: version (1 byte) + x-coordinate (32 bytes)
         // NIP-44 needs only the x-coordinate, so skip the version byte
         let sharedSecret = privateKey.sharedSecretFromKeyAgreement(with: publicKey, format: .compressed)
-        let sharedX = sharedSecret.withUnsafeBytes { bytes in
+        var sharedX = sharedSecret.withUnsafeBytes { bytes in
             Data(bytes.dropFirst())
         }
+        // The conversation key is derived from this; nothing needs the shared point afterwards.
+        defer { sharedX.secureScrub() }
 
         // Derive conversation key using HKDF
         let salt = Data("nip44-v2".utf8)
