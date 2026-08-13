@@ -21,6 +21,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Gift-wrapped messages authenticate their sender (NIP-17)**: `GiftWrap.unwrap` verified the
+  seal's signature but never checked that the rumor inside named the same author, which NIP-17
+  requires precisely because "any sender can impersonate others by simply changing the pubkey on
+  kind:14". The rumor is unsigned by design, so its `pubkey` was whatever the sealer wrote: a
+  message could arrive whose `senderPubkey` was the real sender while the returned event named
+  someone else as its author, and anything storing or re-serializing that event attributed the
+  message to the wrong person. The rumor's `id` was likewise trusted verbatim, though it is the key
+  `DirectMessage` and `DirectMessageReaction` correlate on — a sender could pick one that collides
+  with a message from another conversation. Both are now checked, so `senderPubkey`, the event's
+  `pubkey`, and its `id` are all attested by the seal's signature.
 - **Event verification rejects malformed keys and signatures**: `Event.verify()` now checks that the
   `pubkey` decodes to 32 bytes and the `sig` to 64 before handing them to libsecp256k1, which parses
   both as fixed-width buffers without validating their length. A short `pubkey` previously caused a

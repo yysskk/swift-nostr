@@ -72,11 +72,20 @@ public struct GiftWrap: Sendable {
         return try ephemeralSigner.sign(wrapUnsigned)
     }
 
-    /// Unwraps a gift-wrapped event
+    /// Unwraps a gift-wrapped event, authenticating the sender.
+    ///
+    /// The seal's signature is verified, and the rumor it carries must name that same sealer as its
+    /// author and carry the true hash of its own contents. So both
+    /// ``UnwrappedMessage/senderPubkey`` and the returned event's `pubkey` are attested by the
+    /// seal's signature, and the event's `id` can be trusted as an identity for the message.
     /// - Parameters:
     ///   - giftWrap: The gift-wrapped event
     ///   - recipient: The recipient's signer, local or remote
     /// - Returns: The unwrapped message containing sender and original event
+    /// - Throws: ``NostrError/invalidData`` if the layers are not the expected kinds,
+    ///   ``NostrError/verificationFailed`` if the seal's signature does not verify or the rumor
+    ///   claims a different author, or ``NostrError/invalidEventId`` if the rumor's id is not the
+    ///   hash of its contents.
     public static func unwrap(
         giftWrap: Event,
         recipient: any NostrSigning
@@ -101,6 +110,14 @@ public struct GiftWrap: Sendable {
         // 2. Open seal to get rumor
         let rumorJson = try await recipient.nip44Decrypt(seal.content, from: seal.pubkey)
         let rumor = try decodeRumor(rumorJson)
+
+        // NIP-17: "Clients MUST verify if pubkey of the kind:13 is the same pubkey on the kind:14,
+        // otherwise any sender can impersonate others by simply changing the pubkey on kind:14."
+        // The seal's signature proves only who sealed it; the rumor inside is unsigned by design,
+        // so without this the author it names is whatever the sealer chose to write.
+        guard rumor.pubkey == seal.pubkey else {
+            throw NostrError.verificationFailed
+        }
 
         // 3. Return the unwrapped message
         return UnwrappedMessage(
@@ -133,10 +150,30 @@ public struct GiftWrap: Sendable {
         return json
     }
 
-    /// Decodes a rumor from JSON string
+    /// Decodes a rumor from JSON string, checking that its id is the hash of its own contents.
+    ///
+    /// A rumor carries no signature, so its id is not attested by anything — but callers use it as
+    /// the message's identity: `DirectMessage.rumorId` keys storage and correlates reactions. Left
+    /// unchecked, a sender could choose an id that collides with a message from another
+    /// conversation and overwrite it.
     private static func decodeRumor(_ json: String) throws -> Event {
         let decoder = JSONDecoder()
         let rumor = try decoder.decode(Rumor.self, from: Data(json.utf8))
+
+        // Rebuilt through `UnsignedEvent` so the id comes from the same canonical NIP-01
+        // serialization that signing and rumor construction use, rather than a second copy of it.
+        let unsigned = UnsignedEvent(
+            pubkey: rumor.pubkey,
+            createdAt: rumor.createdAt,
+            kind: rumor.kind,
+            rawTags: rumor.tags,
+            content: rumor.content
+        )
+
+        guard rumor.id == (try unsigned.computedId) else {
+            throw NostrError.invalidEventId
+        }
+
         // Convert rumor back to Event (with empty signature since it's a rumor)
         return Event(
             id: rumor.id,
