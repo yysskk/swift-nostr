@@ -40,8 +40,9 @@ public struct NostrListsAPI: NostrListManaging {
             toURLs: nil,
             timeout: timeout
         )
-        // Replaceable event: pick the newest in case multiple relays return stale copies.
-        guard let newest = events.max(by: { $0.createdAt < $1.createdAt }) else {
+        // Replaceable event: pick the newest the requested author actually signed, so a stale or
+        // forged copy from any relay cannot displace it.
+        guard let newest = VerifiedEventSelection.newest(in: events, kind: kind, author: target) else {
             return nil
         }
         // Only the author can decrypt private items — do so when fetching the current user's
@@ -87,8 +88,12 @@ public struct NostrListsAPI: NostrListManaging {
         var filter = Filter(authors: [target], kinds: [kind])
         filter.addTagQuery("d", values: [identifier])
         let events = try await client.fetch(filters: [filter], toURLs: nil, timeout: timeout)
-        // Addressable event: pick the newest in case multiple relays return stale copies.
-        guard let newest = events.max(by: { $0.createdAt < $1.createdAt }) else {
+        // Addressable event: the identifier is part of its coordinates, so it is matched alongside
+        // the author and kind before the newest signed copy is chosen.
+        guard
+            let newest = VerifiedEventSelection.newest(
+                in: events, kind: kind, author: target, identifier: identifier)
+        else {
             return nil
         }
         if pubkey == nil, await client.hasSigner {
@@ -114,13 +119,13 @@ public struct NostrListsAPI: NostrListManaging {
             timeout: timeout
         )
         // Addressable events: keep the newest event per `d` identifier, ignoring any without one.
+        // Each identifier is resolved through the same selection as a single-set fetch, so a copy
+        // from another author or with an unverifiable signature cannot win one of the slots.
+        let identifiers = Set(events.compactMap { $0.firstTagValue(named: "d") })
         var newestByIdentifier: [String: Event] = [:]
-        for event in events {
-            guard let identifier = event.firstTagValue(named: "d") else { continue }
-            if let existing = newestByIdentifier[identifier], existing.createdAt >= event.createdAt {
-                continue
-            }
-            newestByIdentifier[identifier] = event
+        for identifier in identifiers {
+            newestByIdentifier[identifier] = VerifiedEventSelection.newest(
+                in: events, kind: kind, author: target, identifier: identifier)
         }
         let decrypt = pubkey == nil ? await client.hasSigner : false
         var sets: [NostrListSet] = []
@@ -139,7 +144,13 @@ public struct NostrListsAPI: NostrListManaging {
         var filter = Filter(authors: [naddr.author], kinds: [Event.Kind(rawValue: naddr.kind)])
         filter.addTagQuery("d", values: [naddr.identifier])
         let events = try await client.fetch(filters: [filter], toURLs: nil, timeout: timeout)
-        guard let newest = events.max(by: { $0.createdAt < $1.createdAt }) else {
+        guard
+            let newest = VerifiedEventSelection.newest(
+                in: events,
+                kind: Event.Kind(rawValue: naddr.kind),
+                author: naddr.author,
+                identifier: naddr.identifier)
+        else {
             return nil
         }
         return try NostrListSet(event: newest)

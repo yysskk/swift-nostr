@@ -18,8 +18,11 @@ public struct NostrRoutingAPI: NostrRelayRouting {
         let events = try await client.fetch(
             filters: [.relayListMetadata(pubkey: pubkey)], toURLs: nil, timeout: timeout
         )
-        // Replaceable event: pick the newest in case multiple relays return stale copies.
-        guard let newest = events.max(by: { $0.createdAt < $1.createdAt }),
+        // Replaceable event: the newest list this pubkey actually signed. Taking the newest of
+        // whatever arrived let any relay install a list for someone else by dating it far ahead.
+        guard
+            let newest = VerifiedEventSelection.newest(
+                in: events, kind: .relayListMetadata, author: pubkey),
             let list = newest.relayListMetadata
         else {
             return nil
@@ -119,8 +122,13 @@ public struct NostrRoutingAPI: NostrRelayRouting {
         let events = try await client.fetch(
             filters: [.directMessageRelayList(pubkey: pubkey)], toURLs: nil, timeout: timeout
         )
-        // Replaceable event: pick the newest in case multiple relays return stale copies.
-        guard let newest = events.max(by: { $0.createdAt < $1.createdAt }),
+        // Replaceable event: the newest list this pubkey actually signed. This one decides where
+        // their private messages are delivered, so an unverified copy would let a relay redirect
+        // them — the recipient never receives the message, and the sender's traffic goes to
+        // whoever forged the list.
+        guard
+            let newest = VerifiedEventSelection.newest(
+                in: events, kind: .directMessageRelayList, author: pubkey),
             let list = newest.directMessageRelayList
         else {
             return nil

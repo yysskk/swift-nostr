@@ -348,14 +348,18 @@ public struct NostrGroupsAPI: NostrGroupManaging {
 
     /// Picks the winning event of one relay-generated state kind: the newest `createdAt`,
     /// with ties broken by the lowest event id (the NIP-01 replaceable-event convention).
-    /// With an expected `author`, events by anyone else and events whose signature does not
-    /// verify are dropped before the pick.
+    ///
+    /// With an expected `author`, this is the same selection every other replaceable fetch makes,
+    /// so it goes through ``VerifiedEventSelection``. Without one — a group whose relay has not
+    /// been identified yet — nothing can be verified against, so the newest of what arrived is
+    /// taken as-is.
     private static func newestStateEvent(ofKind kind: Event.Kind, in events: [Event], author: String?) -> Event? {
+        guard author == nil else {
+            return VerifiedEventSelection.newest(in: events, kind: kind, author: author)
+        }
+
         var newest: Event?
         for event in events where event.kind == kind {
-            if let author {
-                guard event.pubkey == author, (try? event.verify()) == true else { continue }
-            }
             if let current = newest {
                 let supersedes =
                     event.createdAt > current.createdAt
