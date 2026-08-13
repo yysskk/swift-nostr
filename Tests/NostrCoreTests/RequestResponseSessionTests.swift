@@ -332,6 +332,39 @@ struct RequestResponseSessionTests {
         throw TestError.timedOut
     }
 
+    // MARK: - Duplicate keys
+
+    /// Registering over an in-flight key dropped the first request's continuation without resolving
+    /// it, so that caller stayed suspended forever — its own cleanup never runs, because it never
+    /// returns — while the orphaned timeout resolved the second request on the first one's clock.
+    @Test("a second request under an in-flight key is refused")
+    func duplicateKeyIsRefused() async throws {
+        let transport = FakeTransport()
+        let session = makeSession(transport)
+        try await start(session)
+
+        let first = Task { try await session.perform(self.request("a"), key: "a", state: [], timeout: 5) }
+        try await transport.waitForSend("a")
+
+        await #expect(throws: RequestResponseSessionError.duplicateRequestKey) {
+            try await session.perform(self.request("a"), key: "a", state: [], timeout: 5)
+        }
+
+        // The request already in flight is untouched and still answerable.
+        await transport.deliver(self.response(for: "a", content: "a-done"))
+        #expect(try await first.value == ["a-done"])
+    }
+
+    /// The refusal is not permanent: once the first request resolves, the key is free again.
+    @Test("a key is reusable once its request completes")
+    func keyIsReusableAfterCompletion() async throws {
+        let transport = FakeTransport()
+        let session = makeSession(transport)
+
+        #expect(try await perform(session, transport: transport, key: "a") == ["a-done"])
+        #expect(try await perform(session, transport: transport, key: "a") == ["a-done"])
+    }
+
     // MARK: - Helpers
 
     /// Starts the session, sends the request under `key`, answers it, and returns what resolved.

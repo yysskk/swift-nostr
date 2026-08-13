@@ -41,6 +41,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   sends compare before touching shared state, so work belonging to a superseded socket stops
   instead of landing on the live session. Reachable from ordinary use — `RelayPool.disconnectAll()`
   or `removeRelay` overlapping `connectAll()`.
+- **A duplicate request key is refused instead of hanging its first caller**: registering a request
+  under a key already in flight overwrote the entry, dropping the first request's continuation
+  without resolving it and leaving its timeout running. That caller stayed suspended forever — its
+  own cleanup never runs, because it never returns — while the orphaned timeout resolved the second
+  request on the first one's schedule. A `RequestResponseSessionError.duplicateRequestKey` is thrown
+  now; the request already in flight is untouched, and the key becomes reusable once it completes.
 - **A NIP-46 or NIP-47 session recovers when its relays stop delivering**: the session's event stream
   ends once every relay's has — automatic reconnection giving up, or the connections going away —
   but the session went on reporting itself started. Requests already in flight waited out their
