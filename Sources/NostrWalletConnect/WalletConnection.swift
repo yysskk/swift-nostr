@@ -204,7 +204,7 @@ public actor WalletConnection {
         return try await session.perform(
             event,
             key: event.id,
-            state: RequestState(scheme: scheme, expected: expectedResponses),
+            state: RequestState(scheme: scheme, expected: expectedResponses, method: method),
             timeout: config.requestTimeout,
             partialResult: partialOnTimeout ? collected : nil)
     }
@@ -291,21 +291,59 @@ public actor WalletConnection {
         let keyPair = keyPair
 
         await session.withPendingRequest(requestID) { request in
+            // A connection URI may list several relays, and the transport merges them without
+            // deduplicating — that only happens in `RelayPool`, which this path does not use. One
+            // response arriving over two relays would otherwise count twice, completing a
+            // `multi_pay_*` early with a duplicate part while the response it was still owed had
+            // nowhere left to go.
+            guard request.seenResponseIDs.insert(event.id).inserted else { return .pending }
             request.receivedCount += 1
 
-            if let content = try? WalletConnectCipher(request.scheme).decrypt(
-                event.content, senderPubkey: walletPubkey, recipient: keyPair)
-            {
-                request.collected.append(ResponsePart(dTag: event.firstTagValue(named: "d"), content: content))
-            } else if request.expected == 1 {
+            guard
+                let content = try? WalletConnectCipher(request.scheme).decrypt(
+                    event.content, senderPubkey: walletPubkey, recipient: keyPair)
+            else {
                 // Nothing to preserve for a single-response request, so fail fast.
-                return .failed(WalletConnectError.responseDecodingFailed)
+                if request.expected == 1 {
+                    return .failed(WalletConnectError.responseDecodingFailed)
+                }
+                // Count undecryptable responses toward completion so a multi-response request
+                // finishes as soon as every response has arrived, rather than waiting out the
+                // timeout.
+                return request.receivedCount >= request.expected ? .resolved(request.collected) : .pending
             }
 
-            // Count undecryptable responses toward completion so a multi-response request finishes
-            // as soon as every response has arrived, rather than waiting out the timeout.
+            // A reply naming another command answers a different request; folding it in would let
+            // a body of the wrong shape satisfy this one whenever it happened to decode.
+            if let received = Self.resultType(of: content), received != request.method.rawValue {
+                if request.expected == 1 {
+                    return .failed(
+                        WalletConnectError.unexpectedResultType(
+                            expected: request.method.rawValue, received: received))
+                }
+                return request.receivedCount >= request.expected ? .resolved(request.collected) : .pending
+            }
+
+            request.collected.append(ResponsePart(dTag: event.firstTagValue(named: "d"), content: content))
             return request.receivedCount >= request.expected ? .resolved(request.collected) : .pending
         }
+    }
+
+    /// The `result_type` a decrypted response declares, or nil when it does not parse as one.
+    ///
+    /// A reply naming another command is an answer to a different request; folding it in would let
+    /// a `get_balance` body satisfy a `pay_invoice` whenever the shapes happened to decode. An
+    /// unparseable body keeps its old path — it is reported as a decoding failure downstream, which
+    /// says more than silently discarding it here would.
+    private static func resultType(of content: String) -> String? {
+        struct ResultTypeOnly: Decodable {
+            let resultType: String
+
+            enum CodingKeys: String, CodingKey {
+                case resultType = "result_type"
+            }
+        }
+        return try? JSONDecoder().decode(ResultTypeOnly.self, from: Data(content.utf8)).resultType
     }
 
     private func handleNotification(_ event: Event, scheme: WalletConnectEncryption) {
@@ -354,8 +392,14 @@ struct ResponsePart: Sendable {
 private struct RequestState: Sendable {
     let scheme: WalletConnectEncryption
     let expected: Int
+    /// The method the request was sent under, so a reply carrying another `result_type` — an answer
+    /// to a different command — is not folded in as though it belonged here.
+    let method: WalletConnectMethod
     /// The successfully decrypted response parts.
     var collected: [ResponsePart] = []
     /// Total responses seen (including undecryptable ones), used for the completion check.
     var receivedCount = 0
+    /// Response event ids already folded in, so a response delivered over more than one relay is
+    /// counted once.
+    var seenResponseIDs: Set<String> = []
 }

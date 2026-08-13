@@ -188,9 +188,11 @@ struct WalletConnectionRoundTripTests {
                 requestID: request.id, client: client, wallet: wallet, dTag: "a"))
 
         let mapped = try await results
-        #expect(mapped.count == 1)
-        #expect(try mapped["a"]?.get().preimage == "pa")
-        #expect(mapped["b"] == nil)
+        // Outcomes stay aligned to the invoices as requested: "a" answered, "b" never did.
+        #expect(mapped.outcomes.count == 2)
+        #expect(mapped.outcomes[0].value?.preimage == "pa")
+        #expect(mapped.indicesWithoutResponse == [1])
+        #expect(mapped.unmatched.isEmpty)
     }
 
     @Test("multi_pay_invoice completes promptly when a response cannot be decrypted")
@@ -220,8 +222,9 @@ struct WalletConnectionRoundTripTests {
         let mapped = try await results
         let elapsed = clock.now - start
 
-        #expect(mapped.count == 1)
-        #expect(try mapped["a"]?.get().preimage == "pa")
+        #expect(mapped.outcomes.count == 2)
+        #expect(mapped.outcomes[0].value?.preimage == "pa")
+        #expect(mapped.indicesWithoutResponse == [1])
         // The two outcomes this separates are "completed when the second response arrived" and
         // "waited out the 5s timeout", so the bound only has to sit between them. A tighter one
         // measures the scheduler instead: on a loaded CI runner the arrival path alone can take

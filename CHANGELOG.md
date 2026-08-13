@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`multiPayInvoice` and `multiPayKeysend` return `MultiPayResults` instead of a dictionary**
+  (breaking): results were keyed by the response's `d` tag, which cannot identify a request item —
+  two responses sharing a tag silently overwrote each other, and an item sent without an `id` is
+  answered under a payment hash this package cannot derive from an invoice, so its result could not
+  be tied back at all. The new type carries one outcome per item **in the order requested**, and
+  anything that could not be matched — an unknown `d` tag, a duplicate of one already claimed —
+  appears in `unmatched` rather than being dropped; those payments still happened. Items the wallet
+  never answered are `.noResponse`, listed by `indicesWithoutResponse`. **Migration:** iterate
+  `results.outcomes` by index instead of subscripting by id, and give every item an `id` so its
+  response can be matched. An empty item list now returns immediately rather than waiting out the
+  full request timeout.
 - **NIP-57 zap receipt validation reports checks it cannot make**: `ZapReceipt.validate` skipped a
   check whenever the tag it needed was absent, so a receipt could pass having established only that
   the provider's key signed something. It now requires the `p` tag NIP-57 mandates, rejects a
@@ -115,6 +126,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `"root"` was carried over as the thread root. A parent written in NIP-10's deprecated positional
   form — no markers at all — looked rootless, and the reply started a second thread beside the one
   it was answering; its first `e` tag is now used as the root, as the spec says.
+- **A wallet response delivered over several relays is counted once**: a NIP-47 connection URI may
+  list several relays, and this path merges them without deduplicating — that only happens in
+  `RelayPool`, which the wallet transport bypasses. One response arriving over two relays counted
+  twice, so a `multi_pay_*` completed early with a duplicate result while the response it was still
+  owed had nowhere to go: the caller was told an invoice had no result when it may have been paid.
+- **A wallet response naming another command is not folded in**: the `result_type` a response
+  declares was never checked, so a reply to a different command satisfied the request whenever its
+  body happened to decode. A single-response command now reports
+  `WalletConnectError.unexpectedResultType`.
 - **Fetched replaceable and addressable events are verified before they are believed**: a relay may
   answer a filter with anything, and these fetches took the newest event they were handed — so a
   forged copy dated far ahead won outright, since newer always displaces older. The DM relay list

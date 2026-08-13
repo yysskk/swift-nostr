@@ -23,6 +23,9 @@ public enum WalletConnectError: Error, LocalizedError, Sendable, Equatable {
     /// The wallet response carried neither a `result` nor an `error`.
     case missingResult
 
+    /// The wallet answered with a `result_type` naming a different command than the one requested.
+    case unexpectedResultType(expected: String, received: String)
+
     /// The wallet returned an explicit error for the request.
     case walletError(code: WalletConnectErrorCode, message: String)
 
@@ -42,6 +45,8 @@ public enum WalletConnectError: Error, LocalizedError, Sendable, Equatable {
             return "The operation was superseded by a newer one"
         case .missingResult:
             return "The wallet response contained neither a result nor an error"
+        case .unexpectedResultType(let expected, let received):
+            return "The wallet answered a \(expected) request with a \(received) response"
         case .walletError(let code, let message):
             return "Wallet error (\(code.rawValue)): \(message)"
         }
