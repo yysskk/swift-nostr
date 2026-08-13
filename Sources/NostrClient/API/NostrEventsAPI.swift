@@ -187,8 +187,11 @@ public struct NostrEventsAPI: NostrEventPublishing, NostrEventFetching {
         var filter = Filter(authors: [author], kinds: [.longFormContent])
         filter.addTagQuery("d", values: [identifier])
         let events = try await client.fetch(filters: [filter], toURLs: nil, timeout: timeout)
-        // Addressable event: pick the newest in case multiple relays return stale copies.
-        guard let newest = events.max(by: { $0.createdAt < $1.createdAt }) else {
+        // Addressable event: the newest copy the named author signed under this identifier.
+        guard
+            let newest = VerifiedEventSelection.newest(
+                in: events, kind: .longFormContent, author: author, identifier: identifier)
+        else {
             return nil
         }
         return LongFormContent(event: newest)
@@ -215,8 +218,15 @@ public struct NostrEventsAPI: NostrEventPublishing, NostrEventFetching {
         let events = try await client.fetch(
             filters: [filter], toURLs: hinted.isEmpty ? nil : hinted, timeout: timeout
         )
-        // Addressable event: pick the newest in case multiple relays return stale copies.
-        guard let newest = events.max(by: { $0.createdAt < $1.createdAt }) else {
+        // Addressable event: the coordinate names the author, kind, and identifier, so all three
+        // are checked — a relay hint the coordinate carries is not a reason to trust what it sends.
+        guard
+            let newest = VerifiedEventSelection.newest(
+                in: events,
+                kind: Event.Kind(rawValue: naddr.kind),
+                author: naddr.author,
+                identifier: naddr.identifier)
+        else {
             return nil
         }
         return LongFormContent(event: newest)
@@ -268,19 +278,26 @@ public struct NostrEventsAPI: NostrEventPublishing, NostrEventFetching {
         return results.values.map(\.value).max() ?? 0
     }
 
-    /// Fetches a single event by ID
+    /// Fetches a single event by ID.
+    ///
+    /// The returned event is the one that was asked for: a relay that ignores the id filter can
+    /// answer with anything, and its signature is checked before it is handed back.
     public func fetchEvent(id: String, timeout: TimeInterval = 10) async throws -> Event? {
         let events = try await client.fetch(filters: [Filter(ids: [id])], toURLs: nil, timeout: timeout)
-        return events.first
+        return VerifiedEventSelection.event(withID: id, in: events)
     }
 
-    /// Fetches user metadata
+    /// Fetches user metadata.
+    ///
+    /// Kind 0 is replaceable, so the newest profile the named pubkey signed wins; taking whichever
+    /// copy arrived first made the result depend on which relay answered soonest.
     public func fetchMetadata(pubkey: String, timeout: TimeInterval = 10) async throws -> UserMetadata? {
         let events = try await client.fetch(
             filters: [.metadata(pubkeys: [pubkey])], toURLs: nil, timeout: timeout
         )
 
-        guard let event = events.first else { return nil }
+        guard let event = VerifiedEventSelection.newest(in: events, kind: .setMetadata, author: pubkey)
+        else { return nil }
 
         return try? JSONDecoder().decode(UserMetadata.self, from: Data(event.content.utf8))
     }

@@ -115,6 +115,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `"root"` was carried over as the thread root. A parent written in NIP-10's deprecated positional
   form — no markers at all — looked rootless, and the reply started a second thread beside the one
   it was answering; its first `e` tag is now used as the root, as the spec says.
+- **Fetched replaceable and addressable events are verified before they are believed**: a relay may
+  answer a filter with anything, and these fetches took the newest event they were handed — so a
+  forged copy dated far ahead won outright, since newer always displaces older. The DM relay list
+  (kind 10050) is the sharpest case: it decides where a user's private messages are delivered, so a
+  forged one routed every gift wrap to relays the attacker chose, and the recipient never received
+  the message. The NIP-65 relay list, profile metadata, lists and sets, and long-form articles were
+  all reachable the same way, and `fetchEvent(id:)` returned whatever a relay sent for an id filter
+  it ignored. Every such fetch now selects through one helper that checks the author, kind, `d`
+  identifier where the coordinates include one, and the signature, and breaks a `created_at` tie on
+  the lowest id as NIP-01 prescribes. `fetchMetadata` additionally picks the newest profile rather
+  than whichever copy arrived first.
 - **Gift-wrapped messages authenticate their sender (NIP-17)**: `GiftWrap.unwrap` verified the
   seal's signature but never checked that the rumor inside named the same author, which NIP-17
   requires precisely because "any sender can impersonate others by simply changing the pubkey on
