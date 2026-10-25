@@ -5,7 +5,8 @@ import NostrCore
 /// Reached as ``NostrClient/events``.
 ///
 /// Every `publish*` helper signs through the configured signer — local or remote NIP-46 — and
-/// broadcasts to the whole pool. Use ``NostrRoutingAPI/publishGossip(_:strategy:)`` instead to
+/// broadcasts to the whole pool; ``publish(_:to:strategy:)`` sends an already-signed event to the
+/// whole pool or to chosen relays. Use ``NostrRoutingAPI/publishGossip(_:strategy:)`` instead to
 /// route by NIP-65, and ``NostrSubscriptionsAPI`` for live streams rather than one-time fetches.
 public struct NostrEventsAPI: NostrEventPublishing, NostrEventFetching {
     let client: NostrClient
@@ -156,15 +157,32 @@ public struct NostrEventsAPI: NostrEventPublishing, NostrEventFetching {
         try await signAndPublish(strategy: strategy) { .report(pubkey: $0, event: event, type: type, reason: reason) }
     }
 
-    /// Publishes a raw signed event.
+    /// Publishes an already-signed event, to the whole pool or to chosen relays.
+    ///
+    /// `relayURLs` is nil (the default) to broadcast to the whole pool, or relay URL strings to
+    /// target a subset — for example, an event signed by a separate key that should reach only a
+    /// few named relays. Targets are normalized the way ``NostrRelaysAPI/add(_:config:)`` keys
+    /// the pool and de-duplicate by that key; an empty array always throws, so an
+    /// accidentally-empty computed list never fans out to the whole pool. Targets not in the pool
+    /// are skipped, not connected on demand: add them with ``NostrRelaysAPI/add(_:config:)`` first.
     /// - Parameters:
-    ///   - event: The already-signed event to broadcast.
+    ///   - event: The already-signed event to publish.
+    ///   - relayURLs: The relays to publish to, or nil for the whole pool.
     ///   - strategy: How many relay acknowledgments to wait for before returning
     ///     (default: the pool config's ``RelayPoolConfig/defaultPublishStrategy``).
-    /// - Returns: The per-relay outcome of the publish.
+    /// - Returns: The per-relay outcome of the publish, keyed by canonical relay URL.
+    /// - Throws: ``NostrError/invalidRelayURL(_:)`` for an invalid target string,
+    ///   ``NostrError/noRelaysInPool`` when broadcasting to an empty pool,
+    ///   ``NostrError/noMatchingRelays(_:)`` when none of the targeted URLs are in the pool
+    ///   (including an empty array), the last relay error if no targeted relay accepts the event,
+    ///   or ``NostrError/relayError(_:)`` if a `.quorum` strategy cannot be satisfied.
     @discardableResult
-    public func publish(_ event: Event, strategy: PublishStrategy? = nil) async throws -> PublishResult {
-        try await client.pool.publish(event, strategy: strategy)
+    public func publish(
+        _ event: Event,
+        to relayURLs: [String]? = nil,
+        strategy: PublishStrategy? = nil
+    ) async throws -> PublishResult {
+        try await client.pool.publish(event, toURLs: relayURLs.map(RelayURL.requireTargets), strategy: strategy)
     }
 
     // MARK: - Long-form content (NIP-23)
