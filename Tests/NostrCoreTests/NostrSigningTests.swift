@@ -9,7 +9,7 @@ struct NostrSigningTests {
         let keyPair = try KeyPair()
         let signer: any NostrSigning = EventSigner(keyPair: keyPair)
 
-        #expect(try await signer.publicKey == keyPair.publicKey.hex)
+        #expect(try await signer.publicKey == keyPair.publicKey)
     }
 
     @Test("signing through any NostrSigning produces a verifiable event")
@@ -33,8 +33,8 @@ struct NostrSigningTests {
         let aliceSigner: any NostrSigning = EventSigner(keyPair: alice)
         let bobSigner: any NostrSigning = EventSigner(keyPair: bob)
 
-        let ciphertext = try await aliceSigner.nip44Encrypt("secret", to: bob.publicKey.hex)
-        let plaintext = try await bobSigner.nip44Decrypt(ciphertext, from: alice.publicKey.hex)
+        let ciphertext = try await aliceSigner.nip44Encrypt("secret", to: bob.publicKey)
+        let plaintext = try await bobSigner.nip44Decrypt(ciphertext, from: alice.publicKey)
 
         #expect(plaintext == "secret")
     }
@@ -47,7 +47,7 @@ struct NostrSigningTests {
         let bobSigner = EventSigner(keyPair: bob)
 
         // Alice encrypts to Bob; Bob decrypts from Alice.
-        let ciphertext = try aliceSigner.nip44Encrypt("gm", to: bob.publicKey.hex)
-        #expect(try bobSigner.nip44Decrypt(ciphertext, from: alice.publicKey.hex) == "gm")
+        let ciphertext = try aliceSigner.nip44Encrypt("gm", to: bob.publicKey)
+        #expect(try bobSigner.nip44Decrypt(ciphertext, from: alice.publicKey) == "gm")
     }
 }

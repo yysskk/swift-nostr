@@ -84,7 +84,7 @@ struct NostrClientNamespaceTests {
 
         let peer = try KeyPair()
         let payload = try await identity.nip44Encrypt("sealed", to: peer.publicKey.hex)
-        #expect(try EventSigner(keyPair: peer).nip44Decrypt(payload, from: keyPair.publicKey.hex) == "sealed")
+        #expect(try EventSigner(keyPair: peer).nip44Decrypt(payload, from: keyPair.publicKey) == "sealed")
         #expect(try await identity.nip44Decrypt(payload, from: peer.publicKey.hex) == "sealed")
 
         await client.relays.disconnect()
@@ -201,7 +201,7 @@ struct NostrClientNamespaceTests {
         let (client, socket) = try await ConnectedClientFixture.make()
         try await client.identity.setPrivateKey(try KeyPair().privateKeyHex)
         let lists: any NostrListManaging = client.lists
-        let bookmarks = NostrList(kind: .bookmarkList, publicItems: [.event("noteid")])
+        let bookmarks = NostrList(kind: .bookmarkList, publicItems: [.event(.fixture("note"))])
 
         let published = try await PublishAckSupport.acknowledgingPublishes(on: socket) {
             try await lists.publish(bookmarks, strategy: nil)

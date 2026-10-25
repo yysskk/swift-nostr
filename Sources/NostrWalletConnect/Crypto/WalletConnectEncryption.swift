@@ -35,7 +35,7 @@ struct WalletConnectCipher: Sendable {
     func encrypt(_ plaintext: String, recipientPubkey: String, sender: KeyPair) throws -> String {
         switch scheme {
         case .nip44:
-            return try SealedMessage.seal(plaintext, for: recipientPubkey, using: sender).payload
+            return try SealedMessage.seal(plaintext, for: PublicKey(hex: recipientPubkey), using: sender).payload
         case .nip04:
             let peer = try xOnlyKey(recipientPubkey)
             return try NIP04.encrypt(plaintext, privateKey: sender.privateKey, peerPubkeyXOnly: peer)
@@ -51,7 +51,7 @@ struct WalletConnectCipher: Sendable {
     func decrypt(_ payload: String, senderPubkey: String, recipient: KeyPair) throws -> String {
         switch scheme {
         case .nip44:
-            return try SealedMessage(payload: payload).open(from: senderPubkey, using: recipient)
+            return try SealedMessage(payload: payload).open(from: PublicKey(hex: senderPubkey), using: recipient)
         case .nip04:
             let peer = try xOnlyKey(senderPubkey)
             return try NIP04.decrypt(payload, privateKey: recipient.privateKey, peerPubkeyXOnly: peer)

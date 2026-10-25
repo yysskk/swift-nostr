@@ -6,11 +6,13 @@ public import NostrCore
 /// ``sign(_:)``, ``nip44Encrypt(_:to:)``, and ``nip44Decrypt(_:from:)`` already satisfy the protocol
 /// as declared on ``RemoteSigner``; only ``publicKey`` is added here, mapping to the user's key.
 extension RemoteSigner: NostrSigning {
-    /// The user's public key, hex-encoded (via `get_public_key`).
+    /// The user's public key (via `get_public_key`).
     ///
     /// This is the user key the signer authors events under, not the client/session key. The value
-    /// is cached by ``userPublicKey()`` after the first fetch.
-    public var publicKey: String {
-        get async throws { try await userPublicKey() }
+    /// is cached after the first fetch, shared with ``userPublicKey()``.
+    /// - Throws: ``RemoteSignerError/responseValidationFailed`` if the signer replies with anything
+    ///   but a canonical hex public key.
+    public var publicKey: PublicKey {
+        get async throws { try await fetchUserPublicKey() }
     }
 }

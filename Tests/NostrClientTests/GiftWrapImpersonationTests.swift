@@ -39,7 +39,7 @@ struct GiftWrapImpersonationTests {
     private func wrap(
         rumorJSON: String,
         sender: KeyPair,
-        recipientPubkey: String
+        recipientPubkey: PublicKey
     ) throws -> Event {
         let senderSigner = EventSigner(keyPair: sender)
         let seal = try senderSigner.sign(
@@ -56,7 +56,7 @@ struct GiftWrapImpersonationTests {
         let ephemeral = EventSigner(keyPair: try KeyPair())
         return try ephemeral.sign(
             UnsignedEvent(
-                pubkey: try PublicKey(hex: ephemeral.publicKey),
+                pubkey: ephemeral.publicKey,
                 createdAt: Int64(Date().timeIntervalSince1970) - 60,
                 kind: .giftWrap,
                 tags: [Tag.pubkey(recipientPubkey)],
@@ -91,7 +91,7 @@ struct GiftWrapImpersonationTests {
             content: forged.content
         )
 
-        let giftWrap = try wrap(rumorJSON: rumor, sender: mallory, recipientPubkey: bob.publicKey.hex)
+        let giftWrap = try wrap(rumorJSON: rumor, sender: mallory, recipientPubkey: bob.publicKey)
 
         await #expect(throws: NostrError.verificationFailed) {
             try await GiftWrap.unwrap(giftWrap: giftWrap, recipient: EventSigner(keyPair: bob))
@@ -115,7 +115,7 @@ struct GiftWrapImpersonationTests {
             content: "hello"
         )
 
-        let giftWrap = try wrap(rumorJSON: rumor, sender: alice, recipientPubkey: bob.publicKey.hex)
+        let giftWrap = try wrap(rumorJSON: rumor, sender: alice, recipientPubkey: bob.publicKey)
 
         await #expect(throws: NostrError.invalidEventID) {
             try await GiftWrap.unwrap(giftWrap: giftWrap, recipient: EventSigner(keyPair: bob))
@@ -146,7 +146,7 @@ struct GiftWrapImpersonationTests {
             content: forged.content
         )
 
-        let giftWrap = try wrap(rumorJSON: rumor, sender: mallory, recipientPubkey: bob.publicKey.hex)
+        let giftWrap = try wrap(rumorJSON: rumor, sender: mallory, recipientPubkey: bob.publicKey)
 
         await #expect(throws: NostrError.verificationFailed) {
             try await GiftWrap.unwrap(giftWrap: giftWrap, recipient: EventSigner(keyPair: bob))
@@ -176,7 +176,7 @@ struct GiftWrapImpersonationTests {
             content: event.content
         )
 
-        let giftWrap = try wrap(rumorJSON: rumor, sender: alice, recipientPubkey: bob.publicKey.hex)
+        let giftWrap = try wrap(rumorJSON: rumor, sender: alice, recipientPubkey: bob.publicKey)
         let unwrapped = try await GiftWrap.unwrap(
             giftWrap: giftWrap, recipient: EventSigner(keyPair: bob))
 

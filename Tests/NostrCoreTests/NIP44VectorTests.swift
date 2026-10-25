@@ -134,14 +134,14 @@ struct NIP44VectorTests {
 
         let sealed = try SealedMessage.seal(
             vector.plaintext,
-            for: recipient.publicKey.hex,
+            for: recipient.publicKey,
             using: sender,
             nonce: nonce
         )
         #expect(sealed.payload == vector.payload)
 
         let opened = try SealedMessage(payload: vector.payload).open(
-            from: sender.publicKey.hex,
+            from: sender.publicKey,
             using: recipient
         )
         #expect(Data(opened.utf8) == Data(vector.plaintext.utf8))

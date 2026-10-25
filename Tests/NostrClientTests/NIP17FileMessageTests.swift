@@ -59,7 +59,7 @@ struct NIP17FileMessageTests {
         #expect(rumor.kind == .fileMessage)
         #expect(rumor.content == "https://files.example.com/1")
         #expect(rumor.signature == nil)  // NIP-17 rumors are never signed
-        #expect(rumor.referencedPubkeys == [recipient.publicKey.hex])
+        #expect(rumor.referencedPubkeys == [recipient.publicKey])
         #expect(rumor.firstTagValue(named: "file-type") == "image/png")
         #expect(rumor.firstTagValue(named: "encryption-algorithm") == "aes-gcm")
         #expect(rumor.firstTagValue(named: "decryption-key") == encrypted.key.base64EncodedString())
@@ -156,7 +156,7 @@ struct NIP17FileMessageTests {
         // Hand-built kind-15 rumor missing the decryption-key/nonce tags.
         let rumor = try UnsignedEvent(
             pubkey: sender.publicKey, kind: .fileMessage,
-            tags: [.pubkey(recipient.publicKey.hex), Tag(name: "file-type", values: ["image/png"])],
+            tags: [.pubkey(recipient.publicKey), Tag(name: "file-type", values: ["image/png"])],
             content: "https://files.example.com/1"
         ).asRumor()
         let giftWrap = try await GiftWrap.wrap(
@@ -204,7 +204,7 @@ struct NIP17FileMessageTests {
         let rumor = try UnsignedEvent(
             pubkey: sender.publicKey, kind: .fileMessage,
             tags: [
-                .pubkey(recipient.publicKey.hex),
+                .pubkey(recipient.publicKey),
                 Tag(name: "decryption-key", values: [key.base64EncodedString()]),
                 Tag(name: "decryption-nonce", values: [nonce.base64EncodedString()]),
             ],

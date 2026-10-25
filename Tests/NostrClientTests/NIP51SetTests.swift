@@ -1,5 +1,6 @@
 import Foundation
 import NostrCore
+import NostrTestSupport
 import Testing
 
 @testable import NostrClient
@@ -54,8 +55,8 @@ struct NIP51SetTests {
     @Test("signSet then openSet restores metadata and items")
     func signOpenRoundTrip() throws {
         let signer = EventSigner(keyPair: try KeyPair())
-        let publicItems: [Event.Tag] = [.event("public-note-id"), .hashtag("nostr")]
-        let privateItems: [Event.Tag] = [.event("private-note-id"), .word("secret-word")]
+        let publicItems: [Event.Tag] = [.event(EventID.fixture("public-note-id")), .hashtag("nostr")]
+        let privateItems: [Event.Tag] = [.event(EventID.fixture("private-note-id")), .word("secret-word")]
         let set = try NostrListSet(
             kind: .bookmarkSet,
             identifier: "reading",
@@ -145,7 +146,7 @@ struct NIP51SetTests {
         let signer = EventSigner(keyPair: try KeyPair())
         let event = try signer.sign(
             UnsignedEvent(
-                pubkey: try PublicKey(hex: signer.publicKey), kind: .bookmarkSet, tags: [.hashtag("nostr")], content: ""
+                pubkey: signer.publicKey, kind: .bookmarkSet, tags: [.hashtag("nostr")], content: ""
             )
         )
         #expect(throws: (any Error).self) {
@@ -192,9 +193,9 @@ struct NIP51SetTests {
         let set = try NostrListSet(kind: .bookmarkSet, identifier: "reading")
         let event = try signer.signSet(set)
 
-        let naddr = try set.naddr(author: signer.publicKey)
+        let naddr = try set.naddr(author: signer.publicKey.hex)
         #expect(naddr.identifier == "reading")
-        #expect(naddr.author == signer.publicKey)
+        #expect(naddr.author == signer.publicKey.hex)
         #expect(naddr.kind == 30003)
 
         // Round-trips through its bech32 encoding.

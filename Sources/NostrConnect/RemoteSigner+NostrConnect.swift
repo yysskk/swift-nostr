@@ -61,6 +61,6 @@ extension RemoteSigner {
     ///   ``RemoteSignerError/notConnected`` if the session is torn down, or a transport error.
     @discardableResult
     public func awaitConnection() async throws -> String {
-        try await discoverSigner()
+        try await discoverSigner().hex
     }
 }

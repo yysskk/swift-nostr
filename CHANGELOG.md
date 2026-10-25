@@ -29,11 +29,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Malformed events no longer decode** (breaking): an event whose `id`, `pubkey`, or `sig` is not
   canonical hex of the right length fails decoding rather than failing `verify()` later, so
   `RelayMessage.parse(_:)` throws for an `EVENT` frame carrying one and the relay connection drops it.
-  For the same reason `identity.setSigner(_:)` throws `invalidPublicKey` for a `NostrSigning` whose
-  `publicKey` is not canonical hex.
 - **`UnsignedEvent.pubkey` is a `PublicKey`, and `computedId` is now `computedID: EventID`**
   (breaking). The `pubkey:` parameters of `UnsignedEvent.init`, `Groups.joinRequest`,
   `Groups.leaveRequest`, `Groups.contentEvent`, and `Groups.moderationEvent` take a `PublicKey`.
+- **Filters take typed ids and public keys** (breaking): `Filter.ids` and `eventReferences` (`#e`)
+  are `[EventID]?`, `authors` and `pubkeyReferences` (`#p`) are `[PublicKey]?`, and the factories
+  `userNotes(pubkey:)`, `metadata(pubkeys:)`, `replies(to:)`, `mentions(pubkey:)`, `contactList`,
+  `relayListMetadata`, and `directMessageRelayList` take them too. The wire format is unchanged —
+  each value encodes as its hex string — and decoding a filter whose `ids`, `authors`, `#e`, or `#p`
+  holds anything else fails.
+- **Tag builders take typed values, and tag accessors return them** (breaking): `Tag.event`,
+  `Tag.quote`, `Tag.pubkey` (both overloads), and `Tag.address` take an `EventID` and/or `PublicKey`
+  and write its hex. `Event.referencedEventIds` is renamed `referencedEventIDs` and returns
+  `[EventID]`; `referencedPubkeys` returns `[PublicKey]`. Tags are written by whoever authored the
+  event, so a value that is not canonical hex is skipped rather than returned.
+- **Signers deal in `PublicKey`** (breaking): `EventSigner.publicKey` and the `NostrSigning.publicKey`
+  requirement are `PublicKey`, and `nip44Encrypt(_:to:)` / `nip44Decrypt(_:from:)` take one — on
+  `EventSigner`, `NostrSigning`, and `RemoteSigner` alike — as do `SealedMessage.seal(_:for:using:)`
+  and `open(from:using:)`. `EventSigner.signDeletion(eventIds:reason:)` is now
+  `signDeletion(eventIDs:reason:)` taking `[EventID]`, and `signZapRequest` takes a `PublicKey`
+  recipient and an `eventID: EventID?` (was `eventId: String?`). A `RemoteSigner` parses the
+  signer's `get_public_key` reply and throws `RemoteSignerError.responseValidationFailed` for
+  anything but a canonical hex key, from both `publicKey` and `userPublicKey()`.
+- **`RelayMessage.ok` carries an `EventID`** (breaking): the case is now
+  `ok(eventID:accepted:message:)`. An `OK` frame whose id is not canonical hex cannot answer any
+  event this client sent, so `RelayMessage.parse(_:)` throws `invalidMessageFormat` for it, as it
+  does for other malformed frames, and the relay connection drops it.
+  `RelayConnection.authenticatedPubkeys` is a `Set<PublicKey>`.
+- **Third-party documents read their public keys leniently** (breaking):
+  `RelayInformation.pubkey` and `selfPubkey` (NIP-11) and `LNURLPayResponse.nostrPubkey` (NIP-57)
+  are `PublicKey?`. A value that is not a canonical hex key decodes as `nil` instead of failing the
+  whole document, so an LNURL endpoint advertising one no longer `supportsZaps`.
+- **NIP-29 groups use typed keys and ids** (breaking): `relayPubkey:` on the state parsers,
+  `Groups.ValidationError.unexpectedAuthor`, `Groups.Admin.pubkey`, `Groups.MemberList.members`,
+  `Groups.membership(of:in:)`, `ModerationAction.putUser` / `removeUser`, and
+  `previousReferences(from:excludingAuthor:…)` take `PublicKey`; `ModerationAction.deleteEvent(id:)`,
+  `PinnedItem.event(id:)`, `previousReference(forEventID:)`, and
+  `unknownPreviousReferences(of:knownEventIDs:)` take `EventID`. Parsing skips an admin, member, or
+  pinned event whose value is not canonical hex, and a moderation event whose `p` or `e` target is
+  malformed throws `missingTag` as if it were absent.
+- **`ProofOfWork.difficulty(ofHexId:)` is now `difficulty(of:)`**, taking an `EventID` (breaking).
+- **NostrClient's string-typed key and id parameters are validated** (breaking): APIs that still
+  take a hex public key or event id as a `String` — among them `subscriptions.userTimeline`,
+  `mentions`, and `metadata`, `events.fetchEvent(id:)`, `fetchMetadata(pubkey:)`,
+  `fetchLongFormContent(author:…)`, and `publishDeletion(eventIds:…)`, the `routing` and `lists`
+  fetches, `groups.fetchMetadata` / `fetchState`, `identity.nip44Encrypt` / `nip44Decrypt`,
+  `DirectMessageBuilder`, `GiftWrap.wrap`, and `EventSigner.signContactList` — throw
+  `invalidPublicKey` or `invalidEventID` for a value that is not 64 hex digits instead of sending it
+  on. Either case is still accepted.
 - **`KeyPair.publicKey` is a `PublicKey`** (breaking): `KeyPair.publicKeyHex` and `KeyPair.npub`
   are removed in favor of `publicKey.hex` and `publicKey.npub`; the raw bytes are `publicKey.data`.
 - **`EventSigner.npub` and `NostrIdentityAPI.npub` no longer throw** (breaking for conformers of

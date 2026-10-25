@@ -12,15 +12,15 @@ extension Groups {
     /// https://github.com/nostr-protocol/nips/blob/master/29.md
     public enum ModerationAction: Sendable, Hashable {
         /// kind 9000 — adds `pubkey` to the group and/or replaces their role names.
-        case putUser(pubkey: String, roles: [String])
+        case putUser(pubkey: PublicKey, roles: [String])
         /// kind 9001 — removes `pubkey` from the group.
-        case removeUser(pubkey: String)
+        case removeUser(pubkey: PublicKey)
         /// kind 9002 — replaces the group's metadata with `Metadata`'s ``Metadata/fieldTags``
         /// (the embedded ``Metadata/groupID`` is not emitted; the event's "h" tag carries the
         /// group).
         case editMetadata(Metadata)
         /// kind 9005 — deletes the event with this id from the group.
-        case deleteEvent(id: String)
+        case deleteEvent(id: EventID)
         /// kind 9007 — creates the group.
         case createGroup
         /// kind 9008 — deletes the group.
@@ -145,7 +145,7 @@ extension Groups {
                 groupID: groupID,
                 previous: previous,
                 reason: reason,
-                pubkey: try PublicKey(hex: await signer.publicKey),
+                pubkey: try await signer.publicKey,
                 createdAt: createdAt
             )
         )
@@ -186,7 +186,8 @@ extension Groups {
         ///   (including 9003, 9004, and 9006, which the spec leaves undefined),
         ///   ``ValidationError/missingGroupID(_:)`` when no non-empty "h" tag is present,
         ///   or ``ValidationError/missingTag(name:kind:)`` when a tag the kind requires is
-        ///   absent.
+        ///   absent. A "p" or "e" target whose value is not a canonical hex public key or event
+        ///   id counts as absent, and a pinned "e" item with such a value is skipped.
         public init(event: Event) throws {
             guard Self.moderationKinds.contains(event.kind) else {
                 throw ValidationError.unsupportedModerationKind(event.kind)
@@ -197,12 +198,14 @@ extension Groups {
 
             switch event.kind {
             case .groupPutUser:
-                guard let target = event.tags(named: "p").first, let pubkey = target.primaryValue else {
+                guard let target = event.tags(named: "p").first,
+                    let pubkey = target.primaryValue.flatMap(PublicKey.init)
+                else {
                     throw ValidationError.missingTag(name: "p", kind: event.kind)
                 }
                 action = .putUser(pubkey: pubkey, roles: Array(target.values.dropFirst()))
             case .groupRemoveUser:
-                guard let pubkey = event.firstTagValue(named: "p") else {
+                guard let pubkey = event.firstTagValue(named: "p").flatMap(PublicKey.init) else {
                     throw ValidationError.missingTag(name: "p", kind: event.kind)
                 }
                 action = .removeUser(pubkey: pubkey)
@@ -214,7 +217,7 @@ extension Groups {
                     )
                 )
             case .groupDeleteEvent:
-                guard let id = event.firstTagValue(named: "e") else {
+                guard let id = event.firstTagValue(named: "e").flatMap(EventID.init) else {
                     throw ValidationError.missingTag(name: "e", kind: event.kind)
                 }
                 action = .deleteEvent(id: id)
@@ -232,7 +235,7 @@ extension Groups {
                     event.structuredTags.compactMap { tag in
                         switch tag.name {
                         case "e":
-                            return tag.primaryValue.map { PinnedItem.event(id: $0) }
+                            return tag.primaryValue.flatMap(EventID.init).map { PinnedItem.event(id: $0) }
                         case "a":
                             return tag.primaryValue.map { PinnedItem.address($0) }
                         default:

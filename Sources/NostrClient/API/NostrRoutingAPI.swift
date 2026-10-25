@@ -14,15 +14,17 @@ public struct NostrRoutingAPI: NostrRelayRouting {
 
     /// Fetches a user's NIP-65 relay list (kind 10002), caching it (newer wins).
     /// - Returns: The relay list, or nil if none was found.
+    /// - Throws: ``NostrError/invalidPublicKey`` if `pubkey` is not a hex public key.
     public func fetchRelayList(for pubkey: String, timeout: TimeInterval = 10) async throws -> RelayListMetadata? {
+        let author = try PublicKey(callerHex: pubkey)
         let events = try await client.fetch(
-            filters: [.relayListMetadata(pubkey: pubkey)], toURLs: nil, timeout: timeout
+            filters: [.relayListMetadata(pubkey: author)], toURLs: nil, timeout: timeout
         )
         // Replaceable event: the newest list this pubkey actually signed. Taking the newest of
         // whatever arrived let any relay install a list for someone else by dating it far ahead.
         guard
             let newest = VerifiedEventSelection.newest(
-                in: events, kind: .relayListMetadata, author: pubkey),
+                in: events, kind: .relayListMetadata, author: author),
             let list = newest.relayListMetadata
         else {
             return nil
@@ -67,14 +69,16 @@ public struct NostrRoutingAPI: NostrRelayRouting {
     /// connects them per the gossip policy, and issues a single subscription scoped to those relays.
     /// If any author has no known relay list, the subscription falls back to the full relay pool so
     /// no author is silently dropped; the fallback throws ``NostrError/noRelaysInPool`` when the
-    /// pool is also empty.
+    /// pool is also empty. Throws ``NostrError/invalidPublicKey`` if an author is not a hex public
+    /// key.
     public func subscribeOutbox(
         authors: [String],
         kinds: [Event.Kind] = [.textNote],
         limit: Int? = nil
     ) async throws -> SubscriptionSequence {
+        let typedAuthors = try authors.map(PublicKey.init(callerHex:))
         let routeSet = await resolveOutboxRelays(authors: authors)
-        let filter = Filter(authors: authors, kinds: kinds, limit: limit)
+        let filter = Filter(authors: typedAuthors, kinds: kinds, limit: limit)
         return try await client.subscribe(filters: [filter], toURLs: routeSet)
     }
 
@@ -97,10 +101,10 @@ public struct NostrRoutingAPI: NostrRelayRouting {
 
         let referencedPubkeys = Set(event.referencedPubkeys)
         for pubkey in referencedPubkeys {
-            if await cachedRelayList(for: pubkey) == nil {
-                _ = try? await fetchRelayList(for: pubkey)
+            if await cachedRelayList(for: pubkey.hex) == nil {
+                _ = try? await fetchRelayList(for: pubkey.hex)
             }
-            targets.formUnion(await client.relayListStore.readRelayURLs(for: pubkey))
+            targets.formUnion(await client.relayListStore.readRelayURLs(for: pubkey.hex))
         }
 
         let available = await client.relayListStore.ensureConnected(targets)
@@ -119,8 +123,9 @@ public struct NostrRoutingAPI: NostrRelayRouting {
         for pubkey: String,
         timeout: TimeInterval = 10
     ) async throws -> DirectMessageRelayList? {
+        let author = try PublicKey(callerHex: pubkey)
         let events = try await client.fetch(
-            filters: [.directMessageRelayList(pubkey: pubkey)], toURLs: nil, timeout: timeout
+            filters: [.directMessageRelayList(pubkey: author)], toURLs: nil, timeout: timeout
         )
         // Replaceable event: the newest list this pubkey actually signed. This one decides where
         // their private messages are delivered, so an unverified copy would let a relay redirect
@@ -128,7 +133,7 @@ public struct NostrRoutingAPI: NostrRelayRouting {
         // whoever forged the list.
         guard
             let newest = VerifiedEventSelection.newest(
-                in: events, kind: .directMessageRelayList, author: pubkey),
+                in: events, kind: .directMessageRelayList, author: author),
             let list = newest.directMessageRelayList
         else {
             return nil

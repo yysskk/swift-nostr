@@ -1,5 +1,6 @@
 import Foundation
 import NostrCore
+import NostrTestSupport
 import Testing
 
 @testable import NostrConnect
@@ -50,13 +51,13 @@ struct RemoteSignerCommandsTests {
         #expect(request.params.isEmpty)
         try await transport.deliver(
             RemoteSignerFixtures.response(
-                requestID: request.id, result: "userpubhex", client: client, signer: signer))
+                requestID: request.id, result: PublicKey.fixture("user").hex, client: client, signer: signer))
         let resolved = try await first.value
-        #expect(resolved == "userpubhex")
+        #expect(resolved == PublicKey.fixture("user").hex)
 
         // The second call is served from cache — no new request event is sent.
         let cached = try await remote.userPublicKey()
-        #expect(cached == "userpubhex")
+        #expect(cached == PublicKey.fixture("user").hex)
         #expect(await transport.sentEvents.count == 2)
     }
 
@@ -177,17 +178,42 @@ struct RemoteSignerCommandsTests {
         await #expect(throws: RemoteSignerError.responseValidationFailed) { try await pong.value }
     }
 
+    /// The reply is whatever the signer chose to send, so anything but a canonical key is rejected
+    /// rather than handed back as the identity events would be authored under — and not cached.
+    @Test(
+        "userPublicKey rejects a reply that is not a canonical hex public key",
+        arguments: ["userpubhex", String(repeating: "A", count: 64), String(repeating: "0", count: 63)])
+    func userPublicKeyRejectsMalformedReply(reply: String) async throws {
+        let (remote, transport) = try await connected()
+
+        let first = Task { try await remote.userPublicKey() }
+        let request = try await nextRequest(transport)
+        try await transport.deliver(
+            RemoteSignerFixtures.response(requestID: request.id, result: reply, client: client, signer: signer))
+        await #expect(throws: RemoteSignerError.responseValidationFailed) { try await first.value }
+
+        // Nothing was cached: the next call asks the signer again.
+        let second = Task { try await remote.userPublicKey() }
+        let sent = try await RemoteSignerFixtures.waitForSentEvents(transport, count: 3)
+        let retry = try RemoteSignerFixtures.decryptRequest(sent[2], client: client, signer: signer)
+        #expect(retry.method == RemoteSignerMethod.getPublicKey.rawValue)
+        try await transport.deliver(
+            RemoteSignerFixtures.response(
+                requestID: retry.id, result: PublicKey.fixture("user").hex, client: client, signer: signer))
+        #expect(try await second.value == PublicKey.fixture("user").hex)
+    }
+
     // MARK: - nip44 / nip04
 
     @Test("nip44Encrypt sends third-party pubkey then plaintext and returns the ciphertext")
     func nip44EncryptRoundTrip() async throws {
         let (remote, transport) = try await connected()
-        let third = try KeyPair().publicKey.hex
+        let third = try KeyPair().publicKey
 
         let ciphertext = Task { try await remote.nip44Encrypt("secret message", to: third) }
         let request = try await nextRequest(transport)
         #expect(request.method == RemoteSignerMethod.nip44Encrypt.rawValue)
-        #expect(request.params == [third, "secret message"])
+        #expect(request.params == [third.hex, "secret message"])
         try await transport.deliver(
             RemoteSignerFixtures.response(
                 requestID: request.id, result: "cipher==", client: client, signer: signer))
@@ -198,12 +224,12 @@ struct RemoteSignerCommandsTests {
     @Test("nip44Decrypt sends third-party pubkey then ciphertext and returns the plaintext")
     func nip44DecryptRoundTrip() async throws {
         let (remote, transport) = try await connected()
-        let third = try KeyPair().publicKey.hex
+        let third = try KeyPair().publicKey
 
         let plaintext = Task { try await remote.nip44Decrypt("cipher==", from: third) }
         let request = try await nextRequest(transport)
         #expect(request.method == RemoteSignerMethod.nip44Decrypt.rawValue)
-        #expect(request.params == [third, "cipher=="])
+        #expect(request.params == [third.hex, "cipher=="])
         try await transport.deliver(
             RemoteSignerFixtures.response(
                 requestID: request.id, result: "plain text", client: client, signer: signer))

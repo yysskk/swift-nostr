@@ -22,7 +22,7 @@ enum RemoteSignerFixtures {
 
     /// Decrypts a request event the client sent to the signer, returning the request body.
     static func decryptRequest(_ event: Event, client: KeyPair, signer: KeyPair) throws -> RemoteSignerRequest {
-        let json = try SealedMessage(payload: event.content).open(from: client.publicKey.hex, using: signer)
+        let json = try SealedMessage(payload: event.content).open(from: client.publicKey, using: signer)
         return try JSONDecoder().decode(RemoteSignerRequest.self, from: Data(json.utf8))
     }
 
@@ -38,7 +38,7 @@ enum RemoteSignerFixtures {
         if let error { object["error"] = error }
         let json = String(
             decoding: try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys]), as: UTF8.self)
-        let sealed = try SealedMessage.seal(json, for: client.publicKey.hex, using: signer)
+        let sealed = try SealedMessage.seal(json, for: client.publicKey, using: signer)
         return Event(
             id: .fixture("resp-\(requestID)"),
             pubkey: signer.publicKey,

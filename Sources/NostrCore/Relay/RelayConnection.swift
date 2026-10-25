@@ -85,7 +85,7 @@ public actor RelayConnection {
     /// Pending continuations waiting for OK response after publish,
     /// keyed by event id and then by a per-publish token so concurrent
     /// publishes of the same event don't clobber each other's waiters
-    private var pendingPublishWaiters: [String: [UUID: AsyncThrowingStream<Void, any Error>.Continuation]] = [:]
+    private var pendingPublishWaiters: [EventID: [UUID: AsyncThrowingStream<Void, any Error>.Continuation]] = [:]
 
     /// Continuations waiting for a NIP-45 COUNT response, keyed by the generated
     /// COUNT subscription id. One waiter per subid: the ids are unique per
@@ -108,7 +108,7 @@ public actor RelayConnection {
     /// the set is emptied whenever the connection is torn down or re-established.
     /// Multiple pubkeys can be authenticated on one connection by calling
     /// ``authenticate(with:)`` once per identity.
-    public private(set) var authenticatedPubkeys: Set<String> = []
+    public private(set) var authenticatedPubkeys: Set<PublicKey> = []
 
     /// The error from the most recent automatic NIP-42 authentication attempt driven
     /// by the ``AuthenticationResponder``, or nil when none has failed.
@@ -125,7 +125,7 @@ public actor RelayConnection {
     /// lives only as long as its ``authenticate(with:)`` call: a failed or
     /// cancelled call removes it, so a late OK after a reported failure cannot
     /// silently flip the connection to authenticated.
-    var pendingAuthentications: [String: String] = [:]
+    var pendingAuthentications: [EventID: PublicKey] = [:]
 
     /// Answers AUTH challenges automatically when set (NIP-42). Configuration
     /// rather than session state: it survives reconnects, so challenges the
@@ -416,7 +416,7 @@ public actor RelayConnection {
     /// a success records the pubkey, wakes ``waitForAuthentication()`` callers,
     /// and re-requests subscriptions the relay closed with `auth-required:`; a
     /// rejection fails the waiters with the relay's status string.
-    func settleAuthentication(pubkey: String, accepted: Bool, message: String) {
+    func settleAuthentication(pubkey: PublicKey, accepted: Bool, message: String) {
         let waiters = authenticationWaiters.values
         authenticationWaiters.removeAll()
 
@@ -533,7 +533,7 @@ public actor RelayConnection {
         }
 
         do {
-            try await sendAndAwaitOK(.event(event), eventId: event.id.hex)
+            try await sendAndAwaitOK(.event(event), eventID: event.id)
         } catch let rejection as EventRejection {
             try await retryPublishAfterAuthentication(event, rejection: rejection)
         }
@@ -562,7 +562,7 @@ public actor RelayConnection {
         }
 
         do {
-            try await sendAndAwaitOK(.event(event), eventId: event.id.hex)
+            try await sendAndAwaitOK(.event(event), eventID: event.id)
         } catch let rejection as EventRejection {
             throw Self.rejectionError(rejection)
         }
@@ -571,7 +571,7 @@ public actor RelayConnection {
     /// The public error for an OK `false`, shared by every publish path so the
     /// message format stays identical with and without the NIP-42 retry.
     private static func rejectionError(_ rejection: EventRejection) -> NostrError {
-        NostrError.relayError("Relay rejected event \(rejection.eventId): \(rejection.message)")
+        NostrError.relayError("Relay rejected event \(rejection.eventID): \(rejection.message)")
     }
 
     /// Suspends until an AUTH round-trip on this connection succeeds, bounded
@@ -640,17 +640,17 @@ public actor RelayConnection {
 
         // Recorded before sending so the receive loop can mark the pubkey as
         // authenticated the moment the OK arrives while this call is in flight.
-        pendingAuthentications[event.id.hex] = event.pubkey.hex
+        pendingAuthentications[event.id] = event.pubkey
 
         do {
-            try await sendAndAwaitOK(.auth(event), eventId: event.id.hex)
+            try await sendAndAwaitOK(.auth(event), eventID: event.id)
         } catch let rejection as EventRejection {
             throw NostrError.authenticationFailed(rejection.message)
         } catch {
             // Once a failure (timeout, send error, cancellation) is reported to
             // the caller, a late OK must not silently flip the connection to
             // authenticated — drop the pending entry along with the error.
-            pendingAuthentications.removeValue(forKey: event.id.hex)
+            pendingAuthentications.removeValue(forKey: event.id)
             throw error
         }
     }
@@ -728,26 +728,26 @@ public actor RelayConnection {
         }
     }
 
-    /// Sends `message` and suspends until the relay's OK for `eventId` arrives,
+    /// Sends `message` and suspends until the relay's OK for `eventID` arrives,
     /// bounded by ``RelayConnectionConfig/publishAckTimeout``. Shared by
     /// ``publish(_:)`` and ``authenticate(with:)``.
     ///
     /// - Throws: ``EventRejection`` when the relay answers OK `false`,
     ///   ``NostrError/timeout`` when no OK arrives in time.
-    private func sendAndAwaitOK(_ message: ClientMessage, eventId: String) async throws {
+    private func sendAndAwaitOK(_ message: ClientMessage, eventID: EventID) async throws {
         let token = UUID()
         let (stream, continuation) = AsyncThrowingStream<Void, any Error>.makeStream()
-        pendingPublishWaiters[eventId, default: [:]][token] = continuation
+        pendingPublishWaiters[eventID, default: [:]][token] = continuation
 
         do {
             try await send(message)
         } catch {
-            removePublishWaiter(eventId: eventId, token: token)?.finish()
+            removePublishWaiter(eventID: eventID, token: token)?.finish()
             throw error
         }
 
         defer {
-            removePublishWaiter(eventId: eventId, token: token)?.finish()
+            removePublishWaiter(eventID: eventID, token: token)?.finish()
         }
 
         try await withThrowingTaskGroup(of: Void.self) { group in
@@ -770,23 +770,23 @@ public actor RelayConnection {
     /// Removes and returns a single publish waiter (called from within the actor).
     @discardableResult
     private func removePublishWaiter(
-        eventId: String,
+        eventID: EventID,
         token: UUID
     ) -> AsyncThrowingStream<Void, any Error>.Continuation? {
-        guard var waiters = pendingPublishWaiters[eventId] else { return nil }
+        guard var waiters = pendingPublishWaiters[eventID] else { return nil }
         let continuation = waiters.removeValue(forKey: token)
         if waiters.isEmpty {
-            pendingPublishWaiters.removeValue(forKey: eventId)
+            pendingPublishWaiters.removeValue(forKey: eventID)
         } else {
-            pendingPublishWaiters[eventId] = waiters
+            pendingPublishWaiters[eventID] = waiters
         }
         return continuation
     }
 
     /// Removes and returns all publish waiters for an event id —
     /// one OK from the relay satisfies every pending publish of that event.
-    func removeAllPublishWaiters(eventId: String) -> [AsyncThrowingStream<Void, any Error>.Continuation] {
-        guard let waiters = pendingPublishWaiters.removeValue(forKey: eventId) else { return [] }
+    func removeAllPublishWaiters(eventID: EventID) -> [AsyncThrowingStream<Void, any Error>.Continuation] {
+        guard let waiters = pendingPublishWaiters.removeValue(forKey: eventID) else { return [] }
         return Array(waiters.values)
     }
 
@@ -984,7 +984,7 @@ extension RelayConnection {
 /// its own vocabulary from the same wire response.
 struct EventRejection: Error, Sendable {
     /// The id of the rejected event.
-    let eventId: String
+    let eventID: EventID
 
     /// The relay's status string, e.g. `"restricted: not allowed to write"`.
     let message: String

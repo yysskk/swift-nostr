@@ -61,7 +61,7 @@ struct SealedMessageConversationKeyTests {
             )
         )
 
-        let sealed = try SealedMessage.seal("from Alice", for: bob.publicKey.hex, using: alice)
+        let sealed = try SealedMessage.seal("from Alice", for: bob.publicKey, using: alice)
 
         #expect(try sealed.open(conversationKey: key) == "from Alice")
     }
@@ -81,7 +81,7 @@ struct SealedMessageConversationKeyTests {
 
         let sealed = try SealedMessage.seal("to Bob", conversationKey: key)
 
-        #expect(try sealed.open(from: alice.publicKey.hex, using: bob) == "to Bob")
+        #expect(try sealed.open(from: alice.publicKey, using: bob) == "to Bob")
     }
 
     @Test(

@@ -14,19 +14,19 @@ import Testing
 private struct FakeRemoteSigner: NostrSigning {
     let keyPair: KeyPair
 
-    var publicKey: String {
-        get async throws { keyPair.publicKey.hex }
+    var publicKey: PublicKey {
+        get async throws { keyPair.publicKey }
     }
 
     func sign(_ event: UnsignedEvent) async throws -> Event {
         try EventSigner(keyPair: keyPair).sign(event)
     }
 
-    func nip44Encrypt(_ plaintext: String, to recipientPubkey: String) async throws -> String {
+    func nip44Encrypt(_ plaintext: String, to recipientPubkey: PublicKey) async throws -> String {
         try EventSigner(keyPair: keyPair).nip44Encrypt(plaintext, to: recipientPubkey)
     }
 
-    func nip44Decrypt(_ ciphertext: String, from senderPubkey: String) async throws -> String {
+    func nip44Decrypt(_ ciphertext: String, from senderPubkey: PublicKey) async throws -> String {
         try EventSigner(keyPair: keyPair).nip44Decrypt(ciphertext, from: senderPubkey)
     }
 }
@@ -108,7 +108,7 @@ struct NIP29GroupClientTests {
     ) throws -> Event {
         try signer.sign(
             UnsignedEvent(
-                pubkey: try PublicKey(hex: signer.publicKey),
+                pubkey: signer.publicKey,
                 createdAt: createdAt,
                 kind: kind,
                 tags: [.identifier(groupID)] + fieldTags,
@@ -222,7 +222,7 @@ struct NIP29GroupClientTests {
         let (client, socket) = makeClient()
         await client.identity.setSigner(EventSigner(keyPair: try KeyPair()))
         try await client.relays.connect(to: [groupRelayURL.absoluteString])
-        let member = try KeyPair().publicKey.hex
+        let member = try KeyPair().publicKey
 
         let group = GroupReference(relayURL: groupRelayURL.absoluteString, id: groupID)
         let moderationTask = Task {
@@ -320,7 +320,7 @@ struct NIP29GroupClientTests {
         let (client, socket) = makeClient()
         try await client.relays.connect(to: [groupRelayURL.absoluteString])
         let viaReference = GroupReference(
-            relayURL: groupRelayURL.absoluteString, id: groupID, relayPubkey: relaySigner.publicKey)
+            relayURL: groupRelayURL.absoluteString, id: groupID, relayPubkey: relaySigner.publicKey.hex)
         let metadata = try await answering(socket, with: [genuine, impostor]) {
             try await client.groups.fetchMetadata(for: viaReference)
         }
@@ -332,7 +332,7 @@ struct NIP29GroupClientTests {
         try await parameterClient.relays.connect(to: [groupRelayURL.absoluteString])
         let bare = GroupReference(relayURL: groupRelayURL.absoluteString, id: groupID)
         let parameterMetadata = try await answering(parameterSocket, with: [genuine, impostor]) {
-            try await parameterClient.groups.fetchMetadata(for: bare, authorPubkey: relaySigner.publicKey)
+            try await parameterClient.groups.fetchMetadata(for: bare, authorPubkey: relaySigner.publicKey.hex)
         }
         #expect(parameterMetadata?.name == "Genuine")
         await parameterClient.relays.disconnect()
@@ -365,7 +365,7 @@ struct NIP29GroupClientTests {
         let (client, socket) = makeClient()
         try await client.relays.connect(to: [groupRelayURL.absoluteString])
         let relaySigner = EventSigner(keyPair: try KeyPair())
-        let admin = try KeyPair().publicKey.hex
+        let admin = try KeyPair().publicKey
         let metadata = try stateEvent(
             kind: .groupMetadata, fieldTags: [Event.Tag(name: "name", values: ["Pizza Lovers"])],
             createdAt: 1_700_000_000, signer: relaySigner)
@@ -377,7 +377,7 @@ struct NIP29GroupClientTests {
             createdAt: 1_700_000_002, signer: relaySigner)
 
         let group = GroupReference(
-            relayURL: groupRelayURL.absoluteString, id: groupID, relayPubkey: relaySigner.publicKey)
+            relayURL: groupRelayURL.absoluteString, id: groupID, relayPubkey: relaySigner.publicKey.hex)
         let state = try await answering(socket, with: [metadata, admins, roles]) {
             try await client.groups.fetchState(for: group)
         }

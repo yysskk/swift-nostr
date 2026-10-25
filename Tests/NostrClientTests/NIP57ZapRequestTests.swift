@@ -1,5 +1,6 @@
 import Foundation
 import NostrCore
+import NostrTestSupport
 import Testing
 
 @testable import NostrClient
@@ -13,7 +14,7 @@ struct NIP57ZapRequestTests {
     func signZapRequest() throws {
         let signer = EventSigner(keyPair: try KeyPair())
         let event = try signer.signZapRequest(
-            recipientPubkey: "recipienthex",
+            recipientPubkey: .fixture("recipient"),
             relays: ["wss://relay1.example.com", "wss://relay2.example.com"],
             amountMillisats: 21000,
             lnurl: "lnurl1example",
@@ -21,7 +22,7 @@ struct NIP57ZapRequestTests {
 
         #expect(event.kind == .zapRequest)
         #expect(event.content == "great post")
-        #expect(event.referencedPubkeys == ["recipienthex"])
+        #expect(event.referencedPubkeys == [.fixture("recipient")])
         #expect(event.firstTagValue(named: "amount") == "21000")
         #expect(event.firstTagValue(named: "lnurl") == "lnurl1example")
         #expect(
@@ -35,18 +36,18 @@ struct NIP57ZapRequestTests {
     func zapRequestWithEvent() throws {
         let signer = EventSigner(keyPair: try KeyPair())
         let event = try signer.signZapRequest(
-            recipientPubkey: "rp", relays: ["wss://r.example.com"], eventId: "noteid")
-        #expect(event.referencedEventIds == ["noteid"])
+            recipientPubkey: .fixture("recipient"), relays: ["wss://r.example.com"], eventID: .fixture("note"))
+        #expect(event.referencedEventIDs == [.fixture("note")])
     }
 
     @Test("signZapRequest omits optional tags when not provided")
     func zapRequestMinimal() throws {
         let signer = EventSigner(keyPair: try KeyPair())
-        let event = try signer.signZapRequest(recipientPubkey: "rp", relays: ["wss://r.example.com"])
+        let event = try signer.signZapRequest(recipientPubkey: .fixture("recipient"), relays: ["wss://r.example.com"])
 
         #expect(event.firstTagValue(named: "amount") == nil)
         #expect(event.firstTagValue(named: "lnurl") == nil)
-        #expect(event.referencedEventIds.isEmpty)
+        #expect(event.referencedEventIDs.isEmpty)
         #expect(event.content.isEmpty)
     }
 
@@ -54,7 +55,7 @@ struct NIP57ZapRequestTests {
     func zapRequestRequiresRelay() throws {
         let signer = EventSigner(keyPair: try KeyPair())
         #expect(throws: NostrError.invalidData) {
-            _ = try signer.signZapRequest(recipientPubkey: "rp", relays: [])
+            _ = try signer.signZapRequest(recipientPubkey: .fixture("recipient"), relays: [])
         }
     }
 
@@ -62,7 +63,7 @@ struct NIP57ZapRequestTests {
     func zapRequestWithCoordinate() throws {
         let signer = EventSigner(keyPair: try KeyPair())
         let event = try signer.signZapRequest(
-            recipientPubkey: "rp", relays: ["wss://r.example.com"],
+            recipientPubkey: .fixture("recipient"), relays: ["wss://r.example.com"],
             eventCoordinate: "30023:author:identifier")
         #expect(event.firstTagValue(named: "a") == "30023:author:identifier")
     }
@@ -130,7 +131,7 @@ struct NIP57ZapRequestTests {
     func decodePayResponse() throws {
         let json = """
             {"callback":"https://example.com/lnurl/cb","minSendable":1000,"maxSendable":100000000,
-             "allowsNostr":true,"nostrPubkey":"abc123","commentAllowed":255,"tag":"payRequest"}
+             "allowsNostr":true,"nostrPubkey":"\(PublicKey.fixture("provider").hex)","commentAllowed":255,"tag":"payRequest"}
             """
         let response = try JSONDecoder().decode(LNURLPayResponse.self, from: Data(json.utf8))
 
@@ -155,11 +156,11 @@ struct NIP57ZapRequestTests {
         let signer = EventSigner(keyPair: try KeyPair())
         // A "+" in the comment exercises the strict query-value encoding.
         let zap = try signer.signZapRequest(
-            recipientPubkey: "rp", relays: ["wss://r.example.com"], amountMillisats: 21000,
+            recipientPubkey: .fixture("recipient"), relays: ["wss://r.example.com"], amountMillisats: 21000,
             comment: "tipping 1 + 1 sats")
         let response = LNURLPayResponse(
             callback: "https://example.com/cb", minSendable: 1000, maxSendable: 100_000,
-            allowsNostr: true, nostrPubkey: "np")
+            allowsNostr: true, nostrPubkey: .fixture("provider"))
 
         let url = try #require(
             response.invoiceRequestURL(amountMillisats: 21000, zapRequest: zap, lnurl: "lnurl1xyz"))

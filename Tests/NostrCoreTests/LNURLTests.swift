@@ -1,5 +1,6 @@
 import Foundation
 import NostrCore
+import NostrTestSupport
 import Testing
 
 @Suite("LNURL Tests")
@@ -56,7 +57,36 @@ struct LNURLTests {
         #expect(response.callback == "https://example.com/lnurl/cb")
         #expect(response.minSendable == 1000)
         #expect(response.maxSendable == 100_000_000)
+        #expect(response.nostrPubkey?.hex == "3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d")
         #expect(response.supportsZaps)
+    }
+
+    /// The response comes from a third-party endpoint: a malformed key must not cost the caller the
+    /// rest of it, but it must not count as a key receipts can be checked against either.
+    @Test(
+        "a malformed nostrPubkey decodes as nil and disables zaps",
+        arguments: [
+            #""nostrPubkey": "abc123""#,
+            #""nostrPubkey": "3BF0C63FCB93463407AF97A5E5EE64FA883D107EF9E558472C4EB9AAAEFA459D""#,
+            #""nostrPubkey": 42"#,
+        ])
+    func malformedNostrPubkeyIsDropped(field: String) throws {
+        let json = """
+            {
+                "callback": "https://example.com/lnurl/cb",
+                "minSendable": 1000,
+                "maxSendable": 100000000,
+                "allowsNostr": true,
+                \(field)
+            }
+            """
+
+        let response = try JSONDecoder().decode(LNURLPayResponse.self, from: Data(json.utf8))
+
+        #expect(response.callback == "https://example.com/lnurl/cb")
+        #expect(response.allowsNostr == true)
+        #expect(response.nostrPubkey == nil)
+        #expect(!response.supportsZaps)
     }
 
     @Test("supportsZaps is false without Nostr support")
@@ -81,13 +111,13 @@ struct LNURLTests {
             minSendable: 1000,
             maxSendable: 100_000_000,
             allowsNostr: true,
-            nostrPubkey: "3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d"
+            nostrPubkey: .fixture("provider")
         )
 
         let recipient = try KeyPair()
         let signer = EventSigner(keyPair: try KeyPair())
         let zapRequest = try signer.signZapRequest(
-            recipientPubkey: recipient.publicKey.hex,
+            recipientPubkey: recipient.publicKey,
             relays: ["wss://relay.example.com"],
             amountMillisats: 21000
         )

@@ -31,7 +31,7 @@ struct ProofOfWorkTests {
     @Test("spec example event has the difficulty stated by NIP-13")
     func specVectorDifficulty() throws {
         // 000006… = five zero nibbles (20 bits) then 0b0110 (one more leading zero) = 21 bits.
-        #expect(ProofOfWork.difficulty(ofHexId: try specEvent.id.hex) == 21)
+        #expect(ProofOfWork.difficulty(of: try specEvent.id) == 21)
     }
 
     @Test("spec example event validates at its committed target but not above it")
@@ -51,57 +51,30 @@ struct ProofOfWorkTests {
 
     // MARK: - Difficulty Edges
 
-    @Test("a fully-zero 64-char id is 256 bits")
-    func difficultyAllZeros() {
-        #expect(ProofOfWork.difficulty(ofHexId: String(repeating: "0", count: 64)) == 256)
+    /// An id that starts with `prefix` and is padded with `f` — a nibble with no leading zeros —
+    /// so the prefix alone decides the difficulty.
+    private func id(startingWith prefix: String) throws -> EventID {
+        try EventID(hex: prefix + String(repeating: "f", count: 64 - prefix.count))
+    }
+
+    @Test("a fully-zero id is 256 bits")
+    func difficultyAllZeros() throws {
+        #expect(ProofOfWork.difficulty(of: try EventID(hex: String(repeating: "0", count: 64))) == 256)
     }
 
     @Test("the first non-zero nibble sets the leading-zero count")
-    func difficultyNibbleTable() {
-        #expect(ProofOfWork.difficulty(ofHexId: "f00000") == 0)
-        #expect(ProofOfWork.difficulty(ofHexId: "700000") == 1)
-        #expect(ProofOfWork.difficulty(ofHexId: "100000") == 3)
-        #expect(ProofOfWork.difficulty(ofHexId: "0f0000") == 4)
+    func difficultyNibbleTable() throws {
+        #expect(ProofOfWork.difficulty(of: try id(startingWith: "f")) == 0)
+        #expect(ProofOfWork.difficulty(of: try id(startingWith: "7")) == 1)
+        #expect(ProofOfWork.difficulty(of: try id(startingWith: "1")) == 3)
+        #expect(ProofOfWork.difficulty(of: try id(startingWith: "0f")) == 4)
     }
 
-    @Test("an empty id is zero difficulty")
-    func difficultyEmpty() {
-        #expect(ProofOfWork.difficulty(ofHexId: "") == 0)
-    }
-
-    @Test("counting stops at the first non-hex character")
-    func difficultyStopsAtNonHex() {
-        #expect(ProofOfWork.difficulty(ofHexId: "00zz") == 8)
-    }
-
-    /// `Character.hexDigitValue` is non-nil for the Halfwidth and Fullwidth Forms of the hex
-    /// digits, so an id of fullwidth zeros counted as a fully-mined one. A real event id is
-    /// ASCII — the fullwidth spelling can only come from something crafted to look mined.
-    @Test("fullwidth digits are not hex digits")
-    func difficultyRejectsFullwidthDigits() {
-        // U+FF10 FULLWIDTH DIGIT ZERO, 64 of them: the shape of a maximally-mined id.
-        #expect(ProofOfWork.difficulty(ofHexId: String(repeating: "０", count: 64)) == 0)
-        // Counting stops there rather than continuing past it.
-        #expect(ProofOfWork.difficulty(ofHexId: "00０0") == 8)
-        // U+FF41 FULLWIDTH LATIN SMALL LETTER A and U+FF21 its uppercase.
-        #expect(ProofOfWork.difficulty(ofHexId: "00ａ") == 8)
-        #expect(ProofOfWork.difficulty(ofHexId: "00Ａ") == 8)
-    }
-
-    /// A client that filters on proof of work before verifying — the natural order, since the
-    /// hash is the cheap check — would otherwise accept a crafted id as maximally mined.
-    @Test("fullwidth zeros count for no difficulty and cannot form an event id")
-    func fullwidthDigitsAreNotWork() {
-        let fullwidthZeros = String(repeating: "０", count: 64)
-
-        #expect(ProofOfWork.difficulty(ofHexId: fullwidthZeros) == 0)
-        #expect(EventID(fullwidthZeros) == nil)
-    }
-
-    @Test("uppercase ASCII hex is still counted")
-    func difficultyAcceptsUppercaseASCII() {
-        #expect(ProofOfWork.difficulty(ofHexId: "00F0") == 8)
-        #expect(ProofOfWork.difficulty(ofHexId: "000A") == 12)
+    @Test("counting carries across byte boundaries and stops at the first set bit")
+    func difficultyAcrossBytes() throws {
+        #expect(ProofOfWork.difficulty(of: try id(startingWith: "0080")) == 8)
+        #expect(ProofOfWork.difficulty(of: try id(startingWith: "00000001")) == 31)
+        #expect(ProofOfWork.difficulty(of: try id(startingWith: "0000000010")) == 35)
     }
 
     // MARK: - Mining
@@ -114,7 +87,7 @@ struct ProofOfWorkTests {
 
     private func unsignedNote(for signer: EventSigner, tags: [Event.Tag] = []) throws -> UnsignedEvent {
         UnsignedEvent(
-            pubkey: try PublicKey(hex: signer.publicKey),
+            pubkey: signer.publicKey,
             createdAt: 1_700_000_000,
             kind: .textNote,
             tags: tags,
@@ -134,7 +107,7 @@ struct ProofOfWorkTests {
         #expect(nonceTags.first?[2] == String(difficulty))
 
         let signed = try signer.sign(mined)
-        #expect(ProofOfWork.difficulty(ofHexId: signed.id.hex) >= difficulty)
+        #expect(ProofOfWork.difficulty(of: signed.id) >= difficulty)
         #expect(try signed.verify())
         #expect(ProofOfWork.validate(event: signed, minimumDifficulty: difficulty))
     }
@@ -184,7 +157,7 @@ struct ProofOfWorkTests {
         let signer = try testSigner()
         let signed = try await signer.sign(try unsignedNote(for: signer), proofOfWork: 8)
 
-        #expect(ProofOfWork.difficulty(ofHexId: signed.id.hex) >= 8)
+        #expect(ProofOfWork.difficulty(of: signed.id) >= 8)
         #expect(try signed.verify())
         #expect(ProofOfWork.validate(event: signed, minimumDifficulty: 8))
     }

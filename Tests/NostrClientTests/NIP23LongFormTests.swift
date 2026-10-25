@@ -147,10 +147,10 @@ struct NIP23LongFormTests {
         let article = LongFormContent(identifier: "addressable-id")
         let event = try signer.signLongFormContent(article, draft: false)
 
-        let naddr = try article.naddr(author: signer.publicKey)
+        let naddr = try article.naddr(author: signer.publicKey.hex)
         let decoded = try NAddr(bech32String: naddr.encoded)
         #expect(decoded.identifier == "addressable-id")
-        #expect(decoded.author == signer.publicKey)
+        #expect(decoded.author == signer.publicKey.hex)
         #expect(decoded.kind == Event.Kind.longFormContent.rawValue)
 
         let fromEvent = try NAddr(event: event)
@@ -232,7 +232,7 @@ struct NIP23LongFormTests {
             publishedAt: Date(timeIntervalSince1970: 1_600_000_100)
         )
         let newerUnsigned = UnsignedEvent(
-            pubkey: try PublicKey(hex: signer.publicKey),
+            pubkey: signer.publicKey,
             createdAt: older.createdAt + 1000,
             kind: .longFormContent,
             rawTags: newerBase.toTags(),
@@ -252,7 +252,7 @@ struct NIP23LongFormTests {
         try await connection.connect()
 
         let task = Task {
-            try await client.events.fetchLongFormContent(author: signer.publicKey, identifier: "same-d", timeout: 2)
+            try await client.events.fetchLongFormContent(author: signer.publicKey.hex, identifier: "same-d", timeout: 2)
         }
 
         try await pollUntil { mock.sentTextFrames.contains { $0.hasPrefix("[\"REQ\"") } }
@@ -286,7 +286,7 @@ struct NIP23LongFormTests {
         try await connection.connect()
 
         // A relay hint matching the pooled relay: the fetch targets it (the new `to:` param).
-        let naddr = try article.naddr(author: signer.publicKey, relays: [relayURL.absoluteString])
+        let naddr = try article.naddr(author: signer.publicKey.hex, relays: [relayURL.absoluteString])
 
         let task = Task { try await client.events.fetchLongFormContent(naddr: naddr, timeout: 2) }
 

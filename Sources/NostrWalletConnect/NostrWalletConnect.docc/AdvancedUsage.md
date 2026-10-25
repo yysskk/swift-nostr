@@ -171,7 +171,7 @@ let lnurlPay = try JSONDecoder().decode(LNURLPayResponse.self, from: data)
 
 let signer = EventSigner(keyPair: try KeyPair(nsec: "nsec1..."))
 let zapRequest = try signer.signZapRequest(
-    recipientPubkey: "recipientPubkeyHex",
+    recipientPubkey: try PublicKey(npub: "npub1..."),
     relays: ["wss://relay.example.com"],
     amountMillisats: 21_000,
     lnurl: LNURL.encode(serviceURL))

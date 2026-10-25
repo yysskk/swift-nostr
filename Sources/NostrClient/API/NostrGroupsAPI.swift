@@ -165,7 +165,8 @@ public struct NostrGroupsAPI: NostrGroupManaging {
     ///   - authorPubkey: The relay pubkey to validate against, overriding `group.relayPubkey`.
     ///   - timeout: How long to wait for the relay's EOSE (default: 10 seconds).
     /// - Returns: The parsed metadata, or nil when the relay returned no usable event.
-    /// - Throws: ``Groups/ValidationError`` when the winning event does not parse, plus
+    /// - Throws: ``Groups/ValidationError`` when the winning event does not parse,
+    ///   ``NostrError/invalidPublicKey`` when the relay pubkey is not a hex public key, plus
     ///   anything the connection or fetch throws.
     public func fetchMetadata(
         for group: GroupReference,
@@ -173,7 +174,7 @@ public struct NostrGroupsAPI: NostrGroupManaging {
         timeout: TimeInterval = 10
     ) async throws -> Groups.Metadata? {
         let relayURL = try await ensureRelay(group)
-        let author = authorPubkey ?? group.relayPubkey
+        let author = try (authorPubkey ?? group.relayPubkey).map(PublicKey.init(callerHex:))
         let events = try await client.fetch(
             filters: [.groupState(groupID: group.id, kinds: [.groupMetadata])],
             toURLs: [relayURL],
@@ -197,7 +198,8 @@ public struct NostrGroupsAPI: NostrGroupManaging {
     ///   - authorPubkey: The relay pubkey to validate against, overriding `group.relayPubkey`.
     ///   - timeout: How long to wait for the relay's EOSE (default: 10 seconds).
     /// - Returns: The snapshot, with a nil field per kind the relay did not answer for.
-    /// - Throws: ``Groups/ValidationError`` when a winning event does not parse, plus
+    /// - Throws: ``Groups/ValidationError`` when a winning event does not parse,
+    ///   ``NostrError/invalidPublicKey`` when the relay pubkey is not a hex public key, plus
     ///   anything the connection or fetch throws.
     public func fetchState(
         for group: GroupReference,
@@ -205,7 +207,7 @@ public struct NostrGroupsAPI: NostrGroupManaging {
         timeout: TimeInterval = 10
     ) async throws -> GroupState {
         let relayURL = try await ensureRelay(group)
-        let author = authorPubkey ?? group.relayPubkey
+        let author = try (authorPubkey ?? group.relayPubkey).map(PublicKey.init(callerHex:))
         let events = try await client.fetch(
             filters: [.groupState(groupID: group.id)],
             toURLs: [relayURL],
@@ -353,7 +355,7 @@ public struct NostrGroupsAPI: NostrGroupManaging {
     /// so it goes through ``VerifiedEventSelection``. Without one — a group whose relay has not
     /// been identified yet — nothing can be verified against, so the newest of what arrived is
     /// taken as-is.
-    private static func newestStateEvent(ofKind kind: Event.Kind, in events: [Event], author: String?) -> Event? {
+    private static func newestStateEvent(ofKind kind: Event.Kind, in events: [Event], author: PublicKey?) -> Event? {
         guard author == nil else {
             return VerifiedEventSelection.newest(in: events, kind: kind, author: author)
         }

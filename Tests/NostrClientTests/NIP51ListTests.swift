@@ -1,5 +1,6 @@
 import Foundation
 import NostrCore
+import NostrTestSupport
 import Testing
 
 @testable import NostrClient
@@ -25,16 +26,16 @@ struct NIP51ListTests {
     @Test("address tag without relay")
     func addressTag() {
         #expect(
-            Event.Tag.address(kind: .longFormContent, pubkey: "pk", identifier: "d").rawArray
-                == ["a", "30023:pk:d"]
+            Event.Tag.address(kind: .longFormContent, pubkey: .fixture("pk"), identifier: "d").rawArray
+                == ["a", "30023:\(PublicKey.fixture("pk").hex):d"]
         )
     }
 
     @Test("address tag with relay")
     func addressTagWithRelay() {
         #expect(
-            Event.Tag.address(kind: .longFormContent, pubkey: "pk", identifier: "d", relayURL: "wss://r").rawArray
-                == ["a", "30023:pk:d", "wss://r"]
+            Event.Tag.address(kind: .longFormContent, pubkey: .fixture("pk"), identifier: "d", relayURL: "wss://r").rawArray
+                == ["a", "30023:\(PublicKey.fixture("pk").hex):d", "wss://r"]
         )
     }
 
@@ -48,8 +49,8 @@ struct NIP51ListTests {
     @Test("signList then openList restores public and private items")
     func signOpenRoundTrip() throws {
         let signer = EventSigner(keyPair: try KeyPair())
-        let publicItems: [Event.Tag] = [.event("public-note-id"), .hashtag("nostr")]
-        let privateItems: [Event.Tag] = [.event("private-note-id"), .word("secret-word")]
+        let publicItems: [Event.Tag] = [.event(EventID.fixture("public-note-id")), .hashtag("nostr")]
+        let privateItems: [Event.Tag] = [.event(EventID.fixture("private-note-id")), .word("secret-word")]
         let list = NostrList(kind: .bookmarkList, publicItems: publicItems, privateItems: privateItems)
 
         let event = try signer.signList(list)

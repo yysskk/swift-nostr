@@ -85,7 +85,7 @@ for await event in timeline.events {
 }
 
 // Custom filter, events only
-let filter = Filter(kinds: [1], authors: ["pubkey1"], limit: 100)
+let filter = Filter(authors: [try PublicKey(npub: "npub1...")], kinds: [1], limit: 100)
 for await event in try await client.subscriptions.events(filters: [filter]) {
     print("Received: \(event.id)")
 }
@@ -109,6 +109,6 @@ print("Name: \(metadata?.name ?? "Unknown")")
 
 // Fetch with custom filters
 let events = try await client.events.fetch(filters: [
-    Filter(kinds: [1], authors: ["pubkey1"], limit: 50)
+    Filter(authors: [try PublicKey(npub: "npub1...")], kinds: [1], limit: 50)
 ])
 ```

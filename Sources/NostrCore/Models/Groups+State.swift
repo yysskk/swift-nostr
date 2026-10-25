@@ -9,8 +9,8 @@ extension Groups {
         /// The event carries no group id: no non-empty "d" tag (relay-generated state) or
         /// "h" tag (moderation events).
         case missingGroupID(Event.Kind)
-        /// The event author is not the expected relay pubkey.
-        case unexpectedAuthor(expected: String, actual: String)
+        /// The event author is not the expected relay public key.
+        case unexpectedAuthor(expected: PublicKey, actual: PublicKey)
         /// The event lacks a tag the kind requires (e.g. a kind-9000 without "p").
         case missingTag(name: String, kind: Event.Kind)
         /// The kind is not one of the moderation kinds this library models (defined by the
@@ -38,13 +38,13 @@ extension Groups {
     fileprivate static func validatedGroupID(
         of event: Event,
         expecting kind: Event.Kind,
-        relayPubkey: String?
+        relayPubkey: PublicKey?
     ) throws -> String {
         guard event.kind == kind else {
             throw ValidationError.invalidEventKind(expected: kind, actual: event.kind)
         }
-        if let relayPubkey, event.pubkey.hex != relayPubkey {
-            throw ValidationError.unexpectedAuthor(expected: relayPubkey, actual: event.pubkey.hex)
+        if let relayPubkey, event.pubkey != relayPubkey {
+            throw ValidationError.unexpectedAuthor(expected: relayPubkey, actual: event.pubkey)
         }
         guard let groupID = event.firstTagValue(named: "d"), !groupID.isEmpty else {
             throw ValidationError.missingGroupID(kind)
@@ -153,10 +153,10 @@ extension Groups {
         ///
         /// - Parameters:
         ///   - event: The kind-39000 event to parse.
-        ///   - relayPubkey: The group relay's public key (hex); when given, an event by
+        ///   - relayPubkey: The group relay's public key; when given, an event by
         ///     any other author is rejected. Nil skips the author check.
         /// - Throws: ``ValidationError`` naming the first failed check.
-        public init(event: Event, relayPubkey: String? = nil) throws {
+        public init(event: Event, relayPubkey: PublicKey? = nil) throws {
             let groupID = try Groups.validatedGroupID(
                 of: event, expecting: .groupMetadata, relayPubkey: relayPubkey)
             self.init(groupID: groupID, fieldTags: event.structuredTags)
@@ -273,13 +273,14 @@ extension Groups {
 extension Groups {
     /// One admin of a kind-39001 list: `["p", pubkey, role...]`.
     public struct Admin: Sendable, Hashable {
-        /// The admin's public key (hex).
-        public var pubkey: String
+        /// The admin's public key.
+        public var pubkey: PublicKey
 
         /// The admin's role names, in order ([] for an admin listed without roles).
         public var roles: [String]
 
-        public init(pubkey: String, roles: [String] = []) {
+        /// Creates an admin entry for `pubkey` with the given role names.
+        public init(pubkey: PublicKey, roles: [String] = []) {
             self.pubkey = pubkey
             self.roles = roles
         }
@@ -302,19 +303,19 @@ extension Groups {
 
         /// Parses a relay-generated kind-39001 admin list event.
         ///
-        /// Never verifies the event signature — callers check ``Event/verify()``
+        /// A "p" tag whose value is not a canonical hex public key is skipped. Never verifies the event signature — callers check ``Event/verify()``
         /// themselves.
         ///
         /// - Parameters:
         ///   - event: The kind-39001 event to parse.
-        ///   - relayPubkey: The group relay's public key (hex); when given, an event by
+        ///   - relayPubkey: The group relay's public key; when given, an event by
         ///     any other author is rejected. Nil skips the author check.
         /// - Throws: ``ValidationError`` naming the first failed check.
-        public init(event: Event, relayPubkey: String? = nil) throws {
+        public init(event: Event, relayPubkey: PublicKey? = nil) throws {
             groupID = try Groups.validatedGroupID(
                 of: event, expecting: .groupAdmins, relayPubkey: relayPubkey)
             admins = event.tags(named: "p").compactMap { tag in
-                guard let pubkey = tag.primaryValue else { return nil }
+                guard let pubkey = tag.primaryValue.flatMap(PublicKey.init) else { return nil }
                 return Admin(pubkey: pubkey, roles: Array(tag.values.dropFirst()))
             }
         }
@@ -339,28 +340,29 @@ extension Groups {
         /// The group's id on its relay (the event's "d" tag).
         public var groupID: String
 
-        /// The listed members' public keys (hex), one per "p" tag, in order.
-        public var members: [String]
+        /// The listed members' public keys, one per "p" tag, in order.
+        public var members: [PublicKey]
 
-        public init(groupID: String, members: [String] = []) {
+        /// Creates a member list for the group `groupID`.
+        public init(groupID: String, members: [PublicKey] = []) {
             self.groupID = groupID
             self.members = members
         }
 
         /// Parses a relay-generated kind-39002 member list event.
         ///
-        /// Never verifies the event signature — callers check ``Event/verify()``
+        /// A "p" tag whose value is not a canonical hex public key is skipped. Never verifies the event signature — callers check ``Event/verify()``
         /// themselves.
         ///
         /// - Parameters:
         ///   - event: The kind-39002 event to parse.
-        ///   - relayPubkey: The group relay's public key (hex); when given, an event by
+        ///   - relayPubkey: The group relay's public key; when given, an event by
         ///     any other author is rejected. Nil skips the author check.
         /// - Throws: ``ValidationError`` naming the first failed check.
-        public init(event: Event, relayPubkey: String? = nil) throws {
+        public init(event: Event, relayPubkey: PublicKey? = nil) throws {
             groupID = try Groups.validatedGroupID(
                 of: event, expecting: .groupMembers, relayPubkey: relayPubkey)
-            members = event.tags(named: "p").compactMap(\.primaryValue)
+            members = event.tags(named: "p").compactMap { $0.primaryValue.flatMap(PublicKey.init) }
         }
 
         /// The complete wire tags of the kind-39002 event: `["d", groupID]` first, then
@@ -409,10 +411,10 @@ extension Groups {
         ///
         /// - Parameters:
         ///   - event: The kind-39003 event to parse.
-        ///   - relayPubkey: The group relay's public key (hex); when given, an event by
+        ///   - relayPubkey: The group relay's public key; when given, an event by
         ///     any other author is rejected. Nil skips the author check.
         /// - Throws: ``ValidationError`` naming the first failed check.
-        public init(event: Event, relayPubkey: String? = nil) throws {
+        public init(event: Event, relayPubkey: PublicKey? = nil) throws {
             groupID = try Groups.validatedGroupID(
                 of: event, expecting: .groupRoles, relayPubkey: relayPubkey)
             roles = event.tags(named: "role").compactMap { tag in
@@ -434,7 +436,7 @@ extension Groups {
     /// A pinned item of a kind-39005 pin list: an "e" event id or an "a" address.
     public enum PinnedItem: Sendable, Hashable {
         /// A pinned event, referenced by id in an "e" tag.
-        case event(id: String)
+        case event(id: EventID)
         /// A pinned addressable event, referenced by its "kind:pubkey:identifier"
         /// coordinate in an "a" tag.
         case address(String)
@@ -459,21 +461,21 @@ extension Groups {
 
         /// Parses a relay-generated kind-39005 pin list event.
         ///
-        /// Never verifies the event signature — callers check ``Event/verify()``
+        /// An "e" tag whose value is not a canonical hex event id is skipped. Never verifies the event signature — callers check ``Event/verify()``
         /// themselves.
         ///
         /// - Parameters:
         ///   - event: The kind-39005 event to parse.
-        ///   - relayPubkey: The group relay's public key (hex); when given, an event by
+        ///   - relayPubkey: The group relay's public key; when given, an event by
         ///     any other author is rejected. Nil skips the author check.
         /// - Throws: ``ValidationError`` naming the first failed check.
-        public init(event: Event, relayPubkey: String? = nil) throws {
+        public init(event: Event, relayPubkey: PublicKey? = nil) throws {
             groupID = try Groups.validatedGroupID(
                 of: event, expecting: .groupPinList, relayPubkey: relayPubkey)
             items = event.structuredTags.compactMap { tag in
                 switch tag.name {
                 case "e":
-                    return tag.primaryValue.map { PinnedItem.event(id: $0) }
+                    return tag.primaryValue.flatMap(EventID.init).map { PinnedItem.event(id: $0) }
                 case "a":
                     return tag.primaryValue.map { PinnedItem.address($0) }
                 default:
@@ -517,16 +519,16 @@ extension Groups {
     /// signatures — callers check ``Event/verify()`` themselves.
     ///
     /// - Parameters:
-    ///   - pubkey: The user's public key (hex).
+    ///   - pubkey: The user's public key.
     ///   - events: The group's moderation events, in any order.
     /// - Returns: ``Membership/member(roles:)`` with the roles from the winning
     ///   kind-9000 event's matching "p" tag, ``Membership/removed`` for a winning
     ///   kind-9001, or nil when no event targets `pubkey` — the spec says to assume
     ///   non-membership then.
-    public static func membership(of pubkey: String, in events: some Sequence<Event>) -> Membership? {
+    public static func membership(of pubkey: PublicKey, in events: some Sequence<Event>) -> Membership? {
         var latest: (event: Event, roles: [String])?
         for event in events where event.kind == .groupPutUser || event.kind == .groupRemoveUser {
-            guard let target = event.tags(named: "p").first(where: { $0.primaryValue == pubkey }) else {
+            guard let target = event.tags(named: "p").first(where: { $0.primaryValue == pubkey.hex }) else {
                 continue
             }
             if let current = latest?.event {

@@ -103,9 +103,9 @@ under the signer's public key and is never signed:
 ```swift
 let rumor = UnsignedEvent(
     pubkey: myPubkey, kind: Event.Kind(rawValue: 30_999),
-    tags: [.pubkey(recipientPubkey)], content: payload
+    tags: [.pubkey(recipient)], content: payload
 )
-try await client.messages.sendGiftWrapped(rumor, to: recipientPubkey)
+try await client.messages.sendGiftWrapped(rumor, to: recipient.hex)
 ```
 
 To build the gift wrap without publishing, use ``GiftWrap/wrap(event:signer:recipientPubkey:expiration:)``.
@@ -173,7 +173,7 @@ For lower-level access to encryption primitives:
 
 ```swift
 let senderKeyPair = try KeyPair()
-let recipientPubkey = "..."
+let recipientPubkey = try PublicKey(npub: "npub1...")
 
 // Seal a message (NIP-44)
 let sealed = try SealedMessage.seal(
@@ -479,7 +479,7 @@ samples them for you. Check inbound events' references against what you have see
 var recent: [Event] = []
 let timeline = try await client.groups.timeline(group)
 for await event in timeline.events {
-    let unknown = Groups.unknownPreviousReferences(of: event, knownEventIDs: recent.map(\.id.hex))
+    let unknown = Groups.unknownPreviousReferences(of: event, knownEventIDs: recent.map(\.id))
     if !unknown.isEmpty {
         print("timeline references I have not seen: \(unknown)")
     }
@@ -490,7 +490,8 @@ for await event in timeline.events {
 try await client.groups.publishMessage(
     "gm group",
     in: group,
-    previous: Groups.previousReferences(from: recent, excludingAuthor: await client.identity.publicKey)
+    previous: Groups.previousReferences(
+        from: recent, excludingAuthor: (await client.identity.publicKey).flatMap(PublicKey.init))
 )
 ```
 
@@ -533,7 +534,7 @@ list. To check your own standing, derive it from the kind-9000/9001 moderation h
 `Groups.membership(of:in:)` instead (the latest event targeting the pubkey wins):
 
 ```swift
-if let pubkey = await client.identity.publicKey {
+if let pubkey = (await client.identity.publicKey).flatMap(PublicKey.init) {
     var filter = Filter.groupTimeline(groupID: group.id, kinds: [.groupPutUser, .groupRemoveUser])
     filter.pubkeyReferences = [pubkey]
     let history = try await client.events.fetch(filters: [filter])
@@ -606,7 +607,8 @@ every pubkey it mentions in `p` tags, with ``NostrRoutingAPI/publishGossip(_:str
 
 ```swift
 let signer = EventSigner(keyPair: keyPair)
-let note = try signer.signTextNote(content: "gm!", tags: [.pubkey("alice_pubkey")])
+let alice = try PublicKey(npub: "npub1...")
+let note = try signer.signTextNote(content: "gm!", tags: [.pubkey(alice)])
 try await client.routing.publishGossip(note)
 ```
 
@@ -631,7 +633,7 @@ guard pay.supportsZaps, let providerPubkey = pay.nostrPubkey else { return }
 // 2. Sign a zap request (kind 9734) — note it is NOT published to relays.
 let signer = EventSigner(keyPair: keyPair)
 let zapRequest = try signer.signZapRequest(
-    recipientPubkey: "recipientPubkeyHex",
+    recipientPubkey: try PublicKey(npub: "npub1..."),
     relays: ["wss://relay.example.com"],     // where the recipient's wallet should publish the receipt
     amountMillisats: 21_000,
     lnurl: LNURL.encode(serviceURL),
@@ -648,7 +650,7 @@ if let invoice = Bolt11Invoice(bolt11) {
 
 // 4. When the kind-9735 zap receipt arrives over relays, verify it is authentic.
 if let receipt = ZapReceipt(event: receiptEvent) {
-    try receipt.validate(lnurlProviderPubkey: providerPubkey, expectedAmountMillisats: 21_000)
+    try receipt.validate(lnurlProviderPubkey: providerPubkey.hex, expectedAmountMillisats: 21_000)
     // receipt.recipientPubkey, receipt.amountMillisats, receipt.zappedEventId, …
 }
 ```
@@ -658,7 +660,7 @@ and `expectedAmountMillisats` fails against an invoice that names no amount. The
 commit to the zap request through its description hash; pass `requiringDescriptionHash: false` only
 for a provider known to omit it, accepting the loss of that binding.
 
-The ``EventSigner/signZapRequest(recipientPubkey:relays:amountMillisats:lnurl:eventId:eventCoordinate:comment:)``,
+The ``EventSigner/signZapRequest(recipientPubkey:relays:amountMillisats:lnurl:eventID:eventCoordinate:comment:)``,
 ``LNURLPayResponse/fetchInvoice(amountMillisats:zapRequest:lnurl:urlSession:)``, ``Bolt11Invoice``,
 and ``ZapReceipt/validate(lnurlProviderPubkey:expectedAmountMillisats:requiringDescriptionHash:)`` APIs each work standalone,
 so you can adopt only the parts of the flow you need.

@@ -42,7 +42,7 @@ public actor WalletConnection {
     private let config: Config
     private let keyPair: KeyPair
     private let signer: EventSigner
-    private let walletPubkey: String
+    private let walletPubkey: PublicKey
     private let clientPubkey: PublicKey
 
     /// Open notification streams, keyed so each can deregister on termination.
@@ -64,7 +64,11 @@ public actor WalletConnection {
         self.config = config
         self.keyPair = keyPair
         self.signer = EventSigner(keyPair: keyPair)
-        self.walletPubkey = uri.walletPubkey
+        // `WalletConnectURI` only holds a validated, lowercased 32-byte hex key.
+        guard let walletPubkey = PublicKey(uri.walletPubkey) else {
+            preconditionFailure("WalletConnectURI.walletPubkey is canonical hex")
+        }
+        self.walletPubkey = walletPubkey
         self.clientPubkey = keyPair.publicKey
         self.session = Session(
             transport: transport ?? RelayConnectionTransport(relayURLs: uri.relays),
@@ -246,14 +250,14 @@ public actor WalletConnection {
         let content: String
         do {
             let json = String(decoding: try JSONEncoder().encode(request), as: UTF8.self)
-            content = try WalletConnectCipher(scheme).encrypt(json, recipientPubkey: walletPubkey, sender: keyPair)
+            content = try WalletConnectCipher(scheme).encrypt(json, recipientPubkey: walletPubkey.hex, sender: keyPair)
         } catch {
             throw WalletConnectError.requestEncodingFailed
         }
 
         let expiration = Int64(Date().timeIntervalSince1970) + Int64(config.requestTimeout) + 10
         let tags: [[String]] = [
-            ["p", walletPubkey],
+            ["p", walletPubkey.hex],
             ["encryption", scheme.rawValue],
             ["expiration", String(expiration)],
         ]
@@ -272,7 +276,7 @@ public actor WalletConnection {
         // The relay filter already restricts authors, but enforce it here too as defense in depth —
         // and require the event to say what it was signed to say, so nothing downstream reads a
         // payload whose author has not actually vouched for it.
-        guard event.pubkey.hex == walletPubkey, (try? event.verify()) == true else { return }
+        guard event.pubkey == walletPubkey, (try? event.verify()) == true else { return }
         switch event.kind {
         case .walletConnectResponse:
             await handleResponse(event)
@@ -322,7 +326,7 @@ public actor WalletConnection {
 
             guard
                 let content = try? WalletConnectCipher(scheme).decrypt(
-                    event.content, senderPubkey: walletPubkey, recipient: keyPair)
+                    event.content, senderPubkey: walletPubkey.hex, recipient: keyPair)
             else {
                 // Nothing to preserve for a single-response request, so fail fast.
                 if request.expected == 1 {
@@ -370,7 +374,7 @@ public actor WalletConnection {
     private func handleNotification(_ event: Event, scheme: WalletConnectEncryption) {
         guard !notificationStreams.isEmpty,
             let content = try? WalletConnectCipher(scheme).decrypt(
-                event.content, senderPubkey: walletPubkey, recipient: keyPair),
+                event.content, senderPubkey: walletPubkey.hex, recipient: keyPair),
             let notification = WalletConnectNotification(content: content)
         else {
             return
@@ -394,7 +398,7 @@ public actor WalletConnection {
         Filter(
             authors: [walletPubkey],
             kinds: [.walletConnectResponse, .walletConnectNotification, .walletConnectNotificationLegacy],
-            pubkeyReferences: [clientPubkey.hex])
+            pubkeyReferences: [clientPubkey])
     }
 
     private var infoFilter: Filter {

@@ -1,5 +1,6 @@
 import Foundation
 import NostrCore
+import NostrTestSupport
 import Testing
 
 @testable import NostrClient
@@ -299,16 +300,16 @@ struct RelayListMetadataFilterTests {
 
     @Test("Relay list filter for single pubkey")
     func filterSinglePubkey() {
-        let filter = Filter.relayListMetadata(pubkey: "abc123")
-        #expect(filter.authors == ["abc123"])
+        let filter = Filter.relayListMetadata(pubkey: .fixture("abc123"))
+        #expect(filter.authors == [.fixture("abc123")])
         #expect(filter.kinds == [10002])
         #expect(filter.limit == 1)
     }
 
     @Test("Relay list filter for multiple pubkeys")
     func filterMultiplePubkeys() {
-        let filter = Filter.relayListMetadata(pubkeys: ["abc123", "def456"])
-        #expect(filter.authors == ["abc123", "def456"])
+        let filter = Filter.relayListMetadata(pubkeys: [.fixture("abc123"), .fixture("def456")])
+        #expect(filter.authors == [.fixture("abc123"), .fixture("def456")])
         #expect(filter.kinds == [10002])
         #expect(filter.limit == nil)
     }

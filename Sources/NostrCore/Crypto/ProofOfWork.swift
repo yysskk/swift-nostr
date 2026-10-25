@@ -3,28 +3,12 @@ import Foundation
 /// NIP-13 proof of work: leading-zero-bit difficulty over event ids, with mining and validation.
 /// https://github.com/nostr-protocol/nips/blob/master/13.md
 public enum ProofOfWork {
-    /// The number of leading zero bits in a hex-encoded event id.
-    ///
-    /// Each leading `0` hex character contributes four zero bits; the first non-zero nibble
-    /// contributes its own leading zeros (`1` → 3, `2`–`3` → 2, `4`–`7` → 1, `8`–`f` → 0) and then
-    /// counting stops. Counting also stops at the first character that is not an ASCII hex digit,
-    /// so a fully-zero id of length `n` returns `n * 4`.
-    public static func difficulty(ofHexId id: String) -> Int {
+    /// The number of leading zero bits in an event id, in `0...256`.
+    public static func difficulty(of id: EventID) -> Int {
         var count = 0
-        for character in id {
-            // Only ASCII counts. `hexDigitValue` also resolves the Halfwidth and Fullwidth Forms
-            // of the same digits, so an id written in fullwidth zeros would otherwise report a
-            // fully-mined 256 — free difficulty for anything that filters on proof of work before
-            // checking that the id is the real hash.
-            guard character.isASCII, let nibble = character.hexDigitValue else { break }
-            if nibble == 0 {
-                count += 4
-            } else {
-                // `leadingZeroBitCount` counts across the full Int width, so subtract everything
-                // above the low nibble to keep the four-bit view: e.g. 0b0001 → 3, 0b1000 → 0.
-                count += nibble.leadingZeroBitCount - (Int.bitWidth - 4)
-                break
-            }
+        for byte in id.data {
+            count += byte.leadingZeroBitCount
+            if byte != 0 { break }
         }
         return count
     }
@@ -36,7 +20,7 @@ public enum ProofOfWork {
     public static func validate(event: Event, minimumDifficulty: Int) -> Bool {
         guard minimumDifficulty > 0 else { return true }
 
-        guard difficulty(ofHexId: event.id.hex) >= minimumDifficulty else { return false }
+        guard difficulty(of: event.id) >= minimumDifficulty else { return false }
 
         // The committed target lives in the third element of the nonce tag; without it a merely
         // lucky id could masquerade as intentional work, so an absent or short commitment fails.
@@ -81,9 +65,8 @@ public enum ProofOfWork {
                 rawTags: strippedTags + [["nonce", String(nonce), target]],
                 content: event.content
             )
-            let id = try candidate.computedID.hex
             // `Self.` disambiguates from the `difficulty` parameter that shadows the method here.
-            if Self.difficulty(ofHexId: id) >= difficulty {
+            if Self.difficulty(of: try candidate.computedID) >= difficulty {
                 return candidate
             }
 

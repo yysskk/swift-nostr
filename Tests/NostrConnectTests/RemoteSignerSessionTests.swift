@@ -121,14 +121,14 @@ struct RemoteSignerSessionTests {
 
         // Answer them out of order to prove correlation is by id, not arrival order.
         for request in requests.reversed() {
-            let result = request.method == RemoteSignerMethod.ping.rawValue ? "pong" : "userpub"
+            let result = request.method == RemoteSignerMethod.ping.rawValue ? "pong" : PublicKey.fixture("user").hex
             try await transport.deliver(
                 RemoteSignerFixtures.response(
                     requestID: request.id, result: result, client: client, signer: signer))
         }
 
         let resolved = try await pubkey.value
-        #expect(resolved == "userpub")
+        #expect(resolved == PublicKey.fixture("user").hex)
         try await pong.value
     }
 
@@ -163,7 +163,7 @@ struct RemoteSignerSessionTests {
         // A response encrypted by a different keypair, authored by an impostor, must be dropped.
         let impostor = try KeyPair()
         let json = "{\"id\":\"\(request.id)\",\"result\":\"pong\"}"
-        let sealed = try SealedMessage.seal(json, for: client.publicKey.hex, using: impostor)
+        let sealed = try SealedMessage.seal(json, for: client.publicKey, using: impostor)
         let forged = Event(
             id: .fixture("forged"), pubkey: impostor.publicKey, createdAt: 0, kind: .nostrConnect,
             tags: [["p", client.publicKey.hex]], content: sealed.payload, signature: nil)
@@ -238,9 +238,9 @@ struct RemoteSignerSessionTests {
         try await Task.sleep(for: .milliseconds(500))
         try await transport.deliver(
             RemoteSignerFixtures.response(
-                requestID: request.id, result: "userpub", client: client, signer: signer))
+                requestID: request.id, result: PublicKey.fixture("user").hex, client: client, signer: signer))
         let resolved = try await pubkey.value
-        #expect(resolved == "userpub")
+        #expect(resolved == PublicKey.fixture("user").hex)
     }
 
     // MARK: - disconnect / logout

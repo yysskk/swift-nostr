@@ -36,12 +36,12 @@ public struct SealedMessage: Sendable {
     /// Seals a message for a recipient using NIP-44 encryption
     /// - Parameters:
     ///   - message: The plaintext message to seal
-    ///   - recipientPubkey: The recipient's public key (hex string)
+    ///   - recipientPubkey: The recipient's public key
     ///   - senderKeyPair: The sender's key pair
     /// - Returns: A SealedMessage containing the encrypted payload
     public static func seal(
         _ message: String,
-        for recipientPubkey: String,
+        for recipientPubkey: PublicKey,
         using senderKeyPair: KeyPair
     ) throws -> SealedMessage {
         // Generate a random 32-byte nonce, then delegate to the deterministic implementation.
@@ -56,23 +56,19 @@ public struct SealedMessage: Sendable {
     /// generates a fresh random nonce for every message as the spec requires.
     /// - Parameters:
     ///   - message: The plaintext message to seal.
-    ///   - recipientPubkey: The recipient's public key (hex string).
+    ///   - recipientPubkey: The recipient's public key.
     ///   - senderKeyPair: The sender's key pair.
     ///   - nonce: The 32-byte nonce to use.
     /// - Returns: A SealedMessage containing the encrypted payload.
     static func seal(
         _ message: String,
-        for recipientPubkey: String,
+        for recipientPubkey: PublicKey,
         using senderKeyPair: KeyPair,
         nonce: Data
     ) throws -> SealedMessage {
-        guard let recipientPubkeyData = Data(hexString: recipientPubkey) else {
-            throw NostrError.invalidPublicKey
-        }
-
         let conversationKey = try getConversationKey(
             senderPrivateKey: senderKeyPair.privateKey,
-            recipientPubkey: recipientPubkeyData
+            recipientPubkey: recipientPubkey.data
         )
 
         let payload = try encrypt(plaintext: message, conversationKey: conversationKey, nonce: nonce)
@@ -166,17 +162,13 @@ public struct SealedMessage: Sendable {
 
     /// Opens a sealed message from a sender
     /// - Parameters:
-    ///   - senderPubkey: The sender's public key (hex string)
+    ///   - senderPubkey: The sender's public key
     ///   - recipientKeyPair: The recipient's key pair
     /// - Returns: The decrypted plaintext message
-    public func open(from senderPubkey: String, using recipientKeyPair: KeyPair) throws -> String {
-        guard let senderPubkeyData = Data(hexString: senderPubkey) else {
-            throw NostrError.invalidPublicKey
-        }
-
+    public func open(from senderPubkey: PublicKey, using recipientKeyPair: KeyPair) throws -> String {
         let conversationKey = try Self.getConversationKey(
             senderPrivateKey: recipientKeyPair.privateKey,
-            recipientPubkey: senderPubkeyData
+            recipientPubkey: senderPubkey.data
         )
 
         return try Self.decrypt(payload: payload, conversationKey: conversationKey)

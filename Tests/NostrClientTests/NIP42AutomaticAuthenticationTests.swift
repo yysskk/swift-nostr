@@ -123,7 +123,7 @@ struct NIP42AutomaticAuthenticationTests {
 
         let sent = try await acknowledgeAuth(on: connection, mock: mock)
         #expect(sent.kind == .clientAuthentication)
-        #expect(sent.pubkey.hex == signer.publicKey)
+        #expect(sent.pubkey == signer.publicKey)
         #expect(sent.firstTagValue(named: "challenge") == "challengestringhere")
         #expect(await connection.authenticatedPubkeys == [signer.publicKey])
         await connection.disconnect()

@@ -101,7 +101,7 @@ struct EventKindTests {
     func signedEventsRoundTrip() throws {
         let signer = EventSigner(keyPair: try KeyPair())
         let unsigned = UnsignedEvent(
-            pubkey: try PublicKey(hex: signer.publicKey),
+            pubkey: signer.publicKey,
             kind: Event.Kind(rawValue: 31337),
             content: "custom kind"
         )

@@ -14,19 +14,19 @@ import Testing
 private struct MockRemoteSigner: NostrSigning {
     let keyPair: KeyPair
 
-    var publicKey: String {
-        get async throws { keyPair.publicKey.hex }
+    var publicKey: PublicKey {
+        get async throws { keyPair.publicKey }
     }
 
     func sign(_ event: UnsignedEvent) async throws -> Event {
         try EventSigner(keyPair: keyPair).sign(event)
     }
 
-    func nip44Encrypt(_ plaintext: String, to recipientPubkey: String) async throws -> String {
+    func nip44Encrypt(_ plaintext: String, to recipientPubkey: PublicKey) async throws -> String {
         try EventSigner(keyPair: keyPair).nip44Encrypt(plaintext, to: recipientPubkey)
     }
 
-    func nip44Decrypt(_ ciphertext: String, from senderPubkey: String) async throws -> String {
+    func nip44Decrypt(_ ciphertext: String, from senderPubkey: PublicKey) async throws -> String {
         try EventSigner(keyPair: keyPair).nip44Decrypt(ciphertext, from: senderPubkey)
     }
 }
@@ -119,9 +119,9 @@ struct NostrSigningClientTests {
         await client.identity.setSigner(EventSigner(keyPair: sender))
 
         let payload = try await client.identity.nip44Encrypt("to the peer", to: peer.publicKey.hex)
-        #expect(try EventSigner(keyPair: peer).nip44Decrypt(payload, from: sender.publicKey.hex) == "to the peer")
+        #expect(try EventSigner(keyPair: peer).nip44Decrypt(payload, from: sender.publicKey) == "to the peer")
 
-        let reply = try EventSigner(keyPair: peer).nip44Encrypt("from the peer", to: sender.publicKey.hex)
+        let reply = try EventSigner(keyPair: peer).nip44Encrypt("from the peer", to: sender.publicKey)
         #expect(try await client.identity.nip44Decrypt(reply, from: peer.publicKey.hex) == "from the peer")
     }
 
@@ -133,9 +133,9 @@ struct NostrSigningClientTests {
         try await client.identity.setSigner(MockRemoteSigner(keyPair: sender) as any NostrSigning)
 
         let payload = try await client.identity.nip44Encrypt("to the peer", to: peer.publicKey.hex)
-        #expect(try EventSigner(keyPair: peer).nip44Decrypt(payload, from: sender.publicKey.hex) == "to the peer")
+        #expect(try EventSigner(keyPair: peer).nip44Decrypt(payload, from: sender.publicKey) == "to the peer")
 
-        let reply = try EventSigner(keyPair: peer).nip44Encrypt("from the peer", to: sender.publicKey.hex)
+        let reply = try EventSigner(keyPair: peer).nip44Encrypt("from the peer", to: sender.publicKey)
         #expect(try await client.identity.nip44Decrypt(reply, from: peer.publicKey.hex) == "from the peer")
     }
 
@@ -143,7 +143,7 @@ struct NostrSigningClientTests {
     func nip44WithoutSignerThrows() async throws {
         let (client, _) = makeClient()
         let peer = try KeyPair()
-        let payload = try EventSigner(keyPair: peer).nip44Encrypt("x", to: try KeyPair().publicKey.hex)
+        let payload = try EventSigner(keyPair: peer).nip44Encrypt("x", to: try KeyPair().publicKey)
 
         await #expect(throws: NostrError.signerNotSet) {
             try await client.identity.nip44Encrypt("x", to: peer.publicKey.hex)
@@ -206,8 +206,8 @@ struct NostrSigningClientTests {
 
         let list = NostrList(
             kind: .muteList,
-            publicItems: [.pubkey(String(repeating: "a", count: 64))],
-            privateItems: [.pubkey(String(repeating: "b", count: 64))]
+            publicItems: [.pubkey(.fixture("public"))],
+            privateItems: [.pubkey(.fixture("private"))]
         )
 
         let published = try await PublishAckSupport.acknowledgingPublishes(on: socket) {
