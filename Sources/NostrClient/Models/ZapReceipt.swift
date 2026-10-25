@@ -6,8 +6,8 @@ import NostrCore
 /// invoice has been paid, attesting to the payment.
 ///
 /// Wrap a kind-9735 event to read its fields, then call
-/// ``validate(lnurlProviderPubkey:expectedAmountMillisats:)`` to confirm the receipt is authentic and
-/// matches the zap you requested.
+/// ``validate(lnurlProviderPubkey:expectedAmountMillisats:requiringDescriptionHash:)`` to confirm the
+/// receipt is authentic and matches the zap you requested.
 /// https://github.com/nostr-protocol/nips/blob/master/57.md
 public struct ZapReceipt: Sendable, Hashable {
     /// The underlying kind-9735 event.
@@ -63,7 +63,8 @@ public struct ZapReceipt: Sendable, Hashable {
 // MARK: - Validation
 
 extension ZapReceipt {
-    /// The reason a zap receipt failed ``ZapReceipt/validate(lnurlProviderPubkey:expectedAmountMillisats:)``.
+    /// The reason a zap receipt failed
+    /// ``ZapReceipt/validate(lnurlProviderPubkey:expectedAmountMillisats:requiringDescriptionHash:)``.
     public enum ValidationError: Error, LocalizedError, Sendable, Equatable {
         /// The receipt was not signed by the recipient's LNURL provider.
         case payeePubkeyMismatch

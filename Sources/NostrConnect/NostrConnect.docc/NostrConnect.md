@@ -16,7 +16,7 @@ answers with the result. The user's private key never leaves the signer.
 
 - Actor-based ``RemoteSigner`` with full `Sendable` compliance.
 - The signer-initiated `bunker://` connect handshake, with the connection secret presented
-  automatically.
+  automatically and any requested permissions sent along.
 - The client-initiated `nostrconnect://` flow: generate an invitation, then discover the signer from
   its first response after validating the invitation secret.
 - Typed commands: sign an event, fetch the user public key, ping, NIP-44/NIP-04 encrypt and

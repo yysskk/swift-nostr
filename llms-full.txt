@@ -642,10 +642,11 @@ NIP-49 password-encrypted private key (`ncryptsec1...`), protected with scrypt a
 - `ncryptsec: String` -- the bech32 `ncryptsec` string
 - `logN: UInt8` -- scrypt cost exponent recorded in the payload (N = 2^logN)
 - `keySecurity: KeySecurity` -- `.insecure` (0x00), `.secure` (0x01), or `.unknown` (0x02)
+- `static defaultMaximumLogN: UInt8` -- the default scrypt cost bound (18) for both encrypting and decrypting
 
 ### Encrypt and Decrypt
 
-Passwords are NFKC-normalized before key derivation. `logN` must be in `1...22` (default 16); a larger value throws `NostrError.unsupportedScryptCost`. A wrong password throws `NostrError.decryptionFailed`.
+Passwords are NFKC-normalized before key derivation. scrypt allocates 2^logN KiB, and the cost byte is chosen by whoever wrote the payload, so both sides are bounded: `encrypt` writes at most `maximumLogN` and `decrypt` spends at most `maxLogN`, both defaulting to `EncryptedPrivateKey.defaultMaximumLogN` (18, 256 MiB; NIP-49 permits up to 22). A cost outside the bound throws `NostrError.unsupportedScryptCost` before any derivation. Raise the bound only to write or open a deliberately costlier key; a parsed payload's `logN` is readable first. A wrong password throws `NostrError.decryptionFailed`.
 
 ```swift
 // Encrypt raw private-key bytes.
@@ -653,20 +654,22 @@ let encrypted = try EncryptedPrivateKey.encrypt(
     privateKey: keyPair.privateKey,
     password: "hunter2",
     logN: 16,                 // optional, default 16
-    keySecurity: .unknown     // optional, default .unknown
+    keySecurity: .unknown,    // optional, default .unknown
+    maximumLogN: 18           // optional, default EncryptedPrivateKey.defaultMaximumLogN
 )
 let ncryptsec = encrypted.ncryptsec
 
 // Parse and decrypt (decrypt returns the raw 32 bytes without validating the scalar).
 let parsed = try EncryptedPrivateKey(ncryptsec: ncryptsec)
-let privateKey = try parsed.decrypt(password: "hunter2")
+let privateKey = try parsed.decrypt(password: "hunter2")       // maxLogN defaults to 18
+let costly = try parsed.decrypt(password: "hunter2", maxLogN: 22)  // opt in to a costlier key
 ```
 
 ### KeyPair Convenience
 
 ```swift
 let encrypted = try keyPair.encryptedPrivateKey(password: "hunter2")
-let keyPair = try KeyPair(ncryptsec: "ncryptsec1...", password: "hunter2")  // validates the key
+let keyPair = try KeyPair(ncryptsec: "ncryptsec1...", password: "hunter2")  // validates the key; optional maxLogN:
 ```
 
 ## EventSigner
@@ -1433,6 +1436,13 @@ let config = RemoteSigner.Config(
     requestTimeout: 30,          // seconds to wait for a response before failing
     authChallengeTimeout: 300)   // seconds a request may stay pending after an auth_url challenge
 let tuned = try RemoteSigner(bunker: bunker, config: config)
+
+// Ask the signer to grant operations up front (sent as NIP-46 `perms` in the connect request), so
+// each one does not draw its own auth_url challenge. Empty by default, which omits them. A
+// nostrconnect:// session instead carries its permissions in the invitation URI.
+let authorized = try RemoteSigner(
+    bunker: bunker,
+    requesting: [.signEvent(kind: .textNote), .nip44Encrypt, .nip44Decrypt])
 
 // Connect, subscribe to responses, and perform the connect handshake (presents the bunker secret
 // when present). Commands call this automatically; call it to surface errors up front.

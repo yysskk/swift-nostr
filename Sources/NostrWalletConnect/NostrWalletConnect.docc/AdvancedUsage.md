@@ -187,7 +187,7 @@ print(zap.invoice, zap.preimage, zap.feesPaid ?? 0)
 An out-of-range amount is rejected before any wallet request is sent. The kind-9735 zap **receipt**
 is published by the LNURL provider to the zap request's relays — not to the wallet's NWC relay — so
 confirm it with `NostrClient` (subscribe to those relays and validate with
-`ZapReceipt(event:)?.validate(lnurlProviderPubkey:expectedAmountMillisats:)`).
+`ZapReceipt(event:)?.validate(lnurlProviderPubkey:expectedAmountMillisats:requiringDescriptionHash:)`).
 
 ## Custom Transport
 

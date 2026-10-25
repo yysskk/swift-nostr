@@ -32,8 +32,8 @@ extension WalletConnection {
     ///
     /// To confirm the recipient's LNURL provider published a matching kind-9735 zap receipt,
     /// subscribe to the zap request's relays with `NostrClient` and validate it with
-    /// `ZapReceipt(event:)?.validate(lnurlProviderPubkey:expectedAmountMillisats:)` — the receipt is
-    /// published to those relays, not to the wallet's NWC relay.
+    /// `ZapReceipt(event:)?.validate(lnurlProviderPubkey:expectedAmountMillisats:requiringDescriptionHash:)`
+    /// — the receipt is published to those relays, not to the wallet's NWC relay.
     /// https://github.com/nostr-protocol/nips/blob/master/57.md
     ///
     /// - Parameters:

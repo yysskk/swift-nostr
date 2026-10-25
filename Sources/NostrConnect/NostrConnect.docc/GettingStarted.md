@@ -48,6 +48,18 @@ To resume a previously authorized session, persist the client keypair and pass i
 let signer = try RemoteSigner(bunker: bunker, clientKeyPair: savedClientKeyPair)
 ```
 
+To have the signer grant operations up front rather than challenging the user for each, list them
+as ``RemoteSignerPermission`` values. They are sent in the `connect` request; requesting none (the
+default) leaves them out:
+
+```swift
+let signer = try RemoteSigner(
+    bunker: bunker,
+    requesting: [.signEvent(kind: .textNote), .nip44Encrypt, .nip44Decrypt])
+```
+
+A `nostrconnect://` invitation carries its permissions in the URI instead (see below).
+
 ## Start the Handshake From the Client
 
 Alternatively the *client* can begin the handshake with a `nostrconnect://` invitation. Generate one
