@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **NIP-44 encryption under a caller-supplied conversation key**:
+  `SealedMessage.seal(_:conversationKey:)` and `open(conversationKey:)` take the 32-byte conversation
+  key directly instead of deriving it from a key pair, so one ciphertext can be read by everyone
+  holding a shared key. The payload is standard NIP-44 v2 and a fresh random nonce is generated per
+  message; the nonce is not exposed, so callers cannot reuse one. Anyone holding the key can both
+  read and forge messages under it.
 - **A `bunker://` session can request permissions**: `RemoteSigner(bunker:clientKeyPair:requesting:…)`
   takes the `[RemoteSignerPermission]` to ask for, and sends them in NIP-46's `connect` call. They
   were modeled but never sent, so a session could not pre-authorize anything and every operation drew

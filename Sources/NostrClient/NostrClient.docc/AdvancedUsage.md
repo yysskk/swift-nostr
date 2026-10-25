@@ -168,6 +168,11 @@ let plaintext = try sealed.open(
     using: recipientKeyPair
 )
 
+// Seal and open under a caller-supplied 32-byte conversation key, e.g. one
+// shared by a group. Anyone holding the key can read and forge messages.
+let groupSealed = try SealedMessage.seal("group message", conversationKey: groupKey)
+let groupPlaintext = try groupSealed.open(conversationKey: groupKey)
+
 // Gift wrap an event (NIP-59). Both sides take any NostrSigning, so a remote
 // NIP-46 signer wraps and unwraps as well as a local key does.
 let wrapped = try await GiftWrap.wrap(
