@@ -10,7 +10,7 @@ The high-level `NostrClient` library provides an actor-based API for the Nostr n
 - `EncryptedPrivateKey`: NIP-49 password-encrypted private keys (`ncryptsec`), scrypt + XChaCha20-Poly1305
 - `Event` / `Filter` / `SubscriptionEvent`: NIP-01 data models
 - `RelayPool` / `RelayConnection`: multi-relay WebSocket management with auto-reconnect
-- `DirectMessage` / `DirectMessageReaction` / `DirectMessageFile` / `DirectMessagePayload` / `DirectMessageBuilder` / `DirectMessageParser`: NIP-17 private DMs, NIP-25 reactions, and kind 15 file messages
+- `DirectMessage` / `DirectMessageReaction` / `DirectMessageFile` / `DirectMessagePayload` / `DirectMessageBuilder` / `DirectMessageParser`: NIP-17 private DMs, NIP-25 reactions, and kind 15 file messages; `client.messages.sendGiftWrapped(_:to:)` delivers a rumor of any kind the same way
 - `EncryptedFile`: AES-256-GCM encryption for NIP-17 file messages
 - `Groups` / `GroupReference` / `GroupState`: NIP-29 relay-based groups — join/leave and chat with timeline references, moderation (kinds 9000-9002, 9005, 9007-9010), relay-signed state parsing (metadata/admins/members/roles/pins), naddr share links with invite codes
 - `SimpleGroupList` / `GroupListEntry`: the NIP-51 kind-10009 list of the NIP-29 groups a user is in (public + NIP-44-encrypted private entries)

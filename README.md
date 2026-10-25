@@ -159,6 +159,9 @@ for try await message in try await client.messages.subscribe() {
 
 // Send (encrypted, gift-wrapped, routed to each party's DM relays).
 try await client.messages.send("Hello privately!", to: "recipientPubkeyHex")
+
+// Any other rumor kind, wrapped and routed the same way.
+try await client.messages.sendGiftWrapped(rumor, to: "recipientPubkeyHex")
 ```
 
 Reactions (NIP-25), encrypted file messages (kind 15), and disappearing messages (NIP-40) build on the same flow — see [Advanced Usage](https://yysskk.github.io/swift-nostr/documentation/nostrclient/advancedusage).

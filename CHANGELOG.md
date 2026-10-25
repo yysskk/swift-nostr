@@ -14,6 +14,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   direct-message path, so it had no way to encrypt its own payloads to a peer. Both route through
   the signer set on `client.identity`, local or remote, and throw `signerNotSet` without one. With
   a remote signer each call is a relay round-trip.
+- **`NostrMessagesAPI.sendGiftWrapped(_:to:expiration:strategy:)` delivers a rumor of any kind
+  gift-wrapped**: the rumor is wrapped for the recipient and as a self-copy and routed exactly like
+  `send` — each addressee's kind-10050 DM relays, falling back to the pool. Private payloads other
+  than kinds 14, 15, and 7 no longer need the routing reimplemented. A rumor whose `pubkey` is not
+  the signer's throws `invalidPublicKey`, since the recipient's unwrap would reject it.
 - **NIP-44 encryption under a caller-supplied conversation key**:
   `SealedMessage.seal(_:conversationKey:)` and `open(conversationKey:)` take the 32-byte conversation
   key directly instead of deriving it from a key pair, so one ciphertext can be read by everyone
@@ -38,6 +43,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **`NostrIdentityProviding` requires `nip44Encrypt(_:to:)` and `nip44Decrypt(_:from:)`**
   (breaking): conforming types outside the package must implement both.
+- **`NostrMessaging` adds the requirement `sendGiftWrapped(_:to:expiration:strategy:)`**
+  (breaking): conforming types outside the package must implement it.
 - **The `NostrEventPublishing` requirement `publish(_:strategy:)` is now `publish(_:to:strategy:)`**
   (breaking): conforming types outside the package must add the `to relayURLs: [String]?` parameter.
   Call sites are unchanged, since `NostrEventsAPI` defaults it to nil.

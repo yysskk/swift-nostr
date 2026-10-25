@@ -156,8 +156,9 @@ public struct DirectMessageBuilder: Sendable {
     /// together. Any NIP-40 `expiration` is applied to both wraps so the copies expire in lockstep.
     ///
     /// The two wraps are independent seals, so they are built concurrently — with a remote signer
-    /// that halves the round-trips a send costs.
-    private func wrapWithSelfCopy(
+    /// that halves the round-trips a send costs. Internal so
+    /// ``NostrMessagesAPI/sendGiftWrapped(_:to:expiration:strategy:)`` can wrap a caller-built rumor.
+    func wrapWithSelfCopy(
         rumor: Event,
         senderPubkey: String,
         to recipientPubkey: String,

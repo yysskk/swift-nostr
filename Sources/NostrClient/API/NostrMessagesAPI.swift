@@ -1,8 +1,8 @@
 import Foundation
 import NostrCore
 
-/// NIP-17 private direct messages: gift-wrapped sends, reactions, files, and the streams that
-/// deliver them already unwrapped. Reached as ``NostrClient/messages``.
+/// NIP-17 private direct messages: gift-wrapped sends, reactions, files, rumors of any kind, and
+/// the streams that deliver them already unwrapped. Reached as ``NostrClient/messages``.
 ///
 /// Every send is routed by the addressee's NIP-17 DM relay list (kind 10050) via
 /// ``NostrClient/routing``, discovering and caching the list as needed and falling back to the
@@ -140,6 +140,47 @@ public struct NostrMessagesAPI: NostrMessaging {
         return try await deliver(result, to: recipientPubkey, strategy: strategy)
     }
 
+    /// Sends a rumor of any kind gift-wrapped (NIP-59), delivered like a NIP-17 direct message.
+    ///
+    /// The event is turned into an unsigned rumor and wrapped twice — for the recipient and as the
+    /// sender's self-copy — then routed exactly like
+    /// ``send(_:to:subject:replyTo:expiration:strategy:)``: to each addressee's kind-10050 DM
+    /// relays, falling back to the full pool. Use it for private payloads other than kinds 14, 15,
+    /// and 7. To build the gift wraps without publishing, use
+    /// ``GiftWrap/wrap(event:signer:recipientPubkey:expiration:)``.
+    /// - Parameters:
+    ///   - rumor: The event to deliver. Its `pubkey` must be the signer's public key; it is never
+    ///     signed.
+    ///   - recipientPubkey: The recipient's public key (hex).
+    ///   - expiration: Optional NIP-40 expiration applied to both gift wraps.
+    ///   - strategy: How many relay acknowledgments to wait for on the recipient gift wrap before
+    ///     returning (default: the pool config's ``RelayPoolConfig/defaultPublishStrategy``).
+    /// - Returns: The shared rumor, both gift wraps, and the per-relay publish outcomes.
+    /// - Throws: ``NostrError/invalidPublicKey`` when `rumor.pubkey` is not the signer's public key
+    ///   (the recipient's unwrap would reject it as an impersonation), or
+    ///   ``NostrError/noRelaysInPool`` when the recipient copy falls back to an empty pool.
+    @discardableResult
+    public func sendGiftWrapped(
+        _ rumor: UnsignedEvent,
+        to recipientPubkey: String,
+        expiration: Date? = nil,
+        strategy: PublishStrategy? = nil
+    ) async throws -> SendDirectMessageResult {
+        let result = try await client.withSigner { signer, publicKey in
+            guard rumor.pubkey == publicKey else {
+                throw NostrError.invalidPublicKey
+            }
+            return try await DirectMessageBuilder(signer: signer).wrapWithSelfCopy(
+                rumor: try rumor.asRumor(),
+                senderPubkey: publicKey,
+                to: recipientPubkey,
+                expiration: expiration
+            )
+        }
+
+        return try await deliver(result, to: recipientPubkey, strategy: strategy)
+    }
+
     // MARK: - Parsing
 
     /// Parses a received gift-wrapped direct message
@@ -217,8 +258,8 @@ public struct NostrMessagesAPI: NostrMessaging {
     // MARK: - Private
 
     /// Routes a built result's gift wraps to the recipient's and sender's kind-10050 DM relays and
-    /// publishes them, returning the result enriched with per-relay outcomes. Shared by the message,
-    /// reaction, and file send paths.
+    /// publishes them, returning the result enriched with per-relay outcomes. Shared by every send
+    /// path.
     ///
     /// A nil target means the addressee advertised no DM relay list (or none could be connected), so
     /// the copy falls back to the full pool rather than being dropped; the recipient copy's fallback
