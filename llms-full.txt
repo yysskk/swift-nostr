@@ -788,6 +788,13 @@ print(sealed.payload)  // base64-encoded
 let plaintext = try sealed.open(from: senderPubkey, using: recipientKeyPair)
 ```
 
+With a caller-supplied 32-byte conversation key (e.g. one shared by a group) instead of a key pair. A fresh nonce is generated per call; anyone holding the key can read and forge messages.
+
+```swift
+let sealed = try SealedMessage.seal("message", conversationKey: groupKey)
+let plaintext = try sealed.open(conversationKey: groupKey)
+```
+
 ## GiftWrap
 
 NIP-59 Gift Wrap for sender anonymity (struct: Sendable).

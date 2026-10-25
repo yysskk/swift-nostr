@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **NIP-44 encryption under a caller-supplied conversation key**:
+  `SealedMessage.seal(_:conversationKey:)` and `open(conversationKey:)` take the 32-byte conversation
+  key directly instead of deriving it from a key pair, so one ciphertext can be read by everyone
+  holding a shared key. The payload is standard NIP-44 v2 and a fresh random nonce is generated per
+  message; the nonce is not exposed, so callers cannot reuse one. Anyone holding the key can both
+  read and forge messages under it.
 - **`NostrEventsAPI.publish(_:to:strategy:)` publishes an already-signed event to chosen relays**:
   `publish(_:strategy:)` only broadcast to the whole pool, so an event signed by a separate key and
   meant for a small named relay set could not be routed through the public API, unlike `fetch`,

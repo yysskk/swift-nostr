@@ -4,6 +4,11 @@ import P256K
 
 /// NIP-44 Versioned Encryption
 /// https://github.com/nostr-protocol/nips/blob/master/44.md
+///
+/// Two modes produce the same NIP-44 v2 payload. ``seal(_:for:using:)`` and
+/// ``open(from:using:)`` derive the conversation key from a sender and recipient key pair, for
+/// one-to-one messages. ``seal(_:conversationKey:)`` and ``open(conversationKey:)`` take the
+/// conversation key directly, for a ciphertext shared by everyone who holds that key.
 public struct SealedMessage: Sendable {
     /// The base64-encoded sealed payload
     public let payload: String
@@ -74,11 +79,36 @@ public struct SealedMessage: Sendable {
         return SealedMessage(payload: payload)
     }
 
+    /// Seals a message under a caller-supplied conversation key.
+    ///
+    /// A conversation key is the 32-byte NIP-44 key that the per-message keys are expanded from.
+    /// ``seal(_:for:using:)`` derives it by ECDH and HKDF from a key pair; here the caller supplies
+    /// it, e.g. a key shared among a group so that one ciphertext can be read by all of its
+    /// members. It must be uniformly random secret material, such as 32 bytes from a CSPRNG.
+    ///
+    /// A fresh random nonce is generated for every call. The payload is standard NIP-44 v2, so any
+    /// implementation holding the same conversation key can open it.
+    ///
+    /// NIP-44 authenticates the key, not a sender: anyone holding the conversation key can both
+    /// read and forge messages under it.
+    /// - Parameters:
+    ///   - message: The plaintext message to seal.
+    ///   - conversationKey: The 32-byte conversation key.
+    /// - Returns: A SealedMessage containing the encrypted payload.
+    /// - Throws: ``NostrError/encryptionFailed`` if `conversationKey` is not 32 bytes or `message`
+    ///   is not 1 to 65535 bytes of UTF-8.
+    public static func seal(_ message: String, conversationKey: Data) throws -> SealedMessage {
+        let nonce = try generateSecureRandomBytes(count: nonceByteCount)
+        let payload = try encrypt(plaintext: message, conversationKey: conversationKey, nonce: nonce)
+        return SealedMessage(payload: payload)
+    }
+
     /// Encrypts a plaintext under an already-derived conversation key.
     ///
-    /// Internal and intended for tests that drive the official `encrypt_decrypt` vectors, which
-    /// give the conversation key and nonce directly rather than a pair of keys. Splitting this
-    /// out mirrors the reference implementation's own `encrypt`/`get_conversation_key` split.
+    /// Backs ``seal(_:conversationKey:)`` and ``seal(_:for:using:)``. Taking the nonce keeps it
+    /// testable against the official `encrypt_decrypt` vectors, which give the conversation key and
+    /// nonce directly; it stays internal so that callers cannot reuse a nonce. Splitting this out
+    /// mirrors the reference implementation's own `encrypt`/`get_conversation_key` split.
     /// - Parameters:
     ///   - plaintext: The plaintext message.
     ///   - conversationKey: The 32-byte conversation key.
@@ -152,12 +182,31 @@ public struct SealedMessage: Sendable {
         return try Self.decrypt(payload: payload, conversationKey: conversationKey)
     }
 
+    /// Opens a message sealed under a caller-supplied conversation key.
+    ///
+    /// The counterpart of ``seal(_:conversationKey:)``. It opens any NIP-44 v2 payload encrypted
+    /// under `conversationKey`, including one sealed with ``seal(_:for:using:)`` when the caller
+    /// holds that pair's conversation key.
+    ///
+    /// A successful open shows only that the payload was sealed by someone holding the
+    /// conversation key, not who: anyone holding it can both read and forge messages under it.
+    /// - Parameter conversationKey: The 32-byte conversation key.
+    /// - Returns: The decrypted plaintext message.
+    /// - Throws: ``NostrError/decryptionFailed`` if `conversationKey` is not 32 bytes;
+    ///   ``NostrError/invalidPayloadFormat`` if the payload is not valid base64, is out of range,
+    ///   or does not decrypt to UTF-8; ``NostrError/unsupportedEncryptionVersion(_:)`` if its
+    ///   version is not 2; ``NostrError/hmacVerificationFailed`` if it was not sealed under this
+    ///   key or was altered; ``NostrError/invalidPadding`` if its padding is not canonical.
+    public func open(conversationKey: Data) throws -> String {
+        try Self.decrypt(payload: payload, conversationKey: conversationKey)
+    }
+
     /// Decrypts a base64 payload under an already-derived conversation key.
     ///
-    /// Internal and intended for tests that drive the official `encrypt_decrypt` and
-    /// `invalid.decrypt` vectors, which give the conversation key directly rather than a pair of
-    /// keys. Splitting this out mirrors the reference implementation's own `decrypt` /
-    /// `get_conversation_key` split.
+    /// Backs ``open(conversationKey:)`` and ``open(from:using:)``, and lets tests drive the
+    /// official `encrypt_decrypt` and `invalid.decrypt` vectors, which give the conversation key
+    /// directly rather than a pair of keys. Splitting this out mirrors the reference
+    /// implementation's own `decrypt` / `get_conversation_key` split.
     /// - Parameters:
     ///   - payload: The base64-encoded `version || nonce || ciphertext || mac` payload.
     ///   - conversationKey: The 32-byte conversation key.
