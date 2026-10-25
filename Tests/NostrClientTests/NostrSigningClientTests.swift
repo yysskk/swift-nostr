@@ -109,6 +109,50 @@ struct NostrSigningClientTests {
         }
     }
 
+    // MARK: - NIP-44 through both paths
+
+    @Test("nip44Encrypt/nip44Decrypt with a local signer round-trip with a peer's key")
+    func localSignerNIP44RoundTrip() async throws {
+        let (client, _) = makeClient()
+        let sender = try KeyPair()
+        let peer = try KeyPair()
+        await client.identity.setSigner(EventSigner(keyPair: sender))
+
+        let payload = try await client.identity.nip44Encrypt("to the peer", to: peer.publicKeyHex)
+        #expect(try EventSigner(keyPair: peer).nip44Decrypt(payload, from: sender.publicKeyHex) == "to the peer")
+
+        let reply = try EventSigner(keyPair: peer).nip44Encrypt("from the peer", to: sender.publicKeyHex)
+        #expect(try await client.identity.nip44Decrypt(reply, from: peer.publicKeyHex) == "from the peer")
+    }
+
+    @Test("nip44Encrypt/nip44Decrypt with a remote signer round-trip with a peer's key")
+    func remoteSignerNIP44RoundTrip() async throws {
+        let (client, _) = makeClient()
+        let sender = try KeyPair()
+        let peer = try KeyPair()
+        try await client.identity.setSigner(MockRemoteSigner(keyPair: sender) as any NostrSigning)
+
+        let payload = try await client.identity.nip44Encrypt("to the peer", to: peer.publicKeyHex)
+        #expect(try EventSigner(keyPair: peer).nip44Decrypt(payload, from: sender.publicKeyHex) == "to the peer")
+
+        let reply = try EventSigner(keyPair: peer).nip44Encrypt("from the peer", to: sender.publicKeyHex)
+        #expect(try await client.identity.nip44Decrypt(reply, from: peer.publicKeyHex) == "from the peer")
+    }
+
+    @Test("nip44Encrypt/nip44Decrypt without a signer throw signerNotSet")
+    func nip44WithoutSignerThrows() async throws {
+        let (client, _) = makeClient()
+        let peer = try KeyPair()
+        let payload = try EventSigner(keyPair: peer).nip44Encrypt("x", to: try KeyPair().publicKeyHex)
+
+        await #expect(throws: NostrError.signerNotSet) {
+            try await client.identity.nip44Encrypt("x", to: peer.publicKeyHex)
+        }
+        await #expect(throws: NostrError.signerNotSet) {
+            try await client.identity.nip44Decrypt(payload, from: peer.publicKeyHex)
+        }
+    }
+
     // MARK: - The convenience helpers work with a remote signer
 
     @Test("a convenience publish helper signs and publishes with a remote signer")

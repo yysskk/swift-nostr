@@ -73,7 +73,7 @@ Every operation is reached through one of eight namespaces on the client, not as
 list. Each is a `Sendable` value holding only the client, so reading one is free and it can be
 stored or passed to a view model.
 
-- `client.identity` -- signer setup, `publicKey`, `npub`, `sign(_:)`, NIP-42 authentication
+- `client.identity` -- signer setup, `publicKey`, `npub`, `sign(_:)`, NIP-44 `nip44Encrypt(_:to:)`/`nip44Decrypt(_:from:)`, NIP-42 authentication
 - `client.relays` -- `add`, `remove`, `connect`, `disconnect`, pool inspection, and `pool: RelayPool`
 - `client.events` -- the `publish*` helpers, `publish(_:)`, `fetch`, `count`, NIP-23 long-form content
 - `client.subscriptions` -- `subscribe`, `events`, `unsubscribe`, and the convenience feeds
@@ -131,6 +131,15 @@ let pubkey = await client.identity.publicKey!
 let signed = try await client.identity.sign(
     UnsignedEvent(pubkey: pubkey, kind: .textNote, content: "Signed remotely"))
 try await client.events.publish(signed)           // generic publish of a pre-signed event
+```
+
+`identity.nip44Encrypt(_:to:)` and `identity.nip44Decrypt(_:from:)` run NIP-44 v2 through the same
+signer, for app payloads to a peer outside the DM path (a relay round-trip per call with a remote
+signer); both throw `signerNotSet` without a signer:
+
+```swift
+let payload = try await client.identity.nip44Encrypt("app payload", to: peerPubkey)
+let plaintext = try await client.identity.nip44Decrypt(payload, from: peerPubkey)
 ```
 
 ### Authentication (NIP-42)
