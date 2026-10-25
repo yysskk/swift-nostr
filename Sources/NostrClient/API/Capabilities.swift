@@ -268,6 +268,11 @@ public protocol NostrMessaging: Sendable {
         expiration: Date?,
         strategy: PublishStrategy?
     ) async throws -> SendDirectMessageResult
+    /// Sends a rumor of any kind gift-wrapped, routed like a direct message.
+    @discardableResult
+    func sendGiftWrapped(
+        _ rumor: UnsignedEvent, to recipientPubkey: String, expiration: Date?, strategy: PublishStrategy?
+    ) async throws -> SendDirectMessageResult
 
     /// Unwraps a received gift wrap as a message.
     func parse(_ giftWrap: Event) async throws -> DirectMessage

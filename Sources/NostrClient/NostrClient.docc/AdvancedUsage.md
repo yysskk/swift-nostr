@@ -93,6 +93,26 @@ let blob = try await download(file.url)  // your transport
 let data = try EncryptedFile.decrypt(blob, key: file.decryptionKey, nonce: file.decryptionNonce)
 ```
 
+### Gift-Wrapped Rumors of Any Kind
+
+``NostrMessagesAPI/sendGiftWrapped(_:to:expiration:strategy:)`` delivers a rumor of any kind with the
+same wrapping and routing as ``NostrMessagesAPI/send(_:to:subject:replyTo:expiration:strategy:)``: a
+recipient copy and a self-copy, each sent to its addressee's DM relays. The rumor must be authored
+under the signer's public key and is never signed:
+
+```swift
+let rumor = UnsignedEvent(
+    pubkey: myPubkey, kind: Event.Kind(rawValue: 30_999),
+    tags: [.pubkey(recipientPubkey)], content: payload
+)
+try await client.messages.sendGiftWrapped(rumor, to: recipientPubkey)
+```
+
+To build the gift wrap without publishing, use ``GiftWrap/wrap(event:signer:recipientPubkey:expiration:)``.
+On the receiving side, read the raw stream from ``NostrMessagesAPI/giftWraps(limit:)`` and open each
+event with ``GiftWrap/unwrap(giftWrap:recipient:)``; the parsing helpers understand only kinds 14, 15,
+and 7.
+
 ### Disappearing Messages (NIP-40)
 
 Pass an `expiration` to attach a NIP-40 expiration timestamp to a message's gift wraps. Relays stop
