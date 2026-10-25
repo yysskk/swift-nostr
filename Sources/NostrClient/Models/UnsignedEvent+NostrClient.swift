@@ -10,20 +10,20 @@ import NostrCore
 // remote one.
 extension UnsignedEvent {
     /// A metadata event (kind 0).
-    package static func metadata(pubkey: String, _ metadata: UserMetadata) throws -> UnsignedEvent {
+    package static func metadata(pubkey: PublicKey, _ metadata: UserMetadata) throws -> UnsignedEvent {
         let content = try JSONEncoder().encode(metadata)
         return UnsignedEvent(pubkey: pubkey, kind: .setMetadata, content: String(decoding: content, as: UTF8.self))
     }
 
     /// A relay list metadata event (kind 10002, NIP-65).
-    package static func relayListMetadata(pubkey: String, _ relayList: RelayListMetadata) -> UnsignedEvent {
+    package static func relayListMetadata(pubkey: PublicKey, _ relayList: RelayListMetadata) -> UnsignedEvent {
         UnsignedEvent(pubkey: pubkey, kind: .relayListMetadata, rawTags: relayList.toTags(), content: "")
     }
 
     /// A DM relay list event (kind 10050, NIP-17), advertising where the author receives
     /// private direct messages. Its content is empty; the relays are carried as `relay` tags.
     package static func directMessageRelayList(
-        pubkey: String, _ relayList: DirectMessageRelayList
+        pubkey: PublicKey, _ relayList: DirectMessageRelayList
     ) -> UnsignedEvent {
         UnsignedEvent(pubkey: pubkey, kind: .directMessageRelayList, rawTags: relayList.toTags(), content: "")
     }
@@ -31,7 +31,7 @@ extension UnsignedEvent {
     /// A report of `target` (kind 1984, NIP-56). The report type rides on the "p" tag;
     /// `reason` becomes the content.
     package static func report(
-        pubkey: String, target: String, type: ReportType, reason: String
+        pubkey: PublicKey, target: String, type: ReportType, reason: String
     ) -> UnsignedEvent {
         UnsignedEvent(
             pubkey: pubkey,
@@ -44,14 +44,14 @@ extension UnsignedEvent {
     /// A report of an event and its author (kind 1984, NIP-56). The report type rides on the
     /// "e" tag; a bare "p" tag names the author.
     package static func report(
-        pubkey: String, event: Event, type: ReportType, reason: String
+        pubkey: PublicKey, event: Event, type: ReportType, reason: String
     ) -> UnsignedEvent {
         UnsignedEvent(
             pubkey: pubkey,
             kind: .report,
             tags: [
-                Tag(name: "e", values: [event.id, type.rawValue]),
-                Tag(name: "p", values: [event.pubkey]),
+                Tag(name: "e", values: [event.id.hex, type.rawValue]),
+                Tag(name: "p", values: [event.pubkey.hex]),
             ],
             content: reason
         )
@@ -62,7 +62,7 @@ extension UnsignedEvent {
     /// When `publishedAt` is nil it is set to the current time (first-publication time per the
     /// spec); it is preserved verbatim on later edits.
     package static func longFormContent(
-        pubkey: String, _ article: LongFormContent, draft: Bool
+        pubkey: PublicKey, _ article: LongFormContent, draft: Bool
     ) -> UnsignedEvent {
         var article = article
         if article.publishedAt == nil {
@@ -77,7 +77,7 @@ extension UnsignedEvent {
     }
 
     /// A NIP-51 list event whose private items are already sealed into `encryptedContent`.
-    package static func list(pubkey: String, _ list: NostrList, encryptedContent: String) -> UnsignedEvent {
+    package static func list(pubkey: PublicKey, _ list: NostrList, encryptedContent: String) -> UnsignedEvent {
         UnsignedEvent(
             pubkey: pubkey,
             kind: list.kind,
@@ -88,7 +88,7 @@ extension UnsignedEvent {
 
     /// A NIP-51 set event whose private items are already sealed into `encryptedContent`: the `d`
     /// identifier, presentation metadata, and public items as tags.
-    package static func set(pubkey: String, _ set: NostrListSet, encryptedContent: String) -> UnsignedEvent {
+    package static func set(pubkey: PublicKey, _ set: NostrListSet, encryptedContent: String) -> UnsignedEvent {
         var tags: [Tag] = [.identifier(set.identifier)]
         if let title = set.title {
             tags.append(Tag(name: "title", values: [title]))

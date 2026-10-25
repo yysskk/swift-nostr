@@ -35,7 +35,7 @@ struct HTTPAuthValidationTests {
         let event = try HTTPAuth.validate(
             authorization: header, url: url, method: "GET", now: now)
 
-        #expect(event.pubkey == signer.publicKey)
+        #expect(event.pubkey.hex == signer.publicKey)
         #expect(event.kind == .httpAuth)
     }
 
@@ -47,7 +47,7 @@ struct HTTPAuthValidationTests {
         let event = try HTTPAuth.validate(
             authorization: header, url: url, method: "POST", payload: body, now: now)
 
-        #expect(event.pubkey == signer.publicKey)
+        #expect(event.pubkey.hex == signer.publicKey)
     }
 
     @Test("the NIP-98 spec example header decodes, and its inconsistent signature is rejected")
@@ -62,8 +62,8 @@ struct HTTPAuthValidationTests {
         // The wire format decodes into the exact event fields.
         let event = try HTTPAuth.event(fromAuthorizationHeader: header)
         #expect(event.kind == .httpAuth)
-        #expect(event.pubkey == "63fe6318dc58583cfe16810f86dd09e18bfd76aabc24a0081ce2856f330504ed")
-        #expect(event.id == "fe964e758903360f28d8424d092da8494ed207cba823110be3a57dfe4b578734")
+        #expect(event.pubkey.hex == "63fe6318dc58583cfe16810f86dd09e18bfd76aabc24a0081ce2856f330504ed")
+        #expect(event.id.hex == "fe964e758903360f28d8424d092da8494ed207cba823110be3a57dfe4b578734")
         #expect(event.createdAt == 1_682_327_852)
         #expect(event.firstTagValue(named: "u") == "https://api.snort.social/api/v1/n5sp/list")
         #expect(event.firstTagValue(named: "method") == "GET")
@@ -155,7 +155,7 @@ struct HTTPAuthValidationTests {
     func wrongKind() async throws {
         let signer = EventSigner(keyPair: try KeyPair())
         let note = try signer.sign(
-            UnsignedEvent(pubkey: signer.publicKey, kind: .textNote, content: ""))
+            UnsignedEvent(pubkey: try PublicKey(hex: signer.publicKey), kind: .textNote, content: ""))
 
         #expect(throws: HTTPAuth.ValidationError.invalidEventKind(.textNote)) {
             try HTTPAuth.validate(
@@ -175,7 +175,7 @@ struct HTTPAuthValidationTests {
             kind: original.kind,
             tags: [["u", "https://evil.example.com/"], ["method", "GET"]],
             content: original.content,
-            sig: original.sig
+            signature: original.signature
         )
 
         #expect(throws: HTTPAuth.ValidationError.invalidSignature) {
@@ -287,7 +287,7 @@ struct HTTPAuthValidationTests {
         // Succeeds even though the event is long expired against the real clock.
         let event = try HTTPAuth.event(fromAuthorizationHeader: header)
 
-        #expect(event.pubkey == signer.publicKey)
+        #expect(event.pubkey.hex == signer.publicKey)
         #expect(event.firstTagValue(named: "u") == url.absoluteString)
     }
 }

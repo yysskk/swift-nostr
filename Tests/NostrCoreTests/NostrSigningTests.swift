@@ -9,18 +9,18 @@ struct NostrSigningTests {
         let keyPair = try KeyPair()
         let signer: any NostrSigning = EventSigner(keyPair: keyPair)
 
-        #expect(try await signer.publicKey == keyPair.publicKeyHex)
+        #expect(try await signer.publicKey == keyPair.publicKey.hex)
     }
 
     @Test("signing through any NostrSigning produces a verifiable event")
     func signThroughProtocol() async throws {
         let keyPair = try KeyPair()
         let signer: any NostrSigning = EventSigner(keyPair: keyPair)
-        let unsigned = UnsignedEvent(pubkey: keyPair.publicKeyHex, kind: .textNote, content: "hello")
+        let unsigned = UnsignedEvent(pubkey: keyPair.publicKey, kind: .textNote, content: "hello")
 
         let event = try await signer.sign(unsigned)
 
-        #expect(event.pubkey == keyPair.publicKeyHex)
+        #expect(event.pubkey == keyPair.publicKey)
         #expect(event.kind == .textNote)
         #expect(event.content == "hello")
         #expect(try event.verify())
@@ -33,8 +33,8 @@ struct NostrSigningTests {
         let aliceSigner: any NostrSigning = EventSigner(keyPair: alice)
         let bobSigner: any NostrSigning = EventSigner(keyPair: bob)
 
-        let ciphertext = try await aliceSigner.nip44Encrypt("secret", to: bob.publicKeyHex)
-        let plaintext = try await bobSigner.nip44Decrypt(ciphertext, from: alice.publicKeyHex)
+        let ciphertext = try await aliceSigner.nip44Encrypt("secret", to: bob.publicKey.hex)
+        let plaintext = try await bobSigner.nip44Decrypt(ciphertext, from: alice.publicKey.hex)
 
         #expect(plaintext == "secret")
     }
@@ -47,7 +47,7 @@ struct NostrSigningTests {
         let bobSigner = EventSigner(keyPair: bob)
 
         // Alice encrypts to Bob; Bob decrypts from Alice.
-        let ciphertext = try aliceSigner.nip44Encrypt("gm", to: bob.publicKeyHex)
-        #expect(try bobSigner.nip44Decrypt(ciphertext, from: alice.publicKeyHex) == "gm")
+        let ciphertext = try aliceSigner.nip44Encrypt("gm", to: bob.publicKey.hex)
+        #expect(try bobSigner.nip44Decrypt(ciphertext, from: alice.publicKey.hex) == "gm")
     }
 }

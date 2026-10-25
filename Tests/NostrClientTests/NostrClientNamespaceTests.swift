@@ -70,22 +70,22 @@ struct NostrClientNamespaceTests {
         #expect(await identity.publicKey == nil)
         try await identity.setPrivateKey(keyPair.privateKeyHex)
 
-        #expect(await identity.publicKey == keyPair.publicKeyHex)
-        #expect(try await identity.npub == keyPair.npub)
+        #expect(await identity.publicKey == keyPair.publicKey.hex)
+        #expect(await identity.npub == keyPair.publicKey.npub)
         #expect(await identity.authenticationMode == .automatic)
 
         await identity.setAuthenticationMode(.manual)
         #expect(await identity.authenticationMode == .manual)
 
         let signed = try await identity.sign(
-            UnsignedEvent(pubkey: keyPair.publicKeyHex, kind: .textNote, content: "signed")
+            UnsignedEvent(pubkey: keyPair.publicKey, kind: .textNote, content: "signed")
         )
         #expect(try signed.verify())
 
         let peer = try KeyPair()
-        let payload = try await identity.nip44Encrypt("sealed", to: peer.publicKeyHex)
-        #expect(try EventSigner(keyPair: peer).nip44Decrypt(payload, from: keyPair.publicKeyHex) == "sealed")
-        #expect(try await identity.nip44Decrypt(payload, from: peer.publicKeyHex) == "sealed")
+        let payload = try await identity.nip44Encrypt("sealed", to: peer.publicKey.hex)
+        #expect(try EventSigner(keyPair: peer).nip44Decrypt(payload, from: keyPair.publicKey.hex) == "sealed")
+        #expect(try await identity.nip44Decrypt(payload, from: peer.publicKey.hex) == "sealed")
 
         await client.relays.disconnect()
     }
@@ -156,7 +156,7 @@ struct NostrClientNamespaceTests {
 
         #expect(published.event.kind == .relayListMetadata)
         // Publishing seeds the cache, so the author's list resolves without a network round trip.
-        let cached = await routing.cachedRelayList(for: published.event.pubkey)
+        let cached = await routing.cachedRelayList(for: published.event.pubkey.hex)
         #expect(cached?.writeRelays == ["wss://write.example.com"])
         await client.relays.disconnect()
     }
@@ -170,12 +170,12 @@ struct NostrClientNamespaceTests {
 
         let sender = try KeyPair()
         let sent = try await DirectMessageBuilder(signer: EventSigner(keyPair: sender))
-            .createMessageWithSelfCopy(content: "through the protocol", to: recipient.publicKeyHex)
+            .createMessageWithSelfCopy(content: "through the protocol", to: recipient.publicKey.hex)
 
         let parsed = try await messaging.parse(sent.recipientGiftWrap)
 
         #expect(parsed.content == "through the protocol")
-        #expect(parsed.senderPubkey == sender.publicKeyHex)
+        #expect(parsed.senderPubkey == sender.publicKey.hex)
         await client.relays.disconnect()
     }
 

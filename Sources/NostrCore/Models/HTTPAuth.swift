@@ -70,7 +70,7 @@ public enum HTTPAuth {
             tags.append(.payload(sha256: Data(SHA256.hash(data: payload)).hexEncodedString()))
         }
         let unsigned = UnsignedEvent(
-            pubkey: try await signer.publicKey,
+            pubkey: try PublicKey(hex: await signer.publicKey),
             createdAt: Int64(createdAt.timeIntervalSince1970),
             kind: .httpAuth,
             tags: tags,

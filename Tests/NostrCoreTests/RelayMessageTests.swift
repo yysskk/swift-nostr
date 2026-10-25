@@ -1,5 +1,6 @@
 import Foundation
 import NostrCore
+import NostrTestSupport
 import Testing
 
 @Suite("RelayMessage Tests")
@@ -8,17 +9,28 @@ struct RelayMessageTests {
     @Test("Parse EVENT message")
     func parseEventMessage() throws {
         let json =
-            #"["EVENT","sub1",{"id":"abc123","pubkey":"def456","created_at":1234567890,"kind":1,"tags":[],"content":"Hello","sig":"sig123"}]"#
+            #"["EVENT","sub1",{"id":"abababababababababababababababababababababababababababababababab","pubkey":"cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd","created_at":1234567890,"kind":1,"tags":[],"content":"Hello","sig":"efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef"}]"#
 
         let message = try RelayMessage.parse(json)
 
         if case .event(let subscriptionId, let event) = message {
             #expect(subscriptionId == "sub1")
-            #expect(event.id == "abc123")
-            #expect(event.pubkey == "def456")
+            #expect(event.id.hex == String(repeating: "ab", count: 32))
+            #expect(event.pubkey.hex == String(repeating: "cd", count: 32))
+            #expect(event.signature?.hex == String(repeating: "ef", count: 64))
             #expect(event.content == "Hello")
         } else {
             Issue.record("Expected EVENT message")
+        }
+    }
+
+    @Test("an EVENT message carrying a malformed event fails to parse")
+    func parseEventMessageWithMalformedEvent() {
+        let json =
+            #"["EVENT","sub1",{"id":"abc123","pubkey":"cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd","created_at":1234567890,"kind":1,"tags":[],"content":"Hello","sig":"efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef"}]"#
+
+        #expect(throws: DecodingError.self) {
+            try RelayMessage.parse(json)
         }
     }
 
@@ -179,20 +191,20 @@ struct ClientMessageTests {
     @Test("Serialize EVENT message")
     func serializeEventMessage() throws {
         let event = Event(
-            id: "id123",
-            pubkey: "pubkey123",
+            id: EventID.fixture("id123"),
+            pubkey: PublicKey.fixture("pubkey123"),
             createdAt: 1_234_567_890,
             kind: 1,
             tags: [],
             content: "Hello",
-            sig: "sig123"
+            signature: nil
         )
 
         let message = ClientMessage.event(event)
         let serialized = try message.serialize()
 
         #expect(serialized.contains("EVENT"))
-        #expect(serialized.contains("id123"))
+        #expect(serialized.contains(event.id.hex))
         #expect(serialized.contains("Hello"))
     }
 

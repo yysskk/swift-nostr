@@ -95,13 +95,13 @@ ChatViewModel(messages: client.messages)
 import NostrClient
 
 let keyPair = try KeyPair()               // new random keypair
-print(try keyPair.npub, try keyPair.nsec)
+print(keyPair.publicKey.npub, try keyPair.nsec)
 
 let imported = try KeyPair(nsec: "nsec1...")
 
 // From a BIP-39 mnemonic (NIP-06)
 let (mnemonic, derived) = try KeyPair.generate(wordCount: 12)
-print(mnemonic.phrase, try derived.npub)
+print(mnemonic.phrase, derived.publicKey.npub)
 ```
 
 ### Connect and publish

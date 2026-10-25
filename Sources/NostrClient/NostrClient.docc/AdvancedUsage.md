@@ -479,7 +479,7 @@ samples them for you. Check inbound events' references against what you have see
 var recent: [Event] = []
 let timeline = try await client.groups.timeline(group)
 for await event in timeline.events {
-    let unknown = Groups.unknownPreviousReferences(of: event, knownEventIDs: recent.map(\.id))
+    let unknown = Groups.unknownPreviousReferences(of: event, knownEventIDs: recent.map(\.id.hex))
     if !unknown.isEmpty {
         print("timeline references I have not seen: \(unknown)")
     }
@@ -779,10 +779,11 @@ for await message in await connection.messages() {
 ### Manual Event Signing
 
 ```swift
-let signer = EventSigner(keyPair: try KeyPair())
+let keyPair = try KeyPair()
+let signer = EventSigner(keyPair: keyPair)
 
 let unsigned = UnsignedEvent(
-    pubkey: signer.publicKey,
+    pubkey: keyPair.publicKey,
     kind: .textNote,
     tags: [.hashtag("test")],
     content: "Manually signed"

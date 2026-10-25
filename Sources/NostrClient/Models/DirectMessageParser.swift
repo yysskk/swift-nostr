@@ -117,7 +117,7 @@ public struct DirectMessageParser: Sendable {
         case .invalidData:
             return true
         // The seal does not verify as the event it claims to be.
-        case .verificationFailed, .invalidEventId, .invalidHex:
+        case .verificationFailed, .invalidEventID, .invalidSignature, .invalidHex:
             return true
         // NIP-44 refused the payload — the usual outcome for a wrap sealed to someone else.
         case .decryptionFailed, .invalidPublicKey, .invalidPayloadFormat, .hmacVerificationFailed,
@@ -145,7 +145,7 @@ public struct DirectMessageParser: Sendable {
             .primaryValue
 
         return DirectMessage(
-            rumorId: rumor.id,
+            rumorId: rumor.id.hex,
             senderPubkey: unwrapped.senderPubkey,
             recipientPubkey: recipientPubkey,
             content: rumor.content,
@@ -172,7 +172,7 @@ public struct DirectMessageParser: Sendable {
         }
 
         return DirectMessageReaction(
-            rumorId: rumor.id,
+            rumorId: rumor.id.hex,
             senderPubkey: unwrapped.senderPubkey,
             messageId: messageId,
             messageAuthorPubkey: author,
@@ -204,7 +204,7 @@ public struct DirectMessageParser: Sendable {
         let recipientPubkey = try await addressee(of: rumor)
 
         return DirectMessageFile(
-            rumorId: rumor.id,
+            rumorId: rumor.id.hex,
             senderPubkey: unwrapped.senderPubkey,
             recipientPubkey: recipientPubkey,
             url: rumor.content,

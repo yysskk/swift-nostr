@@ -34,14 +34,14 @@ public enum Groups {
     ///   - inviteCode: An invite code to join a closed group without admin approval, if any.
     ///   - reason: An optional free-form message to the group's admins; becomes the event
     ///     content ("" when nil).
-    ///   - pubkey: The requesting user's public key (hex).
+    ///   - pubkey: The requesting user's public key.
     ///   - createdAt: The event timestamp. Defaults to now.
     /// - Returns: The unsigned kind-9021 event.
     public static func joinRequest(
         groupID: String,
         inviteCode: String? = nil,
         reason: String? = nil,
-        pubkey: String,
+        pubkey: PublicKey,
         createdAt: Date = Date()
     ) -> UnsignedEvent {
         var tags: [Tag] = [.group(groupID)]
@@ -76,7 +76,7 @@ public enum Groups {
                 groupID: groupID,
                 inviteCode: inviteCode,
                 reason: reason,
-                pubkey: try await signer.publicKey,
+                pubkey: try PublicKey(hex: await signer.publicKey),
                 createdAt: createdAt
             )
         )
@@ -90,13 +90,13 @@ public enum Groups {
     /// - Parameters:
     ///   - groupID: The group's id on its relay.
     ///   - reason: An optional free-form message; becomes the event content ("" when nil).
-    ///   - pubkey: The leaving user's public key (hex).
+    ///   - pubkey: The leaving user's public key.
     ///   - createdAt: The event timestamp. Defaults to now.
     /// - Returns: The unsigned kind-9022 event.
     public static func leaveRequest(
         groupID: String,
         reason: String? = nil,
-        pubkey: String,
+        pubkey: PublicKey,
         createdAt: Date = Date()
     ) -> UnsignedEvent {
         UnsignedEvent(
@@ -125,7 +125,7 @@ public enum Groups {
             leaveRequest(
                 groupID: groupID,
                 reason: reason,
-                pubkey: try await signer.publicKey,
+                pubkey: try PublicKey(hex: await signer.publicKey),
                 createdAt: createdAt
             )
         )
@@ -147,7 +147,7 @@ public enum Groups {
     ///   - tags: Additional tags, appended after the "h" tag in order.
     ///   - previous: Timeline references for a trailing "previous" tag, e.g. from
     ///     ``previousReferences(from:excludingAuthor:maxCount:)``. Omitted when empty.
-    ///   - pubkey: The author's public key (hex).
+    ///   - pubkey: The author's public key.
     ///   - createdAt: The event timestamp. Defaults to now.
     /// - Returns: The unsigned group-scoped event.
     public static func contentEvent(
@@ -156,7 +156,7 @@ public enum Groups {
         content: String,
         tags: [Tag] = [],
         previous: [String] = [],
-        pubkey: String,
+        pubkey: PublicKey,
         createdAt: Date = Date()
     ) -> UnsignedEvent {
         var allTags: [Tag] = [.group(groupID)]
@@ -196,7 +196,7 @@ public enum Groups {
                 content: content,
                 tags: tags,
                 previous: previous,
-                pubkey: try await signer.publicKey,
+                pubkey: try PublicKey(hex: await signer.publicKey),
                 createdAt: createdAt
             )
         )
@@ -264,14 +264,14 @@ public enum Groups {
                 return lhs.id < rhs.id
             }
             .prefix(50)
-        var candidates = window.filter { $0.pubkey != pubkey }
+        var candidates = window.filter { $0.pubkey.hex != pubkey }
         let count = min(max(maxCount, 0), candidates.count)
         var references: [String] = []
         references.reserveCapacity(count)
         for index in 0..<count {
             let swapIndex = Int.random(in: index..<candidates.count, using: &generator)
             candidates.swapAt(index, swapIndex)
-            references.append(previousReference(forEventID: candidates[index].id))
+            references.append(previousReference(forEventID: candidates[index].id.hex))
         }
         return references
     }

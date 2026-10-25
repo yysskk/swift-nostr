@@ -33,7 +33,7 @@ public actor NostrClient {
 
     /// The signer's public key, cached at set-time (a remote signer's `publicKey` is async).
     /// Readable module-wide so ``NostrIdentityAPI`` can surface it without a throwing lookup.
-    private(set) var cachedPublicKey: String?
+    private(set) var cachedPublicKey: PublicKey?
 
     /// How the client reacts to NIP-42 AUTH challenges, published as
     /// ``NostrIdentityAPI/authenticationMode``.
@@ -91,7 +91,7 @@ public actor NostrClient {
     /// Backs ``NostrIdentityAPI/setSigner(_:)-(EventSigner)``.
     func install(_ signer: EventSigner) async {
         activeSigner = signer
-        cachedPublicKey = signer.publicKey
+        cachedPublicKey = signer.typedPublicKey
         await refreshAuthenticationResponder()
     }
 
@@ -100,7 +100,7 @@ public actor NostrClient {
     ///
     /// Backs ``NostrIdentityAPI/setSigner(_:)-(any NostrSigning)``.
     func install(_ signer: any NostrSigning) async throws {
-        cachedPublicKey = try await signer.publicKey
+        cachedPublicKey = try PublicKey(hex: await signer.publicKey)
         activeSigner = signer
         await refreshAuthenticationResponder()
     }
@@ -112,16 +112,9 @@ public actor NostrClient {
 
     /// The signer's public key, for the helpers that cannot proceed without one.
     /// - Throws: ``NostrError/signerNotSet`` when no signer is set.
-    func requiredPublicKey() throws -> String {
+    func requiredPublicKey() throws -> PublicKey {
         guard let cachedPublicKey else { throw NostrError.signerNotSet }
         return cachedPublicKey
-    }
-
-    /// The signer's npub, or nil when no signer is set.
-    /// Backs ``NostrIdentityAPI/npub``.
-    func currentNpub() throws -> String? {
-        guard let cachedPublicKey else { return nil }
-        return try PublicKey(hex: cachedPublicKey).npub
     }
 
     /// Signs `unsignedEvent` with the active signer (local synchronously, remote via relay
@@ -134,7 +127,7 @@ public actor NostrClient {
     ///
     /// The convenience `publish*` helpers all have this shape: they differ only in the event they
     /// build, and every one of them works with a local or a remote signer.
-    func signEvent(_ build: @Sendable (_ publicKey: String) throws -> UnsignedEvent) async throws -> Event {
+    func signEvent(_ build: @Sendable (_ publicKey: PublicKey) throws -> UnsignedEvent) async throws -> Event {
         try await withSigner { signer, publicKey in try await signer.sign(build(publicKey)) }
     }
 
@@ -148,7 +141,7 @@ public actor NostrClient {
     ///
     /// - Throws: ``NostrError/signerNotSet`` when no signer is set.
     func withSigner<T: Sendable>(
-        _ body: @Sendable (_ signer: any NostrSigning, _ publicKey: String) async throws -> T
+        _ body: @Sendable (_ signer: any NostrSigning, _ publicKey: PublicKey) async throws -> T
     ) async throws -> T {
         guard let activeSigner, let cachedPublicKey else {
             throw NostrError.signerNotSet

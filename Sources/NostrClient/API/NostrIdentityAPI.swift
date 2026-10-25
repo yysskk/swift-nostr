@@ -43,12 +43,12 @@ public struct NostrIdentityAPI: NostrIdentityProviding {
 
     /// The public key events are authored under, or nil when no signer is set.
     public var publicKey: String? {
-        get async { await client.cachedPublicKey }
+        get async { await client.cachedPublicKey?.hex }
     }
 
     /// The signer's public key as an npub, or nil when no signer is set.
     public var npub: String? {
-        get async throws { try await client.currentNpub() }
+        get async { await client.cachedPublicKey?.npub }
     }
 
     /// Signs an event with the configured signer, local or remote.

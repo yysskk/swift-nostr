@@ -20,11 +20,11 @@ struct NIP56ReportTests {
         let signer = EventSigner(keyPair: try KeyPair())
         let target = try KeyPair()
 
-        let event = try signer.signReport(pubkey: target.publicKeyHex, type: .nudity, reason: "explicit content")
+        let event = try signer.signReport(pubkey: target.publicKey.hex, type: .nudity, reason: "explicit content")
 
         #expect(event.kind == .report)
         #expect(event.content == "explicit content")
-        #expect(event.tags.contains(["p", target.publicKeyHex, "nudity"]))
+        #expect(event.tags.contains(["p", target.publicKey.hex, "nudity"]))
         #expect(try event.verify())
     }
 
@@ -33,11 +33,11 @@ struct NIP56ReportTests {
         let signer = EventSigner(keyPair: try KeyPair())
         let target = try KeyPair()
 
-        let event = try signer.signReport(pubkey: target.publicKeyHex, type: .impersonation)
+        let event = try signer.signReport(pubkey: target.publicKey.hex, type: .impersonation)
 
         #expect(event.kind == .report)
         #expect(event.content.isEmpty)
-        #expect(event.tags.contains(["p", target.publicKeyHex, "impersonation"]))
+        #expect(event.tags.contains(["p", target.publicKey.hex, "impersonation"]))
         #expect(try event.verify())
     }
 
@@ -51,10 +51,10 @@ struct NIP56ReportTests {
 
         #expect(event.kind == .report)
         #expect(event.content == "against the law")
-        #expect(event.tags.contains(["e", note.id, "illegal"]))
+        #expect(event.tags.contains(["e", note.id.hex, "illegal"]))
         // The author is named by a bare "p" tag carrying no report type.
         let authorTag = event.tags(named: "p").first
-        #expect(authorTag?.rawArray == ["p", note.pubkey])
+        #expect(authorTag?.rawArray == ["p", note.pubkey.hex])
         #expect(try event.verify())
     }
 
@@ -67,9 +67,9 @@ struct NIP56ReportTests {
         let event = try reporter.signReport(event: note, type: .spam)
 
         #expect(event.content.isEmpty)
-        #expect(event.tags.contains(["e", note.id, "spam"]))
+        #expect(event.tags.contains(["e", note.id.hex, "spam"]))
         let authorTag: Event.Tag? = event.tags(named: "p").first
-        #expect(authorTag?.rawArray == ["p", note.pubkey])
+        #expect(authorTag?.rawArray == ["p", note.pubkey.hex])
         #expect(try event.verify())
     }
 

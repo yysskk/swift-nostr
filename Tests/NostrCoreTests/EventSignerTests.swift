@@ -11,10 +11,10 @@ struct EventSignerTests {
     @Test("signs an unsigned event into a verifiable event")
     func signAndVerify() throws {
         let signer = try makeSigner()
-        let unsigned = UnsignedEvent(pubkey: signer.publicKey, kind: .textNote, content: "hello")
+        let unsigned = UnsignedEvent(pubkey: try PublicKey(hex: signer.publicKey), kind: .textNote, content: "hello")
         let event = try signer.sign(unsigned)
 
-        #expect(event.pubkey == signer.publicKey)
+        #expect(event.pubkey.hex == signer.publicKey)
         #expect(event.kind == .textNote)
         #expect(event.content == "hello")
         #expect(try event.verify())
@@ -49,8 +49,8 @@ struct EventSignerTests {
         let event = try signer.signRepost(of: reposted, relayURL: "wss://relay.example.com")
 
         #expect(event.kind == .repost)
-        #expect(event.tags.contains(["e", reposted.id, "wss://relay.example.com"]))
-        #expect(event.tags.contains(["p", reposted.pubkey]))
+        #expect(event.tags.contains(["e", reposted.id.hex, "wss://relay.example.com"]))
+        #expect(event.tags.contains(["p", reposted.pubkey.hex]))
         #expect(try event.verify())
     }
 
@@ -60,7 +60,7 @@ struct EventSignerTests {
         let reposted = try signer.signTextNote(content: "gm")
         let event = try signer.signRepost(of: reposted)
 
-        #expect(event.tags.contains(["e", reposted.id]))
+        #expect(event.tags.contains(["e", reposted.id.hex]))
     }
 
     @Test("verify rejects an event whose content was tampered with")
@@ -74,7 +74,7 @@ struct EventSignerTests {
             kind: event.kind,
             tags: event.tags,
             content: "tampered",
-            sig: event.sig
+            signature: event.signature
         )
 
         // The stored id no longer matches the recomputed hash of the tampered content.

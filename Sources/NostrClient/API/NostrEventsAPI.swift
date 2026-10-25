@@ -64,7 +64,7 @@ public struct NostrEventsAPI: NostrEventPublishing, NostrEventFetching {
 
             if let markedRoot {
                 tags.append(markedRoot)
-                tags.append(.event(event.id, relayURL: relayURL, marker: .reply))
+                tags.append(.event(event.id.hex, relayURL: relayURL, marker: .reply))
             } else if let positionalRoot, let rootID = positionalRoot.primaryValue {
                 // Re-emitted with an explicit "root" marker rather than copied through. Appending
                 // the unmarked tag verbatim would leave a mixed set — one marked "reply", one with
@@ -72,14 +72,14 @@ public struct NostrEventsAPI: NostrEventPublishing, NostrEventFetching {
                 // thread this recovery exists to preserve.
                 let hint = positionalRoot.values.count >= 2 ? positionalRoot.values[1] : nil
                 tags.append(.event(rootID, relayURL: hint, marker: .root))
-                tags.append(.event(event.id, relayURL: relayURL, marker: .reply))
+                tags.append(.event(event.id.hex, relayURL: relayURL, marker: .reply))
             } else {
                 // This is a reply to a root event
-                tags.append(.event(event.id, relayURL: relayURL, marker: .root))
+                tags.append(.event(event.id.hex, relayURL: relayURL, marker: .root))
             }
 
             // Add p tag for the author we're replying to
-            tags.append(.pubkey(event.pubkey))
+            tags.append(.pubkey(event.pubkey.hex))
 
             return .textNote(pubkey: publicKey, content: content, tags: tags)
         }
@@ -334,7 +334,7 @@ public struct NostrEventsAPI: NostrEventPublishing, NostrEventFetching {
     /// the shape every convenience `publish*` helper above shares.
     private func signAndPublish(
         strategy: PublishStrategy?,
-        _ build: @Sendable (_ publicKey: String) throws -> UnsignedEvent
+        _ build: @Sendable (_ publicKey: PublicKey) throws -> UnsignedEvent
     ) async throws -> PublishedEvent {
         let event = try await client.signEvent(build)
         let result = try await client.pool.publish(event, strategy: strategy)

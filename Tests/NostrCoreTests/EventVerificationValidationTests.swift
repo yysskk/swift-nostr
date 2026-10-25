@@ -2,118 +2,107 @@ import Foundation
 import NostrCore
 import Testing
 
-/// Verification must reject structurally invalid keys and signatures before handing them to
-/// libsecp256k1, which parses fixed-width buffers and would otherwise read past the end of a
-/// short one. Every input here is attacker-controlled in practice: an event arrives from a relay
-/// with whatever `pubkey` and `sig` strings its author chose.
+/// Verification hands the pubkey and signature to libsecp256k1, which parses fixed-width buffers
+/// and would read past the end of a short one. Every input here is attacker-controlled in
+/// practice: an event arrives from a relay with whatever `pubkey` and `sig` strings its author
+/// chose. ``PublicKey`` and ``Signature`` only ever hold 32 and 64 bytes, so a structurally
+/// invalid value is stopped when the event is decoded, before anything can verify it.
 @Suite("Event Verification Input Validation")
 struct EventVerificationValidationTests {
-    /// Builds an event whose `id` is the genuine hash of its own serialization, so `verify()`
-    /// gets past the id check and reaches the signature step — exactly what an attacker does.
-    private func makeEventWithValidId(pubkey: String, sig: String) throws -> Event {
-        let unsigned = UnsignedEvent(
-            pubkey: pubkey,
-            createdAt: 1,
-            kind: .textNote,
-            rawTags: [],
-            content: "probe"
-        )
-        return Event(
-            id: try unsigned.computedId,
-            pubkey: pubkey,
-            createdAt: unsigned.createdAt,
-            kind: unsigned.kind,
-            tags: unsigned.tags,
-            content: unsigned.content,
-            sig: sig
-        )
-    }
+    private static let secretKeyHex = "5566778899aabbccddeeff00112233445566778899aabbccddeeff0011223344"
 
-    private var wellFormedSignature: String {
-        String(repeating: "ab", count: 64)
+    /// The JSON object of a genuine signed event, with `overrides` replacing its fields — what an
+    /// attacker sends after taking a real event and rewriting part of it.
+    private func eventJSON(overriding overrides: [String: Any] = [:]) throws -> Data {
+        let event = try EventSigner(privateKeyHex: Self.secretKeyHex).signTextNote(content: "gm")
+        var object = try #require(
+            try JSONSerialization.jsonObject(with: JSONEncoder().encode(event)) as? [String: Any])
+        object.merge(overrides) { _, new in new }
+        return try JSONSerialization.data(withJSONObject: object)
     }
 
     @Test(
-        "verify rejects a pubkey that is not 32 bytes",
+        "an event with a pubkey that is not 32 bytes does not decode",
         arguments: [
-            "",  // decodes to zero bytes
+            "",  // zero bytes
             "ab",  // one byte
             String(repeating: "ab", count: 31),  // one byte short
             String(repeating: "ab", count: 33),  // one byte long, truncation would hide the excess
         ]
     )
-    func verifyRejectsWrongLengthPubkey(pubkey: String) throws {
-        let event = try makeEventWithValidId(pubkey: pubkey, sig: wellFormedSignature)
+    func wrongLengthPubkeyIsRejected(pubkey: String) throws {
+        let json = try eventJSON(overriding: ["pubkey": pubkey])
 
-        #expect(throws: NostrError.invalidPublicKey) {
-            try event.verify()
+        #expect(throws: DecodingError.self) {
+            try JSONDecoder().decode(Event.self, from: json)
         }
     }
 
     @Test(
-        "verify rejects a signature that is not 64 bytes",
+        "an event with a signature that is not 64 bytes does not decode",
         arguments: [
-            "",
             String(repeating: "ab", count: 63),
             String(repeating: "ab", count: 65),
         ]
     )
-    func verifyRejectsWrongLengthSignature(sig: String) throws {
-        let event = try makeEventWithValidId(
-            pubkey: String(repeating: "cd", count: 32),
-            sig: sig
-        )
+    func wrongLengthSignatureIsRejected(sig: String) throws {
+        let json = try eventJSON(overriding: ["sig": sig])
 
-        #expect(throws: NostrError.invalidSignature) {
-            try event.verify()
+        #expect(throws: DecodingError.self) {
+            try JSONDecoder().decode(Event.self, from: json)
         }
     }
 
-    @Test("verify still rejects non-hex pubkeys and signatures as invalid hex")
-    func verifyRejectsNonHex() throws {
-        let nonHexPubkey = try makeEventWithValidId(
-            pubkey: String(repeating: "zz", count: 32),
-            sig: wellFormedSignature
-        )
-        #expect(throws: NostrError.invalidHex) {
-            try nonHexPubkey.verify()
-        }
-
-        let nonHexSignature = try makeEventWithValidId(
-            pubkey: String(repeating: "cd", count: 32),
-            sig: String(repeating: "zz", count: 64)
-        )
-        #expect(throws: NostrError.invalidHex) {
-            try nonHexSignature.verify()
+    @Test("an event with a non-hex pubkey or signature does not decode")
+    func nonHexIsRejected() throws {
+        for overrides in [["pubkey": String(repeating: "zz", count: 32)], ["sig": String(repeating: "zz", count: 64)]] {
+            let json = try eventJSON(overriding: overrides)
+            #expect(throws: DecodingError.self) {
+                try JSONDecoder().decode(Event.self, from: json)
+            }
         }
     }
 
     /// A pubkey longer than 32 bytes must not be silently truncated to its first 32: that would
     /// let one key be spelled arbitrarily many ways, and any allow/block list keyed on the pubkey
-    /// string could be bypassed while the signature still verified.
-    @Test("a signed event does not verify under a padded spelling of its own pubkey")
-    func paddedPubkeyDoesNotVerify() throws {
-        let signer = try EventSigner(
-            privateKeyHex: "5566778899aabbccddeeff00112233445566778899aabbccddeeff0011223344"
-        )
-        let event = try signer.signTextNote(content: "gm")
+    /// could be bypassed while the signature still verified.
+    @Test("a signed event does not decode under a padded spelling of its own pubkey")
+    func paddedPubkeyIsRejected() throws {
+        let event = try EventSigner(privateKeyHex: Self.secretKeyHex).signTextNote(content: "gm")
         #expect(try event.verify())
 
-        let padded = event.pubkey + "00"
-        let forged = try makeEventWithValidId(pubkey: padded, sig: event.sig)
+        let json = try eventJSON(overriding: ["pubkey": event.pubkey.hex + "00"])
 
-        #expect(throws: NostrError.invalidPublicKey) {
-            try forged.verify()
+        #expect(throws: DecodingError.self) {
+            try JSONDecoder().decode(Event.self, from: json)
         }
     }
 
-    @Test("a genuine event still verifies")
+    @Test("a decoded genuine event still verifies")
     func genuineEventVerifies() throws {
-        let signer = try EventSigner(
-            privateKeyHex: "5566778899aabbccddeeff00112233445566778899aabbccddeeff0011223344"
-        )
-        let event = try signer.signTextNote(content: "gm")
+        let event = try JSONDecoder().decode(Event.self, from: try eventJSON())
 
         #expect(try event.verify())
+    }
+
+    @Test("an event with a signature from another key does not verify")
+    func foreignSignatureDoesNotVerify() throws {
+        let event = try EventSigner(privateKeyHex: Self.secretKeyHex).signTextNote(content: "gm")
+        let other = try EventSigner(keyPair: try KeyPair()).signTextNote(content: "gm")
+        let forged = Event(
+            id: event.id, pubkey: event.pubkey, createdAt: event.createdAt, kind: event.kind,
+            tags: event.tags, content: event.content, signature: other.signature)
+
+        #expect(try forged.verify() == false)
+    }
+
+    @Test("an unsigned rumor does not verify")
+    func rumorDoesNotVerify() throws {
+        let rumor = try UnsignedEvent(pubkey: try KeyPair().publicKey, kind: .textNote, content: "gm").asRumor()
+
+        #expect(rumor.signature == nil)
+        #expect(throws: NostrError.invalidSignature) {
+            try rumor.verify()
+        }
     }
 }

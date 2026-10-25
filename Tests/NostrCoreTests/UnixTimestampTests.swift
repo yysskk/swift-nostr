@@ -42,13 +42,13 @@ struct UnixTimestampTests {
     @Test("a hostile expiration tag survives being re-emitted")
     func hostileExpirationRoundTrips() throws {
         let event = Event(
-            id: String(repeating: "aa", count: 32),
-            pubkey: String(repeating: "bb", count: 32),
+            id: try EventID(hex: String(repeating: "aa", count: 32)),
+            pubkey: try PublicKey(hex: String(repeating: "bb", count: 32)),
             createdAt: 1_700_000_000,
             kind: .textNote,
             tags: [["expiration", "9223372036854775807"]],
             content: "",
-            sig: String(repeating: "cc", count: 64))
+            signature: try Signature(hex: String(repeating: "cc", count: 64)))
 
         let expiration = try #require(event.expiration)
         // Feeding it straight back into the tag builder is the crashing path.

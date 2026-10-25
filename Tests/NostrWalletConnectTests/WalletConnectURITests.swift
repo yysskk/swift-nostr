@@ -54,9 +54,9 @@ struct WalletConnectURITests {
     func clientIdentity() throws {
         let uri = try WalletConnectURI(string: canonical)
         let expected = try KeyPair(privateKeyHex: secretHex)
-        #expect(uri.clientKeyPair().publicKeyHex == expected.publicKeyHex)
-        #expect(uri.clientPublicKeyHex == expected.publicKeyHex)
-        #expect(uri.clientSigner().publicKey == expected.publicKeyHex)
+        #expect(uri.clientKeyPair().publicKey.hex == expected.publicKey.hex)
+        #expect(uri.clientPublicKeyHex == expected.publicKey.hex)
+        #expect(uri.clientSigner().publicKey == expected.publicKey.hex)
     }
 
     @Test("rejects a wrong scheme")

@@ -1,5 +1,6 @@
 import Foundation
 import NostrCore
+import NostrTestSupport
 import Testing
 
 @testable import NostrClient
@@ -114,7 +115,7 @@ struct TagTests {
     @Test("UnsignedEvent stores tags in raw wire form")
     func unsignedEventStoresRawWireForm() {
         let unsigned = UnsignedEvent(
-            pubkey: "pk",
+            pubkey: PublicKey.fixture("pk"),
             kind: .textNote,
             tags: [.hashtag("nostr"), .event("id1", marker: .reply)],
             content: "hi"
@@ -125,21 +126,21 @@ struct TagTests {
     @Test("UnsignedEvent rawTags initializer keeps arrays untouched")
     func unsignedEventRawTagsUntouched() {
         let raw = [["e", "id1", "wss://r.example", "root"], ["custom", "x", "y"]]
-        let unsigned = UnsignedEvent(pubkey: "pk", kind: 1, rawTags: raw, content: "hi")
+        let unsigned = UnsignedEvent(pubkey: PublicKey.fixture("pk"), kind: 1, rawTags: raw, content: "hi")
         #expect(unsigned.tags == raw)
     }
 
     @Test("Tag-built and raw-built events hash identically")
     func tagAndRawBuiltEventsHashIdentically() throws {
         let viaTags = UnsignedEvent(
-            pubkey: "pk",
+            pubkey: PublicKey.fixture("pk"),
             createdAt: 1_700_000_000,
             kind: .textNote,
             tags: [.event("id1", marker: .reply), .pubkey("pk2")],
             content: "hi"
         )
         let viaRaw = UnsignedEvent(
-            pubkey: "pk",
+            pubkey: PublicKey.fixture("pk"),
             createdAt: 1_700_000_000,
             kind: 1,
             rawTags: [["e", "id1", "", "reply"], ["p", "pk2"]],
@@ -160,13 +161,13 @@ struct TagTests {
 
     private func makeEvent(tags: [[String]]) -> Event {
         Event(
-            id: "id",
-            pubkey: "pk",
+            id: EventID.fixture("id"),
+            pubkey: PublicKey.fixture("pk"),
             createdAt: 1_700_000_000,
             kind: 1,
             tags: tags,
             content: "",
-            sig: ""
+            signature: nil
         )
     }
 

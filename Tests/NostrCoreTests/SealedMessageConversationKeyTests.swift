@@ -56,12 +56,12 @@ struct SealedMessageConversationKeyTests {
             Data(
                 hexString: SealedMessage.conversationKeyHex(
                     privateKeyHex: alice.privateKeyHex,
-                    publicKeyHex: bob.publicKeyHex
+                    publicKeyHex: bob.publicKey.hex
                 )
             )
         )
 
-        let sealed = try SealedMessage.seal("from Alice", for: bob.publicKeyHex, using: alice)
+        let sealed = try SealedMessage.seal("from Alice", for: bob.publicKey.hex, using: alice)
 
         #expect(try sealed.open(conversationKey: key) == "from Alice")
     }
@@ -74,14 +74,14 @@ struct SealedMessageConversationKeyTests {
             Data(
                 hexString: SealedMessage.conversationKeyHex(
                     privateKeyHex: alice.privateKeyHex,
-                    publicKeyHex: bob.publicKeyHex
+                    publicKeyHex: bob.publicKey.hex
                 )
             )
         )
 
         let sealed = try SealedMessage.seal("to Bob", conversationKey: key)
 
-        #expect(try sealed.open(from: alice.publicKeyHex, using: bob) == "to Bob")
+        #expect(try sealed.open(from: alice.publicKey.hex, using: bob) == "to Bob")
     }
 
     @Test(

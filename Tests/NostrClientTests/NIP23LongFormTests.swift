@@ -84,13 +84,13 @@ struct NIP23LongFormTests {
 
         // Parsing the emitted tags back preserves it in additionalTags, not elsewhere.
         let event = Event(
-            id: "id",
-            pubkey: String(repeating: "a", count: 64),
+            id: EventID.fixture("id"),
+            pubkey: PublicKey(String(repeating: "a", count: 64))!,
             createdAt: 1,
             kind: .longFormContent,
             tags: article.toTags(),
             content: "",
-            sig: ""
+            signature: nil
         )
         let parsed = LongFormContent(event: event)
         #expect(parsed?.additionalTags == [["client", "x"]])
@@ -202,13 +202,13 @@ struct NIP23LongFormTests {
 
     private func eventFrame(subscriptionId: String, event: Event) throws -> String {
         let eventDict: [String: Any] = [
-            "id": event.id,
-            "pubkey": event.pubkey,
+            "id": event.id.hex,
+            "pubkey": event.pubkey.hex,
             "created_at": event.createdAt,
             "kind": event.kind.rawValue,
             "tags": event.tags,
             "content": event.content,
-            "sig": event.sig,
+            "sig": event.signature?.hex ?? "",
         ]
         let array: [Any] = ["EVENT", subscriptionId, eventDict]
         let data = try JSONSerialization.data(withJSONObject: array)
@@ -232,7 +232,7 @@ struct NIP23LongFormTests {
             publishedAt: Date(timeIntervalSince1970: 1_600_000_100)
         )
         let newerUnsigned = UnsignedEvent(
-            pubkey: signer.publicKey,
+            pubkey: try PublicKey(hex: signer.publicKey),
             createdAt: older.createdAt + 1000,
             kind: .longFormContent,
             rawTags: newerBase.toTags(),

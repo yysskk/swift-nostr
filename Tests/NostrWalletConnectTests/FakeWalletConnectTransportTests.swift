@@ -1,20 +1,21 @@
 import Foundation
 import NostrCore
+import NostrTestSupport
 import Testing
 
 @testable import NostrWalletConnect
 
 @Suite("FakeWalletConnectTransport Tests")
 struct FakeWalletConnectTransportTests {
-    private func event(id: String, content: String = "x") -> Event {
+    private func event(id: EventID, content: String = "x") -> Event {
         Event(
             id: id,
-            pubkey: String(repeating: "0", count: 64),
+            pubkey: .fixture("author"),
             createdAt: 0,
             kind: .walletConnectResponse,
             tags: [],
             content: content,
-            sig: "")
+            signature: nil)
     }
 
     @Test("connect and disconnect toggle the connected flag")
@@ -39,21 +40,21 @@ struct FakeWalletConnectTransportTests {
     @Test("send records published events")
     func sendRecords() async throws {
         let transport = FakeWalletConnectTransport()
-        try await transport.send(event(id: "aa"))
-        try await transport.send(event(id: "bb"))
-        #expect(await transport.sentEvents.map(\.id) == ["aa", "bb"])
-        #expect(await transport.lastSentEvent?.id == "bb")
+        try await transport.send(event(id: .fixture("aa")))
+        try await transport.send(event(id: .fixture("bb")))
+        #expect(await transport.sentEvents.map(\.id) == [.fixture("aa"), .fixture("bb")])
+        #expect(await transport.lastSentEvent?.id == .fixture("bb"))
     }
 
     @Test("emit delivers events to the stream")
     func emitDelivers() async throws {
         let transport = FakeWalletConnectTransport()
         let stream = await transport.events()
-        await transport.emit(event(id: "cc"))
+        await transport.emit(event(id: .fixture("cc")))
 
         var iterator = stream.makeAsyncIterator()
         let received = await iterator.next()
-        #expect(received?.id == "cc")
+        #expect(received?.id == .fixture("cc"))
     }
 
     @Test("disconnect finishes the events stream")

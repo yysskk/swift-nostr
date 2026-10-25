@@ -43,8 +43,8 @@ extension Groups {
         guard event.kind == kind else {
             throw ValidationError.invalidEventKind(expected: kind, actual: event.kind)
         }
-        if let relayPubkey, event.pubkey != relayPubkey {
-            throw ValidationError.unexpectedAuthor(expected: relayPubkey, actual: event.pubkey)
+        if let relayPubkey, event.pubkey.hex != relayPubkey {
+            throw ValidationError.unexpectedAuthor(expected: relayPubkey, actual: event.pubkey.hex)
         }
         guard let groupID = event.firstTagValue(named: "d"), !groupID.isEmpty else {
             throw ValidationError.missingGroupID(kind)

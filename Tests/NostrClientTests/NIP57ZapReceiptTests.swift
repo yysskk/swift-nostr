@@ -24,7 +24,8 @@ struct NIP57ZapReceiptTests {
     /// Builds a signed kind-9735 receipt with the given raw tags, signed by `payee`.
     private func makeReceipt(signedBy payee: KeyPair, tags: [[String]]) throws -> Event {
         let signer = EventSigner(keyPair: payee)
-        return try signer.sign(UnsignedEvent(pubkey: signer.publicKey, kind: .zap, rawTags: tags, content: ""))
+        return try signer.sign(
+            UnsignedEvent(pubkey: try PublicKey(hex: signer.publicKey), kind: .zap, rawTags: tags, content: ""))
     }
 
     /// Builds a JSON-encoded kind-9734 zap request with the given amount and, optionally, zapped event.
@@ -46,7 +47,7 @@ struct NIP57ZapReceiptTests {
     @Test("a valid receipt passes validation and exposes its fields")
     func validReceipt() throws {
         let payee = try KeyPair()
-        let recipient = try KeyPair().publicKeyHex
+        let recipient = try KeyPair().publicKey.hex
         let description = try zapRequestJSON(recipient: recipient, amountMillisats: coffeeAmountMillisats)
         let receipt = try makeReceipt(
             signedBy: payee,
@@ -58,7 +59,7 @@ struct NIP57ZapReceiptTests {
 
         let zapReceipt = try #require(ZapReceipt(event: receipt))
         try zapReceipt.validate(
-            lnurlProviderPubkey: payee.publicKeyHex,
+            lnurlProviderPubkey: payee.publicKey.hex,
             expectedAmountMillisats: coffeeAmountMillisats,
             requiringDescriptionHash: false)
 
@@ -71,7 +72,7 @@ struct NIP57ZapReceiptTests {
     @Test("an amountless invoice passes when no amount is asserted")
     func amountlessReceipt() throws {
         let payee = try KeyPair()
-        let recipient = try KeyPair().publicKeyHex
+        let recipient = try KeyPair().publicKey.hex
         let description = try zapRequestJSON(recipient: recipient, amountMillisats: nil)
         let receipt = try makeReceipt(
             signedBy: payee,
@@ -82,7 +83,7 @@ struct NIP57ZapReceiptTests {
             ])
 
         try ZapReceipt(event: receipt)!.validate(
-            lnurlProviderPubkey: payee.publicKeyHex, requiringDescriptionHash: false)
+            lnurlProviderPubkey: payee.publicKey.hex, requiringDescriptionHash: false)
     }
 
     /// Asking for an amount that the invoice never names is a check that cannot be made. Passing
@@ -90,7 +91,7 @@ struct NIP57ZapReceiptTests {
     @Test("an expected amount against an amountless invoice fails")
     func amountlessReceiptRejectsExpectedAmount() throws {
         let payee = try KeyPair()
-        let recipient = try KeyPair().publicKeyHex
+        let recipient = try KeyPair().publicKey.hex
         let description = try zapRequestJSON(recipient: recipient, amountMillisats: nil)
         let receipt = try makeReceipt(
             signedBy: payee,
@@ -102,7 +103,7 @@ struct NIP57ZapReceiptTests {
 
         #expect(throws: ZapReceipt.ValidationError.missingAmount) {
             try ZapReceipt(event: receipt)!.validate(
-                lnurlProviderPubkey: payee.publicKeyHex,
+                lnurlProviderPubkey: payee.publicKey.hex,
                 expectedAmountMillisats: 999_999,
                 requiringDescriptionHash: false)
         }
@@ -114,7 +115,7 @@ struct NIP57ZapReceiptTests {
     @Test("an invoice with no description hash fails by default")
     func descriptionHashRequiredByDefault() throws {
         let payee = try KeyPair()
-        let recipient = try KeyPair().publicKeyHex
+        let recipient = try KeyPair().publicKey.hex
         let description = try zapRequestJSON(recipient: recipient, amountMillisats: coffeeAmountMillisats)
         let receipt = try makeReceipt(
             signedBy: payee,
@@ -125,7 +126,7 @@ struct NIP57ZapReceiptTests {
             ])
 
         #expect(throws: ZapReceipt.ValidationError.missingDescriptionHash) {
-            try ZapReceipt(event: receipt)!.validate(lnurlProviderPubkey: payee.publicKeyHex)
+            try ZapReceipt(event: receipt)!.validate(lnurlProviderPubkey: payee.publicKey.hex)
         }
     }
 
@@ -134,7 +135,7 @@ struct NIP57ZapReceiptTests {
     @Test("a receipt without a p tag fails missingRecipient")
     func missingRecipient() throws {
         let payee = try KeyPair()
-        let recipient = try KeyPair().publicKeyHex
+        let recipient = try KeyPair().publicKey.hex
         let description = try zapRequestJSON(recipient: recipient, amountMillisats: coffeeAmountMillisats)
         let receipt = try makeReceipt(
             signedBy: payee,
@@ -145,7 +146,7 @@ struct NIP57ZapReceiptTests {
 
         #expect(throws: ZapReceipt.ValidationError.missingRecipient) {
             try ZapReceipt(event: receipt)!.validate(
-                lnurlProviderPubkey: payee.publicKeyHex, requiringDescriptionHash: false)
+                lnurlProviderPubkey: payee.publicKey.hex, requiringDescriptionHash: false)
         }
     }
 
@@ -154,11 +155,11 @@ struct NIP57ZapReceiptTests {
     @Test("a non-numeric zap request amount fails invalidAmount")
     func invalidRequestAmount() throws {
         let payee = try KeyPair()
-        let recipient = try KeyPair().publicKeyHex
+        let recipient = try KeyPair().publicKey.hex
         let sender = EventSigner(keyPair: try KeyPair())
         let request = try sender.sign(
             UnsignedEvent(
-                pubkey: sender.publicKey,
+                pubkey: try PublicKey(hex: sender.publicKey),
                 kind: .zapRequest,
                 rawTags: [["p", recipient], ["amount", "not-a-number"]],
                 content: ""
@@ -174,7 +175,7 @@ struct NIP57ZapReceiptTests {
 
         #expect(throws: ZapReceipt.ValidationError.invalidAmount) {
             try ZapReceipt(event: receipt)!.validate(
-                lnurlProviderPubkey: payee.publicKeyHex, requiringDescriptionHash: false)
+                lnurlProviderPubkey: payee.publicKey.hex, requiringDescriptionHash: false)
         }
     }
 
@@ -189,7 +190,7 @@ struct NIP57ZapReceiptTests {
     @Test("a receipt signed by another key fails payeePubkeyMismatch")
     func payeeMismatch() throws {
         let payee = try KeyPair()
-        let recipient = try KeyPair().publicKeyHex
+        let recipient = try KeyPair().publicKey.hex
         let description = try zapRequestJSON(recipient: recipient, amountMillisats: coffeeAmountMillisats)
         let receipt = try makeReceipt(
             signedBy: payee,
@@ -199,7 +200,7 @@ struct NIP57ZapReceiptTests {
                 ["p", recipient],
             ])
 
-        let otherPubkey = try KeyPair().publicKeyHex
+        let otherPubkey = try KeyPair().publicKey.hex
         #expect(throws: ZapReceipt.ValidationError.payeePubkeyMismatch) {
             try ZapReceipt(event: receipt)!.validate(lnurlProviderPubkey: otherPubkey)
         }
@@ -208,7 +209,7 @@ struct NIP57ZapReceiptTests {
     @Test("a tampered signature fails invalidSignature")
     func invalidSignature() throws {
         let payee = try KeyPair()
-        let recipient = try KeyPair().publicKeyHex
+        let recipient = try KeyPair().publicKey.hex
         let description = try zapRequestJSON(recipient: recipient, amountMillisats: coffeeAmountMillisats)
         let receipt = try makeReceipt(
             signedBy: payee,
@@ -219,28 +220,29 @@ struct NIP57ZapReceiptTests {
             ])
 
         // Flip the first hex character of the signature — still well-formed, but invalid.
-        let replacement: Character = receipt.sig.first == "a" ? "b" : "a"
-        let badSig = String(replacement) + receipt.sig.dropFirst()
+        let sig = try #require(receipt.signature).hex
+        let replacement: Character = sig.first == "a" ? "b" : "a"
+        let badSig = try Signature(hex: String(replacement) + sig.dropFirst())
         let tampered = Event(
             id: receipt.id, pubkey: receipt.pubkey, createdAt: receipt.createdAt, kind: receipt.kind,
-            tags: receipt.tags, content: receipt.content, sig: badSig)
+            tags: receipt.tags, content: receipt.content, signature: badSig)
 
         #expect(throws: ZapReceipt.ValidationError.invalidSignature) {
-            try ZapReceipt(event: tampered)!.validate(lnurlProviderPubkey: payee.publicKeyHex)
+            try ZapReceipt(event: tampered)!.validate(lnurlProviderPubkey: payee.publicKey.hex)
         }
     }
 
     @Test("a receipt without a bolt11 tag fails missingBolt11")
     func missingBolt11() throws {
         let payee = try KeyPair()
-        let recipient = try KeyPair().publicKeyHex
+        let recipient = try KeyPair().publicKey.hex
         let description = try zapRequestJSON(recipient: recipient, amountMillisats: coffeeAmountMillisats)
         let receipt = try makeReceipt(
             signedBy: payee,
             tags: [["description", description], ["p", recipient]])
 
         #expect(throws: ZapReceipt.ValidationError.missingBolt11) {
-            try ZapReceipt(event: receipt)!.validate(lnurlProviderPubkey: payee.publicKeyHex)
+            try ZapReceipt(event: receipt)!.validate(lnurlProviderPubkey: payee.publicKey.hex)
         }
     }
 
@@ -249,17 +251,17 @@ struct NIP57ZapReceiptTests {
         let payee = try KeyPair()
         let receipt = try makeReceipt(
             signedBy: payee,
-            tags: [["bolt11", coffeeInvoice], ["p", try KeyPair().publicKeyHex]])
+            tags: [["bolt11", coffeeInvoice], ["p", try KeyPair().publicKey.hex]])
 
         #expect(throws: ZapReceipt.ValidationError.missingDescription) {
-            try ZapReceipt(event: receipt)!.validate(lnurlProviderPubkey: payee.publicKeyHex)
+            try ZapReceipt(event: receipt)!.validate(lnurlProviderPubkey: payee.publicKey.hex)
         }
     }
 
     @Test("an unparseable bolt11 fails invalidBolt11")
     func invalidBolt11() throws {
         let payee = try KeyPair()
-        let recipient = try KeyPair().publicKeyHex
+        let recipient = try KeyPair().publicKey.hex
         let description = try zapRequestJSON(recipient: recipient, amountMillisats: coffeeAmountMillisats)
         let receipt = try makeReceipt(
             signedBy: payee,
@@ -270,7 +272,7 @@ struct NIP57ZapReceiptTests {
             ])
 
         #expect(throws: ZapReceipt.ValidationError.invalidBolt11) {
-            try ZapReceipt(event: receipt)!.validate(lnurlProviderPubkey: payee.publicKeyHex)
+            try ZapReceipt(event: receipt)!.validate(lnurlProviderPubkey: payee.publicKey.hex)
         }
     }
 
@@ -284,18 +286,18 @@ struct NIP57ZapReceiptTests {
             tags: [
                 ["bolt11", descriptionHashInvoice],
                 ["description", "this is not the hashed description"],
-                ["p", try KeyPair().publicKeyHex],
+                ["p", try KeyPair().publicKey.hex],
             ])
 
         #expect(throws: ZapReceipt.ValidationError.descriptionHashMismatch) {
-            try ZapReceipt(event: receipt)!.validate(lnurlProviderPubkey: payee.publicKeyHex)
+            try ZapReceipt(event: receipt)!.validate(lnurlProviderPubkey: payee.publicKey.hex)
         }
     }
 
     @Test("a zap request amount differing from the invoice fails amountMismatch")
     func amountMismatch() throws {
         let payee = try KeyPair()
-        let recipient = try KeyPair().publicKeyHex
+        let recipient = try KeyPair().publicKey.hex
         // The zap request asks for an amount the coffee invoice does not encode.
         let description = try zapRequestJSON(recipient: recipient, amountMillisats: 12_345)
         let receipt = try makeReceipt(
@@ -308,14 +310,14 @@ struct NIP57ZapReceiptTests {
 
         #expect(throws: ZapReceipt.ValidationError.amountMismatch) {
             try ZapReceipt(event: receipt)!.validate(
-                lnurlProviderPubkey: payee.publicKeyHex, requiringDescriptionHash: false)
+                lnurlProviderPubkey: payee.publicKey.hex, requiringDescriptionHash: false)
         }
     }
 
     @Test("an expected amount differing from the invoice fails amountMismatch")
     func expectedAmountMismatch() throws {
         let payee = try KeyPair()
-        let recipient = try KeyPair().publicKeyHex
+        let recipient = try KeyPair().publicKey.hex
         let description = try zapRequestJSON(recipient: recipient, amountMillisats: coffeeAmountMillisats)
         let receipt = try makeReceipt(
             signedBy: payee,
@@ -327,7 +329,7 @@ struct NIP57ZapReceiptTests {
 
         #expect(throws: ZapReceipt.ValidationError.amountMismatch) {
             try ZapReceipt(event: receipt)!.validate(
-                lnurlProviderPubkey: payee.publicKeyHex,
+                lnurlProviderPubkey: payee.publicKey.hex,
                 expectedAmountMillisats: 1,
                 requiringDescriptionHash: false)
         }
@@ -336,8 +338,8 @@ struct NIP57ZapReceiptTests {
     @Test("a receipt recipient differing from the zap request fails recipientMismatch")
     func recipientMismatch() throws {
         let payee = try KeyPair()
-        let requestRecipient = try KeyPair().publicKeyHex
-        let receiptRecipient = try KeyPair().publicKeyHex  // a different recipient
+        let requestRecipient = try KeyPair().publicKey.hex
+        let receiptRecipient = try KeyPair().publicKey.hex  // a different recipient
         let description = try zapRequestJSON(recipient: requestRecipient, amountMillisats: coffeeAmountMillisats)
         let receipt = try makeReceipt(
             signedBy: payee,
@@ -349,14 +351,14 @@ struct NIP57ZapReceiptTests {
 
         #expect(throws: ZapReceipt.ValidationError.recipientMismatch) {
             try ZapReceipt(event: receipt)!.validate(
-                lnurlProviderPubkey: payee.publicKeyHex, requiringDescriptionHash: false)
+                lnurlProviderPubkey: payee.publicKey.hex, requiringDescriptionHash: false)
         }
     }
 
     @Test("a receipt zapped-event differing from the zap request fails zappedEventMismatch")
     func zappedEventMismatch() throws {
         let payee = try KeyPair()
-        let recipient = try KeyPair().publicKeyHex
+        let recipient = try KeyPair().publicKey.hex
         let description = try zapRequestJSON(
             recipient: recipient, amountMillisats: coffeeAmountMillisats, eventId: "eventInRequest")
         let receipt = try makeReceipt(
@@ -370,14 +372,14 @@ struct NIP57ZapReceiptTests {
 
         #expect(throws: ZapReceipt.ValidationError.zappedEventMismatch) {
             try ZapReceipt(event: receipt)!.validate(
-                lnurlProviderPubkey: payee.publicKeyHex, requiringDescriptionHash: false)
+                lnurlProviderPubkey: payee.publicKey.hex, requiringDescriptionHash: false)
         }
     }
 
     @Test("an invalid signature is reported even when the bolt11 is also unparseable")
     func invalidSignatureTakesPrecedenceOverBolt11() throws {
         let payee = try KeyPair()
-        let recipient = try KeyPair().publicKeyHex
+        let recipient = try KeyPair().publicKey.hex
         let description = try zapRequestJSON(recipient: recipient, amountMillisats: coffeeAmountMillisats)
         let receipt = try makeReceipt(
             signedBy: payee,
@@ -386,21 +388,22 @@ struct NIP57ZapReceiptTests {
                 ["description", description],
                 ["p", recipient],
             ])
-        let replacement: Character = receipt.sig.first == "a" ? "b" : "a"
-        let badSig = String(replacement) + receipt.sig.dropFirst()
+        let sig = try #require(receipt.signature).hex
+        let replacement: Character = sig.first == "a" ? "b" : "a"
+        let badSig = try Signature(hex: String(replacement) + sig.dropFirst())
         let tampered = Event(
             id: receipt.id, pubkey: receipt.pubkey, createdAt: receipt.createdAt, kind: receipt.kind,
-            tags: receipt.tags, content: receipt.content, sig: badSig)
+            tags: receipt.tags, content: receipt.content, signature: badSig)
 
         #expect(throws: ZapReceipt.ValidationError.invalidSignature) {
-            try ZapReceipt(event: tampered)!.validate(lnurlProviderPubkey: payee.publicKeyHex)
+            try ZapReceipt(event: tampered)!.validate(lnurlProviderPubkey: payee.publicKey.hex)
         }
     }
 
     @Test("a wrong preimage fails preimageMismatch")
     func preimageMismatch() throws {
         let payee = try KeyPair()
-        let recipient = try KeyPair().publicKeyHex
+        let recipient = try KeyPair().publicKey.hex
         let description = try zapRequestJSON(recipient: recipient, amountMillisats: coffeeAmountMillisats)
         let receipt = try makeReceipt(
             signedBy: payee,
@@ -413,7 +416,7 @@ struct NIP57ZapReceiptTests {
 
         #expect(throws: ZapReceipt.ValidationError.preimageMismatch) {
             try ZapReceipt(event: receipt)!.validate(
-                lnurlProviderPubkey: payee.publicKeyHex, requiringDescriptionHash: false)
+                lnurlProviderPubkey: payee.publicKey.hex, requiringDescriptionHash: false)
         }
     }
 }

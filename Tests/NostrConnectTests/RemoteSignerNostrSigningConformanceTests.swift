@@ -65,13 +65,13 @@ struct RemoteSignerNostrSigningConformanceTests {
         let (remote, transport) = try await connected()
         let signing: any NostrSigning = remote
         let unsigned = UnsignedEvent(
-            pubkey: signer.publicKeyHex, createdAt: 1000, kind: .textNote, content: "hello via protocol")
+            pubkey: signer.publicKey, createdAt: 1000, kind: .textNote, content: "hello via protocol")
 
         async let signed = signing.sign(unsigned)
         let request = try await nextRequest(transport)
         #expect(request.method == RemoteSignerMethod.signEvent.rawValue)
 
-        let toSign = try RemoteSignerFixtures.unsignedEvent(from: request, author: signer.publicKeyHex)
+        let toSign = try RemoteSignerFixtures.unsignedEvent(from: request, author: signer.publicKey)
         let json = try RemoteSignerFixtures.signedEventJSON(toSign, signer: signer)
         try await transport.deliver(
             RemoteSignerFixtures.response(
@@ -81,6 +81,6 @@ struct RemoteSignerNostrSigningConformanceTests {
         #expect(try event.verify())
         #expect(event.kind == .textNote)
         #expect(event.content == "hello via protocol")
-        #expect(event.pubkey == signer.publicKeyHex)
+        #expect(event.pubkey == signer.publicKey)
     }
 }

@@ -1,5 +1,6 @@
 import Foundation
 import NostrCore
+import NostrTestSupport
 import Testing
 
 @Suite("Event Kind Tests")
@@ -61,13 +62,13 @@ struct EventKindTests {
     @Test("Event encodes kind as a bare integer")
     func eventEncodesKindAsBareInt() throws {
         let event = Event(
-            id: "id",
-            pubkey: "pk",
+            id: EventID.fixture("id"),
+            pubkey: PublicKey.fixture("pk"),
             createdAt: 1_700_000_000,
             kind: .textNote,
             tags: [],
             content: "hi",
-            sig: "sig"
+            signature: nil
         )
         let json = String(data: try JSONEncoder().encode(event), encoding: .utf8)!
         #expect(json.contains(#""kind":1"#))
@@ -79,8 +80,8 @@ struct EventKindTests {
     @Test("Event decodes unknown kinds")
     func eventDecodesUnknownKinds() throws {
         let json = """
-            {"id":"id","pubkey":"pk","created_at":1700000000,"kind":31337,\
-            "tags":[],"content":"","sig":"s"}
+            {"id":"abababababababababababababababababababababababababababababababab","pubkey":"cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",\
+            "created_at":1700000000,"kind":31337,"tags":[],"content":"","sig":""}
             """
         let event = try JSONDecoder().decode(Event.self, from: Data(json.utf8))
         #expect(event.kind == Event.Kind(rawValue: 31337))
@@ -100,7 +101,7 @@ struct EventKindTests {
     func signedEventsRoundTrip() throws {
         let signer = EventSigner(keyPair: try KeyPair())
         let unsigned = UnsignedEvent(
-            pubkey: signer.publicKey,
+            pubkey: try PublicKey(hex: signer.publicKey),
             kind: Event.Kind(rawValue: 31337),
             content: "custom kind"
         )

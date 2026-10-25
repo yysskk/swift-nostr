@@ -47,7 +47,7 @@ actor DirectMessageRelayListStore {
         guard let list = event.directMessageRelayList else {
             return nil
         }
-        return store(list, createdAt: event.createdAt, for: event.pubkey)
+        return store(list, createdAt: event.createdAt, for: event.pubkey.hex)
     }
 
     /// Returns the cached DM relay list for a pubkey, if any.

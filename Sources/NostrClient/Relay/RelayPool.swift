@@ -450,7 +450,7 @@ public actor RelayPool {
                         // scoped to this subscription so a different subscription matching the
                         // same event still receives it.
                         let isNewToSubscription = self.recordEvent(
-                            eventId: event.id,
+                            eventId: event.id.hex,
                             subscriptionId: subscriptionId
                         )
                         if isNewToSubscription,

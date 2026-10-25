@@ -105,7 +105,7 @@ struct ResponseSchemeTests {
             try NWCFixtures.signed(
                 kind: .walletConnectResponse,
                 tags: [
-                    ["e", request.id], ["p", client.publicKeyHex], ["encryption", "nip77_quantum"],
+                    ["e", request.id.hex], ["p", client.publicKey.hex], ["encryption", "nip77_quantum"],
                 ],
                 content: try NWCFixtures.encrypt(
                     #"{"result_type":"pay_invoice","result":{"preimage":"x"}}"#,
@@ -156,7 +156,7 @@ struct ResponseSchemeTests {
             Event(
                 id: genuine.id, pubkey: genuine.pubkey, createdAt: genuine.createdAt,
                 kind: genuine.kind, tags: genuine.tags, content: genuine.content,
-                sig: String(repeating: "ab", count: 64)))
+                signature: try Signature(hex: String(repeating: "ab", count: 64))))
 
         await #expect(throws: WalletConnectError.timedOut) {
             _ = try await payment.value

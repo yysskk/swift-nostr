@@ -17,7 +17,7 @@ struct NostrConnectURITests {
             permissions: [.signEvent(kind: .textNote)]
         )
 
-        #expect(invitation.clientPubkey == keyPair.publicKeyHex)
+        #expect(invitation.clientPubkey == keyPair.publicKey.hex)
         #expect(!invitation.secret.isEmpty)
         #expect(Data(hexString: invitation.secret)?.count == 16)
     }
@@ -35,7 +35,7 @@ struct NostrConnectURITests {
     func roundTripsWithMetadata() throws {
         let keyPair = try KeyPair()
         let invitation = try NostrConnectURI(
-            clientPubkey: keyPair.publicKeyHex,
+            clientPubkey: keyPair.publicKey.hex,
             relays: relays,
             secret: "deadbeef",
             permissions: [.signEvent(kind: .textNote), .nip44Encrypt],
@@ -64,7 +64,7 @@ struct NostrConnectURITests {
     func encodedMetadataSurvivesRoundTrip() throws {
         let keyPair = try KeyPair()
         let invitation = try NostrConnectURI(
-            clientPubkey: keyPair.publicKeyHex,
+            clientPubkey: keyPair.publicKey.hex,
             relays: relays,
             secret: "s3cr3t",
             name: "My App & Co",
@@ -82,7 +82,7 @@ struct NostrConnectURITests {
     func rejectsMissingSecret() throws {
         let keyPair = try KeyPair()
         #expect(throws: RemoteSignerError.self) {
-            try NostrConnectURI(string: "nostrconnect://\(keyPair.publicKeyHex)?relay=wss%3A%2F%2Frelay.example")
+            try NostrConnectURI(string: "nostrconnect://\(keyPair.publicKey.hex)?relay=wss%3A%2F%2Frelay.example")
         }
     }
 
@@ -95,7 +95,7 @@ struct NostrConnectURITests {
 
     @Test("rejects a non-WebSocket relay")
     func rejectsNonWebSocketRelay() throws {
-        let pubkey = try KeyPair().publicKeyHex
+        let pubkey = try KeyPair().publicKey.hex
         #expect(throws: RemoteSignerError.self) {
             try NostrConnectURI(string: "nostrconnect://\(pubkey)?relay=https%3A%2F%2Frelay.example&secret=s")
         }
@@ -106,7 +106,7 @@ struct NostrConnectURITests {
         let keyPair = try KeyPair()
         let uri = try NostrConnectURI(
             string:
-                "nostrconnect://\(keyPair.publicKeyHex)?relay=wss%3A%2F%2Frelay.example&secret=s&perms=sign_event%3A1%2Cnip44_encrypt"
+                "nostrconnect://\(keyPair.publicKey.hex)?relay=wss%3A%2F%2Frelay.example&secret=s&perms=sign_event%3A1%2Cnip44_encrypt"
         )
 
         #expect(

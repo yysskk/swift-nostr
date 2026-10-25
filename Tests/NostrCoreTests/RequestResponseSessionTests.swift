@@ -2,6 +2,7 @@ import Foundation
 // Non-@testable import: ``RequestResponseSession`` is package-visible, and the suite drives it the
 // way a NIP-46 signer session or a NIP-47 wallet connection does.
 import NostrCore
+import NostrTestSupport
 import Testing
 
 /// Exercises the session machinery both NIP-46 and NIP-47 run on: starting once, correlating a
@@ -41,12 +42,17 @@ struct RequestResponseSessionTests {
         }
     }
 
-    private func request(_ id: String) -> Event {
-        Event(id: id, pubkey: "client", createdAt: 0, kind: 1, tags: [], content: "", sig: "")
+    /// A request event whose content carries `key`, so the transport log can name it.
+    private func request(_ key: String) -> Event {
+        Event(
+            id: .fixture(key), pubkey: .fixture("client"), createdAt: 0, kind: 1, tags: [], content: key,
+            signature: nil)
     }
 
     private func response(for key: String, content: String) -> Event {
-        Event(id: "resp-\(key)", pubkey: "peer", createdAt: 0, kind: 1, tags: [["e", key]], content: content, sig: "")
+        Event(
+            id: .fixture("resp-\(key)"), pubkey: .fixture("peer"), createdAt: 0, kind: 1, tags: [["e", key]],
+            content: content, signature: nil)
     }
 
     // MARK: - Lifecycle
@@ -418,7 +424,7 @@ private actor FakeTransport: RelayTransport {
     }
 
     func send(_ event: Event) async throws {
-        log.append(.send(event.id))
+        log.append(.send(event.content))
     }
 
     func events() -> AsyncStream<Event> {

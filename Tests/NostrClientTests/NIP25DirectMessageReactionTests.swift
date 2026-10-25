@@ -20,11 +20,11 @@ struct NIP25DirectMessageReactionTests {
         let builder = DirectMessageBuilder(signer: EventSigner(keyPair: sender))
 
         let result = try await builder.createReactionWithSelfCopy(
-            reaction: "🤙", to: "messageid", author: "authorhex", recipientPubkey: recipient.publicKeyHex)
+            reaction: "🤙", to: "messageid", author: "authorhex", recipientPubkey: recipient.publicKey.hex)
 
         #expect(result.rumor.kind == .reaction)
         #expect(result.rumor.content == "🤙")
-        #expect(result.rumor.sig.isEmpty)  // NIP-17 rumors are never signed
+        #expect(result.rumor.signature == nil)  // NIP-17 rumors are never signed
         #expect(result.rumor.referencedEventIds == ["messageid"])
         #expect(result.rumor.referencedPubkeys == ["authorhex"])
         #expect(result.rumor.firstTagValue(named: "k") == "14")
@@ -38,15 +38,15 @@ struct NIP25DirectMessageReactionTests {
         let builder = DirectMessageBuilder(signer: EventSigner(keyPair: sender))
 
         let result = try await builder.createReactionWithSelfCopy(
-            reaction: "+", to: "messageid", author: recipient.publicKeyHex,
-            recipientPubkey: recipient.publicKeyHex)
+            reaction: "+", to: "messageid", author: recipient.publicKey.hex,
+            recipientPubkey: recipient.publicKey.hex)
 
         let reaction = try await DirectMessageParser(signer: EventSigner(keyPair: recipient)).parseReaction(
             result.recipientGiftWrap)
         #expect(reaction.content == "+")
         #expect(reaction.messageId == "messageid")
-        #expect(reaction.messageAuthorPubkey == recipient.publicKeyHex)
-        #expect(reaction.senderPubkey == sender.publicKeyHex)
+        #expect(reaction.messageAuthorPubkey == recipient.publicKey.hex)
+        #expect(reaction.senderPubkey == sender.publicKey.hex)
 
         // The self-copy decrypts with the sender's own key and carries the identical reaction,
         // guarding against a wrong-key regression when wrapping the self-copy.
@@ -55,7 +55,7 @@ struct NIP25DirectMessageReactionTests {
         #expect(selfCopy.rumorId == reaction.rumorId)
         #expect(selfCopy.content == "+")
         #expect(selfCopy.messageId == "messageid")
-        #expect(selfCopy.senderPubkey == sender.publicKeyHex)
+        #expect(selfCopy.senderPubkey == sender.publicKey.hex)
     }
 
     @Test("parsePayload classifies messages and reactions")
@@ -65,7 +65,7 @@ struct NIP25DirectMessageReactionTests {
         let builder = DirectMessageBuilder(signer: EventSigner(keyPair: sender))
         let parser = DirectMessageParser(signer: EventSigner(keyPair: recipient))
 
-        let message = try await builder.createMessageWithSelfCopy(content: "hi", to: recipient.publicKeyHex)
+        let message = try await builder.createMessageWithSelfCopy(content: "hi", to: recipient.publicKey.hex)
         guard case .message(let parsedMessage) = try await parser.parsePayload(message.recipientGiftWrap) else {
             Issue.record("expected a message payload")
             return
@@ -73,8 +73,8 @@ struct NIP25DirectMessageReactionTests {
         #expect(parsedMessage.content == "hi")
 
         let reaction = try await builder.createReactionWithSelfCopy(
-            reaction: "❤️", to: parsedMessage.rumorId, author: sender.publicKeyHex,
-            recipientPubkey: recipient.publicKeyHex)
+            reaction: "❤️", to: parsedMessage.rumorId, author: sender.publicKey.hex,
+            recipientPubkey: recipient.publicKey.hex)
         guard case .reaction(let parsedReaction) = try await parser.parsePayload(reaction.recipientGiftWrap) else {
             Issue.record("expected a reaction payload")
             return
@@ -90,9 +90,9 @@ struct NIP25DirectMessageReactionTests {
         let builder = DirectMessageBuilder(signer: EventSigner(keyPair: sender))
         let parser = DirectMessageParser(signer: EventSigner(keyPair: recipient))
 
-        let message = try await builder.createMessageWithSelfCopy(content: "hi", to: recipient.publicKeyHex)
+        let message = try await builder.createMessageWithSelfCopy(content: "hi", to: recipient.publicKey.hex)
         let reaction = try await builder.createReactionWithSelfCopy(
-            reaction: "+", to: "mid", author: sender.publicKeyHex, recipientPubkey: recipient.publicKeyHex)
+            reaction: "+", to: "mid", author: sender.publicKey.hex, recipientPubkey: recipient.publicKey.hex)
 
         await #expect(throws: NostrError.self) { try await parser.parse(reaction.recipientGiftWrap) }
         await #expect(throws: NostrError.self) { try await parser.parseReaction(message.recipientGiftWrap) }
@@ -105,11 +105,11 @@ struct NIP25DirectMessageReactionTests {
 
         // Hand-built kind-7 rumor with no "e" tag — not a valid reaction.
         let rumor = try UnsignedEvent(
-            pubkey: sender.publicKeyHex, kind: .reaction,
-            tags: [.pubkey(sender.publicKeyHex)], content: "+"
+            pubkey: sender.publicKey, kind: .reaction,
+            tags: [.pubkey(sender.publicKey.hex)], content: "+"
         ).asRumor()
         let giftWrap = try await GiftWrap.wrap(
-            event: rumor, signer: EventSigner(keyPair: sender), recipientPubkey: recipient.publicKeyHex)
+            event: rumor, signer: EventSigner(keyPair: sender), recipientPubkey: recipient.publicKey.hex)
 
         let parser = DirectMessageParser(signer: EventSigner(keyPair: recipient))
         await #expect(throws: NostrError.self) { try await parser.parseReaction(giftWrap) }
@@ -122,11 +122,11 @@ struct NIP25DirectMessageReactionTests {
 
         // Hand-built kind-7 rumor with an "e" tag but no "p" tag — author is unknown.
         let rumor = try UnsignedEvent(
-            pubkey: sender.publicKeyHex, kind: .reaction,
+            pubkey: sender.publicKey, kind: .reaction,
             tags: [.event("messageid")], content: "+"
         ).asRumor()
         let giftWrap = try await GiftWrap.wrap(
-            event: rumor, signer: EventSigner(keyPair: sender), recipientPubkey: recipient.publicKeyHex)
+            event: rumor, signer: EventSigner(keyPair: sender), recipientPubkey: recipient.publicKey.hex)
 
         await #expect(throws: NostrError.self) {
             try await DirectMessageParser(signer: EventSigner(keyPair: recipient)).parseReaction(giftWrap)
@@ -141,8 +141,8 @@ struct NIP25DirectMessageReactionTests {
         let expiry = Date(timeIntervalSince1970: 1_700_000_000)
 
         let result = try await builder.createReactionWithSelfCopy(
-            reaction: "+", to: "mid", author: sender.publicKeyHex,
-            recipientPubkey: recipient.publicKeyHex, expiration: expiry)
+            reaction: "+", to: "mid", author: sender.publicKey.hex,
+            recipientPubkey: recipient.publicKey.hex, expiration: expiry)
 
         #expect(result.recipientGiftWrap.expiration == expiry)
         let parsed = try await DirectMessageParser(signer: EventSigner(keyPair: recipient)).parseReaction(
@@ -158,12 +158,12 @@ struct NIP25DirectMessageReactionTests {
 
         let myPubkey = await client.identity.publicKey ?? ""
         let message = DirectMessage(
-            rumorId: "mid", senderPubkey: author.publicKeyHex,
+            rumorId: "mid", senderPubkey: author.publicKey.hex,
             recipientPubkey: myPubkey, content: "hi", createdAt: Date())
 
         // Confirmed-absent DM relay lists: both copies fall back to the pool's relay
         // without a discovery fetch.
-        await client.dmRelayListStore.markNoList(for: author.publicKeyHex)
+        await client.dmRelayListStore.markNoList(for: author.publicKey.hex)
         await client.dmRelayListStore.markNoList(for: myPubkey)
 
         let result = try await PublishAckSupport.acknowledgingPublishes(2, on: socket) {

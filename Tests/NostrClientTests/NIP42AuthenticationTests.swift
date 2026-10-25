@@ -30,7 +30,7 @@ struct NIP42AuthenticationEventTests {
         let event = try signer.signClientAuthentication(relayURL: relayURL, challenge: "challengestringhere")
 
         #expect(event.kind == .clientAuthentication)
-        #expect(event.pubkey == signer.publicKey)
+        #expect(event.pubkey.hex == signer.publicKey)
         #expect(event.firstTagValue(named: "relay") == "wss://relay.example.com/")
         #expect(event.firstTagValue(named: "challenge") == "challengestringhere")
         #expect(event.content.isEmpty)
@@ -177,7 +177,7 @@ struct NIP42RelayConnectionTests {
 
         // Deliver the OK only once the AUTH frame has been sent, so the waiter
         // is registered when the acknowledgment arrives.
-        try await pollUntil { mock.sentTextFrames.contains { $0.contains("\"AUTH\"") && $0.contains(event.id) } }
+        try await pollUntil { mock.sentTextFrames.contains { $0.contains("\"AUTH\"") && $0.contains(event.id.hex) } }
         mock.deliver(.string("[\"OK\",\"\(event.id)\",true,\"\"]"))
 
         try await authTask.value
@@ -247,7 +247,7 @@ struct NIP42RelayConnectionTests {
         try await pollUntil { mock.sentTextFrames.contains { $0.contains("\"AUTH\"") } }
         let sent = try sentAuthEvent(in: mock)
         #expect(sent.kind == .clientAuthentication)
-        #expect(sent.pubkey == signer.publicKey)
+        #expect(sent.pubkey.hex == signer.publicKey)
         #expect(sent.firstTagValue(named: "relay") == relayURL.absoluteString)
         #expect(sent.firstTagValue(named: "challenge") == "challengestringhere")
         #expect(try sent.verify())
@@ -284,7 +284,7 @@ struct NIP42RelayConnectionTests {
         for signer in [alice, bob] {
             let event = try signedAuthEvent(signer: signer)
             let authTask = Task { try await connection.authenticate(with: event) }
-            try await pollUntil { mock.sentTextFrames.contains { $0.contains(event.id) } }
+            try await pollUntil { mock.sentTextFrames.contains { $0.contains(event.id.hex) } }
             mock.deliver(.string("[\"OK\",\"\(event.id)\",true,\"\"]"))
             try await authTask.value
         }
@@ -324,7 +324,7 @@ struct NIP42RelayConnectionTests {
         let signer = EventSigner(keyPair: try KeyPair())
         let event = try signedAuthEvent(signer: signer)
         let authTask = Task { try await connection.authenticate(with: event) }
-        try await pollUntil { mock.sentTextFrames.contains { $0.contains(event.id) } }
+        try await pollUntil { mock.sentTextFrames.contains { $0.contains(event.id.hex) } }
         mock.deliver(.string("[\"OK\",\"\(event.id)\",true,\"\"]"))
         try await authTask.value
 

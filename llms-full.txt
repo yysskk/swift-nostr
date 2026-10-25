@@ -330,13 +330,13 @@ NIP-01 Nostr Event (struct: Codable, Identifiable, Hashable, Sendable).
 
 ### Properties
 
-- `id: String` -- 32-byte lowercase hex sha256
-- `pubkey: String` -- 32-byte hex public key
+- `id: EventID` -- sha256 of the NIP-01 serialization
+- `pubkey: PublicKey` -- author's public key
 - `createdAt: Int64` -- unix timestamp in seconds
 - `kind: Event.Kind` -- event kind (RawRepresentable struct, encodes as bare integer)
 - `tags: [[String]]` -- array of tag arrays (raw NIP-01 wire form)
 - `content: String` -- arbitrary string content
-- `sig: String` -- 64-byte hex Schnorr signature
+- `signature: Signature?` -- Schnorr signature, the `sig` field on the wire; `nil` for an unsigned NIP-59 rumor, which encodes without `sig` (decoding treats a missing or empty `sig` as `nil`). A malformed `id`, `pubkey`, or `sig` fails decoding, so a relay frame carrying one is dropped. `verify()` throws `invalidSignature` for a rumor.
 
 ### Tag
 
@@ -432,11 +432,12 @@ published.result.status(for: "wss://Relay.Example.com/")  // any spelling; nil i
 
 ## UnsignedEvent
 
-Event before signing (struct: Sendable). Same fields as Event minus `id` and `sig`.
+Event before signing (struct: Sendable). Same fields as Event minus `id` and `signature`;
+`computedID` is the `EventID` it will be signed under, and `asRumor()` gives the unsigned NIP-59 rumor.
 
 ```swift
 let unsigned = UnsignedEvent(
-    pubkey: keyPair.publicKeyHex,
+    pubkey: keyPair.publicKey,
     kind: .textNote,
     tags: [.hashtag("test")],
     content: "Hello"
@@ -597,9 +598,9 @@ Nostr keypair (struct: Sendable).
 ### Properties
 
 - `privateKey: Data` -- 32-byte private key
-- `publicKey: Data` -- 32-byte x-only public key
-- `privateKeyHex: String`, `publicKeyHex: String`
-- `nsec: String`, `npub: String`
+- `publicKey: PublicKey` -- x-only public key (`publicKey.hex`, `publicKey.npub`)
+- `privateKeyHex: String`
+- `nsec: String` (throwing getter)
 
 ### Initialization
 
@@ -615,15 +616,20 @@ let fromMnemonic = try KeyPair(                       // from BIP-39 (NIP-06)
 let (mnemonic, kp) = try KeyPair.generate(wordCount: 12)  // random mnemonic
 ```
 
-## PublicKey
+## PublicKey / EventID / Signature
 
-Nostr public key only (struct: Sendable, Hashable).
+Typed hex values (structs: Sendable, Hashable, Codable, LosslessStringConvertible). Each holds exactly
+one spelling, canonical lowercase hex (`PublicKey`/`EventID`: 64 digits = 32 bytes, `Signature`: 128
+digits = 64 bytes), which is also its `description` and its JSON encoding (a bare string). Uppercase,
+the wrong length, or non-hex is rejected: every failed parse throws `invalidPublicKey` / `invalidEventID`
+/ `invalidSignature` respectively (including an npub or note with another bech32 prefix), the failable
+`init?(_:)` returns nil, and decoding fails with `DecodingError.dataCorrupted`. `EventID` is `Comparable`
+(byte order, the NIP-01 tie-break).
 
 ### Properties
 
-- `data: Data` -- 32-byte x-only public key
-- `hex: String`
-- `npub: String`
+- `hex: String`, `data: Data`
+- `PublicKey.npub: String`, `EventID.note: String` -- NIP-19 bech32 forms
 
 ### Initialization
 
@@ -631,6 +637,9 @@ Nostr public key only (struct: Sendable, Hashable).
 let pk = try PublicKey(hex: "...")
 let pk = try PublicKey(npub: "npub1...")
 let pk = try PublicKey(data: data)
+let id = try EventID(note: "note1...")
+let sig = try Signature(hex: "...")
+let parsed = EventID(someString)   // nil unless canonical hex
 ```
 
 ## EncryptedPrivateKey
@@ -739,7 +748,7 @@ NIP-13 proof of work: leading-zero-bit difficulty over event ids, with mining an
 
 ```swift
 // Leading zero bits of a hex event id (each leading "0" nibble is 4 bits).
-let bits = ProofOfWork.difficulty(ofHexId: event.id)
+let bits = ProofOfWork.difficulty(ofHexId: event.id.hex)
 
 // Mine an unsigned event to a target difficulty, then sign it. Mining holds createdAt fixed
 // (deterministic) and is cooperative — it checks cancellation and yields, so it can be cancelled.
@@ -1513,7 +1522,7 @@ for await challenge in await signer.authChallenges() {
 
 Error types (enum: Error, LocalizedError, Sendable, Equatable).
 
-Cases: `invalidPrivateKey`, `invalidPublicKey`, `invalidSignature`, `invalidEventId`, `signingFailed`, `signerNotSet`, `verificationFailed`, `serializationFailed`, `invalidData`, `invalidMessageFormat`, `invalidRelayURL(String)`, `connectionFailed(String)`, `notConnected`, `subscriptionNotFound(String)`, `relayError(String)`, `noRelaysInPool`, `noMatchingRelays([String])`, `authenticationFailed(String)`, `cannotPublishAuthenticationEvent`, `timeout`, `invalidHex`, `invalidBech32`, `unknownPrefix(String)`, `invalidTLV`, `invalidNIP19Entity`, `invalidNostrURI`, `encryptionFailed`, `decryptionFailed`, `unsupportedEncryptionVersion(UInt8)`, `invalidPayloadFormat`, `hmacVerificationFailed`, `invalidPadding`, `invalidMnemonic`, `invalidMnemonicWord(String)`, `invalidMnemonicChecksum`, `randomGenerationFailed`, `invalidNcryptsec`, `unsupportedScryptCost(UInt8)`.
+Cases: `invalidPrivateKey`, `invalidPublicKey`, `invalidSignature`, `invalidEventID`, `signingFailed`, `signerNotSet`, `verificationFailed`, `serializationFailed`, `invalidData`, `invalidMessageFormat`, `invalidRelayURL(String)`, `connectionFailed(String)`, `notConnected`, `subscriptionNotFound(String)`, `relayError(String)`, `noRelaysInPool`, `noMatchingRelays([String])`, `authenticationFailed(String)`, `cannotPublishAuthenticationEvent`, `timeout`, `invalidHex`, `invalidBech32`, `unknownPrefix(String)`, `invalidTLV`, `invalidNIP19Entity`, `invalidNostrURI`, `encryptionFailed`, `decryptionFailed`, `unsupportedEncryptionVersion(UInt8)`, `invalidPayloadFormat`, `hmacVerificationFailed`, `invalidPadding`, `invalidMnemonic`, `invalidMnemonicWord(String)`, `invalidMnemonicChecksum`, `randomGenerationFailed`, `invalidNcryptsec`, `unsupportedScryptCost(UInt8)`.
 
 ## Supported NIPs
 

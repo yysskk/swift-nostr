@@ -172,7 +172,7 @@ public struct NostrMessagesAPI: NostrMessaging {
             }
             return try await DirectMessageBuilder(signer: signer).wrapWithSelfCopy(
                 rumor: try rumor.asRumor(),
-                senderPubkey: publicKey,
+                senderPubkey: publicKey.hex,
                 to: recipientPubkey,
                 expiration: expiration
             )
@@ -273,7 +273,7 @@ public struct NostrMessagesAPI: NostrMessaging {
     ) async throws -> SendDirectMessageResult {
         async let recipientTargetsTask = inboxTargets(for: recipientPubkey)
         // The rumor is authored under the sender's key, so it names the self-copy's addressee.
-        async let senderTargetsTask = inboxTargets(for: result.rumor.pubkey)
+        async let senderTargetsTask = inboxTargets(for: result.rumor.pubkey.hex)
         let recipientTargets = await recipientTargetsTask
         let senderTargets = await senderTargetsTask
 
@@ -314,7 +314,7 @@ public struct NostrMessagesAPI: NostrMessaging {
     private func giftWrapFilter(limit: Int) async throws -> Filter {
         Filter(
             kinds: [.giftWrap],
-            pubkeyReferences: [try await client.requiredPublicKey()],
+            pubkeyReferences: [try await client.requiredPublicKey().hex],
             limit: limit
         )
     }

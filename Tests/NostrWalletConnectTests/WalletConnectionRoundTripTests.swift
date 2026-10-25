@@ -44,7 +44,7 @@ struct WalletConnectionRoundTripTests {
         async let result = connection.payInvoice("lnbc1")
         let request = try await NWCFixtures.waitForSentEvents(transport, count: 1)[0]
 
-        #expect(request.firstTagValue(named: "p") == wallet.publicKeyHex)
+        #expect(request.firstTagValue(named: "p") == wallet.publicKey.hex)
         #expect(request.firstTagValue(named: "encryption") == "nip44_v2")
         #expect(request.firstTagValue(named: "expiration") != nil)
 
@@ -214,7 +214,7 @@ struct WalletConnectionRoundTripTests {
         await transport.emit(
             try NWCFixtures.signed(
                 kind: .walletConnectResponse,
-                tags: [["e", request.id], ["p", client.publicKeyHex], ["d", "b"]],
+                tags: [["e", request.id.hex], ["p", client.publicKey.hex], ["d", "b"]],
                 content: "not-decryptable",
                 wallet: wallet))
 

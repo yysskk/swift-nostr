@@ -17,7 +17,7 @@ struct MnemonicTests {
         let keyPair = try KeyPair(mnemonicPhrase: phrase)
 
         #expect(keyPair.privateKeyHex == expectedPrivateKey)
-        #expect(keyPair.publicKeyHex == expectedPublicKey)
+        #expect(keyPair.publicKey.hex == expectedPublicKey)
     }
 
     @Test("NIP-06 test vector 2 - 24 word mnemonic")
@@ -31,7 +31,7 @@ struct MnemonicTests {
         let keyPair = try KeyPair(mnemonicPhrase: phrase)
 
         #expect(keyPair.privateKeyHex == expectedPrivateKey)
-        #expect(keyPair.publicKeyHex == expectedPublicKey)
+        #expect(keyPair.publicKey.hex == expectedPublicKey)
     }
 
     // MARK: - Mnemonic Generation
@@ -63,12 +63,12 @@ struct MnemonicTests {
 
         #expect(mnemonic.wordCount == 12)
         #expect(keyPair.privateKey.count == 32)
-        #expect(keyPair.publicKey.count == 32)
+        #expect(keyPair.publicKey.data.count == 32)
 
         // Verify the keypair can be recreated from the mnemonic
         let recreatedKeyPair = try KeyPair(mnemonic: mnemonic)
         #expect(recreatedKeyPair.privateKeyHex == keyPair.privateKeyHex)
-        #expect(recreatedKeyPair.publicKeyHex == keyPair.publicKeyHex)
+        #expect(recreatedKeyPair.publicKey.hex == keyPair.publicKey.hex)
     }
 
     // MARK: - Mnemonic Validation
@@ -108,7 +108,7 @@ struct MnemonicTests {
         let keyPair1 = try KeyPair(mnemonic: mnemonic, account: 1)
 
         #expect(keyPair0.privateKeyHex != keyPair1.privateKeyHex)
-        #expect(keyPair0.publicKeyHex != keyPair1.publicKeyHex)
+        #expect(keyPair0.publicKey.hex != keyPair1.publicKey.hex)
     }
 
     // MARK: - Passphrase Support
