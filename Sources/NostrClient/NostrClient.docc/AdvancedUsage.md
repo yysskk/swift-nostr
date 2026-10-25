@@ -396,8 +396,8 @@ means the pubkey is not allowed even when authenticated.
 
 ## Remote Signing (NIP-46)
 
-``NostrIdentityAPI/setSigner(_:)-(NostrSigning)`` accepts any ``NostrCore/NostrSigning`` — a local
-``NostrCore/EventSigner`` or a remote NIP-46 signer (a `RemoteSigner` from the `NostrConnect`
+``NostrIdentityAPI/setSigner(_:)-(NostrSigning)`` accepts any `NostrSigning` — a local
+``EventSigner`` or a remote NIP-46 signer (a `RemoteSigner` from the `NostrConnect`
 library), so the private key can live in a separate "bunker" the app never touches. The signer's
 public key is resolved once and cached, so ``NostrIdentityAPI/publicKey`` and ``NostrIdentityAPI/npub`` stay
 synchronous.
@@ -417,7 +417,7 @@ try await client.events.publishTextNote(content: "Signed by my bunker")
 try await client.messages.send("and gift-wrapped by it too", to: recipientPubkey)
 ```
 
-To author an event this library has no helper for, build an ``NostrCore/UnsignedEvent`` under
+To author an event this library has no helper for, build an ``UnsignedEvent`` under
 ``NostrIdentityAPI/publicKey``, sign it, and publish it:
 
 ```swift
@@ -653,9 +653,14 @@ if let receipt = ZapReceipt(event: receiptEvent) {
 }
 ```
 
+Validation reports a check it cannot make instead of skipping it: the receipt must carry a `p` tag,
+and `expectedAmountMillisats` fails against an invoice that names no amount. The invoice must also
+commit to the zap request through its description hash; pass `requiringDescriptionHash: false` only
+for a provider known to omit it, accepting the loss of that binding.
+
 The ``EventSigner/signZapRequest(recipientPubkey:relays:amountMillisats:lnurl:eventId:eventCoordinate:comment:)``,
 ``LNURLPayResponse/fetchInvoice(amountMillisats:zapRequest:lnurl:urlSession:)``, ``Bolt11Invoice``,
-and ``ZapReceipt/validate(lnurlProviderPubkey:expectedAmountMillisats:)`` APIs each work standalone,
+and ``ZapReceipt/validate(lnurlProviderPubkey:expectedAmountMillisats:requiringDescriptionHash:)`` APIs each work standalone,
 so you can adopt only the parts of the flow you need.
 
 ## Relay Configuration
