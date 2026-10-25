@@ -36,7 +36,7 @@ let package = Package(
         ),
     ],
     dependencies: [
-        .package(url: "https://github.com/21-DOT-DEV/swift-secp256k1", from: "0.23.2"),
+        .package(url: "https://github.com/21-DOT-DEV/swift-secp256k1", from: "0.24.0"),
         .package(url: "https://github.com/apple/swift-crypto.git", from: "5.0.0"),
         .package(url: "https://github.com/swiftlang/swift-docc-plugin.git", from: "1.4.3"),
     ],
