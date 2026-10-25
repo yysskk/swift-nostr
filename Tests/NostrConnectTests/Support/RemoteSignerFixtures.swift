@@ -1,5 +1,6 @@
 import Foundation
 import NostrCore
+import NostrTestSupport
 
 @testable import NostrConnect
 
@@ -14,14 +15,14 @@ enum RemoteSignerFixtures {
     /// Builds a `bunker://` token pointing at `signer`, with an optional connection secret.
     static func bunker(signer: KeyPair, secret: String? = nil) throws -> BunkerURI {
         try BunkerURI(
-            remoteSignerPubkey: signer.publicKeyHex,
+            remoteSignerPubkey: signer.publicKey.hex,
             relays: [URL(string: "wss://relay.example")!],
             secret: secret)
     }
 
     /// Decrypts a request event the client sent to the signer, returning the request body.
     static func decryptRequest(_ event: Event, client: KeyPair, signer: KeyPair) throws -> RemoteSignerRequest {
-        let json = try SealedMessage(payload: event.content).open(from: client.publicKeyHex, using: signer)
+        let json = try SealedMessage(payload: event.content).open(from: client.publicKey.hex, using: signer)
         return try JSONDecoder().decode(RemoteSignerRequest.self, from: Data(json.utf8))
     }
 
@@ -37,15 +38,15 @@ enum RemoteSignerFixtures {
         if let error { object["error"] = error }
         let json = String(
             decoding: try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys]), as: UTF8.self)
-        let sealed = try SealedMessage.seal(json, for: client.publicKeyHex, using: signer)
+        let sealed = try SealedMessage.seal(json, for: client.publicKey.hex, using: signer)
         return Event(
-            id: "resp-\(requestID)",
-            pubkey: signer.publicKeyHex,
+            id: .fixture("resp-\(requestID)"),
+            pubkey: signer.publicKey,
             createdAt: 0,
             kind: .nostrConnect,
-            tags: [["p", client.publicKeyHex]],
+            tags: [["p", client.publicKey.hex]],
             content: sealed.payload,
-            sig: "")
+            signature: nil)
     }
 
     /// Signs `unsigned` with the fake signer, producing the JSON-stringified signed event a
@@ -58,7 +59,7 @@ enum RemoteSignerFixtures {
 
     /// Reconstructs the unsigned event a `sign_event` request carries in its first parameter, as the
     /// signer would to sign it. Uses the client's pubkey as the author.
-    static func unsignedEvent(from request: RemoteSignerRequest, author: String) throws -> UnsignedEvent {
+    static func unsignedEvent(from request: RemoteSignerRequest, author: PublicKey) throws -> UnsignedEvent {
         guard let param = request.params.first,
             let object = try JSONSerialization.jsonObject(with: Data(param.utf8)) as? [String: Any]
         else {

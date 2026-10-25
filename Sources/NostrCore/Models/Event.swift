@@ -4,11 +4,11 @@ import Foundation
 /// Nostr Event (NIP-01)
 /// https://github.com/nostr-protocol/nips/blob/master/01.md
 public struct Event: Codable, Identifiable, Hashable, Sendable {
-    /// 32-byte lowercase hex-encoded sha256 of the serialized event data
-    public let id: String
+    /// The SHA-256 of the serialized event data.
+    public let id: EventID
 
-    /// 32-byte lowercase hex-encoded public key of the event creator
-    public let pubkey: String
+    /// The public key of the event creator.
+    public let pubkey: PublicKey
 
     /// Unix timestamp in seconds
     public let createdAt: Int64
@@ -23,8 +23,12 @@ public struct Event: Codable, Identifiable, Hashable, Sendable {
     /// Arbitrary string content
     public let content: String
 
-    /// 64-byte lowercase hex-encoded signature
-    public let sig: String
+    /// The creator's Schnorr signature over ``id``, carried in the `sig` field on the wire.
+    ///
+    /// `nil` for an unsigned NIP-59 rumor (see ``UnsignedEvent/asRumor()``), which encodes without
+    /// a `sig` field. Decoding accepts a missing or empty `sig` as such a rumor; ``verify()`` fails
+    /// for it.
+    public let signature: Signature?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -33,17 +37,22 @@ public struct Event: Codable, Identifiable, Hashable, Sendable {
         case kind
         case tags
         case content
-        case sig
+        case signature = "sig"
     }
 
+    /// Creates an event from its fields.
+    ///
+    /// Nothing is checked here: ``verify()`` tells whether `id` and `signature` match the rest.
+    /// To build a new event, sign an ``UnsignedEvent`` instead.
+    /// - Parameter signature: The event's signature, or `nil` for an unsigned NIP-59 rumor.
     public init(
-        id: String,
-        pubkey: String,
+        id: EventID,
+        pubkey: PublicKey,
         createdAt: Int64,
         kind: Kind,
         tags: [[String]],
         content: String,
-        sig: String
+        signature: Signature?
     ) {
         self.id = id
         self.pubkey = pubkey
@@ -51,7 +60,45 @@ public struct Event: Codable, Identifiable, Hashable, Sendable {
         self.kind = kind
         self.tags = tags
         self.content = content
-        self.sig = sig
+        self.signature = signature
+    }
+
+    /// Decodes a NIP-01 event.
+    ///
+    /// A missing `sig` field, or the empty string some implementations write for an unsigned
+    /// rumor, decodes as a `nil` ``signature``.
+    /// - Throws: `DecodingError` if a field is missing or mistyped, or if `id`, `pubkey`, or a
+    ///   non-empty `sig` is not canonical lowercase hex of the right length.
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decode(EventID.self, forKey: .id)
+        self.pubkey = try container.decode(PublicKey.self, forKey: .pubkey)
+        self.createdAt = try container.decode(Int64.self, forKey: .createdAt)
+        self.kind = try container.decode(Kind.self, forKey: .kind)
+        self.tags = try container.decode([[String]].self, forKey: .tags)
+        self.content = try container.decode(String.self, forKey: .content)
+        if let sig = try container.decodeIfPresent(String.self, forKey: .signature), !sig.isEmpty {
+            guard let signature = Signature(sig) else {
+                throw DecodingError.dataCorruptedError(
+                    forKey: .signature, in: container,
+                    debugDescription: "A signature must be 128 lowercase hexadecimal digits")
+            }
+            self.signature = signature
+        } else {
+            self.signature = nil
+        }
+    }
+
+    /// Encodes the event in its NIP-01 form, omitting `sig` when ``signature`` is `nil`.
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(pubkey, forKey: .pubkey)
+        try container.encode(createdAt, forKey: .createdAt)
+        try container.encode(kind, forKey: .kind)
+        try container.encode(tags, forKey: .tags)
+        try container.encode(content, forKey: .content)
+        try container.encodeIfPresent(signature, forKey: .signature)
     }
 }
 
@@ -256,8 +303,8 @@ extension Event.Kind: Codable {
 // MARK: - Unsigned Event
 /// An event before it has been signed
 public struct UnsignedEvent: Sendable {
-    /// The creator's public key (32-byte lowercase hex).
-    public let pubkey: String
+    /// The creator's public key.
+    public let pubkey: PublicKey
     /// Creation time as a Unix timestamp in seconds.
     public let createdAt: Int64
     /// The event kind (NIP-01).
@@ -267,8 +314,9 @@ public struct UnsignedEvent: Sendable {
     /// The event's content; its meaning depends on ``kind``.
     public let content: String
 
+    /// Builds an unsigned event from typed ``Tag``s.
     public init(
-        pubkey: String,
+        pubkey: PublicKey,
         createdAt: Int64 = Int64(Date().timeIntervalSince1970),
         kind: Event.Kind,
         tags: [Tag] = [],
@@ -281,7 +329,7 @@ public struct UnsignedEvent: Sendable {
     /// from another event. Prefer the ``Tag``-based initializer when
     /// constructing tags yourself.
     public init(
-        pubkey: String,
+        pubkey: PublicKey,
         createdAt: Int64 = Int64(Date().timeIntervalSince1970),
         kind: Event.Kind,
         rawTags: [[String]],
@@ -298,7 +346,7 @@ public struct UnsignedEvent: Sendable {
     public func serializedForHashing() throws -> Data {
         let serializable: [Any] = [
             0,
-            pubkey,
+            pubkey.hex,
             createdAt,
             kind.rawValue,
             tags,
@@ -308,32 +356,32 @@ public struct UnsignedEvent: Sendable {
             withJSONObject: serializable, options: [.sortedKeys, .withoutEscapingSlashes])
     }
 
-    /// The NIP-01 event id: the lowercase hex SHA-256 of ``serializedForHashing()``.
+    /// The NIP-01 event id: the SHA-256 of ``serializedForHashing()``.
     ///
     /// This is the single source of truth for deriving an event id from its
     /// unsigned form; signing, rumor construction, and proof-of-work mining all
     /// go through it.
-    public var computedId: String {
+    public var computedID: EventID {
         get throws {
-            try Data(SHA256.hash(data: serializedForHashing())).hexEncodedString()
+            try EventID(data: Data(SHA256.hash(data: serializedForHashing())))
         }
     }
 
     /// Returns this event as an unsigned rumor (NIP-59): the event id is computed
-    /// from the serialized form, but no signature is ever produced (`sig` is empty).
+    /// from the serialized form, but no signature is ever produced (``Event/signature`` is `nil`).
     ///
     /// NIP-17 requires that kind-14 rumors are never signed — a leaked signed rumor
     /// would be cryptographic proof of authorship and destroy deniability.
     /// https://github.com/nostr-protocol/nips/blob/master/59.md
     public func asRumor() throws -> Event {
         Event(
-            id: try computedId,
+            id: try computedID,
             pubkey: pubkey,
             createdAt: createdAt,
             kind: kind,
             tags: tags,
             content: content,
-            sig: ""
+            signature: nil
         )
     }
 }

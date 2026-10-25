@@ -43,7 +43,7 @@ public actor WalletConnection {
     private let keyPair: KeyPair
     private let signer: EventSigner
     private let walletPubkey: String
-    private let clientPubkey: String
+    private let clientPubkey: PublicKey
 
     /// Open notification streams, keyed so each can deregister on termination.
     private var notificationStreams: [UUID: AsyncStream<WalletConnectNotification>.Continuation] = [:]
@@ -65,7 +65,7 @@ public actor WalletConnection {
         self.keyPair = keyPair
         self.signer = EventSigner(keyPair: keyPair)
         self.walletPubkey = uri.walletPubkey
-        self.clientPubkey = keyPair.publicKeyHex
+        self.clientPubkey = keyPair.publicKey
         self.session = Session(
             transport: transport ?? RelayConnectionTransport(relayURLs: uri.relays),
             timedOut: WalletConnectError.timedOut,
@@ -203,7 +203,7 @@ public actor WalletConnection {
         let collected: Session.PartialResult = { $0.collected }
         return try await session.perform(
             event,
-            key: event.id,
+            key: event.id.hex,
             state: RequestState(scheme: scheme, expected: expectedResponses, method: method),
             timeout: config.requestTimeout,
             partialResult: partialOnTimeout ? collected : nil)
@@ -272,7 +272,7 @@ public actor WalletConnection {
         // The relay filter already restricts authors, but enforce it here too as defense in depth —
         // and require the event to say what it was signed to say, so nothing downstream reads a
         // payload whose author has not actually vouched for it.
-        guard event.pubkey == walletPubkey, (try? event.verify()) == true else { return }
+        guard event.pubkey.hex == walletPubkey, (try? event.verify()) == true else { return }
         switch event.kind {
         case .walletConnectResponse:
             await handleResponse(event)
@@ -306,7 +306,7 @@ public actor WalletConnection {
             // response arriving over two relays would otherwise count twice, completing a
             // `multi_pay_*` early with a duplicate part while the response it was still owed had
             // nowhere left to go.
-            guard request.seenResponseIDs.insert(event.id).inserted else { return .pending }
+            guard request.seenResponseIDs.insert(event.id.hex).inserted else { return .pending }
             request.receivedCount += 1
 
             // A tag naming a scheme this package does not implement is reported as such: the
@@ -394,7 +394,7 @@ public actor WalletConnection {
         Filter(
             authors: [walletPubkey],
             kinds: [.walletConnectResponse, .walletConnectNotification, .walletConnectNotificationLegacy],
-            pubkeyReferences: [clientPubkey])
+            pubkeyReferences: [clientPubkey.hex])
     }
 
     private var infoFilter: Filter {

@@ -22,7 +22,7 @@ struct NIP04Tests {
     @Test("decrypts a known go-nostr ciphertext")
     func decryptKnownVector() throws {
         let recipientSecret = try bytes(recipientSecretHex)
-        let senderPubkey = try KeyPair(privateKeyHex: senderSecretHex).publicKey
+        let senderPubkey = try KeyPair(privateKeyHex: senderSecretHex).publicKey.data
         let content = "zJxfaJ32rN5Dg1ODjOlEew==?iv=EV5bUjcc4OX2Km/zPp4ndQ=="
 
         let plaintext = try NIP04.decrypt(content, privateKey: recipientSecret, peerPubkeyXOnly: senderPubkey)
@@ -33,7 +33,7 @@ struct NIP04Tests {
     @Test("decrypts a known multi-block go-nostr ciphertext")
     func decryptKnownBigVector() throws {
         let recipientSecret = try bytes(recipientSecretHex)
-        let senderPubkey = try KeyPair(privateKeyHex: senderSecretHex).publicKey
+        let senderPubkey = try KeyPair(privateKeyHex: senderSecretHex).publicKey.data
         let content =
             "6f8dMstm+udOu7yipSn33orTmwQpWbtfuY95NH+eTU1kArysWJIDkYgI2D25EAGIDJsNd45jOJ2NbVOhFiL3ZP/NWsTwXokk34iyHyA"
             + "/lkjzugQ1bHXoMD1fP/Ay4hB4al1NHb8HXHKZaxPrErwdRDb8qa/I6dXb/1xxyVvNQBHHvmsM5yIFaPwnCN1DZqXf2KbTA/Ekz7Hy"
@@ -59,8 +59,8 @@ struct NIP04Tests {
         let bob = try KeyPair()
         let message = "the quick brown fox 🦊"
 
-        let content = try NIP04.encrypt(message, privateKey: alice.privateKey, peerPubkeyXOnly: bob.publicKey)
-        let decrypted = try NIP04.decrypt(content, privateKey: bob.privateKey, peerPubkeyXOnly: alice.publicKey)
+        let content = try NIP04.encrypt(message, privateKey: alice.privateKey, peerPubkeyXOnly: bob.publicKey.data)
+        let decrypted = try NIP04.decrypt(content, privateKey: bob.privateKey, peerPubkeyXOnly: alice.publicKey.data)
 
         #expect(decrypted == message)
     }
@@ -70,8 +70,8 @@ struct NIP04Tests {
         let alice = try KeyPair()
         let bob = try KeyPair()
 
-        let aliceToBob = try NIP04.sharedKey(privateKey: alice.privateKey, peerPubkeyXOnly: bob.publicKey)
-        let bobToAlice = try NIP04.sharedKey(privateKey: bob.privateKey, peerPubkeyXOnly: alice.publicKey)
+        let aliceToBob = try NIP04.sharedKey(privateKey: alice.privateKey, peerPubkeyXOnly: bob.publicKey.data)
+        let bobToAlice = try NIP04.sharedKey(privateKey: bob.privateKey, peerPubkeyXOnly: alice.publicKey.data)
 
         #expect(keyData(aliceToBob) == keyData(bobToAlice))
     }
@@ -81,7 +81,7 @@ struct NIP04Tests {
         let alice = try KeyPair()
         let bob = try KeyPair()
 
-        let content = try NIP04.encrypt("hi", privateKey: alice.privateKey, peerPubkeyXOnly: bob.publicKey)
+        let content = try NIP04.encrypt("hi", privateKey: alice.privateKey, peerPubkeyXOnly: bob.publicKey.data)
         let ivPart = try #require(content.components(separatedBy: "?iv=").last)
 
         #expect(Data(base64Encoded: ivPart)?.count == 16)
@@ -93,7 +93,8 @@ struct NIP04Tests {
         let bob = try KeyPair()
 
         #expect(throws: NIP04.DecodingError.malformedContent) {
-            try NIP04.decrypt("zJxfaJ32rN5Dg1ODjOlEew==", privateKey: bob.privateKey, peerPubkeyXOnly: alice.publicKey)
+            try NIP04.decrypt(
+                "zJxfaJ32rN5Dg1ODjOlEew==", privateKey: bob.privateKey, peerPubkeyXOnly: alice.publicKey.data)
         }
     }
 
@@ -103,7 +104,8 @@ struct NIP04Tests {
         let bob = try KeyPair()
 
         #expect(throws: NIP04.DecodingError.invalidBase64) {
-            try NIP04.decrypt("not base64!?iv=also bad!", privateKey: bob.privateKey, peerPubkeyXOnly: alice.publicKey)
+            try NIP04.decrypt(
+                "not base64!?iv=also bad!", privateKey: bob.privateKey, peerPubkeyXOnly: alice.publicKey.data)
         }
     }
 
@@ -115,7 +117,7 @@ struct NIP04Tests {
         let content = "zJxfaJ32rN5Dg1ODjOlEew==?iv=AAAAAAAAAAA="
 
         #expect(throws: NIP04.DecodingError.malformedContent) {
-            try NIP04.decrypt(content, privateKey: bob.privateKey, peerPubkeyXOnly: alice.publicKey)
+            try NIP04.decrypt(content, privateKey: bob.privateKey, peerPubkeyXOnly: alice.publicKey.data)
         }
     }
 }

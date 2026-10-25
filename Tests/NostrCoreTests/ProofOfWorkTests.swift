@@ -11,26 +11,32 @@ struct ProofOfWorkTests {
     /// bits, and it commits to a target of 20.
     /// https://github.com/nostr-protocol/nips/blob/master/13.md
     private var specEvent: Event {
-        Event(
-            id: "000006d8c378af1779d2feebc7603a125d99eca0ccf1085959b307f64e5dd358",
-            pubkey: "a48380f4cfcc1ad5378294fcac36439770f9c878dd880ffa94bb74ea54a6f243",
-            createdAt: 1_651_794_653,
-            kind: 1,
-            tags: [["nonce", "776797", "20"]],
-            content: "It's just me mining my own business",
-            sig:
-                "284622fc0a3f4f1303455d5175f7ba962a3300d136085b9566801bc2e0699de0c7e31e44c81fb40ad9049173742e904713c3594a1da0fc5d2382a25c11aba977"
-        )
+        get throws {
+            Event(
+                id: try EventID(hex: "000006d8c378af1779d2feebc7603a125d99eca0ccf1085959b307f64e5dd358"),
+                pubkey: try PublicKey(hex: "a48380f4cfcc1ad5378294fcac36439770f9c878dd880ffa94bb74ea54a6f243"),
+                createdAt: 1_651_794_653,
+                kind: 1,
+                tags: [["nonce", "776797", "20"]],
+                content: "It's just me mining my own business",
+                signature:
+                    try Signature(
+                        hex:
+                            "284622fc0a3f4f1303455d5175f7ba962a3300d136085b9566801bc2e0699de0c7e31e44c81fb40ad9049173742e904713c3594a1da0fc5d2382a25c11aba977"
+                    )
+            )
+        }
     }
 
     @Test("spec example event has the difficulty stated by NIP-13")
-    func specVectorDifficulty() {
+    func specVectorDifficulty() throws {
         // 000006… = five zero nibbles (20 bits) then 0b0110 (one more leading zero) = 21 bits.
-        #expect(ProofOfWork.difficulty(ofHexId: specEvent.id) == 21)
+        #expect(ProofOfWork.difficulty(ofHexId: try specEvent.id.hex) == 21)
     }
 
     @Test("spec example event validates at its committed target but not above it")
-    func specVectorValidation() {
+    func specVectorValidation() throws {
+        let specEvent = try specEvent
         // Committed target is 20 and the id clears 21 bits, so it validates through 20.
         #expect(ProofOfWork.validate(event: specEvent, minimumDifficulty: 20))
         // One above the commitment fails even though the id itself would clear 21 bits — the
@@ -83,20 +89,13 @@ struct ProofOfWorkTests {
     }
 
     /// A client that filters on proof of work before verifying — the natural order, since the
-    /// hash is the cheap check — would otherwise accept a crafted event as maximally mined.
-    @Test("an event whose id is fullwidth zeros does not validate")
-    func validateRejectsFullwidthDigits() {
-        let event = Event(
-            id: String(repeating: "０", count: 64),
-            pubkey: "a48380f4cfcc1ad5378294fcac36439770f9c878dd880ffa94bb74ea54a6f243",
-            createdAt: 1_651_794_653,
-            kind: 1,
-            tags: [["nonce", "1", "256"]],
-            content: "not actually mined",
-            sig: String(repeating: "ab", count: 64)
-        )
+    /// hash is the cheap check — would otherwise accept a crafted id as maximally mined.
+    @Test("fullwidth zeros count for no difficulty and cannot form an event id")
+    func fullwidthDigitsAreNotWork() {
+        let fullwidthZeros = String(repeating: "０", count: 64)
 
-        #expect(!ProofOfWork.validate(event: event, minimumDifficulty: 1))
+        #expect(ProofOfWork.difficulty(ofHexId: fullwidthZeros) == 0)
+        #expect(EventID(fullwidthZeros) == nil)
     }
 
     @Test("uppercase ASCII hex is still counted")
@@ -113,9 +112,9 @@ struct ProofOfWorkTests {
         )
     }
 
-    private func unsignedNote(for signer: EventSigner, tags: [Event.Tag] = []) -> UnsignedEvent {
+    private func unsignedNote(for signer: EventSigner, tags: [Event.Tag] = []) throws -> UnsignedEvent {
         UnsignedEvent(
-            pubkey: signer.publicKey,
+            pubkey: try PublicKey(hex: signer.publicKey),
             createdAt: 1_700_000_000,
             kind: .textNote,
             tags: tags,
@@ -126,7 +125,7 @@ struct ProofOfWorkTests {
     @Test("mining reaches the requested difficulty and produces a signable, valid event", arguments: [8, 12])
     func mineMeetsDifficulty(_ difficulty: Int) async throws {
         let signer = try testSigner()
-        let mined = try await ProofOfWork.mine(event: unsignedNote(for: signer), difficulty: difficulty)
+        let mined = try await ProofOfWork.mine(event: try unsignedNote(for: signer), difficulty: difficulty)
 
         // Exactly one nonce tag, committing to the requested target.
         let nonceTags = mined.tags.filter { $0.first == "nonce" }
@@ -135,7 +134,7 @@ struct ProofOfWorkTests {
         #expect(nonceTags.first?[2] == String(difficulty))
 
         let signed = try signer.sign(mined)
-        #expect(ProofOfWork.difficulty(ofHexId: signed.id) >= difficulty)
+        #expect(ProofOfWork.difficulty(ofHexId: signed.id.hex) >= difficulty)
         #expect(try signed.verify())
         #expect(ProofOfWork.validate(event: signed, minimumDifficulty: difficulty))
     }
@@ -143,7 +142,7 @@ struct ProofOfWorkTests {
     @Test("mining replaces any pre-existing nonce tag")
     func mineReplacesExistingNonce() async throws {
         let signer = try testSigner()
-        let seeded = unsignedNote(for: signer, tags: [.nonce("0", target: 4), .hashtag("nostr")])
+        let seeded = try unsignedNote(for: signer, tags: [.nonce("0", target: 4), .hashtag("nostr")])
 
         let mined = try await ProofOfWork.mine(event: seeded, difficulty: 8)
 
@@ -158,14 +157,14 @@ struct ProofOfWorkTests {
     func mineRejectsOutOfRangeDifficulty() async throws {
         let signer = try testSigner()
         await #expect(throws: NostrError.invalidData) {
-            _ = try await ProofOfWork.mine(event: unsignedNote(for: signer), difficulty: 257)
+            _ = try await ProofOfWork.mine(event: try unsignedNote(for: signer), difficulty: 257)
         }
     }
 
     @Test("mining is cancellable")
     func mineIsCancellable() async throws {
         let signer = try testSigner()
-        let note = unsignedNote(for: signer)
+        let note = try unsignedNote(for: signer)
 
         let task = Task {
             // Difficulty 64 will not complete, so cancellation is the only way out.
@@ -183,9 +182,9 @@ struct ProofOfWorkTests {
     @Test("sign(_:proofOfWork:) produces an event meeting the difficulty that verifies")
     func signWithProofOfWork() async throws {
         let signer = try testSigner()
-        let signed = try await signer.sign(unsignedNote(for: signer), proofOfWork: 8)
+        let signed = try await signer.sign(try unsignedNote(for: signer), proofOfWork: 8)
 
-        #expect(ProofOfWork.difficulty(ofHexId: signed.id) >= 8)
+        #expect(ProofOfWork.difficulty(ofHexId: signed.id.hex) >= 8)
         #expect(try signed.verify())
         #expect(ProofOfWork.validate(event: signed, minimumDifficulty: 8))
     }
@@ -200,7 +199,8 @@ struct ProofOfWorkTests {
     }
 
     @Test("a lucky id without a commitment is rejected")
-    func validateRejectsMissingCommitment() {
+    func validateRejectsMissingCommitment() throws {
+        let specEvent = try specEvent
         // The id clears 21 bits, but there is no nonce tag to commit to it.
         let event = Event(
             id: specEvent.id,
@@ -209,7 +209,7 @@ struct ProofOfWorkTests {
             kind: 1,
             tags: [],
             content: specEvent.content,
-            sig: specEvent.sig
+            signature: specEvent.signature
         )
         #expect(!ProofOfWork.validate(event: event, minimumDifficulty: 20))
     }

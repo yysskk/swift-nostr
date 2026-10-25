@@ -62,7 +62,7 @@ struct RemoteSignerNostrConnectFlowTests {
         try await waitForSubscription(transport)
         let subscribed = await transport.subscriptions.values.first?.first
         #expect(subscribed?.authors == nil)
-        #expect(subscribed?.pubkeyReferences == [client.publicKeyHex])
+        #expect(subscribed?.pubkeyReferences == [client.publicKey.hex])
 
         // The signer accepts by echoing the invitation secret as the response result.
         try await transport.deliver(
@@ -70,8 +70,8 @@ struct RemoteSignerNostrConnectFlowTests {
                 requestID: "connect-ack", result: invitation.secret, client: client, signer: signer))
 
         let discovered = try await connection.value
-        #expect(discovered == signer.publicKeyHex)
-        #expect(await remote.remoteSignerPubkey == signer.publicKeyHex)
+        #expect(discovered == signer.publicKey.hex)
+        #expect(await remote.remoteSignerPubkey == signer.publicKey.hex)
         #expect(await remote.isConnectedForTesting == true)
     }
 
@@ -90,7 +90,7 @@ struct RemoteSignerNostrConnectFlowTests {
 
         // After discovery the subscription is narrowed to the signer's pubkey for defense in depth.
         let repinned = await transport.subscriptions.values.first?.first
-        #expect(repinned?.authors == [signer.publicKeyHex])
+        #expect(repinned?.authors == [signer.publicKey.hex])
     }
 
     // MARK: - secret validation
@@ -119,7 +119,7 @@ struct RemoteSignerNostrConnectFlowTests {
                 requestID: "connect-ack", result: invitation.secret, client: client, signer: signer))
 
         let discovered = try await connection.value
-        #expect(discovered == signer.publicKeyHex)
+        #expect(discovered == signer.publicKey.hex)
     }
 
     // MARK: - post-connection command
@@ -184,7 +184,7 @@ struct RemoteSignerNostrConnectFlowTests {
         try await transport.deliver(
             RemoteSignerFixtures.response(
                 requestID: "connect-ack", result: invitation.secret, client: client, signer: signer))
-        #expect(try await connection.value == signer.publicKeyHex)
+        #expect(try await connection.value == signer.publicKey.hex)
     }
 
     // MARK: - Helpers

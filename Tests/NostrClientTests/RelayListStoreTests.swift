@@ -99,7 +99,7 @@ struct RelayListStoreTests {
         let ingested = await store.ingest(event)
         #expect(ingested != nil)
 
-        let cached = await store.cachedList(for: keyPair.publicKeyHex)
+        let cached = await store.cachedList(for: keyPair.publicKey.hex)
         #expect(cached?.writeRelays == ["wss://a.example.com"])
     }
 

@@ -210,13 +210,13 @@ struct NIP19Tests {
 
     private func makeEvent(kind: Event.Kind, tags: [[String]]) -> Event {
         Event(
-            id: eventIdHex,
-            pubkey: pubkeyHex,
+            id: EventID(eventIdHex)!,
+            pubkey: PublicKey(pubkeyHex)!,
             createdAt: 0,
             kind: kind,
             tags: tags,
             content: "",
-            sig: String(repeating: "0", count: 128)
+            signature: Signature(String(repeating: "0", count: 128))!
         )
     }
 }

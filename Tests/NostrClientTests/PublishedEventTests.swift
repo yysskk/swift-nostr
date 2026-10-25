@@ -60,8 +60,8 @@ struct PublishedEventTests {
 
         #expect(published.event.kind == .textNote)
         // NIP-10 positional form: ["e", <id>, <relay-url placeholder>, <marker>]
-        #expect(published.event.tags.contains(["e", root.id, "", "root"]))
-        #expect(published.event.tags.contains(["p", root.pubkey]))
+        #expect(published.event.tags.contains(["e", root.id.hex, "", "root"]))
+        #expect(published.event.tags.contains(["p", root.pubkey.hex]))
         #expect(published.result.acceptedRelays == [relayURL])
         await client.relays.disconnect()
     }
@@ -80,7 +80,7 @@ struct PublishedEventTests {
             )
         }
 
-        #expect(published.event.tags.contains(["e", root.id, "wss://hint.example.com", "root"]))
+        #expect(published.event.tags.contains(["e", root.id.hex, "wss://hint.example.com", "root"]))
         await client.relays.disconnect()
     }
 
@@ -116,8 +116,8 @@ struct PublishedEventTests {
         }
 
         #expect(repost.event.kind == .repost)
-        #expect(repost.event.tags.contains(["e", note.id, "wss://hint.example.com"]))
-        #expect(repost.event.tags.contains(["p", note.pubkey]))
+        #expect(repost.event.tags.contains(["e", note.id.hex, "wss://hint.example.com"]))
+        #expect(repost.event.tags.contains(["p", note.pubkey.hex]))
         await client.relays.disconnect()
     }
 
@@ -131,10 +131,10 @@ struct PublishedEventTests {
         #expect(metadata.event.kind == .setMetadata)
 
         let deletion = try await PublishAckSupport.acknowledgingPublishes(on: socket) {
-            try await client.events.publishDeletion(eventIds: [metadata.id], reason: "cleanup")
+            try await client.events.publishDeletion(eventIds: [metadata.id.hex], reason: "cleanup")
         }
         #expect(deletion.event.kind == .eventDeletion)
-        #expect(deletion.event.tags.contains(["e", metadata.id]))
+        #expect(deletion.event.tags.contains(["e", metadata.id.hex]))
         await client.relays.disconnect()
     }
 
@@ -164,12 +164,12 @@ struct PublishedEventTests {
         let sender = await client.identity.publicKey!
         // Confirmed-absent DM relay lists: both copies fall back to the pool's relay
         // without a discovery fetch.
-        await client.dmRelayListStore.markNoList(for: recipient.publicKeyHex)
+        await client.dmRelayListStore.markNoList(for: recipient.publicKey.hex)
         await client.dmRelayListStore.markNoList(for: sender)
 
         // Two EVENT frames: the recipient gift wrap and the self-copy gift wrap.
         let result = try await PublishAckSupport.acknowledgingPublishes(2, on: socket) {
-            try await client.messages.send("hi", to: recipient.publicKeyHex)
+            try await client.messages.send("hi", to: recipient.publicKey.hex)
         }
 
         #expect(result.recipientPublishResult?.acceptedRelays == [relayURL])
@@ -182,7 +182,7 @@ struct PublishedEventTests {
         let alice = try KeyPair()
         let bob = try KeyPair()
         let builder = DirectMessageBuilder(signer: EventSigner(keyPair: alice))
-        let result = try await builder.createMessageWithSelfCopy(content: "hi", to: bob.publicKeyHex)
+        let result = try await builder.createMessageWithSelfCopy(content: "hi", to: bob.publicKey.hex)
 
         #expect(result.recipientPublishResult == nil)
         #expect(result.selfCopyPublishResult == nil)
@@ -225,7 +225,7 @@ struct PublishedEventTests {
         let alice = try KeyPair()
         let bob = try KeyPair()
         let giftWrap = try await DirectMessageBuilder(signer: EventSigner(keyPair: alice))
-            .createMessageWithSelfCopy(content: "hi", to: bob.publicKeyHex)
+            .createMessageWithSelfCopy(content: "hi", to: bob.publicKey.hex)
             .recipientGiftWrap
 
         await #expect(throws: NostrError.signerNotSet) {

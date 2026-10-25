@@ -30,7 +30,7 @@ import NostrClient
 
 // Generate a random keypair
 let keyPair = try KeyPair()
-print("npub: \(try keyPair.npub)")
+print("npub: \(keyPair.publicKey.npub)")
 print("nsec: \(try keyPair.nsec)")
 
 // Import from nsec

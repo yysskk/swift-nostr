@@ -22,8 +22,8 @@ struct WalletConnectEncryptionTests {
         let cipher = WalletConnectCipher(scheme)
         let message = #"{"method":"get_balance","params":{}}"#
 
-        let payload = try cipher.encrypt(message, recipientPubkey: wallet.publicKeyHex, sender: client)
-        let decrypted = try cipher.decrypt(payload, senderPubkey: client.publicKeyHex, recipient: wallet)
+        let payload = try cipher.encrypt(message, recipientPubkey: wallet.publicKey.hex, sender: client)
+        let decrypted = try cipher.decrypt(payload, senderPubkey: client.publicKey.hex, recipient: wallet)
 
         #expect(decrypted == message)
     }
@@ -33,8 +33,8 @@ struct WalletConnectEncryptionTests {
         let client = try KeyPair()
         let wallet = try KeyPair()
 
-        let nip04 = try WalletConnectCipher(.nip04).encrypt("hi", recipientPubkey: wallet.publicKeyHex, sender: client)
-        let nip44 = try WalletConnectCipher(.nip44).encrypt("hi", recipientPubkey: wallet.publicKeyHex, sender: client)
+        let nip04 = try WalletConnectCipher(.nip04).encrypt("hi", recipientPubkey: wallet.publicKey.hex, sender: client)
+        let nip44 = try WalletConnectCipher(.nip44).encrypt("hi", recipientPubkey: wallet.publicKey.hex, sender: client)
 
         #expect(nip04.contains("?iv="))
         #expect(!nip44.contains("?iv="))
@@ -46,15 +46,15 @@ struct WalletConnectEncryptionTests {
         let wallet = try KeyPair()
 
         let nip04Payload = try WalletConnectCipher(.nip04)
-            .encrypt("hi", recipientPubkey: wallet.publicKeyHex, sender: client)
+            .encrypt("hi", recipientPubkey: wallet.publicKey.hex, sender: client)
         #expect(throws: (any Error).self) {
-            try WalletConnectCipher(.nip44).decrypt(nip04Payload, senderPubkey: client.publicKeyHex, recipient: wallet)
+            try WalletConnectCipher(.nip44).decrypt(nip04Payload, senderPubkey: client.publicKey.hex, recipient: wallet)
         }
 
         let nip44Payload = try WalletConnectCipher(.nip44)
-            .encrypt("hi", recipientPubkey: wallet.publicKeyHex, sender: client)
+            .encrypt("hi", recipientPubkey: wallet.publicKey.hex, sender: client)
         #expect(throws: (any Error).self) {
-            try WalletConnectCipher(.nip04).decrypt(nip44Payload, senderPubkey: client.publicKeyHex, recipient: wallet)
+            try WalletConnectCipher(.nip04).decrypt(nip44Payload, senderPubkey: client.publicKey.hex, recipient: wallet)
         }
     }
 

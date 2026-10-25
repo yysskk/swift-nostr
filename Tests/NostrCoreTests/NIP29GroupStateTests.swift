@@ -1,5 +1,6 @@
 import Foundation
 import NostrCore
+import NostrTestSupport
 import Testing
 
 /// Signs a relay-generated group state event carrying `tags` at a pinned timestamp.
@@ -10,7 +11,8 @@ private func stateEvent(
     createdAt: Int64 = 1_700_000_000
 ) throws -> Event {
     try signer.sign(
-        UnsignedEvent(pubkey: signer.publicKey, createdAt: createdAt, kind: kind, tags: tags, content: ""))
+        UnsignedEvent(
+            pubkey: try PublicKey(hex: signer.publicKey), createdAt: createdAt, kind: kind, tags: tags, content: ""))
 }
 
 /// One (kind, parser) pair per relay-generated state model, so the shared validation
@@ -161,8 +163,8 @@ struct NIP29GroupStateTests {
         // spec-vector precedent: the spec example carries no consistent signature, and
         // the parsers never verify one.
         let event = Event(
-            id: String(repeating: "0", count: 64),
-            pubkey: String(repeating: "b", count: 64),
+            id: try EventID(hex: String(repeating: "0", count: 64)),
+            pubkey: try PublicKey(hex: String(repeating: "b", count: 64)),
             createdAt: 1_700_000_000,
             kind: .groupMetadata,
             tags: [
@@ -176,7 +178,7 @@ struct NIP29GroupStateTests {
                 ["supported_kinds", "9", "11"],
             ],
             content: "",
-            sig: "sig"
+            signature: nil
         )
 
         let metadata = try Groups.Metadata(event: event)
@@ -342,28 +344,30 @@ struct NIP29GroupMembershipTests {
     let member = String(repeating: "c", count: 64)
 
     /// The 64-character event id whose first 8 characters encode `index` in hex.
-    private func paddedID(_ index: Int) -> String {
-        String(format: "%08x", index) + String(repeating: "0", count: 56)
+    private func paddedID(_ index: Int) -> EventID {
+        EventID(String(format: "%08x", index) + String(repeating: "0", count: 56))!
     }
 
     /// Builds a moderation-event literal with a controlled id and timestamp; membership
     /// derivation never verifies signatures.
     private func moderation(
-        id: String,
+        id: EventID,
         kind: Event.Kind,
         createdAt: Int64,
         tags: [[String]]
     ) -> Event {
-        Event(id: id, pubkey: "admin", createdAt: createdAt, kind: kind, tags: tags, content: "", sig: "sig")
+        Event(
+            id: id, pubkey: PublicKey.fixture("admin"), createdAt: createdAt, kind: kind, tags: tags, content: "",
+            signature: nil)
     }
 
-    private func putUser(id: String, createdAt: Int64, roles: [String]) -> Event {
+    private func putUser(id: EventID, createdAt: Int64, roles: [String]) -> Event {
         moderation(
             id: id, kind: .groupPutUser, createdAt: createdAt,
             tags: [["h", "abcdef"], ["p", member] + roles])
     }
 
-    private func removeUser(id: String, createdAt: Int64) -> Event {
+    private func removeUser(id: EventID, createdAt: Int64) -> Event {
         moderation(
             id: id, kind: .groupRemoveUser, createdAt: createdAt,
             tags: [["h", "abcdef"], ["p", member]])
@@ -410,9 +414,9 @@ struct NIP29GroupMembershipTests {
 
     @Test("a created-at tie is broken by the lowest event id")
     func tieBrokenByLowestID() {
-        let removal = removeUser(id: String(repeating: "a", count: 64), createdAt: 1_700_000_000)
+        let removal = removeUser(id: EventID(String(repeating: "a", count: 64))!, createdAt: 1_700_000_000)
         let put = putUser(
-            id: String(repeating: "b", count: 64), createdAt: 1_700_000_000, roles: ["member"])
+            id: EventID(String(repeating: "b", count: 64))!, createdAt: 1_700_000_000, roles: ["member"])
 
         #expect(Groups.membership(of: member, in: [removal, put]) == .removed)
         #expect(Groups.membership(of: member, in: [put, removal]) == .removed)

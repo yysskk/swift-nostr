@@ -78,8 +78,8 @@ struct NIP44VectorTests {
         arguments: NIP44Vectors.valid.encryptDecrypt
     )
     func encryptDecryptConversationKey(_ vector: NIP44Vectors.EncryptDecryptVector) throws {
-        let pub1 = try KeyPair(privateKeyHex: vector.sec1).publicKeyHex
-        let pub2 = try KeyPair(privateKeyHex: vector.sec2).publicKeyHex
+        let pub1 = try KeyPair(privateKeyHex: vector.sec1).publicKey.hex
+        let pub2 = try KeyPair(privateKeyHex: vector.sec2).publicKey.hex
 
         let fromSender = try SealedMessage.conversationKeyHex(privateKeyHex: vector.sec1, publicKeyHex: pub2)
         let fromRecipient = try SealedMessage.conversationKeyHex(privateKeyHex: vector.sec2, publicKeyHex: pub1)
@@ -134,14 +134,14 @@ struct NIP44VectorTests {
 
         let sealed = try SealedMessage.seal(
             vector.plaintext,
-            for: recipient.publicKeyHex,
+            for: recipient.publicKey.hex,
             using: sender,
             nonce: nonce
         )
         #expect(sealed.payload == vector.payload)
 
         let opened = try SealedMessage(payload: vector.payload).open(
-            from: sender.publicKeyHex,
+            from: sender.publicKey.hex,
             using: recipient
         )
         #expect(Data(opened.utf8) == Data(vector.plaintext.utf8))

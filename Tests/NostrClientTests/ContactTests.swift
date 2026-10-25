@@ -112,9 +112,9 @@ struct ContactTests {
     @Test("Create contact from npub")
     func createContactFromNpub() throws {
         let keyPair = try KeyPair()
-        let contact = try Contact(npub: keyPair.npub, petname: "test")
+        let contact = try Contact(npub: keyPair.publicKey.npub, petname: "test")
 
-        #expect(contact.pubkey == keyPair.publicKeyHex)
+        #expect(contact.pubkey == keyPair.publicKey.hex)
         #expect(contact.petname == "test")
     }
 

@@ -91,7 +91,7 @@ struct DirectMessageRoutingTests {
 
         // Empty pool, no cached lists: the recipient copy's pool fallback finds nothing.
         await #expect(throws: NostrError.noRelaysInPool) {
-            try await client.messages.send("hi", to: recipient.publicKeyHex)
+            try await client.messages.send("hi", to: recipient.publicKey.hex)
         }
     }
 
@@ -103,11 +103,11 @@ struct DirectMessageRoutingTests {
         let sender = await client.identity.publicKey!
         // Confirmed-absent DM relay lists: both copies fall back to the pool's relay
         // without a discovery fetch.
-        await client.dmRelayListStore.markNoList(for: recipient.publicKeyHex)
+        await client.dmRelayListStore.markNoList(for: recipient.publicKey.hex)
         await client.dmRelayListStore.markNoList(for: sender)
 
         let result = try await PublishAckSupport.acknowledgingPublishes(2, on: socket) {
-            try await client.messages.send("hi", to: recipient.publicKeyHex)
+            try await client.messages.send("hi", to: recipient.publicKey.hex)
         }
 
         let poolRelay = ConnectedClientFixture.defaultRelayURL

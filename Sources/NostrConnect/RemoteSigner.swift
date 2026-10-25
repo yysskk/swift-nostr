@@ -121,7 +121,7 @@ public actor RemoteSigner {
         let keyPair = try clientKeyPair ?? KeyPair()
         self.clientKeyPair = keyPair
         self.signer = EventSigner(keyPair: keyPair)
-        self.clientPublicKey = keyPair.publicKeyHex
+        self.clientPublicKey = keyPair.publicKey.hex
         self.signerPubkey = bunker.remoteSignerPubkey
         self.secret = bunker.secret
         self.expectedInvitationSecret = nil
@@ -145,7 +145,7 @@ public actor RemoteSigner {
     ) {
         self.clientKeyPair = clientKeyPair
         self.signer = EventSigner(keyPair: clientKeyPair)
-        self.clientPublicKey = clientKeyPair.publicKeyHex
+        self.clientPublicKey = clientKeyPair.publicKey.hex
         self.signerPubkey = nil
         self.secret = nil
         self.expectedInvitationSecret = expectedInvitationSecret
@@ -317,7 +317,7 @@ public actor RemoteSigner {
             let json = String(decoding: try JSONEncoder().encode(request), as: UTF8.self)
             let sealed = try SealedMessage.seal(json, for: signerPubkey, using: clientKeyPair)
             let unsigned = UnsignedEvent(
-                pubkey: clientPublicKey,
+                pubkey: clientKeyPair.publicKey,
                 kind: .nostrConnect,
                 rawTags: [["p", signerPubkey]],
                 content: sealed.payload)
@@ -340,9 +340,10 @@ public actor RemoteSigner {
 
         // The relay filter already restricts authors, but enforce it here too as defense in depth:
         // ignore anything that is not from the signer.
-        guard event.pubkey == signerPubkey else { return }
+        guard event.pubkey.hex == signerPubkey else { return }
 
-        guard let content = try? SealedMessage(payload: event.content).open(from: event.pubkey, using: clientKeyPair),
+        guard
+            let content = try? SealedMessage(payload: event.content).open(from: event.pubkey.hex, using: clientKeyPair),
             let response = try? JSONDecoder().decode(RemoteSignerResponse.self, from: Data(content.utf8))
         else {
             return
@@ -436,7 +437,8 @@ public actor RemoteSigner {
     private func handleConnectionCandidate(_ event: Event) {
         guard let expectedInvitationSecret else { return }
 
-        guard let content = try? SealedMessage(payload: event.content).open(from: event.pubkey, using: clientKeyPair),
+        guard
+            let content = try? SealedMessage(payload: event.content).open(from: event.pubkey.hex, using: clientKeyPair),
             let response = try? JSONDecoder().decode(RemoteSignerResponse.self, from: Data(content.utf8)),
             response.result.map({ Self.constantTimeEquals($0, expectedInvitationSecret) }) == true
         else {
@@ -444,11 +446,11 @@ public actor RemoteSigner {
         }
 
         if connectionWaiter != nil {
-            resolveConnection(with: event.pubkey)
+            resolveConnection(with: event.pubkey.hex)
         } else {
             // The waiter isn't registered yet (the response arrived between the subscription being
             // created and ``discoverSigner()`` suspending); hold the pubkey for it to pick up.
-            bufferedDiscovery = event.pubkey
+            bufferedDiscovery = event.pubkey.hex
         }
     }
 

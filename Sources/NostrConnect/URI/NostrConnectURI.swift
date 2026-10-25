@@ -100,7 +100,7 @@ public struct NostrConnectURI: Sendable, Hashable {
         image: URL? = nil
     ) throws -> NostrConnectURI {
         try NostrConnectURI(
-            clientPubkey: clientKeyPair.publicKeyHex,
+            clientPubkey: clientKeyPair.publicKey.hex,
             relays: relays,
             secret: URIQuery.randomHex(byteCount: 16),
             permissions: permissions,

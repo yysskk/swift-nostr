@@ -144,7 +144,9 @@ struct NIP51SetTests {
     func eventInitRequiresIdentifier() throws {
         let signer = EventSigner(keyPair: try KeyPair())
         let event = try signer.sign(
-            UnsignedEvent(pubkey: signer.publicKey, kind: .bookmarkSet, tags: [.hashtag("nostr")], content: "")
+            UnsignedEvent(
+                pubkey: try PublicKey(hex: signer.publicKey), kind: .bookmarkSet, tags: [.hashtag("nostr")], content: ""
+            )
         )
         #expect(throws: (any Error).self) {
             try NostrListSet(event: event)

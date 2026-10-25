@@ -5,7 +5,7 @@ public enum NostrError: Error, LocalizedError, Sendable, Equatable {
     case invalidPrivateKey
     case invalidPublicKey
     case invalidSignature
-    case invalidEventId
+    case invalidEventID
     case signingFailed
     case signerNotSet
     case verificationFailed
@@ -53,7 +53,7 @@ public enum NostrError: Error, LocalizedError, Sendable, Equatable {
             return "Invalid public key"
         case .invalidSignature:
             return "Invalid signature"
-        case .invalidEventId:
+        case .invalidEventID:
             return "Invalid event ID"
         case .signingFailed:
             return "Failed to sign event"

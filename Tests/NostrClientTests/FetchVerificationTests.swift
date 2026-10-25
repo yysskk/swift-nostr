@@ -56,7 +56,7 @@ struct FetchVerificationTests {
     ) throws -> Event {
         try signer.sign(
             UnsignedEvent(
-                pubkey: signer.publicKey, createdAt: createdAt, kind: kind, rawTags: tags,
+                pubkey: try PublicKey(hex: signer.publicKey), createdAt: createdAt, kind: kind, rawTags: tags,
                 content: content))
     }
 
@@ -70,15 +70,15 @@ struct FetchVerificationTests {
         content: String = ""
     ) throws -> Event {
         let unsigned = UnsignedEvent(
-            pubkey: pubkey, createdAt: createdAt, kind: kind, rawTags: tags, content: content)
+            pubkey: try PublicKey(hex: pubkey), createdAt: createdAt, kind: kind, rawTags: tags, content: content)
         return Event(
-            id: try unsigned.computedId,
-            pubkey: pubkey,
+            id: try unsigned.computedID,
+            pubkey: try PublicKey(hex: pubkey),
             createdAt: createdAt,
             kind: kind,
             tags: unsigned.tags,
             content: content,
-            sig: String(repeating: "ab", count: 64)
+            signature: try Signature(hex: String(repeating: "ab", count: 64))
         )
     }
 
@@ -199,7 +199,7 @@ struct FetchVerificationTests {
         let wanted = try signed(signer, kind: .textNote, createdAt: 1_700_000_000, content: "the one")
 
         let event = try await answering(socket, with: [wanted]) {
-            try await client.events.fetchEvent(id: wanted.id)
+            try await client.events.fetchEvent(id: wanted.id.hex)
         }
 
         #expect(event?.id == wanted.id)

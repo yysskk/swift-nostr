@@ -26,6 +26,8 @@ let isValid = try event.verify()
 
 - ``Event``
 - ``UnsignedEvent``
+- ``EventID``
+- ``Signature``
 - ``Tag``
 - ``Filter``
 

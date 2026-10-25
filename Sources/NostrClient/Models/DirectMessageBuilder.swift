@@ -210,7 +210,7 @@ public struct DirectMessageBuilder: Sendable {
     /// be cryptographic proof of authorship and destroy deniability).
     private func makeRumor(senderPubkey: String, content: String, tags: [Tag]) throws -> Event {
         let unsigned = UnsignedEvent(
-            pubkey: senderPubkey,
+            pubkey: try PublicKey(hex: senderPubkey),
             kind: .privateDirectMessage,
             tags: tags,
             content: content
@@ -228,7 +228,7 @@ public struct DirectMessageBuilder: Sendable {
             .kind(.privateDirectMessage),
         ]
         let unsigned = UnsignedEvent(
-            pubkey: senderPubkey,
+            pubkey: try PublicKey(hex: senderPubkey),
             kind: .reaction,
             tags: tags,
             content: reaction
@@ -268,7 +268,7 @@ public struct DirectMessageBuilder: Sendable {
         }
 
         let unsigned = UnsignedEvent(
-            pubkey: senderPubkey,
+            pubkey: try PublicKey(hex: senderPubkey),
             kind: .fileMessage,
             tags: tags,
             content: url

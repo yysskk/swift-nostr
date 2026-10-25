@@ -14,7 +14,7 @@ struct WalletConnectURISchemeTests {
         let secret = try KeyPair()
         let encoded =
             relay.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? relay
-        return "nostr+walletconnect://\(wallet.publicKeyHex)?relay=\(encoded)&secret=\(secret.privateKeyHex)"
+        return "nostr+walletconnect://\(wallet.publicKey.hex)?relay=\(encoded)&secret=\(secret.privateKeyHex)"
     }
 
     @Test(

@@ -21,13 +21,22 @@ If you need the higher-level client (relay pool, gossip routing, direct messages
 import NostrCore
 
 let keyPair = try KeyPair()                  // new random keypair
-print(try keyPair.npub, try keyPair.nsec)
+print(keyPair.publicKey.npub, try keyPair.nsec)
 
 let imported = try KeyPair(nsec: "nsec1...")
 
 // From a BIP-39 mnemonic (NIP-06)
 let (mnemonic, derived) = try KeyPair.generate(wordCount: 12)
-print(mnemonic.phrase, try derived.npub)
+print(mnemonic.phrase, derived.publicKey.npub)
+```
+
+Public keys, event ids, and signatures are value types — ``PublicKey``, ``EventID``, and ``Signature`` — that hold exactly one spelling: canonical lowercase hex, which is also how they encode to JSON. Parsing anything else (uppercase, the wrong length, non-hex) throws, and ``PublicKey/npub`` / ``EventID/note`` give the NIP-19 forms:
+
+```swift
+let pubkey = try PublicKey(npub: "npub1...")
+print(pubkey.hex, pubkey.npub)
+let id = try EventID(hex: "4cd665db042864ee600ee976d6cfcc7c5ce743859462f94a347cd970d88a5f3b")
+print(id.note)
 ```
 
 ## Sign and Verify
@@ -42,7 +51,7 @@ let reaction = try signer.signReaction(to: note, content: "🤙")
 
 // Or build any event yourself.
 let custom = try signer.sign(
-    UnsignedEvent(pubkey: signer.publicKey, kind: .textNote, content: "gm")
+    UnsignedEvent(pubkey: keyPair.publicKey, kind: .textNote, content: "gm")
 )
 
 let isValid = try note.verify()

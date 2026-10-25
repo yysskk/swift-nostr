@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`PublicKey`, `EventID`, and `Signature` are typed hex values**: each holds exactly one
+  spelling, canonical lowercase hex (64, 64, and 128 digits), which is also its `description` and
+  its JSON encoding. `init(hex:)`, `init(data:)`, `PublicKey(npub:)`, and `EventID(note:)` reject
+  anything else — uppercase, the wrong length, non-hex, or a bech32 string with another prefix —
+  with `invalidPublicKey`, `invalidEventID`, or `invalidSignature`; the failable `init?(_:)` returns
+  nil, and decoding fails with `DecodingError.dataCorrupted`. `PublicKey.npub` and `EventID.note`
+  give the NIP-19 forms and no longer throw. `EventID` is `Comparable` in byte order, the order
+  NIP-01 breaks `created_at` ties by.
+
+### Changed
+
+- **`Event.id`, `Event.pubkey`, and the event signature are typed** (breaking): `id` is an
+  `EventID`, `pubkey` a `PublicKey`, and `sig: String` is now `signature: Signature?` — still the
+  `sig` field on the wire. `Event.init` takes `signature:` instead of `sig:`. A `nil` signature is an
+  unsigned NIP-59 rumor: it encodes without `sig`, a missing or empty `sig` decodes as `nil`, and
+  `verify()` throws `invalidSignature` for it. `UnsignedEvent.asRumor()` and gift-wrap unwrapping
+  return rumors with a `nil` signature instead of an empty string.
+- **Malformed events no longer decode** (breaking): an event whose `id`, `pubkey`, or `sig` is not
+  canonical hex of the right length fails decoding rather than failing `verify()` later, so
+  `RelayMessage.parse(_:)` throws for an `EVENT` frame carrying one and the relay connection drops it.
+  For the same reason `identity.setSigner(_:)` throws `invalidPublicKey` for a `NostrSigning` whose
+  `publicKey` is not canonical hex.
+- **`UnsignedEvent.pubkey` is a `PublicKey`, and `computedId` is now `computedID: EventID`**
+  (breaking). The `pubkey:` parameters of `UnsignedEvent.init`, `Groups.joinRequest`,
+  `Groups.leaveRequest`, `Groups.contentEvent`, and `Groups.moderationEvent` take a `PublicKey`.
+- **`KeyPair.publicKey` is a `PublicKey`** (breaking): `KeyPair.publicKeyHex` and `KeyPair.npub`
+  are removed in favor of `publicKey.hex` and `publicKey.npub`; the raw bytes are `publicKey.data`.
+- **`EventSigner.npub` and `NostrIdentityAPI.npub` no longer throw** (breaking for conformers of
+  `NostrIdentityProviding`, whose `npub` requirement is now `get async`).
+- **`NostrError.invalidEventId` is renamed `invalidEventID`** (breaking).
+
 ## [0.8.0] - 2026-10-25
 
 A hardening release. A review of the whole package fixed more than thirty defects — relay

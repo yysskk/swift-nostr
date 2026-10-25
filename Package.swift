@@ -100,12 +100,12 @@ let package = Package(
         ),
         .testTarget(
             name: "NostrWalletConnectTests",
-            dependencies: ["NostrWalletConnect", "NostrCore"],
+            dependencies: ["NostrWalletConnect", "NostrCore", "NostrTestSupport"],
             swiftSettings: swiftSettings
         ),
         .testTarget(
             name: "NostrConnectTests",
-            dependencies: ["NostrConnect", "NostrCore"],
+            dependencies: ["NostrConnect", "NostrCore", "NostrTestSupport"],
             swiftSettings: swiftSettings
         ),
     ]

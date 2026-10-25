@@ -134,7 +134,7 @@ struct RelayConnectionTests {
             return
         }
         #expect(subscriptionId == Self.subscriptionId)
-        #expect(event.id == Self.eventId)
+        #expect(event.id.hex == Self.eventId)
         #expect(event.content == "hello")
         await connection.disconnect()
     }

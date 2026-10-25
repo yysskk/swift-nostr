@@ -13,13 +13,13 @@ struct PublishStrategyTests {
 
     private var dummyEvent: Event {
         Event(
-            id: String(repeating: "a", count: 64),
-            pubkey: String(repeating: "b", count: 64),
+            id: EventID(String(repeating: "a", count: 64))!,
+            pubkey: PublicKey(String(repeating: "b", count: 64))!,
             createdAt: 1_700_000_000,
             kind: 1,
             tags: [],
             content: "test",
-            sig: String(repeating: "c", count: 128)
+            signature: Signature(String(repeating: "c", count: 128))!
         )
     }
 

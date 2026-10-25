@@ -32,7 +32,7 @@ extension RemoteSigner {
         transport: (any RelayTransport)? = nil,
         config: Config = Config()
     ) throws {
-        guard clientKeyPair.publicKeyHex == invitation.clientPubkey else {
+        guard clientKeyPair.publicKey.hex == invitation.clientPubkey else {
             throw RemoteSignerError.invalidURI(reason: "client keypair does not match the invitation pubkey")
         }
         self.init(

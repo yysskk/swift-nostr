@@ -99,7 +99,7 @@ extension Groups {
     ///     ``previousReferences(from:excludingAuthor:maxCount:)``. Omitted when empty.
     ///   - reason: An optional human-readable reason for the action; becomes the event
     ///     content ("" when nil).
-    ///   - pubkey: The acting admin's public key (hex).
+    ///   - pubkey: The acting admin's public key.
     ///   - createdAt: The event timestamp. Defaults to now.
     /// - Returns: The unsigned moderation event of ``ModerationAction/kind``.
     public static func moderationEvent(
@@ -107,7 +107,7 @@ extension Groups {
         groupID: String,
         previous: [String] = [],
         reason: String? = nil,
-        pubkey: String,
+        pubkey: PublicKey,
         createdAt: Date = Date()
     ) -> UnsignedEvent {
         var tags: [Tag] = [.group(groupID)]
@@ -145,7 +145,7 @@ extension Groups {
                 groupID: groupID,
                 previous: previous,
                 reason: reason,
-                pubkey: try await signer.publicKey,
+                pubkey: try PublicKey(hex: await signer.publicKey),
                 createdAt: createdAt
             )
         )

@@ -145,7 +145,7 @@ public struct WalletConnectURI: Sendable, Hashable {
 
     /// The client's public key (hex), derived from ``secret``.
     public var clientPublicKeyHex: String {
-        cachedClientKeyPair.publicKeyHex
+        cachedClientKeyPair.publicKey.hex
     }
 }
 

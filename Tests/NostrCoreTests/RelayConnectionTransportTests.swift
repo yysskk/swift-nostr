@@ -32,7 +32,7 @@ struct RelayConnectionTransportTests {
         }
 
         var ids: Set<String> {
-            lock.withLock { Set(values.map(\.id)) }
+            lock.withLock { Set(values.map(\.id.hex)) }
         }
     }
 
@@ -133,15 +133,15 @@ struct RelayConnectionTransportTests {
     }
 
     /// A syntactically complete request event, as a session would publish it.
-    private static func event(id: String) -> Event {
+    private static func event(id: String) throws -> Event {
         Event(
-            id: id,
-            pubkey: String(repeating: "b", count: 64),
+            id: try EventID(hex: id),
+            pubkey: try PublicKey(hex: String(repeating: "b", count: 64)),
             createdAt: 1_700_000_000,
             kind: .nostrConnect,
             tags: [],
             content: "sealed",
-            sig: String(repeating: "c", count: 128))
+            signature: try Signature(hex: String(repeating: "c", count: 128)))
     }
 
     /// An `EVENT` frame as a relay would send it, carrying a syntactically complete event.

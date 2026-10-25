@@ -26,6 +26,13 @@ public enum Bech32 {
         else {
             throw NostrError.invalidBech32
         }
+        return encode(validatedHRP: hrp, data: data)
+    }
+
+    /// Encodes data under a prefix the caller has already checked, or that is a known-valid
+    /// constant such as `"npub"` or `"note"` — which is what lets ``PublicKey/npub`` and
+    /// ``EventID/note`` be non-throwing.
+    static func encode(validatedHRP hrp: String, data: Data) -> String {
         let values = convertBits(from: 8, to: 5, data: Array(data), pad: true)
         let checksum = createChecksum(hrp: hrp, values: values)
         let combined = values + checksum

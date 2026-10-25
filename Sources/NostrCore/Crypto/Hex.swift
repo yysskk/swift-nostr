@@ -47,3 +47,36 @@ extension Character {
         isASCII && isHexDigit
     }
 }
+
+extension String {
+    /// Whether this is the canonical hex spelling of exactly `byteCount` bytes: `2 * byteCount`
+    /// lowercase ASCII hexadecimal digits (`0`–`9`, `a`–`f`) and nothing else.
+    ///
+    /// The canonical form is what ``PublicKey``, ``EventID``, and ``Signature`` accept, so a value
+    /// has exactly one textual spelling and anything keyed on that string stays in step with the
+    /// bytes it names.
+    func isCanonicalHex(byteCount: Int) -> Bool {
+        utf8.count == byteCount * 2
+            && utf8.allSatisfy { (0x30...0x39).contains($0) || (0x61...0x66).contains($0) }
+    }
+}
+
+extension Data {
+    /// Decodes a string already known to be canonical hex (see `String.isCanonicalHex(byteCount:)`).
+    ///
+    /// Non-failing because the typed hex values validate their spelling once, when they are made;
+    /// reading their bytes back afterwards cannot meet a malformed digit.
+    init(canonicalHex hex: String) {
+        func nibble(_ digit: UInt8) -> UInt8 {
+            digit <= 0x39 ? digit - 0x30 : digit - 0x61 + 10
+        }
+        let digits = Array(hex.utf8)
+        var data = Data(capacity: digits.count / 2)
+        var index = 0
+        while index + 1 < digits.count {
+            data.append(nibble(digits[index]) << 4 | nibble(digits[index + 1]))
+            index += 2
+        }
+        self = data
+    }
+}

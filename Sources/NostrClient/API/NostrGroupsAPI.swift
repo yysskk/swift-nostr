@@ -317,7 +317,7 @@ public struct NostrGroupsAPI: NostrGroupManaging {
     private func publish(
         to group: GroupReference,
         strategy: PublishStrategy?,
-        _ build: (_ publicKey: String) -> UnsignedEvent
+        _ build: (_ publicKey: PublicKey) -> UnsignedEvent
     ) async throws -> PublishedEvent {
         let pubkey = try await client.requiredPublicKey()
         let relayURL = try await ensureRelay(group)

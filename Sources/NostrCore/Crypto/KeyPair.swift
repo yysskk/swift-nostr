@@ -6,24 +6,19 @@ public struct KeyPair: Sendable {
     /// The private key (32 bytes)
     public let privateKey: Data
 
-    /// The public key (32 bytes, x-only)
-    public let publicKey: Data
+    /// The public key derived from ``privateKey``.
+    public let publicKey: PublicKey
 
     /// The private key as a hex string
     public var privateKeyHex: String {
         privateKey.hexEncodedString()
     }
 
-    /// The public key as a hex string
-    public var publicKeyHex: String {
-        publicKey.hexEncodedString()
-    }
-
     /// Creates a new random keypair
     public init() throws {
         let secpPrivateKey = try P256K.Schnorr.PrivateKey()
         self.privateKey = Data(secpPrivateKey.dataRepresentation)
-        self.publicKey = Data(secpPrivateKey.xonly.bytes)
+        self.publicKey = try PublicKey(data: Data(secpPrivateKey.xonly.bytes))
     }
 
     /// Creates a keypair from an existing private key
@@ -34,7 +29,7 @@ public struct KeyPair: Sendable {
 
         let secpPrivateKey = try P256K.Schnorr.PrivateKey(dataRepresentation: privateKey)
         self.privateKey = privateKey
-        self.publicKey = Data(secpPrivateKey.xonly.bytes)
+        self.publicKey = try PublicKey(data: Data(secpPrivateKey.xonly.bytes))
     }
 
     /// Creates a keypair from a hex-encoded private key
@@ -96,13 +91,6 @@ public struct KeyPair: Sendable {
             try Bech32.encode(hrp: "nsec", data: privateKey)
         }
     }
-
-    /// Returns the public key as npub (bech32 encoded)
-    public var npub: String {
-        get throws {
-            try Bech32.encode(hrp: "npub", data: publicKey)
-        }
-    }
 }
 
 // MARK: - Equatable & Hashable
@@ -118,49 +106,5 @@ extension KeyPair: Equatable, Hashable {
     /// Hashes the public key only, keeping private-key bytes out of hash values.
     public func hash(into hasher: inout Hasher) {
         hasher.combine(publicKey)
-    }
-}
-
-// MARK: - Public Key Only
-/// Represents a Nostr public key (without private key)
-public struct PublicKey: Sendable, Hashable {
-    /// The public key (32 bytes, x-only)
-    public let data: Data
-
-    /// The public key as a hex string
-    public var hex: String {
-        data.hexEncodedString()
-    }
-
-    /// Creates a public key from data
-    public init(data: Data) throws {
-        guard data.count == 32 else {
-            throw NostrError.invalidPublicKey
-        }
-        self.data = data
-    }
-
-    /// Creates a public key from a hex string
-    public init(hex: String) throws {
-        guard let data = Data(hexString: hex) else {
-            throw NostrError.invalidHex
-        }
-        try self.init(data: data)
-    }
-
-    /// Creates a public key from an npub bech32-encoded string
-    public init(npub: String) throws {
-        let (hrp, data) = try Bech32.decode(npub)
-        guard hrp == "npub" else {
-            throw NostrError.unknownPrefix(hrp)
-        }
-        try self.init(data: data)
-    }
-
-    /// Returns the public key as npub (bech32 encoded)
-    public var npub: String {
-        get throws {
-            try Bech32.encode(hrp: "npub", data: data)
-        }
     }
 }

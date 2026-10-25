@@ -7,7 +7,7 @@ import NostrCore
 enum NWCFixtures {
     static func uri(wallet: KeyPair, client: KeyPair) throws -> WalletConnectURI {
         try WalletConnectURI(
-            walletPubkey: wallet.publicKeyHex,
+            walletPubkey: wallet.publicKey.hex,
             relays: [URL(string: "wss://relay.example")!],
             secret: client.privateKey)
     }
@@ -16,14 +16,14 @@ enum NWCFixtures {
     static func encrypt(
         _ json: String, to recipient: KeyPair, from sender: KeyPair, scheme: WalletConnectEncryption = .nip44
     ) throws -> String {
-        try WalletConnectCipher(scheme).encrypt(json, recipientPubkey: recipient.publicKeyHex, sender: sender)
+        try WalletConnectCipher(scheme).encrypt(json, recipientPubkey: recipient.publicKey.hex, sender: sender)
     }
 
     /// Decrypts a request event the client sent to the wallet.
     static func decryptRequest(
         _ event: Event, client: KeyPair, wallet: KeyPair, scheme: WalletConnectEncryption = .nip44
     ) throws -> String {
-        try WalletConnectCipher(scheme).decrypt(event.content, senderPubkey: client.publicKeyHex, recipient: wallet)
+        try WalletConnectCipher(scheme).decrypt(event.content, senderPubkey: client.publicKey.hex, recipient: wallet)
     }
 
     /// Builds a signed kind-23195 response event for a request, encrypting `resultJSON` to the
@@ -32,11 +32,11 @@ enum NWCFixtures {
     /// Signed by the wallet key, as a real response is: the connection verifies a response before
     /// reading anything in it, so an unsigned fixture would not stand in for one.
     static func response(
-        resultJSON: String, requestID: String, client: KeyPair, wallet: KeyPair,
+        resultJSON: String, requestID: EventID, client: KeyPair, wallet: KeyPair,
         scheme: WalletConnectEncryption = .nip44, dTag: String? = nil,
         declaringEncryption: Bool = false
     ) throws -> Event {
-        var tags = [["e", requestID], ["p", client.publicKeyHex]]
+        var tags = [["e", requestID.hex], ["p", client.publicKey.hex]]
         if let dTag { tags.append(["d", dTag]) }
         if declaringEncryption { tags.append(["encryption", scheme.rawValue]) }
         return try signed(
@@ -52,7 +52,7 @@ enum NWCFixtures {
     ) throws -> Event {
         try EventSigner(keyPair: wallet).sign(
             UnsignedEvent(
-                pubkey: wallet.publicKeyHex, createdAt: createdAt, kind: kind, rawTags: tags,
+                pubkey: wallet.publicKey, createdAt: createdAt, kind: kind, rawTags: tags,
                 content: content))
     }
 
@@ -63,7 +63,7 @@ enum NWCFixtures {
     ) throws -> Event {
         try signed(
             kind: kind,
-            tags: [["p", client.publicKeyHex]],
+            tags: [["p", client.publicKey.hex]],
             content: try encrypt(notificationJSON, to: client, from: wallet, scheme: scheme),
             wallet: wallet)
     }

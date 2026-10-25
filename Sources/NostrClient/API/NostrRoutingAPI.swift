@@ -46,7 +46,7 @@ public struct NostrRoutingAPI: NostrRelayRouting {
     ) async throws -> PublishedEvent {
         let event = try await client.signEvent { .relayListMetadata(pubkey: $0, relayList) }
         let result = try await client.pool.publish(event, strategy: strategy)
-        await client.relayListStore.store(relayList, createdAt: event.createdAt, for: event.pubkey)
+        await client.relayListStore.store(relayList, createdAt: event.createdAt, for: event.pubkey.hex)
         return PublishedEvent(event: event, result: result)
     }
 
@@ -93,7 +93,7 @@ public struct NostrRoutingAPI: NostrRelayRouting {
     public func publishGossip(_ event: Event, strategy: PublishStrategy? = nil) async throws -> PublishResult {
         var targets: Set<URL> = []
 
-        targets.formUnion(await writeRelays(for: event.pubkey))
+        targets.formUnion(await writeRelays(for: event.pubkey.hex))
 
         let referencedPubkeys = Set(event.referencedPubkeys)
         for pubkey in referencedPubkeys {
@@ -154,7 +154,7 @@ public struct NostrRoutingAPI: NostrRelayRouting {
     ) async throws -> PublishedEvent {
         let event = try await client.signEvent { .directMessageRelayList(pubkey: $0, relayList) }
         let result = try await client.pool.publish(event, strategy: strategy)
-        await client.dmRelayListStore.store(relayList, createdAt: event.createdAt, for: event.pubkey)
+        await client.dmRelayListStore.store(relayList, createdAt: event.createdAt, for: event.pubkey.hex)
         return PublishedEvent(event: event, result: result)
     }
 
@@ -178,7 +178,7 @@ public struct NostrRoutingAPI: NostrRelayRouting {
     /// - Throws: ``NostrError/signerNotSet`` if no signer is configured.
     @discardableResult
     public func connectDirectMessageInboxRelays() async throws -> Set<URL> {
-        await connectedInboxRelays(for: try await client.requiredPublicKey())
+        await connectedInboxRelays(for: try await client.requiredPublicKey().hex)
     }
 
     // MARK: - Internal

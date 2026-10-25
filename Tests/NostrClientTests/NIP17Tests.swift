@@ -17,13 +17,13 @@ struct NIP17Tests {
         let originalMessage = "Hello, Bob! This is a private message."
 
         // Alice seals a message for Bob
-        let sealed = try SealedMessage.seal(originalMessage, for: bob.publicKeyHex, using: alice)
+        let sealed = try SealedMessage.seal(originalMessage, for: bob.publicKey.hex, using: alice)
 
         // Verify it's base64 encoded
         #expect(Data(base64Encoded: sealed.payload) != nil)
 
         // Bob opens the message from Alice
-        let opened = try sealed.open(from: alice.publicKeyHex, using: bob)
+        let opened = try sealed.open(from: alice.publicKey.hex, using: bob)
 
         #expect(opened == originalMessage)
     }
@@ -35,10 +35,10 @@ struct NIP17Tests {
 
         let originalMessage = "Hello, Bob!"
 
-        let sealed = try SealedMessage.seal(originalMessage, for: bob.publicKeyHex, using: alice)
+        let sealed = try SealedMessage.seal(originalMessage, for: bob.publicKey.hex, using: alice)
 
         // Alice can open using Bob's pubkey (same shared secret)
-        let opened = try sealed.open(from: bob.publicKeyHex, using: alice)
+        let opened = try sealed.open(from: bob.publicKey.hex, using: alice)
 
         #expect(opened == originalMessage)
     }
@@ -50,8 +50,8 @@ struct NIP17Tests {
 
         let originalMessage = "Hello! 🎉 Special: <>&\"'日本語中文한국어"
 
-        let sealed = try SealedMessage.seal(originalMessage, for: bob.publicKeyHex, using: alice)
-        let opened = try sealed.open(from: alice.publicKeyHex, using: bob)
+        let sealed = try SealedMessage.seal(originalMessage, for: bob.publicKey.hex, using: alice)
+        let opened = try sealed.open(from: alice.publicKey.hex, using: bob)
 
         #expect(opened == originalMessage)
     }
@@ -63,8 +63,8 @@ struct NIP17Tests {
 
         let originalMessage = String(repeating: "A", count: 10000)
 
-        let sealed = try SealedMessage.seal(originalMessage, for: bob.publicKeyHex, using: alice)
-        let opened = try sealed.open(from: alice.publicKeyHex, using: bob)
+        let sealed = try SealedMessage.seal(originalMessage, for: bob.publicKey.hex, using: alice)
+        let opened = try sealed.open(from: alice.publicKey.hex, using: bob)
 
         #expect(opened == originalMessage)
     }
@@ -74,7 +74,7 @@ struct NIP17Tests {
         let alice = try KeyPair()
         let bob = try KeyPair()
 
-        let sealed = try SealedMessage.seal("test", for: bob.publicKeyHex, using: alice)
+        let sealed = try SealedMessage.seal("test", for: bob.publicKey.hex, using: alice)
         let payload = Data(base64Encoded: sealed.payload)!
 
         // First byte should be version 2
@@ -96,7 +96,7 @@ struct NIP17Tests {
         let wrapped = try await GiftWrap.wrap(
             event: originalEvent,
             signer: signer,
-            recipientPubkey: bob.publicKeyHex
+            recipientPubkey: bob.publicKey.hex
         )
 
         // Verify it's a gift wrap event
@@ -104,12 +104,12 @@ struct NIP17Tests {
 
         // Verify the p tag points to Bob
         let pTag = wrapped.tags.first { $0.first == "p" }
-        #expect(pTag?[1] == bob.publicKeyHex)
+        #expect(pTag?[1] == bob.publicKey.hex)
 
         // Bob unwraps the event
         let unwrapped = try await GiftWrap.unwrap(giftWrap: wrapped, recipient: EventSigner(keyPair: bob))
 
-        #expect(unwrapped.senderPubkey == alice.publicKeyHex)
+        #expect(unwrapped.senderPubkey == alice.publicKey.hex)
         #expect(unwrapped.event.content == "Secret message")
     }
 
@@ -124,11 +124,11 @@ struct NIP17Tests {
         let wrapped = try await GiftWrap.wrap(
             event: event,
             signer: signer,
-            recipientPubkey: bob.publicKeyHex
+            recipientPubkey: bob.publicKey.hex
         )
 
         // The gift wrap pubkey should NOT be Alice's pubkey (it's ephemeral)
-        #expect(wrapped.pubkey != alice.publicKeyHex)
+        #expect(wrapped.pubkey != alice.publicKey)
     }
 
     // MARK: - Direct Message Tests
@@ -141,7 +141,7 @@ struct NIP17Tests {
         let builder = DirectMessageBuilder(signer: EventSigner(keyPair: alice))
         let giftWrap = try await builder.createMessageWithSelfCopy(
             content: "Hello Bob!",
-            to: bob.publicKeyHex,
+            to: bob.publicKey.hex,
             subject: "Test Subject"
         ).recipientGiftWrap
 
@@ -153,7 +153,7 @@ struct NIP17Tests {
         let message = try await parser.parse(giftWrap)
 
         #expect(message.content == "Hello Bob!")
-        #expect(message.senderPubkey == alice.publicKeyHex)
+        #expect(message.senderPubkey == alice.publicKey.hex)
         #expect(message.subject == "Test Subject")
     }
 
@@ -167,7 +167,7 @@ struct NIP17Tests {
         // First message
         let firstMessage = try await builder.createMessageWithSelfCopy(
             content: "First message",
-            to: bob.publicKeyHex
+            to: bob.publicKey.hex
         ).recipientGiftWrap
 
         let parser = DirectMessageParser(signer: EventSigner(keyPair: bob))
@@ -177,7 +177,7 @@ struct NIP17Tests {
         let bobBuilder = DirectMessageBuilder(signer: EventSigner(keyPair: bob))
         let reply = try await bobBuilder.createMessageWithSelfCopy(
             content: "Reply to first",
-            to: alice.publicKeyHex,
+            to: alice.publicKey.hex,
             replyTo: parsedFirst.rumorId
         ).recipientGiftWrap
 
@@ -197,7 +197,7 @@ struct NIP17Tests {
         let builder = DirectMessageBuilder(signer: EventSigner(keyPair: alice))
         let giftWraps = try await builder.createGroupMessage(
             content: "Hello everyone!",
-            to: [bob.publicKeyHex, charlie.publicKeyHex],
+            to: [bob.publicKey.hex, charlie.publicKey.hex],
             subject: "Group Chat"
         )
 
@@ -230,18 +230,17 @@ struct NIP17Tests {
         let builder = DirectMessageBuilder(signer: EventSigner(keyPair: alice))
         let result = try await builder.createMessageWithSelfCopy(
             content: "Hello Bob!",
-            to: bob.publicKeyHex,
+            to: bob.publicKey.hex,
             subject: "Test Subject"
         )
 
         // The rumor is an unsigned kind 14 with a computed id
         #expect(result.rumor.kind == .privateDirectMessage)
-        #expect(result.rumor.sig.isEmpty)
-        #expect(!result.rumor.id.isEmpty)
+        #expect(result.rumor.signature == nil)
 
         // Each wrap is addressed to its own recipient
-        #expect(result.recipientGiftWrap.tags.first { $0.first == "p" }?[1] == bob.publicKeyHex)
-        #expect(result.selfGiftWrap.tags.first { $0.first == "p" }?[1] == alice.publicKeyHex)
+        #expect(result.recipientGiftWrap.tags.first { $0.first == "p" }?[1] == bob.publicKey.hex)
+        #expect(result.selfGiftWrap.tags.first { $0.first == "p" }?[1] == alice.publicKey.hex)
 
         // Bob unwraps the recipient copy, Alice unwraps the self-copy — same rumor
         let bobUnwrapped = try await GiftWrap.unwrap(
@@ -253,8 +252,8 @@ struct NIP17Tests {
         #expect(aliceUnwrapped.event.id == result.rumor.id)
         #expect(bobUnwrapped.event.content == "Hello Bob!")
         #expect(aliceUnwrapped.event.content == "Hello Bob!")
-        #expect(bobUnwrapped.senderPubkey == alice.publicKeyHex)
-        #expect(aliceUnwrapped.senderPubkey == alice.publicKeyHex)
+        #expect(bobUnwrapped.senderPubkey == alice.publicKey.hex)
+        #expect(aliceUnwrapped.senderPubkey == alice.publicKey.hex)
     }
 
     @Test("Self-copy parses identically for sender and recipient")
@@ -265,7 +264,7 @@ struct NIP17Tests {
         let builder = DirectMessageBuilder(signer: EventSigner(keyPair: alice))
         let result = try await builder.createMessageWithSelfCopy(
             content: "Hello again",
-            to: bob.publicKeyHex,
+            to: bob.publicKey.hex,
             subject: "Subject",
             replyTo: String(repeating: "d", count: 64)
         )
@@ -275,13 +274,13 @@ struct NIP17Tests {
         let aliceMessage = try await DirectMessageParser(signer: EventSigner(keyPair: alice)).parse(result.selfGiftWrap)
 
         // The rumor id is the echo-matching key on both sides
-        #expect(bobMessage.rumorId == result.rumor.id)
-        #expect(aliceMessage.rumorId == result.rumor.id)
+        #expect(bobMessage.rumorId == result.rumor.id.hex)
+        #expect(aliceMessage.rumorId == result.rumor.id.hex)
         #expect(aliceMessage.content == bobMessage.content)
         #expect(aliceMessage.subject == bobMessage.subject)
         #expect(aliceMessage.replyTo == bobMessage.replyTo)
-        #expect(aliceMessage.senderPubkey == alice.publicKeyHex)
-        #expect(aliceMessage.recipientPubkey == bob.publicKeyHex)
+        #expect(aliceMessage.senderPubkey == alice.publicKey.hex)
+        #expect(aliceMessage.recipientPubkey == bob.publicKey.hex)
     }
 
     @Test("Rumor id matches the id the signing path would produce")
@@ -289,10 +288,10 @@ struct NIP17Tests {
         let alice = try KeyPair()
 
         let unsigned = UnsignedEvent(
-            pubkey: alice.publicKeyHex,
+            pubkey: alice.publicKey,
             createdAt: 1_700_000_000,
             kind: .privateDirectMessage,
-            tags: [["p", alice.publicKeyHex]],
+            tags: [["p", alice.publicKey.hex]],
             content: "id derivation check"
         )
 
@@ -301,8 +300,8 @@ struct NIP17Tests {
 
         // The id derives from the serialized content only, never the signature
         #expect(rumor.id == signed.id)
-        #expect(rumor.sig.isEmpty)
-        #expect(!signed.sig.isEmpty)
+        #expect(rumor.signature == nil)
+        #expect(signed.signature != nil)
     }
 
     @Test("Group message rumor is unsigned")
@@ -313,11 +312,11 @@ struct NIP17Tests {
         let builder = DirectMessageBuilder(signer: EventSigner(keyPair: alice))
         let giftWraps = try await builder.createGroupMessage(
             content: "Group hello",
-            to: [bob.publicKeyHex]
+            to: [bob.publicKey.hex]
         )
 
         let unwrapped = try await GiftWrap.unwrap(giftWrap: giftWraps[0], recipient: EventSigner(keyPair: bob))
-        #expect(unwrapped.event.sig.isEmpty)
+        #expect(unwrapped.event.signature == nil)
     }
 
     @Test("DirectMessage properties")
@@ -328,7 +327,7 @@ struct NIP17Tests {
         let builder = DirectMessageBuilder(signer: EventSigner(keyPair: alice))
         let giftWrap = try await builder.createMessageWithSelfCopy(
             content: "Test content",
-            to: bob.publicKeyHex,
+            to: bob.publicKey.hex,
             subject: "Subject"
         ).recipientGiftWrap
 
@@ -336,7 +335,7 @@ struct NIP17Tests {
         let message = try await parser.parse(giftWrap)
 
         #expect(message.id == message.rumorId)
-        #expect(message.senderPubkey == alice.publicKeyHex)
+        #expect(message.senderPubkey == alice.publicKey.hex)
         #expect(!message.rumorId.isEmpty)
     }
 

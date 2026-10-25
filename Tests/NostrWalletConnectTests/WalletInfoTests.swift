@@ -1,5 +1,6 @@
 import Foundation
 import NostrCore
+import NostrTestSupport
 import Testing
 
 @testable import NostrWalletConnect
@@ -8,13 +9,13 @@ import Testing
 struct WalletInfoTests {
     private func infoEvent(content: String, tags: [[String]] = []) -> Event {
         Event(
-            id: String(repeating: "0", count: 64),
-            pubkey: String(repeating: "0", count: 64),
+            id: .fixture("info"),
+            pubkey: .fixture("wallet"),
             createdAt: 0,
             kind: .walletConnectInfo,
             tags: tags,
             content: content,
-            sig: "")
+            signature: nil)
     }
 
     @Test("parses supported and unknown methods from the content")
@@ -75,13 +76,13 @@ struct WalletInfoTests {
     @Test("returns nil for a non-info event")
     func rejectsWrongKind() {
         let event = Event(
-            id: String(repeating: "0", count: 64),
-            pubkey: String(repeating: "0", count: 64),
+            id: .fixture("info"),
+            pubkey: .fixture("wallet"),
             createdAt: 0,
             kind: .textNote,
             tags: [],
             content: "pay_invoice",
-            sig: "")
+            signature: nil)
         #expect(WalletInfo(infoEvent: event) == nil)
     }
 }

@@ -12,7 +12,7 @@ import NostrCore
 public struct SendDirectMessageResult: Sendable {
     /// The unsigned rumor shared by both gift wraps — kind 14 for a message, kind 15 for a file,
     /// kind 7 for a reaction, or the caller's kind for ``NostrMessagesAPI/sendGiftWrapped(_:to:expiration:strategy:)``
-    /// (`sig` is empty; NIP-17 rumors must never be signed). Its `id` is the stable
+    /// (``Event/signature`` is `nil`; NIP-17 rumors must never be signed). Its `id` is the stable
     /// key for matching the payload when it echoes back from a relay.
     public let rumor: Event
 

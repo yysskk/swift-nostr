@@ -23,14 +23,17 @@ public struct EventSigner: Sendable {
 
     /// The public key associated with this signer
     public var publicKey: String {
-        keyPair.publicKeyHex
+        keyPair.publicKey.hex
+    }
+
+    /// ``publicKey`` as a ``PublicKey``, for package code that builds events from it.
+    package var typedPublicKey: PublicKey {
+        keyPair.publicKey
     }
 
     /// The public key as npub
     public var npub: String {
-        get throws {
-            try keyPair.npub
-        }
+        keyPair.publicKey.npub
     }
 
     /// Signs an unsigned event and returns a complete signed event
@@ -40,21 +43,19 @@ public struct EventSigner: Sendable {
 
         // Calculate the event ID (SHA256 hash of serialized event)
         let hash = SHA256.hash(data: serialized)
-        let eventId = Data(hash).hexEncodedString()
 
         // Sign the hash with the private key using Schnorr
         let privateKey = try P256K.Schnorr.PrivateKey(dataRepresentation: keyPair.privateKey)
         let signature = try privateKey.signature(for: hash)
-        let sig = Data(signature.dataRepresentation).hexEncodedString()
 
         return Event(
-            id: eventId,
+            id: try EventID(data: Data(hash)),
             pubkey: unsignedEvent.pubkey,
             createdAt: unsignedEvent.createdAt,
             kind: unsignedEvent.kind,
             tags: unsignedEvent.tags,
             content: unsignedEvent.content,
-            sig: sig
+            signature: try Signature(data: Data(signature.dataRepresentation))
         )
     }
 
@@ -78,12 +79,12 @@ public struct EventSigner: Sendable {
 
     /// Creates and signs a text note (kind 1)
     public func signTextNote(content: String, tags: [Tag] = []) throws -> Event {
-        try sign(.textNote(pubkey: publicKey, content: content, tags: tags))
+        try sign(.textNote(pubkey: keyPair.publicKey, content: content, tags: tags))
     }
 
     /// Creates and signs a reaction event (kind 7)
     public func signReaction(to event: Event, content: String = "+") throws -> Event {
-        try sign(.reaction(pubkey: publicKey, to: event, content: content))
+        try sign(.reaction(pubkey: keyPair.publicKey, to: event, content: content))
     }
 
     /// Creates and signs a repost event (kind 6)
@@ -91,12 +92,12 @@ public struct EventSigner: Sendable {
     ///   - event: The event being reposted; it is embedded in the content and referenced by an `e` tag.
     ///   - relayURL: The relay where the reposted event can be found, recorded in the `e` tag.
     public func signRepost(of event: Event, relayURL: String? = nil) throws -> Event {
-        try sign(.repost(pubkey: publicKey, of: event, relayURL: relayURL))
+        try sign(.repost(pubkey: keyPair.publicKey, of: event, relayURL: relayURL))
     }
 
     /// Creates and signs a delete event (kind 5)
     public func signDeletion(eventIds: [String], reason: String = "") throws -> Event {
-        try sign(.deletion(pubkey: publicKey, eventIds: eventIds, reason: reason))
+        try sign(.deletion(pubkey: keyPair.publicKey, eventIds: eventIds, reason: reason))
     }
 
     /// Creates and signs a client authentication event (kind 22242, NIP-42)
@@ -111,7 +112,7 @@ public struct EventSigner: Sendable {
     ///   - relayURL: The URL of the relay being authenticated to, as used to connect.
     ///   - challenge: The challenge string received in the relay's AUTH message.
     public func signClientAuthentication(relayURL: URL, challenge: String) throws -> Event {
-        try sign(.clientAuthentication(pubkey: publicKey, relayURL: relayURL, challenge: challenge))
+        try sign(.clientAuthentication(pubkey: keyPair.publicKey, relayURL: relayURL, challenge: challenge))
     }
 
     /// Creates and signs a zap request event (kind 9734, NIP-57).
@@ -161,7 +162,7 @@ public struct EventSigner: Sendable {
             tags.append(Tag(name: "a", values: [eventCoordinate]))
         }
 
-        return try sign(UnsignedEvent(pubkey: publicKey, kind: .zapRequest, tags: tags, content: comment))
+        return try sign(UnsignedEvent(pubkey: keyPair.publicKey, kind: .zapRequest, tags: tags, content: comment))
     }
 }
 
@@ -184,7 +185,11 @@ extension EventSigner {
 
 // MARK: - Event Verification
 extension Event {
-    /// Verifies the event's signature
+    /// Verifies the event's id and signature.
+    /// - Returns: Whether ``signature`` is a valid Schnorr signature by ``pubkey`` over ``id``.
+    /// - Throws: ``NostrError/invalidEventID`` if ``id`` is not the hash of the event's other
+    ///   fields; ``NostrError/invalidSignature`` if the event is an unsigned rumor (``signature``
+    ///   is `nil`) or the signature bytes cannot be parsed.
     public func verify() throws -> Bool {
         // Reconstruct the unsigned event
         let unsigned = UnsignedEvent(
@@ -198,36 +203,23 @@ extension Event {
         // Serialize and hash
         let serialized = try unsigned.serializedForHashing()
         let hash = SHA256.hash(data: serialized)
-        let calculatedId = Data(hash).hexEncodedString()
 
         // Verify the event ID
-        guard calculatedId == id else {
-            throw NostrError.invalidEventId
+        guard Data(hash) == id.data else {
+            throw NostrError.invalidEventID
         }
 
-        // Verify the signature
-        guard let pubkeyData = Data(hexString: pubkey),
-            let sigData = Data(hexString: sig)
-        else {
-            throw NostrError.invalidHex
+        guard let signature else {
+            throw NostrError.invalidSignature
         }
 
         // libsecp256k1 parses these as fixed-width buffers: `XonlyKey` forwards the bytes to
         // `secp256k1_xonly_pubkey_parse`, which reads 32 bytes unconditionally and neither checks
-        // nor reports the length. A short pubkey would read past the end of the allocation, and a
-        // long one would be truncated to its first 32 bytes — letting a single key be spelled many
-        // ways and slip past anything keyed on the pubkey string. Both fields come straight off the
-        // wire, so the lengths are checked here rather than trusted.
-        guard pubkeyData.count == 32 else {
-            throw NostrError.invalidPublicKey
-        }
-        guard sigData.count == 64 else {
-            throw NostrError.invalidSignature
-        }
+        // nor reports the length. `PublicKey` and `Signature` only ever hold 32 and 64 bytes, so
+        // the lengths are guaranteed by the types rather than checked here.
+        let xonlyKey = P256K.Schnorr.XonlyKey(dataRepresentation: pubkey.data, keyParity: 0)
+        let schnorrSignature = try P256K.Schnorr.SchnorrSignature(dataRepresentation: signature.data)
 
-        let xonlyKey = P256K.Schnorr.XonlyKey(dataRepresentation: pubkeyData, keyParity: 0)
-        let signature = try P256K.Schnorr.SchnorrSignature(dataRepresentation: sigData)
-
-        return xonlyKey.isValidSignature(signature, for: hash)
+        return xonlyKey.isValidSignature(schnorrSignature, for: hash)
     }
 }

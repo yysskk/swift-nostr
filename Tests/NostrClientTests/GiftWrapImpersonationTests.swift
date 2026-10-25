@@ -44,7 +44,7 @@ struct GiftWrapImpersonationTests {
         let senderSigner = EventSigner(keyPair: sender)
         let seal = try senderSigner.sign(
             UnsignedEvent(
-                pubkey: sender.publicKeyHex,
+                pubkey: sender.publicKey,
                 createdAt: Int64(Date().timeIntervalSince1970) - 60,
                 kind: .seal,
                 tags: [],
@@ -56,7 +56,7 @@ struct GiftWrapImpersonationTests {
         let ephemeral = EventSigner(keyPair: try KeyPair())
         return try ephemeral.sign(
             UnsignedEvent(
-                pubkey: ephemeral.publicKey,
+                pubkey: try PublicKey(hex: ephemeral.publicKey),
                 createdAt: Int64(Date().timeIntervalSince1970) - 60,
                 kind: .giftWrap,
                 tags: [Tag.pubkey(recipientPubkey)],
@@ -76,22 +76,22 @@ struct GiftWrapImpersonationTests {
         let bob = try KeyPair()
 
         let forged = UnsignedEvent(
-            pubkey: alice.publicKeyHex,
+            pubkey: alice.publicKey,
             createdAt: 1_700_000_000,
             kind: .privateDirectMessage,
-            rawTags: [["p", bob.publicKeyHex]],
+            rawTags: [["p", bob.publicKey.hex]],
             content: "I approve this transfer"
         )
         let rumor = try rumorJSON(
-            id: try forged.computedId,
-            pubkey: alice.publicKeyHex,
+            id: try forged.computedID.hex,
+            pubkey: alice.publicKey.hex,
             createdAt: forged.createdAt,
             kind: forged.kind,
             tags: forged.tags,
             content: forged.content
         )
 
-        let giftWrap = try wrap(rumorJSON: rumor, sender: mallory, recipientPubkey: bob.publicKeyHex)
+        let giftWrap = try wrap(rumorJSON: rumor, sender: mallory, recipientPubkey: bob.publicKey.hex)
 
         await #expect(throws: NostrError.verificationFailed) {
             try await GiftWrap.unwrap(giftWrap: giftWrap, recipient: EventSigner(keyPair: bob))
@@ -107,17 +107,17 @@ struct GiftWrapImpersonationTests {
         let bob = try KeyPair()
 
         let rumor = try rumorJSON(
-            id: String(repeating: "11", count: 32),
-            pubkey: alice.publicKeyHex,
+            id: try EventID(hex: String(repeating: "11", count: 32)).hex,
+            pubkey: alice.publicKey.hex,
             createdAt: 1_700_000_000,
             kind: .privateDirectMessage,
-            tags: [["p", bob.publicKeyHex]],
+            tags: [["p", bob.publicKey.hex]],
             content: "hello"
         )
 
-        let giftWrap = try wrap(rumorJSON: rumor, sender: alice, recipientPubkey: bob.publicKeyHex)
+        let giftWrap = try wrap(rumorJSON: rumor, sender: alice, recipientPubkey: bob.publicKey.hex)
 
-        await #expect(throws: NostrError.invalidEventId) {
+        await #expect(throws: NostrError.invalidEventID) {
             try await GiftWrap.unwrap(giftWrap: giftWrap, recipient: EventSigner(keyPair: bob))
         }
     }
@@ -131,22 +131,22 @@ struct GiftWrapImpersonationTests {
         let bob = try KeyPair()
 
         let forged = UnsignedEvent(
-            pubkey: alice.publicKeyHex,
+            pubkey: alice.publicKey,
             createdAt: 1_700_000_000,
             kind: .reaction,
-            rawTags: [["p", bob.publicKeyHex]],
+            rawTags: [["p", bob.publicKey.hex]],
             content: "+"
         )
         let rumor = try rumorJSON(
-            id: try forged.computedId,
-            pubkey: alice.publicKeyHex,
+            id: try forged.computedID.hex,
+            pubkey: alice.publicKey.hex,
             createdAt: forged.createdAt,
             kind: forged.kind,
             tags: forged.tags,
             content: forged.content
         )
 
-        let giftWrap = try wrap(rumorJSON: rumor, sender: mallory, recipientPubkey: bob.publicKeyHex)
+        let giftWrap = try wrap(rumorJSON: rumor, sender: mallory, recipientPubkey: bob.publicKey.hex)
 
         await #expect(throws: NostrError.verificationFailed) {
             try await GiftWrap.unwrap(giftWrap: giftWrap, recipient: EventSigner(keyPair: bob))
@@ -161,27 +161,27 @@ struct GiftWrapImpersonationTests {
         let bob = try KeyPair()
 
         let event = UnsignedEvent(
-            pubkey: alice.publicKeyHex,
+            pubkey: alice.publicKey,
             createdAt: 1_700_000_000,
             kind: .privateDirectMessage,
-            rawTags: [["p", bob.publicKeyHex]],
+            rawTags: [["p", bob.publicKey.hex]],
             content: "hello"
         )
         let rumor = try rumorJSON(
-            id: try event.computedId,
-            pubkey: alice.publicKeyHex,
+            id: try event.computedID.hex,
+            pubkey: alice.publicKey.hex,
             createdAt: event.createdAt,
             kind: event.kind,
             tags: event.tags,
             content: event.content
         )
 
-        let giftWrap = try wrap(rumorJSON: rumor, sender: alice, recipientPubkey: bob.publicKeyHex)
+        let giftWrap = try wrap(rumorJSON: rumor, sender: alice, recipientPubkey: bob.publicKey.hex)
         let unwrapped = try await GiftWrap.unwrap(
             giftWrap: giftWrap, recipient: EventSigner(keyPair: bob))
 
-        #expect(unwrapped.senderPubkey == alice.publicKeyHex)
-        #expect(unwrapped.event.pubkey == alice.publicKeyHex)
+        #expect(unwrapped.senderPubkey == alice.publicKey.hex)
+        #expect(unwrapped.event.pubkey == alice.publicKey)
         #expect(unwrapped.event.content == "hello")
     }
 
@@ -194,12 +194,12 @@ struct GiftWrapImpersonationTests {
 
         let original = try signer.signTextNote(content: "Secret message")
         let giftWrap = try await GiftWrap.wrap(
-            event: original, signer: signer, recipientPubkey: bob.publicKeyHex)
+            event: original, signer: signer, recipientPubkey: bob.publicKey.hex)
         let unwrapped = try await GiftWrap.unwrap(
             giftWrap: giftWrap, recipient: EventSigner(keyPair: bob))
 
-        #expect(unwrapped.senderPubkey == alice.publicKeyHex)
-        #expect(unwrapped.event.pubkey == alice.publicKeyHex)
+        #expect(unwrapped.senderPubkey == alice.publicKey.hex)
+        #expect(unwrapped.event.pubkey == alice.publicKey)
         #expect(unwrapped.event.id == original.id)
         #expect(unwrapped.event.content == "Secret message")
     }

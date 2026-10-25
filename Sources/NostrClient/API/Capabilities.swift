@@ -35,7 +35,7 @@ public protocol NostrIdentityProviding: Sendable {
     /// The public key events are authored under, or nil when no signer is set.
     var publicKey: String? { get async }
     /// The signer's public key as an npub, or nil when no signer is set.
-    var npub: String? { get async throws }
+    var npub: String? { get async }
 
     /// Signs an event with the configured signer.
     func sign(_ unsignedEvent: UnsignedEvent) async throws -> Event

@@ -53,13 +53,13 @@ struct NIP17FileMessageTests {
         let builder = DirectMessageBuilder(signer: EventSigner(keyPair: sender))
         let result = try await builder.createFileMessageWithSelfCopy(
             url: "https://files.example.com/1", mimeType: "image/png", encryption: encrypted,
-            size: 123, dimensions: "640x480", blurhash: "LKO2", to: recipient.publicKeyHex)
+            size: 123, dimensions: "640x480", blurhash: "LKO2", to: recipient.publicKey.hex)
 
         let rumor = result.rumor
         #expect(rumor.kind == .fileMessage)
         #expect(rumor.content == "https://files.example.com/1")
-        #expect(rumor.sig.isEmpty)  // NIP-17 rumors are never signed
-        #expect(rumor.referencedPubkeys == [recipient.publicKeyHex])
+        #expect(rumor.signature == nil)  // NIP-17 rumors are never signed
+        #expect(rumor.referencedPubkeys == [recipient.publicKey.hex])
         #expect(rumor.firstTagValue(named: "file-type") == "image/png")
         #expect(rumor.firstTagValue(named: "encryption-algorithm") == "aes-gcm")
         #expect(rumor.firstTagValue(named: "decryption-key") == encrypted.key.base64EncodedString())
@@ -84,13 +84,13 @@ struct NIP17FileMessageTests {
         let builder = DirectMessageBuilder(signer: EventSigner(keyPair: sender))
         let result = try await builder.createFileMessageWithSelfCopy(
             url: url, mimeType: "text/plain", encryption: encrypted,
-            size: encrypted.ciphertext.count, to: recipient.publicKeyHex)
+            size: encrypted.ciphertext.count, to: recipient.publicKey.hex)
 
         let file = try await DirectMessageParser(signer: EventSigner(keyPair: recipient)).parseFileMessage(
             result.recipientGiftWrap)
         #expect(file.url == url)
         #expect(file.mimeType == "text/plain")
-        #expect(file.senderPubkey == sender.publicKeyHex)
+        #expect(file.senderPubkey == sender.publicKey.hex)
         #expect(file.encryptedSHA256 == encrypted.encryptedSHA256)
         #expect(file.originalSHA256 == encrypted.originalSHA256)
         #expect(file.size == encrypted.ciphertext.count)
@@ -120,7 +120,7 @@ struct NIP17FileMessageTests {
         let builder = DirectMessageBuilder(signer: EventSigner(keyPair: sender))
         let result = try await builder.createFileMessageWithSelfCopy(
             url: "https://files.example.com/1", mimeType: "image/png", encryption: encrypted,
-            to: recipient.publicKeyHex)
+            to: recipient.publicKey.hex)
 
         guard
             case .file(let file) = try await DirectMessageParser(signer: EventSigner(keyPair: recipient))
@@ -139,9 +139,9 @@ struct NIP17FileMessageTests {
         let builder = DirectMessageBuilder(signer: EventSigner(keyPair: sender))
         let encrypted = try EncryptedFile.encrypt(Data("x".utf8))
 
-        let message = try await builder.createMessageWithSelfCopy(content: "hi", to: recipient.publicKeyHex)
+        let message = try await builder.createMessageWithSelfCopy(content: "hi", to: recipient.publicKey.hex)
         let file = try await builder.createFileMessageWithSelfCopy(
-            url: "u", mimeType: "image/png", encryption: encrypted, to: recipient.publicKeyHex)
+            url: "u", mimeType: "image/png", encryption: encrypted, to: recipient.publicKey.hex)
 
         let parser = DirectMessageParser(signer: EventSigner(keyPair: recipient))
         await #expect(throws: NostrError.self) { try await parser.parseFileMessage(message.recipientGiftWrap) }
@@ -155,12 +155,12 @@ struct NIP17FileMessageTests {
 
         // Hand-built kind-15 rumor missing the decryption-key/nonce tags.
         let rumor = try UnsignedEvent(
-            pubkey: sender.publicKeyHex, kind: .fileMessage,
-            tags: [.pubkey(recipient.publicKeyHex), Tag(name: "file-type", values: ["image/png"])],
+            pubkey: sender.publicKey, kind: .fileMessage,
+            tags: [.pubkey(recipient.publicKey.hex), Tag(name: "file-type", values: ["image/png"])],
             content: "https://files.example.com/1"
         ).asRumor()
         let giftWrap = try await GiftWrap.wrap(
-            event: rumor, signer: EventSigner(keyPair: sender), recipientPubkey: recipient.publicKeyHex)
+            event: rumor, signer: EventSigner(keyPair: sender), recipientPubkey: recipient.publicKey.hex)
 
         await #expect(throws: NostrError.self) {
             try await DirectMessageParser(signer: EventSigner(keyPair: recipient)).parseFileMessage(giftWrap)
@@ -202,16 +202,16 @@ struct NIP17FileMessageTests {
         sender: KeyPair, recipient: KeyPair, url: String, key: Data, nonce: Data
     ) async throws -> Event {
         let rumor = try UnsignedEvent(
-            pubkey: sender.publicKeyHex, kind: .fileMessage,
+            pubkey: sender.publicKey, kind: .fileMessage,
             tags: [
-                .pubkey(recipient.publicKeyHex),
+                .pubkey(recipient.publicKey.hex),
                 Tag(name: "decryption-key", values: [key.base64EncodedString()]),
                 Tag(name: "decryption-nonce", values: [nonce.base64EncodedString()]),
             ],
             content: url
         ).asRumor()
         return try await GiftWrap.wrap(
-            event: rumor, signer: EventSigner(keyPair: sender), recipientPubkey: recipient.publicKeyHex)
+            event: rumor, signer: EventSigner(keyPair: sender), recipientPubkey: recipient.publicKey.hex)
     }
 
     @Test("a disappearing file message carries the expiration on the gift wrap")
@@ -224,7 +224,7 @@ struct NIP17FileMessageTests {
         let builder = DirectMessageBuilder(signer: EventSigner(keyPair: sender))
         let result = try await builder.createFileMessageWithSelfCopy(
             url: "u", mimeType: "image/png", encryption: encrypted,
-            to: recipient.publicKeyHex, expiration: expiry)
+            to: recipient.publicKey.hex, expiration: expiry)
 
         #expect(result.recipientGiftWrap.expiration == expiry)
         let file = try await DirectMessageParser(signer: EventSigner(keyPair: recipient)).parseFileMessage(

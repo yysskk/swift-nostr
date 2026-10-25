@@ -10,9 +10,9 @@ struct KeyPairTests {
         let keyPair = try KeyPair()
 
         #expect(keyPair.privateKey.count == 32)
-        #expect(keyPair.publicKey.count == 32)
+        #expect(keyPair.publicKey.data.count == 32)
         #expect(keyPair.privateKeyHex.count == 64)
-        #expect(keyPair.publicKeyHex.count == 64)
+        #expect(keyPair.publicKey.hex.count == 64)
     }
 
     @Test("Create keypair from private key hex")
@@ -21,7 +21,7 @@ struct KeyPairTests {
         let keyPair = try KeyPair(privateKeyHex: privateKeyHex)
 
         #expect(keyPair.privateKeyHex == privateKeyHex)
-        #expect(keyPair.publicKeyHex.count == 64)
+        #expect(keyPair.publicKey.hex.count == 64)
     }
 
     @Test("Bech32 encoding nsec")
@@ -39,13 +39,13 @@ struct KeyPairTests {
     @Test("Bech32 encoding npub")
     func bech32Npub() throws {
         let keyPair = try KeyPair()
-        let npub = try keyPair.npub
+        let npub = keyPair.publicKey.npub
 
         #expect(npub.hasPrefix("npub1"))
 
         // Decode and verify
         let publicKey = try PublicKey(npub: npub)
-        #expect(publicKey.hex == keyPair.publicKeyHex)
+        #expect(publicKey.hex == keyPair.publicKey.hex)
     }
 
     @Test("Invalid private key length throws error")
@@ -82,33 +82,5 @@ struct KeyPairTests {
         let identities: Set<KeyPair> = [keyPair, same, other]
         #expect(identities.count == 2)
         #expect(identities.contains(same))
-    }
-}
-
-@Suite("PublicKey Tests")
-struct PublicKeyTests {
-
-    @Test("Create from hex")
-    func createFromHex() throws {
-        let keyPair = try KeyPair()
-        let publicKey = try PublicKey(hex: keyPair.publicKeyHex)
-
-        #expect(publicKey.hex == keyPair.publicKeyHex)
-    }
-
-    @Test("Create from npub")
-    func createFromNpub() throws {
-        let keyPair = try KeyPair()
-        let publicKey = try PublicKey(npub: keyPair.npub)
-
-        #expect(publicKey.hex == keyPair.publicKeyHex)
-    }
-
-    @Test("Invalid public key length throws error")
-    func invalidPublicKeyLength() {
-        let shortKey = Data(repeating: 0, count: 16)
-        #expect(throws: NostrError.invalidPublicKey) {
-            _ = try PublicKey(data: shortKey)
-        }
     }
 }

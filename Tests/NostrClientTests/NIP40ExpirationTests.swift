@@ -1,5 +1,6 @@
 import Foundation
 import NostrCore
+import NostrTestSupport
 import Testing
 
 @testable import NostrClient
@@ -39,8 +40,8 @@ struct NIP40ExpirationTests {
     @Test("Event.expiration is nil for a non-integer value")
     func eventExpirationInvalid() {
         let event = Event(
-            id: "x", pubkey: "p", createdAt: 0, kind: .textNote,
-            tags: [["expiration", "soon"]], content: "", sig: ""
+            id: EventID.fixture("x"), pubkey: PublicKey.fixture("p"), createdAt: 0, kind: .textNote,
+            tags: [["expiration", "soon"]], content: "", signature: nil
         )
         #expect(event.expiration == nil)
     }
@@ -71,7 +72,7 @@ struct NIP40ExpirationTests {
 
         let builder = DirectMessageBuilder(signer: EventSigner(keyPair: sender))
         let result = try await builder.createMessageWithSelfCopy(
-            content: "self-destructs", to: recipient.publicKeyHex, expiration: expiry)
+            content: "self-destructs", to: recipient.publicKey.hex, expiration: expiry)
 
         // The public gift wraps carry the expiration; the encrypted rumor stays untouched
         // so the plaintext leaks nothing.
@@ -88,7 +89,7 @@ struct NIP40ExpirationTests {
 
         let builder = DirectMessageBuilder(signer: EventSigner(keyPair: sender))
         let result = try await builder.createMessageWithSelfCopy(
-            content: "self-destructs", to: recipient.publicKeyHex, expiration: expiry)
+            content: "self-destructs", to: recipient.publicKey.hex, expiration: expiry)
 
         let parser = DirectMessageParser(signer: EventSigner(keyPair: recipient))
         let message = try await parser.parse(result.recipientGiftWrap)
@@ -102,7 +103,7 @@ struct NIP40ExpirationTests {
         let recipient = try KeyPair()
 
         let builder = DirectMessageBuilder(signer: EventSigner(keyPair: sender))
-        let result = try await builder.createMessageWithSelfCopy(content: "hi", to: recipient.publicKeyHex)
+        let result = try await builder.createMessageWithSelfCopy(content: "hi", to: recipient.publicKey.hex)
 
         #expect(result.recipientGiftWrap.expiration == nil)
 

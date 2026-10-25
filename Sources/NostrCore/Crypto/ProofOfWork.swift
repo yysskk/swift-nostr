@@ -36,7 +36,7 @@ public enum ProofOfWork {
     public static func validate(event: Event, minimumDifficulty: Int) -> Bool {
         guard minimumDifficulty > 0 else { return true }
 
-        guard difficulty(ofHexId: event.id) >= minimumDifficulty else { return false }
+        guard difficulty(ofHexId: event.id.hex) >= minimumDifficulty else { return false }
 
         // The committed target lives in the third element of the nonce tag; without it a merely
         // lucky id could masquerade as intentional work, so an absent or short commitment fails.
@@ -81,7 +81,7 @@ public enum ProofOfWork {
                 rawTags: strippedTags + [["nonce", String(nonce), target]],
                 content: event.content
             )
-            let id = try candidate.computedId
+            let id = try candidate.computedID.hex
             // `Self.` disambiguates from the `difficulty` parameter that shadows the method here.
             if Self.difficulty(ofHexId: id) >= difficulty {
                 return candidate

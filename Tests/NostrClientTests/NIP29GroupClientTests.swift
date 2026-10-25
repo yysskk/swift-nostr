@@ -15,7 +15,7 @@ private struct FakeRemoteSigner: NostrSigning {
     let keyPair: KeyPair
 
     var publicKey: String {
-        get async throws { keyPair.publicKeyHex }
+        get async throws { keyPair.publicKey.hex }
     }
 
     func sign(_ event: UnsignedEvent) async throws -> Event {
@@ -108,7 +108,7 @@ struct NIP29GroupClientTests {
     ) throws -> Event {
         try signer.sign(
             UnsignedEvent(
-                pubkey: signer.publicKey,
+                pubkey: try PublicKey(hex: signer.publicKey),
                 createdAt: createdAt,
                 kind: kind,
                 tags: [.identifier(groupID)] + fieldTags,
@@ -222,7 +222,7 @@ struct NIP29GroupClientTests {
         let (client, socket) = makeClient()
         await client.identity.setSigner(EventSigner(keyPair: try KeyPair()))
         try await client.relays.connect(to: [groupRelayURL.absoluteString])
-        let member = try KeyPair().publicKeyHex
+        let member = try KeyPair().publicKey.hex
 
         let group = GroupReference(relayURL: groupRelayURL.absoluteString, id: groupID)
         let moderationTask = Task {
@@ -271,7 +271,7 @@ struct NIP29GroupClientTests {
         _ = try await joinTask.value
 
         #expect(sent.kind == .groupJoinRequest)
-        #expect(sent.pubkey == keyPair.publicKeyHex)
+        #expect(sent.pubkey == keyPair.publicKey)
         #expect(sent.firstTagValue(named: "code") == "welcome")
         #expect(try sent.verify())
         await client.relays.disconnect()
@@ -365,7 +365,7 @@ struct NIP29GroupClientTests {
         let (client, socket) = makeClient()
         try await client.relays.connect(to: [groupRelayURL.absoluteString])
         let relaySigner = EventSigner(keyPair: try KeyPair())
-        let admin = try KeyPair().publicKeyHex
+        let admin = try KeyPair().publicKey.hex
         let metadata = try stateEvent(
             kind: .groupMetadata, fieldTags: [Event.Tag(name: "name", values: ["Pizza Lovers"])],
             createdAt: 1_700_000_000, signer: relaySigner)

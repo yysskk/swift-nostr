@@ -106,13 +106,13 @@ struct RelayConnectionSocketTests {
         try await connection.connect()
 
         let event = Event(
-            id: String(repeating: "d", count: 64),
-            pubkey: String(repeating: "b", count: 64),
+            id: try EventID(hex: String(repeating: "d", count: 64)),
+            pubkey: try PublicKey(hex: String(repeating: "b", count: 64)),
             createdAt: 1_700_000_000,
             kind: 1,
             tags: [],
             content: "gm",
-            sig: String(repeating: "c", count: 128)
+            signature: try Signature(hex: String(repeating: "c", count: 128))
         )
 
         let publishTask = Task { try await connection.publish(event) }

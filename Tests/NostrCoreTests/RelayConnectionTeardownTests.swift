@@ -47,7 +47,7 @@ struct RelayConnectionTeardownTests {
 
         let publish = Task { try await connection.publish(event) }
         // Wait for the EVENT to reach the socket, so the waiter is registered before the drop.
-        try await pollUntil { socket.sentTextFrames.contains { $0.contains(event.id) } }
+        try await pollUntil { socket.sentTextFrames.contains { $0.contains(event.id.hex) } }
 
         try await failConnection(connection, socket: socket)
         await connection.disconnect()

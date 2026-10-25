@@ -44,7 +44,7 @@ struct RemoteSignerPermissionRequestTests {
         let sent = try await RemoteSignerFixtures.waitForSentEvents(transport, count: 1)
         let request = try RemoteSignerFixtures.decryptRequest(sent[0], client: client, signer: signer)
 
-        #expect(request.params == [signer.publicKeyHex, "", "sign_event:1,nip44_decrypt"])
+        #expect(request.params == [signer.publicKey.hex, "", "sign_event:1,nip44_decrypt"])
         connect.cancel()
     }
 
@@ -58,7 +58,7 @@ struct RemoteSignerPermissionRequestTests {
         let sent = try await RemoteSignerFixtures.waitForSentEvents(transport, count: 1)
         let request = try RemoteSignerFixtures.decryptRequest(sent[0], client: client, signer: signer)
 
-        #expect(request.params == [signer.publicKeyHex, "s3cret", "get_public_key"])
+        #expect(request.params == [signer.publicKey.hex, "s3cret", "get_public_key"])
         connect.cancel()
     }
 
@@ -73,7 +73,7 @@ struct RemoteSignerPermissionRequestTests {
         let sent = try await RemoteSignerFixtures.waitForSentEvents(transport, count: 1)
         let request = try RemoteSignerFixtures.decryptRequest(sent[0], client: client, signer: signer)
 
-        #expect(request.params == [signer.publicKeyHex])
+        #expect(request.params == [signer.publicKey.hex])
         connect.cancel()
     }
 

@@ -88,7 +88,7 @@ struct EncryptedPrivateKeyTests {
         let encrypted = try keyPair.encryptedPrivateKey(password: "hunter2")
         let recovered = try KeyPair(ncryptsec: encrypted.ncryptsec, password: "hunter2")
 
-        #expect(recovered.publicKeyHex == keyPair.publicKeyHex)
+        #expect(recovered.publicKey.hex == keyPair.publicKey.hex)
         #expect(recovered.privateKey == keyPair.privateKey)
     }
 

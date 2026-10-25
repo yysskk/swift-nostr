@@ -1,5 +1,6 @@
 import Foundation
 import NostrCore
+import NostrTestSupport
 import Testing
 
 /// A deterministic linear congruential generator so sampling tests can pin exact output.
@@ -19,18 +20,18 @@ private struct SeededGenerator: RandomNumberGenerator {
 /// Builds an event literal for tag parsing and sampling tests, where signature validity
 /// is irrelevant.
 private func makeEvent(
-    id: String = String(repeating: "a", count: 64),
-    pubkey: String = "pk",
+    id: EventID = EventID(String(repeating: "a", count: 64))!,
+    pubkey: PublicKey = .fixture("pk"),
     createdAt: Int64 = 1_700_000_000,
     kind: Event.Kind = .chatMessage,
     tags: [[String]] = []
 ) -> Event {
-    Event(id: id, pubkey: pubkey, createdAt: createdAt, kind: kind, tags: tags, content: "", sig: "sig")
+    Event(id: id, pubkey: pubkey, createdAt: createdAt, kind: kind, tags: tags, content: "", signature: nil)
 }
 
 /// The 64-character event id whose first 8 characters encode `index` in hex.
-private func paddedID(_ index: Int) -> String {
-    String(format: "%08x", index) + String(repeating: "0", count: 56)
+private func paddedID(_ index: Int) -> EventID {
+    EventID(String(format: "%08x", index) + String(repeating: "0", count: 56))!
 }
 
 /// The 8-character timeline reference of the fixture event at `index`.
@@ -43,7 +44,7 @@ private func timelineFixture() -> [Event] {
     (0..<60).map { index in
         makeEvent(
             id: paddedID(index),
-            pubkey: index.isMultiple(of: 2) ? "author-even" : "author-odd",
+            pubkey: .fixture(index.isMultiple(of: 2) ? "author-even" : "author-odd"),
             createdAt: 1_700_000_000 + Int64(index)
         )
     }
@@ -130,12 +131,12 @@ struct NIP29GroupEventBuilderTests {
             groupID: "abcdef",
             inviteCode: "invite123",
             reason: "let me in",
-            pubkey: "author",
+            pubkey: PublicKey.fixture("author"),
             createdAt: createdAt
         )
 
         #expect(unsigned.kind == .groupJoinRequest)
-        #expect(unsigned.pubkey == "author")
+        #expect(unsigned.pubkey == PublicKey.fixture("author"))
         #expect(unsigned.createdAt == 1_700_000_000)
         #expect(unsigned.tags == [["h", "abcdef"], ["code", "invite123"]])
         #expect(unsigned.content == "let me in")
@@ -143,7 +144,7 @@ struct NIP29GroupEventBuilderTests {
 
     @Test("a join request without an invite code or reason has one tag and empty content")
     func unsignedJoinRequestDefaults() {
-        let unsigned = Groups.joinRequest(groupID: "abcdef", pubkey: "author")
+        let unsigned = Groups.joinRequest(groupID: "abcdef", pubkey: PublicKey.fixture("author"))
 
         #expect(unsigned.tags == [["h", "abcdef"]])
         #expect(unsigned.content.isEmpty)
@@ -162,7 +163,7 @@ struct NIP29GroupEventBuilderTests {
         )
 
         #expect(event.kind == .groupJoinRequest)
-        #expect(event.pubkey == signer.publicKey)
+        #expect(event.pubkey.hex == signer.publicKey)
         #expect(event.createdAt == 1_700_000_000)
         #expect(event.tags == [["h", "abcdef"], ["code", "invite123"]])
         #expect(event.content == "let me in")
@@ -176,16 +177,16 @@ struct NIP29GroupEventBuilderTests {
         let unsigned = Groups.leaveRequest(
             groupID: "abcdef",
             reason: "goodbye",
-            pubkey: "author",
+            pubkey: PublicKey.fixture("author"),
             createdAt: createdAt
         )
 
         #expect(unsigned.kind == .groupLeaveRequest)
-        #expect(unsigned.pubkey == "author")
+        #expect(unsigned.pubkey == PublicKey.fixture("author"))
         #expect(unsigned.createdAt == 1_700_000_000)
         #expect(unsigned.tags == [["h", "abcdef"]])
         #expect(unsigned.content == "goodbye")
-        #expect(Groups.leaveRequest(groupID: "abcdef", pubkey: "author").content.isEmpty)
+        #expect(Groups.leaveRequest(groupID: "abcdef", pubkey: PublicKey.fixture("author")).content.isEmpty)
     }
 
     @Test("a signed leave request verifies with kind 9022 and never carries a code tag")
@@ -195,7 +196,7 @@ struct NIP29GroupEventBuilderTests {
         let event = try await Groups.leaveRequest(groupID: "abcdef", createdAt: createdAt, signer: signer)
 
         #expect(event.kind == .groupLeaveRequest)
-        #expect(event.pubkey == signer.publicKey)
+        #expect(event.pubkey.hex == signer.publicKey)
         #expect(event.tags == [["h", "abcdef"]])
         #expect(event.content.isEmpty)
         #expect(try event.verify())
@@ -211,7 +212,7 @@ struct NIP29GroupEventBuilderTests {
             content: "hello",
             tags: [.hashtag("nostr"), .pubkey("pk1")],
             previous: ["00000001", "00000002"],
-            pubkey: "author",
+            pubkey: PublicKey.fixture("author"),
             createdAt: createdAt
         )
 
@@ -229,7 +230,7 @@ struct NIP29GroupEventBuilderTests {
     @Test("contentEvent omits the previous tag when no references are given")
     func contentEventWithoutPrevious() {
         let unsigned = Groups.contentEvent(
-            groupID: "abcdef", kind: .chatMessage, content: "hello", pubkey: "author")
+            groupID: "abcdef", kind: .chatMessage, content: "hello", pubkey: PublicKey.fixture("author"))
 
         #expect(unsigned.tags == [["h", "abcdef"]])
     }
@@ -237,7 +238,7 @@ struct NIP29GroupEventBuilderTests {
     @Test("contentEvent honors arbitrary content kinds")
     func contentEventArbitraryKind() {
         let article = Groups.contentEvent(
-            groupID: "abcdef", kind: Event.Kind(rawValue: 30023), content: "post", pubkey: "author")
+            groupID: "abcdef", kind: Event.Kind(rawValue: 30023), content: "post", pubkey: PublicKey.fixture("author"))
 
         #expect(article.kind.rawValue == 30023)
         #expect(article.tags.first == ["h", "abcdef"])
@@ -256,7 +257,7 @@ struct NIP29GroupEventBuilderTests {
         )
 
         #expect(event.kind == .chatMessage)
-        #expect(event.pubkey == signer.publicKey)
+        #expect(event.pubkey.hex == signer.publicKey)
         #expect(event.createdAt == 1_700_000_000)
         #expect(event.tags == [["h", "abcdef"]])
         #expect(event.content == "hello")
@@ -354,7 +355,8 @@ struct NIP29TimelineReferenceTests {
         var generator = SeededGenerator(seed: 2)
 
         let references = Groups.previousReferences(
-            from: timelineFixture(), excludingAuthor: "author-even", maxCount: 50, using: &generator)
+            from: timelineFixture(), excludingAuthor: PublicKey.fixture("author-even").hex, maxCount: 50,
+            using: &generator)
 
         // The window is indices 10-59; only the 25 odd-authored events remain, and the
         // even-authored slots are not backfilled with older events.
@@ -408,7 +410,7 @@ struct NIP29TimelineReferenceTests {
     @Test("the system-randomness overload samples from the same window")
     func systemRandomnessOverload() {
         let references = Groups.previousReferences(
-            from: timelineFixture(), excludingAuthor: "author-even")
+            from: timelineFixture(), excludingAuthor: PublicKey.fixture("author-even").hex)
 
         #expect(references.count == 3)
         #expect(Set(references).count == 3)
@@ -429,7 +431,7 @@ struct NIP29TimelineReferenceTests {
 
     @Test("references matching known ids by 8-character prefix are not unknown")
     func allReferencesKnown() {
-        let known = [paddedID(1), paddedID(2), paddedID(3)]
+        let known = [paddedID(1), paddedID(2), paddedID(3)].map(\.hex)
         let event = makeEvent(tags: [["previous", reference(1), reference(3)]])
 
         #expect(Groups.unknownPreviousReferences(of: event, knownEventIDs: known).isEmpty)
@@ -437,7 +439,7 @@ struct NIP29TimelineReferenceTests {
 
     @Test("forged or wrong-length references are reported unknown")
     func unknownReferencesReported() {
-        let known = [paddedID(1), paddedID(2)]
+        let known = [paddedID(1), paddedID(2)].map(\.hex)
         let forged = "deadbeef"
         let wrongLength = String(reference(1).prefix(4))
         let event = makeEvent(tags: [["previous", reference(1), forged, wrongLength]])

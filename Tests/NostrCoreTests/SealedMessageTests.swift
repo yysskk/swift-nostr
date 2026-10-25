@@ -13,8 +13,8 @@ struct SealedMessageTests {
         let bob = try KeyPair()
         let plaintext = "gm from Alice"
 
-        let sealed = try SealedMessage.seal(plaintext, for: bob.publicKeyHex, using: alice)
-        let opened = try sealed.open(from: alice.publicKeyHex, using: bob)
+        let sealed = try SealedMessage.seal(plaintext, for: bob.publicKey.hex, using: alice)
+        let opened = try sealed.open(from: alice.publicKey.hex, using: bob)
 
         #expect(opened == plaintext)
     }
@@ -25,8 +25,8 @@ struct SealedMessageTests {
         let bob = try KeyPair()
         let plaintext = "こんにちは 🍕🫃 café naïve"
 
-        let sealed = try SealedMessage.seal(plaintext, for: bob.publicKeyHex, using: alice)
-        let opened = try sealed.open(from: alice.publicKeyHex, using: bob)
+        let sealed = try SealedMessage.seal(plaintext, for: bob.publicKey.hex, using: alice)
+        let opened = try sealed.open(from: alice.publicKey.hex, using: bob)
 
         #expect(opened == plaintext)
     }
@@ -37,8 +37,8 @@ struct SealedMessageTests {
         let bob = try KeyPair()
         let plaintext = String(repeating: "The quick brown fox. ", count: 500)
 
-        let sealed = try SealedMessage.seal(plaintext, for: bob.publicKeyHex, using: alice)
-        let opened = try sealed.open(from: alice.publicKeyHex, using: bob)
+        let sealed = try SealedMessage.seal(plaintext, for: bob.publicKey.hex, using: alice)
+        let opened = try sealed.open(from: alice.publicKey.hex, using: bob)
 
         #expect(opened == plaintext)
     }
@@ -50,7 +50,7 @@ struct SealedMessageTests {
         let alice = try KeyPair()
         let bob = try KeyPair()
 
-        let sealed = try SealedMessage.seal("hello", for: bob.publicKeyHex, using: alice)
+        let sealed = try SealedMessage.seal("hello", for: bob.publicKey.hex, using: alice)
 
         #expect(!sealed.payload.isEmpty)
         let decoded = try #require(Data(base64Encoded: sealed.payload))
@@ -66,11 +66,11 @@ struct SealedMessageTests {
         let bob = try KeyPair()
         let mallory = try KeyPair()
 
-        let sealed = try SealedMessage.seal("secret", for: bob.publicKeyHex, using: alice)
+        let sealed = try SealedMessage.seal("secret", for: bob.publicKey.hex, using: alice)
 
         // Mallory derives a different conversation key, so the HMAC check fails.
         #expect(throws: NostrError.hmacVerificationFailed) {
-            _ = try sealed.open(from: alice.publicKeyHex, using: mallory)
+            _ = try sealed.open(from: alice.publicKey.hex, using: mallory)
         }
     }
 
@@ -79,7 +79,7 @@ struct SealedMessageTests {
         let alice = try KeyPair()
         let bob = try KeyPair()
 
-        let sealed = try SealedMessage.seal("secret", for: bob.publicKeyHex, using: alice)
+        let sealed = try SealedMessage.seal("secret", for: bob.publicKey.hex, using: alice)
 
         var bytes = try #require(Data(base64Encoded: sealed.payload))
         // Flip a bit in the ciphertext region (byte 40 is past the version + 32-byte nonce).
@@ -87,7 +87,7 @@ struct SealedMessageTests {
         let tampered = SealedMessage(payload: bytes.base64EncodedString())
 
         #expect(throws: NostrError.hmacVerificationFailed) {
-            _ = try tampered.open(from: alice.publicKeyHex, using: bob)
+            _ = try tampered.open(from: alice.publicKey.hex, using: bob)
         }
     }
 

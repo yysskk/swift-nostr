@@ -533,7 +533,7 @@ public actor RelayConnection {
         }
 
         do {
-            try await sendAndAwaitOK(.event(event), eventId: event.id)
+            try await sendAndAwaitOK(.event(event), eventId: event.id.hex)
         } catch let rejection as EventRejection {
             try await retryPublishAfterAuthentication(event, rejection: rejection)
         }
@@ -562,7 +562,7 @@ public actor RelayConnection {
         }
 
         do {
-            try await sendAndAwaitOK(.event(event), eventId: event.id)
+            try await sendAndAwaitOK(.event(event), eventId: event.id.hex)
         } catch let rejection as EventRejection {
             throw Self.rejectionError(rejection)
         }
@@ -640,17 +640,17 @@ public actor RelayConnection {
 
         // Recorded before sending so the receive loop can mark the pubkey as
         // authenticated the moment the OK arrives while this call is in flight.
-        pendingAuthentications[event.id] = event.pubkey
+        pendingAuthentications[event.id.hex] = event.pubkey.hex
 
         do {
-            try await sendAndAwaitOK(.auth(event), eventId: event.id)
+            try await sendAndAwaitOK(.auth(event), eventId: event.id.hex)
         } catch let rejection as EventRejection {
             throw NostrError.authenticationFailed(rejection.message)
         } catch {
             // Once a failure (timeout, send error, cancellation) is reported to
             // the caller, a late OK must not silently flip the connection to
             // authenticated — drop the pending entry along with the error.
-            pendingAuthentications.removeValue(forKey: event.id)
+            pendingAuthentications.removeValue(forKey: event.id.hex)
             throw error
         }
     }

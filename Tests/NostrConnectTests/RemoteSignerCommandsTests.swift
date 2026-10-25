@@ -66,7 +66,7 @@ struct RemoteSignerCommandsTests {
     func signHappyPath() async throws {
         let (remote, transport) = try await connected()
         let unsigned = UnsignedEvent(
-            pubkey: signer.publicKeyHex, createdAt: 1000, kind: .textNote, rawTags: [["t", "nostr"]],
+            pubkey: signer.publicKey, createdAt: 1000, kind: .textNote, rawTags: [["t", "nostr"]],
             content: "hello from the bunker")
 
         async let signed = remote.sign(unsigned)
@@ -74,7 +74,7 @@ struct RemoteSignerCommandsTests {
         #expect(request.method == RemoteSignerMethod.signEvent.rawValue)
 
         // The signer reconstructs the unsigned event, signs it, and returns the JSON event.
-        let toSign = try RemoteSignerFixtures.unsignedEvent(from: request, author: signer.publicKeyHex)
+        let toSign = try RemoteSignerFixtures.unsignedEvent(from: request, author: signer.publicKey)
         let json = try RemoteSignerFixtures.signedEventJSON(toSign, signer: signer)
         try await transport.deliver(
             RemoteSignerFixtures.response(
@@ -86,20 +86,20 @@ struct RemoteSignerCommandsTests {
         #expect(event.content == "hello from the bunker")
         #expect(event.tags == [["t", "nostr"]])
         #expect(event.createdAt == 1000)
-        #expect(event.pubkey == signer.publicKeyHex)
+        #expect(event.pubkey == signer.publicKey)
     }
 
     @Test("sign rejects a tampered event whose content was altered after signing")
     func signRejectsTampered() async throws {
         let (remote, transport) = try await connected()
         let unsigned = UnsignedEvent(
-            pubkey: signer.publicKeyHex, createdAt: 1000, kind: .textNote, content: "original")
+            pubkey: signer.publicKey, createdAt: 1000, kind: .textNote, content: "original")
 
         let signed = Task { try await remote.sign(unsigned) }
         let request = try await nextRequest(transport)
 
         // Sign the requested event, then tamper with the returned content so id/sig no longer match.
-        let toSign = try RemoteSignerFixtures.unsignedEvent(from: request, author: signer.publicKeyHex)
+        let toSign = try RemoteSignerFixtures.unsignedEvent(from: request, author: signer.publicKey)
         let realJSON = try RemoteSignerFixtures.signedEventJSON(toSign, signer: signer)
         let tamperedJSON = realJSON.replacingOccurrences(of: "original", with: "tampered")
         try await transport.deliver(
@@ -113,14 +113,14 @@ struct RemoteSignerCommandsTests {
     func signRejectsMismatchedContent() async throws {
         let (remote, transport) = try await connected()
         let unsigned = UnsignedEvent(
-            pubkey: signer.publicKeyHex, createdAt: 1000, kind: .textNote, content: "requested")
+            pubkey: signer.publicKey, createdAt: 1000, kind: .textNote, content: "requested")
 
         let signed = Task { try await remote.sign(unsigned) }
         let request = try await nextRequest(transport)
 
         // The signer signs a *different* event (valid signature, wrong content) — must be rejected.
         let other = UnsignedEvent(
-            pubkey: signer.publicKeyHex, createdAt: 1000, kind: .textNote, content: "something else")
+            pubkey: signer.publicKey, createdAt: 1000, kind: .textNote, content: "something else")
         let json = try RemoteSignerFixtures.signedEventJSON(other, signer: signer)
         try await transport.deliver(
             RemoteSignerFixtures.response(
@@ -133,7 +133,7 @@ struct RemoteSignerCommandsTests {
     func signRejectsWrongPubkey() async throws {
         let (remote, transport) = try await connected()
         let unsigned = UnsignedEvent(
-            pubkey: signer.publicKeyHex, createdAt: 1000, kind: .textNote, content: "requested")
+            pubkey: signer.publicKey, createdAt: 1000, kind: .textNote, content: "requested")
 
         let signed = Task { try await remote.sign(unsigned) }
         let request = try await nextRequest(transport)
@@ -143,7 +143,7 @@ struct RemoteSignerCommandsTests {
         // must reject it.
         let attacker = try KeyPair()
         let forged = UnsignedEvent(
-            pubkey: attacker.publicKeyHex, createdAt: 1000, kind: .textNote, content: "requested")
+            pubkey: attacker.publicKey, createdAt: 1000, kind: .textNote, content: "requested")
         let json = try RemoteSignerFixtures.signedEventJSON(forged, signer: attacker)
         try await transport.deliver(
             RemoteSignerFixtures.response(
@@ -182,7 +182,7 @@ struct RemoteSignerCommandsTests {
     @Test("nip44Encrypt sends third-party pubkey then plaintext and returns the ciphertext")
     func nip44EncryptRoundTrip() async throws {
         let (remote, transport) = try await connected()
-        let third = try KeyPair().publicKeyHex
+        let third = try KeyPair().publicKey.hex
 
         let ciphertext = Task { try await remote.nip44Encrypt("secret message", to: third) }
         let request = try await nextRequest(transport)
@@ -198,7 +198,7 @@ struct RemoteSignerCommandsTests {
     @Test("nip44Decrypt sends third-party pubkey then ciphertext and returns the plaintext")
     func nip44DecryptRoundTrip() async throws {
         let (remote, transport) = try await connected()
-        let third = try KeyPair().publicKeyHex
+        let third = try KeyPair().publicKey.hex
 
         let plaintext = Task { try await remote.nip44Decrypt("cipher==", from: third) }
         let request = try await nextRequest(transport)
@@ -214,7 +214,7 @@ struct RemoteSignerCommandsTests {
     @Test("nip04Encrypt sends third-party pubkey then plaintext")
     func nip04EncryptRoundTrip() async throws {
         let (remote, transport) = try await connected()
-        let third = try KeyPair().publicKeyHex
+        let third = try KeyPair().publicKey.hex
 
         let ciphertext = Task { try await remote.nip04Encrypt("hi", to: third) }
         let request = try await nextRequest(transport)

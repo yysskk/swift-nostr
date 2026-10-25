@@ -33,7 +33,7 @@ public struct NEvent: Sendable, Hashable {
 
     /// Builds an `nevent` reference from a known event, capturing its id, author, and kind.
     public init(event: Event, relays: [String] = []) throws {
-        try self.init(eventId: event.id, relays: relays, author: event.pubkey, kind: event.kind.rawValue)
+        try self.init(eventId: event.id.hex, relays: relays, author: event.pubkey.hex, kind: event.kind.rawValue)
     }
 
     init(tlvData: Data) throws {

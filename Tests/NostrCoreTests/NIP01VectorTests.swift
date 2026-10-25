@@ -229,26 +229,28 @@ struct NIP01VectorTests {
         var testDescription: String { label }
 
         var unsignedEvent: UnsignedEvent {
-            UnsignedEvent(
-                pubkey: pubkey,
-                createdAt: createdAt,
-                kind: kind,
-                rawTags: rawTags,
-                content: content
-            )
+            get throws {
+                UnsignedEvent(
+                    pubkey: try PublicKey(hex: pubkey),
+                    createdAt: createdAt,
+                    kind: kind,
+                    rawTags: rawTags,
+                    content: content
+                )
+            }
         }
 
         /// The pinned event, reassembled with an overridden `content` where a test needs to
         /// tamper with it.
-        func event(content overriddenContent: String? = nil, sig overriddenSig: String? = nil) -> Event {
+        func event(content overriddenContent: String? = nil, sig overriddenSig: String? = nil) throws -> Event {
             Event(
-                id: id,
-                pubkey: pubkey,
+                id: try EventID(hex: id),
+                pubkey: try PublicKey(hex: pubkey),
                 createdAt: createdAt,
                 kind: kind,
                 tags: rawTags,
                 content: overriddenContent ?? content,
-                sig: overriddenSig ?? sig
+                signature: try Signature(hex: overriddenSig ?? sig)
             )
         }
     }
@@ -305,7 +307,7 @@ struct NIP01VectorTests {
     @Test("canonical serialization and event id match the reference vectors", arguments: serializationVectors)
     func canonicalSerializationMatchesVector(_ vector: SerializationVector) throws {
         let unsigned = UnsignedEvent(
-            pubkey: vector.pubkey,
+            pubkey: try PublicKey(hex: vector.pubkey),
             createdAt: vector.createdAt,
             kind: vector.kind,
             rawTags: vector.rawTags,
@@ -315,7 +317,7 @@ struct NIP01VectorTests {
         let serialized = try unsigned.serializedForHashing()
 
         #expect(String(decoding: serialized, as: UTF8.self) == vector.expectedSerialization)
-        #expect(try unsigned.computedId == vector.expectedId)
+        #expect(try unsigned.computedID.hex == vector.expectedId)
     }
 
     /// Non-ASCII text is emitted as raw UTF-8, never as `\uXXXX` escapes, and surrogate
@@ -335,7 +337,7 @@ struct NIP01VectorTests {
             as: UTF8.self
         )
         let unsigned = UnsignedEvent(
-            pubkey: Self.pubkey1,
+            pubkey: try PublicKey(hex: Self.pubkey1),
             createdAt: Self.timestamp,
             kind: 1,
             rawTags: [["t", hashtag]],
@@ -351,7 +353,7 @@ struct NIP01VectorTests {
         )!
 
         #expect(try unsigned.serializedForHashing() == expectedSerialization)
-        #expect(try unsigned.computedId == "273f93418df624cc93bc4d241e7c0b979797af75a38988ad38bb4d8ba199352b")
+        #expect(try unsigned.computedID.hex == "273f93418df624cc93bc4d241e7c0b979797af75a38988ad38bb4d8ba199352b")
     }
 
     /// NIP-01's text mandates only the seven two-character escapes and says every other
@@ -364,7 +366,7 @@ struct NIP01VectorTests {
     @Test("control characters serialize as lowercase unicode escapes")
     func controlCharactersSerializeAsUnicodeEscapes() throws {
         let unsigned = UnsignedEvent(
-            pubkey: Self.pubkey1,
+            pubkey: try PublicKey(hex: Self.pubkey1),
             createdAt: Self.timestamp,
             kind: 1,
             rawTags: [],
@@ -377,7 +379,7 @@ struct NIP01VectorTests {
             + #"1700000000,1,[],"ctrl:\u0001\u001b!"]"#
 
         #expect(String(decoding: serialized, as: UTF8.self) == expectedSerialization)
-        #expect(try unsigned.computedId == "25afcde11dc0bae511ce9811b35c7d5a59066aa0df373ffdd059849885583440")
+        #expect(try unsigned.computedID.hex == "25afcde11dc0bae511ce9811b35c7d5a59066aa0df373ffdd059849885583440")
     }
 
     /// Cross-implementation signature check. These signatures cannot be reproduced by signing
@@ -391,7 +393,7 @@ struct NIP01VectorTests {
     /// rather than as a mysterious signature failure.
     @Test("pinned bip-340 signatures verify", arguments: signatureVectors)
     func pinnedSignaturesVerify(_ vector: SignatureVector) throws {
-        #expect(try vector.unsignedEvent.computedId == vector.id)
+        #expect(try vector.unsignedEvent.computedID.hex == vector.id)
         #expect(try vector.event().verify())
     }
 
@@ -403,15 +405,15 @@ struct NIP01VectorTests {
         let vector = Self.signatureVectors[0]
         let tamperedContent = vector.content + "!"
         let tamperedUnsigned = UnsignedEvent(
-            pubkey: vector.pubkey,
+            pubkey: try PublicKey(hex: vector.pubkey),
             createdAt: vector.createdAt,
             kind: vector.kind,
             rawTags: vector.rawTags,
             content: tamperedContent
         )
 
-        #expect(try tamperedUnsigned.computedId != vector.id)
-        #expect(throws: NostrError.invalidEventId) {
+        #expect(try tamperedUnsigned.computedID.hex != vector.id)
+        #expect(throws: NostrError.invalidEventID) {
             try vector.event(content: tamperedContent).verify()
         }
     }

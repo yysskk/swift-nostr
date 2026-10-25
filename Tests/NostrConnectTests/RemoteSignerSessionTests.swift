@@ -1,5 +1,6 @@
 import Foundation
 import NostrCore
+import NostrTestSupport
 import Testing
 
 @testable import NostrConnect
@@ -36,12 +37,12 @@ struct RemoteSignerSessionTests {
         let sent = try await RemoteSignerFixtures.waitForSentEvents(transport, count: 1)
         let event = sent[0]
         #expect(event.kind == .nostrConnect)
-        #expect(event.pubkey == client.publicKeyHex)
-        #expect(event.firstTagValue(named: "p") == signer.publicKeyHex)
+        #expect(event.pubkey == client.publicKey)
+        #expect(event.firstTagValue(named: "p") == signer.publicKey.hex)
 
         let request = try RemoteSignerFixtures.decryptRequest(event, client: client, signer: signer)
         #expect(request.method == RemoteSignerMethod.connect.rawValue)
-        #expect(request.params == [signer.publicKeyHex])
+        #expect(request.params == [signer.publicKey.hex])
 
         try await transport.deliver(
             RemoteSignerFixtures.response(
@@ -59,7 +60,7 @@ struct RemoteSignerSessionTests {
 
         let sent = try await RemoteSignerFixtures.waitForSentEvents(transport, count: 1)
         let request = try RemoteSignerFixtures.decryptRequest(sent[0], client: client, signer: signer)
-        #expect(request.params == [signer.publicKeyHex, "s3cr3t"])
+        #expect(request.params == [signer.publicKey.hex, "s3cr3t"])
 
         try await transport.deliver(
             RemoteSignerFixtures.response(
@@ -162,10 +163,10 @@ struct RemoteSignerSessionTests {
         // A response encrypted by a different keypair, authored by an impostor, must be dropped.
         let impostor = try KeyPair()
         let json = "{\"id\":\"\(request.id)\",\"result\":\"pong\"}"
-        let sealed = try SealedMessage.seal(json, for: client.publicKeyHex, using: impostor)
+        let sealed = try SealedMessage.seal(json, for: client.publicKey.hex, using: impostor)
         let forged = Event(
-            id: "forged", pubkey: impostor.publicKeyHex, createdAt: 0, kind: .nostrConnect,
-            tags: [["p", client.publicKeyHex]], content: sealed.payload, sig: "")
+            id: .fixture("forged"), pubkey: impostor.publicKey, createdAt: 0, kind: .nostrConnect,
+            tags: [["p", client.publicKey.hex]], content: sealed.payload, signature: nil)
         await transport.deliver(forged)
 
         await #expect(throws: RemoteSignerError.timedOut) { try await ping.value }
