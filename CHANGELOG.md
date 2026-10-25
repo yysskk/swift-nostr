@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-25
+
+A hardening release. A review of the whole package fixed more than thirty defects — relay
+connections that could wedge or leak, subscriptions that missed or double-delivered events,
+NIP-46 and NIP-47 sessions that trusted unverified or mismatched responses, and encoders and
+decoders that accepted non-canonical input. Alongside the fixes, NIP-44 encryption is reachable
+through any signer and under a caller-supplied conversation key, a rumor of any kind can be
+delivered gift-wrapped, a signed event can be published to chosen relays, and a `bunker://`
+session can request permissions up front. Upgrading from 0.7.0 requires source changes for
+conforming types, NIP-47 multi-pay results, and stricter NIP-57 zap validation; see **Changed**.
+
 ### Added
 
 - **`NostrIdentityAPI.nip44Encrypt(_:to:)` and `nip44Decrypt(_:from:)` encrypt through the active
@@ -80,6 +91,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   bound and accepts the allocation. The writer is capped by the same default as the reader, so this
   library never mints an `ncryptsec` it would then refuse to open. A parsed payload's `logN` is
   readable beforehand, so that choice can be made with the real number in hand.
+
+- **Minimum dependency versions rise to swift-crypto 5.0.0 and swift-secp256k1 0.24.0**: the
+  secp256k1 release builds for Wasm and drops products this package never used.
 
 ### Fixed
 
@@ -573,7 +587,8 @@ remote signing, a spec-compliance fix to NIP-44 encryption, and expanded test co
 
 - Initial release: NIP-01 events, filters, subscriptions, and single-relay support.
 
-[Unreleased]: https://github.com/yysskk/swift-nostr/compare/0.7.0...HEAD
+[Unreleased]: https://github.com/yysskk/swift-nostr/compare/0.8.0...HEAD
+[0.8.0]: https://github.com/yysskk/swift-nostr/compare/0.7.0...0.8.0
 [0.7.0]: https://github.com/yysskk/swift-nostr/compare/0.6.0...0.7.0
 [0.6.0]: https://github.com/yysskk/swift-nostr/compare/0.5.0...0.6.0
 [0.5.0]: https://github.com/yysskk/swift-nostr/compare/0.4.0...0.5.0
