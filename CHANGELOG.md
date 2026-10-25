@@ -15,6 +15,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   holding a shared key. The payload is standard NIP-44 v2 and a fresh random nonce is generated per
   message; the nonce is not exposed, so callers cannot reuse one. Anyone holding the key can both
   read and forge messages under it.
+- **`NostrEventsAPI.publish(_:to:strategy:)` publishes an already-signed event to chosen relays**:
+  `publish(_:strategy:)` only broadcast to the whole pool, so an event signed by a separate key and
+  meant for a small named relay set could not be routed through the public API, unlike `fetch`,
+  `count`, and `subscribe`, which already took `to:`. Targets are normalized and de-duplicated like
+  pool keys, relays not in the pool are skipped rather than connected, and an empty list throws
+  `noMatchingRelays` instead of falling back to the whole pool. Passing nil (the default) broadcasts
+  as before.
 - **A `bunker://` session can request permissions**: `RemoteSigner(bunker:clientKeyPair:requesting:…)`
   takes the `[RemoteSignerPermission]` to ask for, and sends them in NIP-46's `connect` call. They
   were modeled but never sent, so a session could not pre-authorize anything and every operation drew
@@ -24,6 +31,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The `NostrEventPublishing` requirement `publish(_:strategy:)` is now `publish(_:to:strategy:)`**
+  (breaking): conforming types outside the package must add the `to relayURLs: [String]?` parameter.
+  Call sites are unchanged, since `NostrEventsAPI` defaults it to nil.
 - **`multiPayInvoice` and `multiPayKeysend` return `MultiPayResults` instead of a dictionary**
   (breaking): results were keyed by the response's `d` tag, which cannot identify a request item —
   two responses sharing a tag silently overwrote each other, and an item sent without an `id` is

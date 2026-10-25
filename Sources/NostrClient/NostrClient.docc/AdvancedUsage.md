@@ -383,7 +383,7 @@ public key is resolved once and cached, so ``NostrIdentityAPI/publicKey`` and ``
 synchronous.
 
 Every feature runs through the signer, so a remote one is a drop-in for a local key: the generic
-``NostrIdentityAPI/sign(_:)`` and ``NostrEventsAPI/publish(_:strategy:)``, the convenience `publish*`
+``NostrIdentityAPI/sign(_:)`` and ``NostrEventsAPI/publish(_:to:strategy:)``, the convenience `publish*`
 helpers, NIP-17 direct messages, NIP-51 private list items, and NIP-42 authentication all work
 unchanged. Set the signer and use the same API you would with an `nsec`:
 
@@ -691,6 +691,15 @@ let result = try await client.events.publish(event)
 print("accepted:", result.acceptedRelays)
 print("failed:", result.failedRelays)
 print("still in flight:", result.pendingRelays)
+```
+
+To send an already-signed event to chosen relays rather than the whole pool, pass `to:`.
+Targets must already be in the pool; ones that are not are skipped, and an empty list throws
+rather than broadcasting:
+
+```swift
+try await client.relays.add("wss://relay.example.com")
+try await client.events.publish(event, to: ["wss://relay.example.com"], strategy: .allSettled)
 ```
 
 The convenience publish methods (``NostrEventsAPI/publishTextNote(content:tags:strategy:)``,

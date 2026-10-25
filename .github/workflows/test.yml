@@ -157,14 +157,12 @@ jobs:
             -quiet
 
   build-android:
-    # Pinned to 24.04: swift.org publishes no Swift 6.3.x host toolchain for
-    # Ubuntu 26.04, so the action's toolchain download 404s on ubuntu-latest.
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
 
       - name: Build for Android
         uses: skiptools/swift-android-action@2044b79660f201ccef8cbce62877e4ec5409f9c8 # v2.9.5
         with:
-          swift-version: "6.3"
+          swift-version: "6.4.1"
           run-tests: false

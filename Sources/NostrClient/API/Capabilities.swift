@@ -123,9 +123,9 @@ public protocol NostrEventPublishing: Sendable {
     func publishReport(
         event: Event, type: ReportType, reason: String, strategy: PublishStrategy?
     ) async throws -> PublishedEvent
-    /// Publishes an already-signed event.
+    /// Publishes an already-signed event to the whole pool (nil) or to the given relays.
     @discardableResult
-    func publish(_ event: Event, strategy: PublishStrategy?) async throws -> PublishResult
+    func publish(_ event: Event, to relayURLs: [String]?, strategy: PublishStrategy?) async throws -> PublishResult
 
     /// Publishes a NIP-23 long-form article or draft.
     @discardableResult

@@ -54,7 +54,7 @@ public struct NostrIdentityAPI: NostrIdentityProviding {
     /// Signs an event with the configured signer, local or remote.
     ///
     /// Build an ``UnsignedEvent`` with ``publicKey`` as its pubkey; combine with
-    /// ``NostrEventsAPI/publish(_:strategy:)`` to author and publish an event this library has
+    /// ``NostrEventsAPI/publish(_:to:strategy:)`` to author and publish an event this library has
     /// no helper for.
     /// - Parameter unsignedEvent: The event to sign; its `pubkey` should be ``publicKey``.
     /// - Returns: The signed ``Event``.

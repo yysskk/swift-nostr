@@ -118,7 +118,7 @@ and cached, so `identity.publicKey`/`identity.npub` stay a single actor hop even
 Setting a signer also starts answering NIP-42 AUTH challenges automatically (see Authentication).
 
 Every feature runs through the signer, so a remote one is a drop-in for a local key: `sign(_:)`,
-`publish(_:strategy:)`, the convenience `publish*` helpers, NIP-17 direct messages, NIP-51 private
+`publish(_:to:strategy:)`, the convenience `publish*` helpers, NIP-17 direct messages, NIP-51 private
 list items, and NIP-42 authentication all work unchanged:
 
 ```swift
