@@ -82,6 +82,11 @@ struct NostrClientNamespaceTests {
         )
         #expect(try signed.verify())
 
+        let peer = try KeyPair()
+        let payload = try await identity.nip44Encrypt("sealed", to: peer.publicKeyHex)
+        #expect(try EventSigner(keyPair: peer).nip44Decrypt(payload, from: keyPair.publicKeyHex) == "sealed")
+        #expect(try await identity.nip44Decrypt(payload, from: peer.publicKeyHex) == "sealed")
+
         await client.relays.disconnect()
     }
 

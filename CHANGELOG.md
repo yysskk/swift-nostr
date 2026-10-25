@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`NostrIdentityAPI.nip44Encrypt(_:to:)` and `nip44Decrypt(_:from:)` encrypt through the active
+  signer**: an app whose key lives in a NIP-46 bunker could reach NIP-44 only inside the
+  direct-message path, so it had no way to encrypt its own payloads to a peer. Both route through
+  the signer set on `client.identity`, local or remote, and throw `signerNotSet` without one. With
+  a remote signer each call is a relay round-trip.
 - **NIP-44 encryption under a caller-supplied conversation key**:
   `SealedMessage.seal(_:conversationKey:)` and `open(conversationKey:)` take the 32-byte conversation
   key directly instead of deriving it from a key pair, so one ciphertext can be read by everyone
@@ -31,6 +36,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`NostrIdentityProviding` requires `nip44Encrypt(_:to:)` and `nip44Decrypt(_:from:)`**
+  (breaking): conforming types outside the package must implement both.
 - **The `NostrEventPublishing` requirement `publish(_:strategy:)` is now `publish(_:to:strategy:)`**
   (breaking): conforming types outside the package must add the `to relayURLs: [String]?` parameter.
   Call sites are unchanged, since `NostrEventsAPI` defaults it to nil.

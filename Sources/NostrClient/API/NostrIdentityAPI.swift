@@ -23,7 +23,7 @@ public struct NostrIdentityAPI: NostrIdentityProviding {
     /// "bunker"). The signer's ``NostrSigning/publicKey`` is resolved once here and cached, so
     /// ``publicKey`` and ``npub`` stay a single actor hop even for a remote signer. Every feature
     /// works with either kind: signing, publishing, the convenience `publish*` helpers, NIP-17
-    /// direct messages, NIP-51 private list items, and NIP-42 AUTH challenges.
+    /// direct messages, NIP-51 private list items, NIP-44 encryption, and NIP-42 AUTH challenges.
     ///
     /// While ``authenticationMode`` is ``AuthenticationMode/automatic`` (the default), setting a
     /// signer also starts answering NIP-42 AUTH challenges with it on every relay in the pool.
@@ -61,6 +61,38 @@ public struct NostrIdentityAPI: NostrIdentityProviding {
     /// - Throws: ``NostrError/signerNotSet`` if no signer is set, plus anything the signer throws.
     public func sign(_ unsignedEvent: UnsignedEvent) async throws -> Event {
         try await client.activeSign(unsignedEvent)
+    }
+
+    // MARK: - Encryption (NIP-44)
+
+    /// Encrypts `plaintext` to `recipientPubkey` with NIP-44 v2 as the configured signer, local or
+    /// remote.
+    ///
+    /// Use it for app payloads addressed to a peer outside the direct-message path. With a remote
+    /// NIP-46 signer each call is a relay round-trip.
+    /// - Parameters:
+    ///   - plaintext: The message to encrypt.
+    ///   - recipientPubkey: The recipient's public key (hex).
+    /// - Returns: The NIP-44 payload.
+    /// - Throws: ``NostrError/signerNotSet`` if no signer is set, plus anything the signer throws.
+    public func nip44Encrypt(_ plaintext: String, to recipientPubkey: String) async throws -> String {
+        try await client.withSigner { signer, _ in
+            try await signer.nip44Encrypt(plaintext, to: recipientPubkey)
+        }
+    }
+
+    /// Decrypts a NIP-44 v2 payload from `senderPubkey` with the configured signer, local or remote.
+    ///
+    /// With a remote NIP-46 signer each call is a relay round-trip.
+    /// - Parameters:
+    ///   - ciphertext: The NIP-44 payload.
+    ///   - senderPubkey: The sender's public key (hex).
+    /// - Returns: The decrypted plaintext.
+    /// - Throws: ``NostrError/signerNotSet`` if no signer is set, plus anything the signer throws.
+    public func nip44Decrypt(_ ciphertext: String, from senderPubkey: String) async throws -> String {
+        try await client.withSigner { signer, _ in
+            try await signer.nip44Decrypt(ciphertext, from: senderPubkey)
+        }
     }
 
     // MARK: - Authentication (NIP-42)

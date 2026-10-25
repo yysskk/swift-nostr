@@ -407,6 +407,15 @@ let signed = try await client.identity.sign(
 try await client.events.publish(signed)
 ```
 
+To encrypt an app payload to a peer outside the direct-message path, use
+``NostrIdentityAPI/nip44Encrypt(_:to:)`` and ``NostrIdentityAPI/nip44Decrypt(_:from:)``. They use
+NIP-44 v2 through the active signer, so with a remote signer each call is a relay round-trip:
+
+```swift
+let payload = try await client.identity.nip44Encrypt("for your eyes only", to: peerPubkey)
+let plaintext = try await client.identity.nip44Decrypt(reply, from: peerPubkey)
+```
+
 NIP-17 is the one place where a remote signer costs an extra round-trip per message: the gift wrap
 seals the rumor and signs the seal through the bunker. The outer wrap key is ephemeral by design
 and is always generated locally.

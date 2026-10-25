@@ -39,6 +39,10 @@ public protocol NostrIdentityProviding: Sendable {
 
     /// Signs an event with the configured signer.
     func sign(_ unsignedEvent: UnsignedEvent) async throws -> Event
+    /// Encrypts `plaintext` to `recipientPubkey` with NIP-44 as the configured signer.
+    func nip44Encrypt(_ plaintext: String, to recipientPubkey: String) async throws -> String
+    /// Decrypts a NIP-44 payload from `senderPubkey` with the configured signer.
+    func nip44Decrypt(_ ciphertext: String, from senderPubkey: String) async throws -> String
 
     /// How the client reacts to relay AUTH challenges.
     var authenticationMode: AuthenticationMode { get async }
