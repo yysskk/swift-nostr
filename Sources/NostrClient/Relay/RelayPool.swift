@@ -279,6 +279,8 @@ public actor RelayPool {
     /// subset; targets not in the pool are skipped. An empty set always throws — an
     /// accidentally-empty computed target list must not fan out to the whole pool.
     ///
+    /// - Parameter timeout: How long to wait for relays to finish; `nil` uses
+    ///   ``RelayPoolConfig/queryTimeout``.
     /// - Returns: the per-relay count for every relay that answered, keyed by relay URL.
     /// - Throws: ``NostrError/noRelaysInPool`` when the pool is empty,
     ///   ``NostrError/noMatchingRelays(_:)`` when none of the targeted URLs are in the
@@ -286,9 +288,12 @@ public actor RelayPool {
     public func countEvents(
         matching filters: [Filter],
         from relayURLs: Set<RelayURL>? = nil,
-        timeout: TimeInterval = 10
+        timeout: Duration? = nil
     ) async throws -> [RelayURL: EventCount] {
         let connections = try targetConnections(relayURLs)
+        // Passed to every connection explicitly so the pool's setting governs pool calls, not
+        // each relay's own `RelayConnectionConfig/queryTimeout`.
+        let timeout = timeout ?? config.queryTimeout
 
         return try await withThrowingTaskGroup(of: (RelayURL, Result<EventCount, any Error>).self) { group in
             for connection in connections {

@@ -13,8 +13,10 @@ public struct NostrRoutingAPI: NostrRelayRouting {
     // MARK: - Relay list metadata (NIP-65)
 
     /// Fetches a user's NIP-65 relay list (kind 10002), caching it (newer wins).
+    /// - Parameter timeout: How long to wait for relays to finish; `nil` uses
+    ///   ``RelayPoolConfig/queryTimeout``.
     /// - Returns: The relay list, or nil if none was found.
-    public func fetchRelayList(for pubkey: PublicKey, timeout: TimeInterval = 10) async throws -> RelayListMetadata? {
+    public func fetchRelayList(for pubkey: PublicKey, timeout: Duration? = nil) async throws -> RelayListMetadata? {
         let events = try await client.fetch(
             filters: [.relayListMetadata(pubkey: pubkey)], fromURLs: nil, timeout: timeout
         )
@@ -114,10 +116,12 @@ public struct NostrRoutingAPI: NostrRelayRouting {
     /// Fetches a user's NIP-17 DM relay list (kind 10050), caching it (newer wins).
     ///
     /// Look this up to learn where to deliver a recipient's gift-wrapped direct messages.
+    /// - Parameter timeout: How long to wait for relays to finish; `nil` uses
+    ///   ``RelayPoolConfig/queryTimeout``.
     /// - Returns: The DM relay list, or nil if none was found.
     public func fetchDirectMessageRelayList(
         for pubkey: PublicKey,
-        timeout: TimeInterval = 10
+        timeout: Duration? = nil
     ) async throws -> DirectMessageRelayList? {
         let events = try await client.fetch(
             filters: [.directMessageRelayList(pubkey: pubkey)], fromURLs: nil, timeout: timeout

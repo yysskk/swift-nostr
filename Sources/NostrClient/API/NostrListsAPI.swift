@@ -26,13 +26,15 @@ public struct NostrListsAPI: NostrListManaging {
 
     /// Fetches the newest list of `kind`. With no `pubkey` it fetches the current user's list
     /// and decrypts private items; for another pubkey only public items are returned.
+    /// - Parameter timeout: How long to wait for relays to finish; `nil` uses
+    ///   ``RelayPoolConfig/queryTimeout``.
     /// - Throws: when fetching the current user's own list and its private content cannot be
     ///   decrypted (republishing such a list would silently drop the private items).
     /// - Returns: The list, or nil if none was found.
     public func fetch(
         kind: Event.Kind,
         for pubkey: PublicKey? = nil,
-        timeout: TimeInterval = 10
+        timeout: Duration? = nil
     ) async throws -> NostrList? {
         let target = try await author(pubkey)
         let events = try await client.fetch(
@@ -75,6 +77,8 @@ public struct NostrListsAPI: NostrListManaging {
     /// Fetches one set by kind and `d` identifier. With no `pubkey` it fetches the current
     /// user's set and decrypts its private items; for another pubkey only public items are
     /// returned.
+    /// - Parameter timeout: How long to wait for relays to finish; `nil` uses
+    ///   ``RelayPoolConfig/queryTimeout``.
     /// - Throws: when fetching the current user's own set and its private content cannot be
     ///   decrypted (republishing such a set would silently drop the private items).
     /// - Returns: The set, or nil if none was found.
@@ -82,7 +86,7 @@ public struct NostrListsAPI: NostrListManaging {
         kind: Event.Kind,
         identifier: String,
         for pubkey: PublicKey? = nil,
-        timeout: TimeInterval = 10
+        timeout: Duration? = nil
     ) async throws -> NostrListSet? {
         let target = try await author(pubkey)
         var filter = Filter(authors: [target], kinds: [kind])
@@ -105,12 +109,14 @@ public struct NostrListsAPI: NostrListManaging {
     /// Fetches all sets of a kind for an author, keeping the newest per `d` identifier. With no
     /// `pubkey` it fetches the current user's sets and decrypts their private items; for another
     /// pubkey only public items are returned.
+    /// - Parameter timeout: How long to wait for relays to finish; `nil` uses
+    ///   ``RelayPoolConfig/queryTimeout``.
     /// - Throws: when fetching the current user's own sets and a set's private content cannot be
     ///   decrypted.
     public func fetchSets(
         kind: Event.Kind,
         for pubkey: PublicKey? = nil,
-        timeout: TimeInterval = 10
+        timeout: Duration? = nil
     ) async throws -> [NostrListSet] {
         let target = try await author(pubkey)
         let events = try await client.fetch(
@@ -139,8 +145,10 @@ public struct NostrListsAPI: NostrListManaging {
     ///
     /// Only public items are returned; the current user's private items are available via
     /// ``fetchSet(kind:identifier:for:timeout:)`` with no `pubkey`.
+    /// - Parameter timeout: How long to wait for relays to finish; `nil` uses
+    ///   ``RelayPoolConfig/queryTimeout``.
     /// - Returns: The set, or nil if none was found.
-    public func fetchSet(naddr: NAddr, timeout: TimeInterval = 10) async throws -> NostrListSet? {
+    public func fetchSet(naddr: NAddr, timeout: Duration? = nil) async throws -> NostrListSet? {
         var filter = Filter(authors: [naddr.author], kinds: [Event.Kind(rawValue: naddr.kind)])
         filter.addTagQuery("d", values: [naddr.identifier])
         let events = try await client.fetch(filters: [filter], fromURLs: nil, timeout: timeout)

@@ -135,7 +135,7 @@ struct NostrClientNamespaceTests {
         let note = try EventSigner(keyPair: author).signTextNote(content: "stored")
 
         let events = try await answering(socket, with: [note]) {
-            try await fetching.fetch(filters: [Filter(kinds: [.textNote])], from: nil, timeout: 5)
+            try await fetching.fetch(filters: [Filter(kinds: [.textNote])], from: nil, timeout: .seconds(5))
         }
 
         #expect(events.map(\.content) == ["stored"])

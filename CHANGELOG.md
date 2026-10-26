@@ -33,6 +33,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `advanced(by:)` and `duration(to:)` do `Duration` arithmetic without going through `Date`:
   advancing drops the sub-second part of the duration (truncating toward zero) and saturates at the
   bounds of `Int64` instead of trapping.
+- **One-shot fetches and counts take their default timeout from configuration**:
+  `RelayPoolConfig.queryTimeout` is how long a fetch or count through `NostrClient` or `RelayPool`
+  waits for relays (EOSE, or COUNT) when the call passes no timeout, and
+  `RelayConnectionConfig.queryTimeout` does the same for `RelayConnection.count(filters:timeout:)`.
+  Both default to 10 seconds.
 
 ### Changed
 
@@ -271,6 +276,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `FeeSchedule.period` and `Retention.time` were `Int?`; a retention `time` of `.zero` still means
   events are not stored, and `nil` means no time limit. The document still carries integer seconds,
   and a non-integer value still fails decoding.
+- **Per-call fetch and count timeouts are `Duration?`** (breaking): the `timeout:` of every one-shot
+  fetch and count on `client.events`, `client.routing`, `client.groups`, and `client.lists`, of
+  `RelayPool.count`, of `RelayConnection.count`, and of the matching capability protocol
+  requirements was `TimeInterval` defaulting to 10. It now defaults to `nil`, which uses the
+  configured `queryTimeout`; `RelayPool.count` passes its resolved timeout to every connection, so
+  the pool's setting governs pool calls.
 - **`maxLogN` is spelled `maximumLogN`** (breaking): `EncryptedPrivateKey.decrypt(password:maxLogN:)`
   is `decrypt(password:maximumLogN:)` and `KeyPair(ncryptsec:password:maxLogN:)` is
   `KeyPair(ncryptsec:password:maximumLogN:)`, so reading and writing a NIP-49 key bound the scrypt
