@@ -107,3 +107,10 @@ let isValid = try event.verify()
 - ``Mnemonic/Error``
 - ``EncryptedPrivateKey/Error``
 - ``LNURL/Error``
+- ``SealedMessage/Error``
+- ``Event/VerificationError``
+- ``ProofOfWork/Error``
+- ``RelayMessage/Error``
+- ``RelayURL/Error``
+- ``HTTPAuth/AuthorizationError``
+- ``EventTemplate/ZapRequestError``

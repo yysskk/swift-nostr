@@ -270,7 +270,7 @@ struct EventTemplateTests {
 
     @Test("zapRequest requires at least one relay")
     func zapRequestRequiresRelay() {
-        #expect(throws: NostrError.invalidData) {
+        #expect(throws: EventTemplate.ZapRequestError.missingRelays) {
             _ = try EventTemplate.zapRequest(to: .fixture("recipient"), relays: [])
         }
     }

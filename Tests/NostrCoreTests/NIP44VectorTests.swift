@@ -192,7 +192,7 @@ struct NIP44VectorTests {
         arguments: NIP44Vectors.invalid.encryptMsgLengths
     )
     func invalidPlaintextLength(_ length: Int) {
-        #expect(throws: NostrError.encryptionFailed) {
+        #expect(throws: SealedMessage.Error.invalidPlaintextLength(length)) {
             _ = try SealedMessage.encrypt(
                 plaintext: String(repeating: "a", count: length),
                 conversationKey: Data(repeating: 0, count: 32),
@@ -365,19 +365,19 @@ enum NIP44Vectors: Sendable {
         /// vector, or `nil` if the note is one this suite does not know about — which the test
         /// treats as a failure rather than a skip, so a future vectors update cannot quietly drop
         /// a case.
-        var expectedError: NostrError? {
+        var expectedError: SealedMessage.Error? {
             switch note {
             // This payload is prefixed with `#`, which the reference reads as an unknown version
             // byte. Swift's strict base64 decoder refuses the `#` one step earlier, so the payload
             // is rejected with a different error but the same outcome. Sniffing for `#` before
             // decoding would change public `open` behaviour for no practical gain.
-            case "unknown encryption version": .invalidPayloadFormat
-            case "unknown encryption version 0": .unsupportedEncryptionVersion(0)
-            case "invalid base64": .invalidPayloadFormat
-            case "invalid MAC": .hmacVerificationFailed
+            case "unknown encryption version": .malformedPayload
+            case "unknown encryption version 0": .unsupportedVersion(0)
+            case "invalid base64": .malformedPayload
+            case "invalid MAC": .invalidMAC
             case "invalid padding": .invalidPadding
             // The remaining notes carry the offending length, e.g. "invalid payload length: 48".
-            default: note.hasPrefix("invalid payload length:") ? .invalidPayloadFormat : nil
+            default: note.hasPrefix("invalid payload length:") ? .malformedPayload : nil
             }
         }
     }

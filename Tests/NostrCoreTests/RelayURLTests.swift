@@ -51,31 +51,32 @@ struct RelayURLNormalizationTests {
 struct RelayURLValidationTests {
 
     @Test(
-        "Rejects strings that are not WebSocket relay URLs",
+        "Rejects strings that are not WebSocket relay URLs, naming the reason",
         arguments: [
-            "https://relay.example.com",  // non-WebSocket scheme
-            "http://relay.example.com",
-            "relay.example.com",  // no scheme
-            "wss:garbage",  // no host
-            "wss://",  // empty host
-            "wss://relay.example.com/path#frag",  // fragment
-            "wss://user:pw@relay.example.com",  // user and password
-            "wss://user@relay.example.com",  // user
-            "not a url",  // unparseable
-            "",
+            ("https://relay.example.com", RelayURL.Error.unsupportedScheme("https")),
+            ("http://relay.example.com", .unsupportedScheme("http")),
+            ("HTTP://relay.example.com", .unsupportedScheme("http")),
+            ("relay.example.com", .malformed),  // no scheme
+            ("wss:garbage", .missingHost),
+            ("wss://", .missingHost),  // empty host
+            ("wss://relay.example.com/path#frag", .containsFragment),
+            ("wss://user:pw@relay.example.com", .containsCredentials),
+            ("wss://user@relay.example.com", .containsCredentials),
+            ("not a url", .malformed),  // unparseable
+            ("", .malformed),
         ])
-    func rejects(input: String) {
-        #expect(throws: NostrError.invalidRelayURL(input)) {
+    func rejects(input: String, expected: RelayURL.Error) {
+        #expect(throws: expected) {
             _ = try RelayURL(string: input)
         }
         #expect(RelayURL(input) == nil)
     }
 
-    @Test("init(url:) validates and normalizes, reporting the URL's string on failure")
+    @Test("init(url:) validates and normalizes, reporting why a URL is rejected")
     func initFromURL() throws {
         #expect(try RelayURL(url: URL(string: "wss://Relay.Example.com:443/")!) == RelayURL("wss://relay.example.com"))
         let https = URL(string: "https://relay.example.com")!
-        #expect(throws: NostrError.invalidRelayURL("https://relay.example.com")) {
+        #expect(throws: RelayURL.Error.unsupportedScheme("https")) {
             _ = try RelayURL(url: https)
         }
     }

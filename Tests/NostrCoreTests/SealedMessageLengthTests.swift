@@ -17,7 +17,7 @@ struct SealedMessageLengthTests {
         arguments: [0, 16, 31, 33, 64]
     )
     func encryptRejectsWrongLengthKey(byteCount: Int) {
-        #expect(throws: NostrError.encryptionFailed) {
+        #expect(throws: SealedMessage.Error.invalidConversationKey) {
             _ = try SealedMessage.encrypt(
                 plaintext: "hello",
                 conversationKey: Data(repeating: 0x01, count: byteCount),
@@ -31,7 +31,7 @@ struct SealedMessageLengthTests {
         arguments: [0, 12, 24, 31, 33]
     )
     func encryptRejectsWrongLengthNonce(byteCount: Int) {
-        #expect(throws: NostrError.encryptionFailed) {
+        #expect(throws: SealedMessage.Error.invalidNonce) {
             _ = try SealedMessage.encrypt(
                 plaintext: "hello",
                 conversationKey: validKey,
@@ -51,7 +51,7 @@ struct SealedMessageLengthTests {
             nonce: validNonce
         )
 
-        #expect(throws: NostrError.decryptionFailed) {
+        #expect(throws: SealedMessage.Error.invalidConversationKey) {
             _ = try SealedMessage.decrypt(
                 payload: payload,
                 conversationKey: Data(repeating: 0x01, count: byteCount)

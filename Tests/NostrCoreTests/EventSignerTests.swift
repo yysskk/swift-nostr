@@ -64,7 +64,7 @@ struct EventSignerTests {
         )
 
         // The stored id no longer matches the recomputed hash of the tampered content.
-        #expect(throws: NostrError.self) {
+        #expect(throws: Event.VerificationError.idMismatch) {
             try tampered.verify()
         }
     }

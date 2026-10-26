@@ -282,7 +282,7 @@ struct NIP51SimpleGroupListClientTests {
             array.count >= 2,
             let eventDict = array[1] as? [String: Any]
         else {
-            throw NostrError.invalidMessageFormat
+            throw RelayMessage.Error.malformed
         }
         let eventData = try JSONSerialization.data(withJSONObject: eventDict)
         return try JSONDecoder().decode(Event.self, from: eventData)
@@ -297,7 +297,7 @@ struct NIP51SimpleGroupListClientTests {
             let subscriptionID = array[1] as? String,
             let filter = array[2] as? [String: Any]
         else {
-            throw NostrError.invalidMessageFormat
+            throw RelayMessage.Error.malformed
         }
         return (subscriptionID, filter)
     }

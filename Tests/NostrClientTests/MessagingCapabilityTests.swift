@@ -42,13 +42,13 @@ struct MessagingCapabilityTests {
         return try #require(sends.first)
     }
 
-    /// The error `operation` throws, so two failures can be compared.
-    private func thrownError<T>(by operation: () async throws -> T) async -> NostrError? {
+    /// The NIP-44 error `operation` throws, so two failures to open a gift wrap can be compared.
+    private func thrownError<T>(by operation: () async throws -> T) async -> SealedMessage.Error? {
         do {
             _ = try await operation()
             return nil
         } catch {
-            return error as? NostrError
+            return error as? SealedMessage.Error
         }
     }
 

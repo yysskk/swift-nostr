@@ -29,7 +29,7 @@ struct RelayMessageTests {
         let json =
             #"["EVENT","sub1",{"id":"abc123","pubkey":"cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd","created_at":1234567890,"kind":1,"tags":[],"content":"Hello","sig":"efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef"}]"#
 
-        #expect(throws: DecodingError.self) {
+        #expect(throws: RelayMessage.Error.malformed) {
             try RelayMessage.parse(json)
         }
     }
@@ -103,7 +103,7 @@ struct RelayMessageTests {
             String(repeating: "0", count: 63),
         ])
     func parseOkMessageWithMalformedID(id: String) {
-        #expect(throws: NostrError.invalidMessageFormat) {
+        #expect(throws: RelayMessage.Error.malformed) {
             try RelayMessage.parse(#"["OK","\#(id)",true,""]"#)
         }
     }
@@ -165,18 +165,18 @@ struct RelayMessageTests {
         }
     }
 
-    @Test("Malformed COUNT message throws invalidMessageFormat")
+    @Test("Malformed COUNT message throws malformed")
     func parseMalformedCountMessage() {
         // Missing the `count` key in the payload.
-        #expect(throws: NostrError.invalidMessageFormat) {
+        #expect(throws: RelayMessage.Error.malformed) {
             _ = try RelayMessage.parse(#"["COUNT","sub1",{"approximate":true}]"#)
         }
         // Payload is not a dictionary.
-        #expect(throws: NostrError.invalidMessageFormat) {
+        #expect(throws: RelayMessage.Error.malformed) {
             _ = try RelayMessage.parse(#"["COUNT","sub1",238]"#)
         }
         // Too short — no payload element.
-        #expect(throws: NostrError.invalidMessageFormat) {
+        #expect(throws: RelayMessage.Error.malformed) {
             _ = try RelayMessage.parse(#"["COUNT","sub1"]"#)
         }
     }
@@ -194,11 +194,18 @@ struct RelayMessageTests {
         }
     }
 
-    @Test("Invalid message format throws error")
-    func invalidMessageFormat() {
+    @Test("A frame that is not JSON is malformed")
+    func nonJSONFrameIsMalformed() {
         let json = "not json"
-        #expect(throws: (any Error).self) {
+        #expect(throws: RelayMessage.Error.malformed) {
             _ = try RelayMessage.parse(json)
+        }
+    }
+
+    @Test("A JSON frame that is not an array is malformed")
+    func nonArrayFrameIsMalformed() {
+        #expect(throws: RelayMessage.Error.malformed) {
+            _ = try RelayMessage.parse(#"{"type":"EOSE"}"#)
         }
     }
 }

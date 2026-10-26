@@ -2,22 +2,13 @@ import Foundation
 
 /// Errors that can occur in the Nostr client
 public enum NostrError: Error, LocalizedError, Sendable, Equatable {
-    case invalidPrivateKey
-    case invalidPublicKey
-    case invalidSignature
     case invalidEventID
-    case signingFailed
     case signerNotSet
     case verificationFailed
     case serializationFailed
     case invalidData
-    case invalidMessageFormat
-    /// A relay URL string that is unparseable, has a non-ws(s) scheme, lacks a host,
-    /// or carries a fragment or user/password.
-    case invalidRelayURL(String)
     case connectionFailed(String)
     case notConnected
-    case subscriptionNotFound(String)
     case relayError(String)
     /// A relay-targeted operation ran against an empty pool.
     case noRelaysInPool
@@ -30,25 +21,12 @@ public enum NostrError: Error, LocalizedError, Sendable, Equatable {
     case invalidTLV
     case invalidNIP19Entity
     case invalidNostrURI
-    case encryptionFailed
     case decryptionFailed
-    case unsupportedEncryptionVersion(UInt8)
-    case invalidPayloadFormat
-    case hmacVerificationFailed
-    case invalidPadding
 
     public var errorDescription: String? {
         switch self {
-        case .invalidPrivateKey:
-            return "Invalid private key"
-        case .invalidPublicKey:
-            return "Invalid public key"
-        case .invalidSignature:
-            return "Invalid signature"
         case .invalidEventID:
             return "Invalid event ID"
-        case .signingFailed:
-            return "Failed to sign event"
         case .signerNotSet:
             return "No signer is set — call setSigner(_:), setPrivateKey(_:), or setNsec(_:) first"
         case .verificationFailed:
@@ -57,16 +35,10 @@ public enum NostrError: Error, LocalizedError, Sendable, Equatable {
             return "Failed to serialize data"
         case .invalidData:
             return "Invalid data"
-        case .invalidMessageFormat:
-            return "Invalid message format"
-        case .invalidRelayURL(let url):
-            return "Invalid relay URL: \(url)"
         case .connectionFailed(let reason):
             return "Connection failed: \(reason)"
         case .notConnected:
             return "Not connected to relay"
-        case .subscriptionNotFound(let id):
-            return "Subscription not found: \(id)"
         case .relayError(let message):
             return "Relay error: \(message)"
         case .noRelaysInPool:
@@ -92,18 +64,8 @@ public enum NostrError: Error, LocalizedError, Sendable, Equatable {
             return "Invalid NIP-19 entity"
         case .invalidNostrURI:
             return "Invalid nostr: URI"
-        case .encryptionFailed:
-            return "Encryption failed"
         case .decryptionFailed:
             return "Decryption failed"
-        case .unsupportedEncryptionVersion(let version):
-            return "Unsupported encryption version: \(version)"
-        case .invalidPayloadFormat:
-            return "Invalid encrypted payload format"
-        case .hmacVerificationFailed:
-            return "HMAC verification failed"
-        case .invalidPadding:
-            return "Invalid message padding"
         }
     }
 }

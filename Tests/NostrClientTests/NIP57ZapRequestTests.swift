@@ -67,7 +67,7 @@ struct NIP57ZapRequestTests {
     @Test("zapRequest requires at least one relay")
     func zapRequestRequiresRelay() throws {
         let signer = EventSigner(keyPair: try KeyPair())
-        #expect(throws: NostrError.invalidData) {
+        #expect(throws: EventTemplate.ZapRequestError.missingRelays) {
             _ = try signer.sign(.zapRequest(to: .fixture("recipient"), relays: []))
         }
     }

@@ -116,18 +116,18 @@ public struct DirectMessageParser: Sendable {
         if error is DecodingError { return true }
         // An id, key, or signature in the event that is not a well-formed value.
         if error is EventID.Error || error is PublicKey.Error || error is Signature.Error { return true }
+        // The seal does not verify as the event it claims to be.
+        if error is Event.VerificationError { return true }
+        // NIP-44 refused the payload — the usual outcome for a wrap sealed to someone else.
+        if error is SealedMessage.Error { return true }
 
         switch error as? NostrError {
         // The wrap is not a gift wrap, its seal is not a seal, or the rumor is not a well-formed
         // message, reaction, or file.
         case .invalidData:
             return true
-        // The seal does not verify as the event it claims to be.
-        case .verificationFailed, .invalidEventID, .invalidSignature:
-            return true
-        // NIP-44 refused the payload — the usual outcome for a wrap sealed to someone else.
-        case .decryptionFailed, .invalidPublicKey, .invalidPayloadFormat, .hmacVerificationFailed,
-            .invalidPadding, .unsupportedEncryptionVersion:
+        // The seal's signature does not verify, or the rumor's id is not its hash.
+        case .verificationFailed, .invalidEventID:
             return true
         default:
             return false

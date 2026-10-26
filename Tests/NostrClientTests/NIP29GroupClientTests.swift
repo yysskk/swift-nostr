@@ -59,7 +59,7 @@ struct NIP29GroupClientTests {
             let subscriptionID = array[1] as? String,
             let filter = array[2] as? [String: Any]
         else {
-            throw NostrError.invalidMessageFormat
+            throw RelayMessage.Error.malformed
         }
         return (subscriptionID, filter)
     }

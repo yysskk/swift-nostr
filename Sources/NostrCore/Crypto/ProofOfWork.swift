@@ -45,11 +45,11 @@ public enum ProofOfWork {
     ///   - event: The unsigned event to mine. Any existing `nonce` tags are replaced.
     ///   - difficulty: The target number of leading zero bits, in `0...256`.
     /// - Returns: A copy of `event` carrying a single `nonce` tag whose id meets `difficulty`.
-    /// - Throws: `CancellationError` if the task is cancelled; ``NostrError/invalidData`` if
-    ///   `difficulty` is outside `0...256`.
+    /// - Throws: `CancellationError` if the task is cancelled;
+    ///   ``ProofOfWork/Error/invalidDifficulty(_:)`` if `difficulty` is outside `0...256`.
     public static func mine(event: UnsignedEvent, difficulty: Int) async throws -> UnsignedEvent {
         guard 0...256 ~= difficulty else {
-            throw NostrError.invalidData
+            throw Error.invalidDifficulty(difficulty)
         }
 
         let strippedTags = event.tags.filter { $0.first != "nonce" }
@@ -75,6 +75,21 @@ public enum ProofOfWork {
             if iterations % 1024 == 0 {
                 try Task.checkCancellation()
                 await Task.yield()
+            }
+        }
+    }
+}
+
+extension ProofOfWork {
+    /// Why ``ProofOfWork/mine(event:difficulty:)`` could not mine an event.
+    public enum Error: Swift.Error, LocalizedError, Sendable, Equatable {
+        /// The target difficulty is outside `0...256` (payload: the requested difficulty).
+        case invalidDifficulty(Int)
+
+        public var errorDescription: String? {
+            switch self {
+            case .invalidDifficulty(let difficulty):
+                return "A proof-of-work difficulty must be 0 to 256 bits, got \(difficulty)"
             }
         }
     }

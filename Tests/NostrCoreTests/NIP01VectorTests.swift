@@ -413,7 +413,7 @@ struct NIP01VectorTests {
         )
 
         #expect(try tamperedUnsigned.computedID.hex != vector.id)
-        #expect(throws: NostrError.invalidEventID) {
+        #expect(throws: Event.VerificationError.idMismatch) {
             try vector.event(content: tamperedContent).verify()
         }
     }

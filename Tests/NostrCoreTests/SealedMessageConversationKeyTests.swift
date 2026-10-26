@@ -41,7 +41,7 @@ struct SealedMessageConversationKeyTests {
     func wrongKeyFails() throws {
         let sealed = try SealedMessage.seal("secret", conversationKey: Self.randomKey())
 
-        #expect(throws: NostrError.hmacVerificationFailed) {
+        #expect(throws: SealedMessage.Error.invalidMAC) {
             _ = try sealed.open(conversationKey: Self.randomKey())
         }
     }
@@ -100,7 +100,7 @@ struct SealedMessageConversationKeyTests {
 
     @Test("seal rejects a conversation key that is not 32 bytes", arguments: [0, 31, 33])
     func sealRejectsWrongLengthKey(byteCount: Int) {
-        #expect(throws: NostrError.encryptionFailed) {
+        #expect(throws: SealedMessage.Error.invalidConversationKey) {
             _ = try SealedMessage.seal("hello", conversationKey: Data(repeating: 0x01, count: byteCount))
         }
     }
@@ -109,7 +109,7 @@ struct SealedMessageConversationKeyTests {
     func openRejectsWrongLengthKey(byteCount: Int) throws {
         let sealed = try SealedMessage.seal("hello", conversationKey: Self.randomKey())
 
-        #expect(throws: NostrError.decryptionFailed) {
+        #expect(throws: SealedMessage.Error.invalidConversationKey) {
             _ = try sealed.open(conversationKey: Data(repeating: 0x01, count: byteCount))
         }
     }
@@ -118,7 +118,7 @@ struct SealedMessageConversationKeyTests {
     func sealRejectsEmptyMessage() throws {
         let key = try Self.randomKey()
 
-        #expect(throws: NostrError.encryptionFailed) {
+        #expect(throws: SealedMessage.Error.invalidPlaintextLength(0)) {
             _ = try SealedMessage.seal("", conversationKey: key)
         }
     }

@@ -128,7 +128,7 @@ public struct EncryptedPrivateKey: Sendable, Hashable {
         defer { symmetricKey.secureScrub() }
 
         let associatedData = Data([keySecurity.rawValue])
-        let ciphertext = try XChaCha20Poly1305.seal(
+        let ciphertext = XChaCha20Poly1305.seal(
             privateKey,
             key: symmetricKey,
             nonce: nonce,
