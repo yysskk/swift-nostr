@@ -106,9 +106,15 @@ let header = try HTTPAuth.authorizationHeaderValue(for: event)
 A server (or any verifier) runs the full NIP-98 check chain with ``HTTPAuth/validate(authorization:url:method:payload:tolerance:now:)`` and trusts the returned event's ``Event/publicKey`` as the authenticated identity:
 
 ```swift
-let event = try HTTPAuth.validate(
-    authorization: authorizationHeader, url: requestURL, method: "POST", payload: body)
-let authenticatedPublicKey = event.publicKey
+do {
+    let event = try HTTPAuth.validate(
+        authorization: authorizationHeader, url: requestURL, method: "POST", payload: body)
+    let authenticatedPublicKey = event.publicKey
+} catch .timestampOutOfTolerance {
+    // Stale or clock-skewed credential: ask the client to sign a fresh one.
+} catch {
+    // `error` is an `HTTPAuth.ValidationError` naming the failed check.
+}
 ```
 
 ## Join and Post to a Relay-based Group

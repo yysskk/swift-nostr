@@ -143,6 +143,33 @@ struct HTTPAuthValidationTests {
         }
     }
 
+    @Test("validation failures are thrown as the concrete ValidationError")
+    func typedValidationError() throws {
+        let (header, now, _) = try signedHeader()
+
+        do {
+            _ = try HTTPAuth.validate(authorization: header, url: url, method: "POST", now: now)
+            Issue.record("Expected a method mismatch")
+        } catch {
+            #expect(error == .methodMismatch(expected: "POST", actual: "GET"))
+        }
+        do {
+            _ = try HTTPAuth.event(fromAuthorizationHeader: "Nostr not-base64!!")
+            Issue.record("Expected invalid base64")
+        } catch {
+            #expect(error == .invalidBase64)
+        }
+        do {
+            _ = try HTTPAuth.validate(
+                authorization: header, url: url, method: "GET", now: now.advanced(by: .seconds(120)))
+            Issue.record("Expected a stale timestamp")
+        } catch .timestampOutOfTolerance {
+            // Matched by case, without binding the payload.
+        } catch {
+            Issue.record("Unexpected \(error)")
+        }
+    }
+
     @Test("base64 that is not an event is rejected")
     func malformedEvent() {
         let notAnEvent = Data("{\"hello\":\"world\"}".utf8).base64EncodedString()

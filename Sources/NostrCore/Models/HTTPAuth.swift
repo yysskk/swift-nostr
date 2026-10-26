@@ -143,7 +143,7 @@ extension HTTPAuth {
         payload: Data? = nil,
         tolerance: Duration = .seconds(60),
         now: Timestamp = .now
-    ) throws -> Event {
+    ) throws(ValidationError) -> Event {
         let event = try event(fromAuthorizationHeader: authorization)
 
         guard event.kind == .httpAuth else {
@@ -184,7 +184,7 @@ extension HTTPAuth {
     /// - Throws: ``ValidationError/invalidAuthorizationScheme``,
     ///   ``ValidationError/invalidBase64``, or
     ///   ``ValidationError/malformedEvent``.
-    public static func event(fromAuthorizationHeader header: String) throws -> Event {
+    public static func event(fromAuthorizationHeader header: String) throws(ValidationError) -> Event {
         let trimmed = header.trimmingCharacters(in: .whitespaces)
         let parts = trimmed.split(separator: " ", maxSplits: 1)
         guard parts.count == 2, parts[0].lowercased() == scheme.lowercased() else {

@@ -389,6 +389,18 @@ struct NIP29ModerationParsingTests {
                 == .updatePinList([.event(id: pinned), .address("39000:pubkey:abcdef")]))
     }
 
+    @Test("parse failures are thrown as the concrete ValidationError")
+    func typedValidationError() {
+        let event = makeEvent(kind: .groupDeleteEvent, tags: [["h", "abcdef"]])
+
+        do {
+            _ = try Groups.ModerationRequest(event: event)
+            Issue.record("Expected a missing e tag")
+        } catch {
+            #expect(error == .missingTag(name: "e", kind: .groupDeleteEvent))
+        }
+    }
+
     @Test("delete-event requires an e tag")
     func missingEventTag() {
         let event = makeEvent(kind: .groupDeleteEvent, tags: [["h", "abcdef"]])

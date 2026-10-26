@@ -39,7 +39,7 @@ extension Groups {
         of event: Event,
         expecting kind: Event.Kind,
         relayPublicKey: PublicKey?
-    ) throws -> String {
+    ) throws(ValidationError) -> String {
         guard event.kind == kind else {
             throw ValidationError.invalidEventKind(expected: kind, actual: event.kind)
         }
@@ -156,7 +156,7 @@ extension Groups {
         ///   - relayPublicKey: The group relay's public key; when given, an event by
         ///     any other author is rejected. Nil skips the author check.
         /// - Throws: ``ValidationError`` naming the first failed check.
-        public init(event: Event, relayPublicKey: PublicKey? = nil) throws {
+        public init(event: Event, relayPublicKey: PublicKey? = nil) throws(ValidationError) {
             let groupID = try Groups.validatedGroupID(
                 of: event, expecting: .groupMetadata, relayPublicKey: relayPublicKey)
             self.init(groupID: groupID, fieldTags: event.structuredTags)
@@ -311,7 +311,7 @@ extension Groups {
         ///   - relayPublicKey: The group relay's public key; when given, an event by
         ///     any other author is rejected. Nil skips the author check.
         /// - Throws: ``ValidationError`` naming the first failed check.
-        public init(event: Event, relayPublicKey: PublicKey? = nil) throws {
+        public init(event: Event, relayPublicKey: PublicKey? = nil) throws(ValidationError) {
             groupID = try Groups.validatedGroupID(
                 of: event, expecting: .groupAdmins, relayPublicKey: relayPublicKey)
             admins = event.tags(named: "p").compactMap { tag in
@@ -359,7 +359,7 @@ extension Groups {
         ///   - relayPublicKey: The group relay's public key; when given, an event by
         ///     any other author is rejected. Nil skips the author check.
         /// - Throws: ``ValidationError`` naming the first failed check.
-        public init(event: Event, relayPublicKey: PublicKey? = nil) throws {
+        public init(event: Event, relayPublicKey: PublicKey? = nil) throws(ValidationError) {
             groupID = try Groups.validatedGroupID(
                 of: event, expecting: .groupMembers, relayPublicKey: relayPublicKey)
             members = event.tags(named: "p").compactMap { $0.primaryValue.flatMap(PublicKey.init) }
@@ -414,7 +414,7 @@ extension Groups {
         ///   - relayPublicKey: The group relay's public key; when given, an event by
         ///     any other author is rejected. Nil skips the author check.
         /// - Throws: ``ValidationError`` naming the first failed check.
-        public init(event: Event, relayPublicKey: PublicKey? = nil) throws {
+        public init(event: Event, relayPublicKey: PublicKey? = nil) throws(ValidationError) {
             groupID = try Groups.validatedGroupID(
                 of: event, expecting: .groupRoles, relayPublicKey: relayPublicKey)
             roles = event.tags(named: "role").compactMap { tag in
@@ -469,7 +469,7 @@ extension Groups {
         ///   - relayPublicKey: The group relay's public key; when given, an event by
         ///     any other author is rejected. Nil skips the author check.
         /// - Throws: ``ValidationError`` naming the first failed check.
-        public init(event: Event, relayPublicKey: PublicKey? = nil) throws {
+        public init(event: Event, relayPublicKey: PublicKey? = nil) throws(ValidationError) {
             groupID = try Groups.validatedGroupID(
                 of: event, expecting: .groupPinList, relayPublicKey: relayPublicKey)
             items = event.structuredTags.compactMap { tag in

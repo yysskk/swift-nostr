@@ -273,9 +273,15 @@ try await request.setNostrAuthorization(signer: signer)  // any NostrSigning
 On the receiving side, `HTTPAuth.validate` runs the full NIP-98 check chain — scheme, decoding, kind, signature, timestamp window, URL, method, body hash — and returns the verified event, whose `publicKey` is the authenticated identity:
 
 ```swift
-let event = try HTTPAuth.validate(
-    authorization: authorizationHeader, url: requestURL, method: "POST", payload: body)
-let authenticatedPublicKey = event.publicKey
+do {
+    let event = try HTTPAuth.validate(
+        authorization: authorizationHeader, url: requestURL, method: "POST", payload: body)
+    let authenticatedPublicKey = event.publicKey
+} catch .timestampOutOfTolerance {
+    // Stale or clock-skewed credential: ask the client to sign a fresh one.
+} catch {
+    // `error` is an `HTTPAuth.ValidationError` naming the failed check.
+}
 ```
 
 ### Relay-based groups (NIP-29)

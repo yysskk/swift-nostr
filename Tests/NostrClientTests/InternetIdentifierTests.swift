@@ -188,19 +188,29 @@ struct InternetIdentifierTests {
 
     // MARK: - Integration Tests (require network)
 
-    @Test("Verify invalid identifier format throws error")
+    @Test("Verify invalid identifier format throws the concrete VerificationError")
     func verifyInvalidIdentifierFormat() async {
         do {
             _ = try await InternetIdentifier.verify("")
             Issue.record("Expected error to be thrown")
-        } catch let error as InternetIdentifier.VerificationError {
-            if case .invalidIdentifier = error {
-                // Expected error
-            } else {
-                Issue.record("Unexpected VerificationError type: \(error)")
-            }
         } catch {
-            Issue.record("Unexpected error type: \(error)")
+            #expect(error == .invalidIdentifier)
+        }
+    }
+
+    @Test("lookup and String wrappers forward the concrete VerificationError")
+    func wrappersForwardVerificationError() async {
+        do {
+            _ = try await InternetIdentifier.lookupPublicKey("al ice@example.com")
+            Issue.record("Expected error to be thrown")
+        } catch {
+            #expect(error == .invalidIdentifier)
+        }
+        do {
+            _ = try await "al ice@example.com".verifyAsInternetIdentifier(expectedPublicKey: alice)
+            Issue.record("Expected error to be thrown")
+        } catch {
+            #expect(error == .invalidIdentifier)
         }
     }
 
