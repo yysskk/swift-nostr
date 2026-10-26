@@ -53,7 +53,7 @@ struct AuthReChallengeTests {
 
         let signer = EventSigner(keyPair: try KeyPair())
         await connection.setAuthenticationResponder { url, challenge in
-            try? signer.signClientAuthentication(relayURL: url, challenge: challenge)
+            try? signer.sign(.clientAuthentication(relayURL: url, challenge: challenge))
         }
 
         for index in 0..<5 {
@@ -78,7 +78,7 @@ struct AuthReChallengeTests {
 
         let signer = EventSigner(keyPair: try KeyPair())
         await connection.setAuthenticationResponder { url, challenge in
-            try? signer.signClientAuthentication(relayURL: url, challenge: challenge)
+            try? signer.sign(.clientAuthentication(relayURL: url, challenge: challenge))
         }
 
         socket.deliver(.string(#"["AUTH","first"]"#))

@@ -613,7 +613,7 @@ public actor RelayConnection {
     ///
     /// Most callers should prefer ``authenticate(using:)``, which builds and
     /// signs the event from the stored ``authenticationChallenge``. Use this
-    /// overload when the event is produced elsewhere, e.g. by a remote signer.
+    /// overload when the event is produced elsewhere.
     ///
     /// On success the event's public key is added to ``authenticatedPublicKeys`` and
     /// the relay treats it as authenticated for the rest of the session.
@@ -653,15 +653,15 @@ public actor RelayConnection {
     /// Builds, signs, and sends the answer to the relay's most recent AUTH
     /// challenge, then waits for the relay's OK (NIP-42).
     ///
-    /// - Parameter signer: The signer for the identity to authenticate.
+    /// - Parameter signer: The signer for the identity to authenticate, local or remote.
     /// - Throws: ``NostrError/authenticationFailed(_:)`` when the relay has not
-    ///   sent a challenge yet or rejects the authentication, plus everything
-    ///   ``authenticate(with:)`` throws.
-    public func authenticate(using signer: EventSigner) async throws {
+    ///   sent a challenge yet or rejects the authentication, anything the signer
+    ///   throws, plus everything ``authenticate(with:)`` throws.
+    public func authenticate(using signer: some NostrSigning) async throws {
         guard let challenge = authenticationChallenge else {
             throw NostrError.authenticationFailed("The relay has not sent an AUTH challenge")
         }
-        let event = try signer.signClientAuthentication(relayURL: url, challenge: challenge)
+        let event = try await signer.sign(.clientAuthentication(relayURL: url, challenge: challenge))
         try await authenticate(with: event)
     }
 

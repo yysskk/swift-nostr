@@ -123,12 +123,14 @@ public actor NostrClient {
         try await withSigner { signer, _ in try await signer.sign(unsignedEvent) }
     }
 
-    /// Builds an event for the active signer's public key and signs it with that signer.
+    /// Signs `template` as the active signer's public key (local synchronously, remote via relay
+    /// round-trip), throwing ``NostrError/signerNotSet`` if none is set.
     ///
-    /// The convenience `publish*` helpers all have this shape: they differ only in the event they
-    /// build, and every one of them works with a local or a remote signer.
-    func signEvent(_ build: @Sendable (_ publicKey: PublicKey) throws -> UnsignedEvent) async throws -> Event {
-        try await withSigner { signer, publicKey in try await signer.sign(build(publicKey)) }
+    /// The cached public key is used, so a remote signer is not asked for it again.
+    func sign(_ template: EventTemplate) async throws -> Event {
+        try await withSigner { signer, publicKey in
+            try await signer.sign(UnsignedEvent(template, publicKey: publicKey))
+        }
     }
 
     /// Runs `body` with the configured signer and its cached public key.

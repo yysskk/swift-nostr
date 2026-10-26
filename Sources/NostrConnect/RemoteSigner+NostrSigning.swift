@@ -3,7 +3,7 @@ public import NostrCore
 /// ``RemoteSigner`` is a ``NostrSigning`` source: a remote NIP-46 signer usable anywhere a local
 /// ``EventSigner`` is.
 ///
-/// ``sign(_:)``, ``nip44Encrypt(_:to:)``, and ``nip44Decrypt(_:from:)`` already satisfy the protocol
+/// ``sign(_:)-(UnsignedEvent)``, ``nip44Encrypt(_:to:)``, and ``nip44Decrypt(_:from:)`` already satisfy the protocol
 /// as declared on ``RemoteSigner``; only ``publicKey`` is added here, mapping to the user's key.
 extension RemoteSigner: NostrSigning {
     /// The user's public key (via `get_public_key`).

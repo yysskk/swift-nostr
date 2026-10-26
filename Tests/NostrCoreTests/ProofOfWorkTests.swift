@@ -1,5 +1,6 @@
 import Foundation
 import NostrCore
+import NostrTestSupport
 import Testing
 
 @Suite("NIP-13 Proof of Work Tests")
@@ -152,14 +153,43 @@ struct ProofOfWorkTests {
 
     // MARK: - Signer Convenience
 
-    @Test("sign(_:proofOfWork:) produces an event meeting the difficulty that verifies")
+    @Test("sign(_:proofOfWork:) mines a template under the signer's key and signs it")
     func signWithProofOfWork() async throws {
         let signer = try testSigner()
-        let signed = try await signer.sign(try unsignedNote(for: signer), proofOfWork: 8)
+        var template = EventTemplate.textNote("proof of work", tags: [.nonce("0", target: 4), .hashtag("nostr")])
+        template.createdAt = Timestamp(rawValue: 1_700_000_000)
 
+        let signed = try await signer.sign(template, proofOfWork: 8)
+
+        #expect(signed.publicKey == signer.publicKey)
+        #expect(signed.kind == .textNote)
+        #expect(signed.content == "proof of work")
+        #expect(signed.createdAt == template.createdAt)
+        #expect(signed.tags.filter { $0.first == "nonce" }.count == 1)
+        #expect(signed.tags.contains(["t", "nostr"]))
         #expect(ProofOfWork.difficulty(of: signed.id) >= 8)
         #expect(try signed.verify())
         #expect(ProofOfWork.validate(event: signed, minimumDifficulty: 8))
+    }
+
+    @Test("sign(_:proofOfWork:) works with a signer that is not an EventSigner")
+    func signWithProofOfWorkThroughRemoteSigner() async throws {
+        let keyPair = try KeyPair()
+        let signer = StubRemoteSigner(keyPair: keyPair)
+
+        let signed = try await signer.sign(.textNote("mined remotely"), proofOfWork: 8)
+
+        #expect(signed.publicKey == keyPair.publicKey)
+        #expect(try signed.verify())
+        #expect(ProofOfWork.validate(event: signed, minimumDifficulty: 8))
+    }
+
+    @Test("sign(_:proofOfWork:) rejects a difficulty outside 0...256")
+    func signWithProofOfWorkRejectsDifficultyOutOfRange() async throws {
+        let signer = try testSigner()
+        await #expect(throws: NostrError.invalidData) {
+            _ = try await signer.sign(.textNote("too hard"), proofOfWork: 257)
+        }
     }
 
     // MARK: - Validation Edges
@@ -167,7 +197,7 @@ struct ProofOfWorkTests {
     @Test("a zero or negative minimum difficulty accepts any event")
     func validateAcceptsZeroMinimum() throws {
         let signer = try testSigner()
-        let note = try signer.signTextNote(content: "no work")
+        let note = try signer.sign(.textNote("no work"))
         #expect(ProofOfWork.validate(event: note, minimumDifficulty: 0))
     }
 

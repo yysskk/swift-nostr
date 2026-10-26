@@ -116,11 +116,12 @@ struct LNURLTests {
 
         let recipient = try KeyPair()
         let signer = EventSigner(keyPair: try KeyPair())
-        let zapRequest = try signer.signZapRequest(
-            recipientPublicKey: recipient.publicKey,
-            relays: [RelayURL("wss://relay.example.com")!],
-            amountMillisats: 21000
-        )
+        let zapRequest = try signer.sign(
+            .zapRequest(
+                to: recipient.publicKey,
+                relays: [RelayURL("wss://relay.example.com")!],
+                amountMillisats: 21000
+            ))
 
         let url = try #require(
             response.invoiceRequestURL(amountMillisats: 21000, zapRequest: zapRequest, lnurl: "lnurl1xyz"))

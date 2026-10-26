@@ -76,12 +76,12 @@ let lnurlPay = try JSONDecoder().decode(LNURLPayResponse.self, from: data)
 // Sign a zap request (kind 9734) — it is not published to relays.
 let keyPair = try KeyPair(nsec: "nsec1...")   // the zapping user's key
 let signer = EventSigner(keyPair: keyPair)
-let zapRequest = try signer.signZapRequest(
-    recipientPublicKey: try PublicKey(npub: "npub1..."),
+let zapRequest = try signer.sign(.zapRequest(
+    to: try PublicKey(npub: "npub1..."),
     relays: [try RelayURL(string: "wss://relay.example.com")],
     amountMillisats: 21_000,
     lnurl: LNURL.encode(serviceURL),
-    comment: "great post!")
+    comment: "great post!"))
 
 // Fetch the invoice and pay it through the wallet in one call.
 let zap = try await connection.payZap(

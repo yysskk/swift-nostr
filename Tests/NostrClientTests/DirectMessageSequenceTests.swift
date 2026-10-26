@@ -68,7 +68,7 @@ struct DirectMessageSequenceTests {
             .createMessageWithSelfCopy(content: "hi bob", to: bob.publicKey, subject: "greetings")
         let toCarol = try await DirectMessageBuilder(signer: EventSigner(keyPair: alice))
             .createMessageWithSelfCopy(content: "hi carol", to: carol.publicKey)
-        let plainNote = try EventSigner(keyPair: alice).signTextNote(content: "public note")
+        let plainNote = try await EventSigner(keyPair: alice).sign(.textNote("public note"))
 
         let sequence = makeSequence(
             items: [

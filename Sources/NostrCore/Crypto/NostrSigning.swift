@@ -37,4 +37,37 @@ public protocol NostrSigning: Sendable {
     func nip44Decrypt(_ ciphertext: String, from senderPublicKey: PublicKey) async throws -> String
 }
 
+extension NostrSigning {
+    /// Signs `template` as this signer's ``publicKey``, returning the complete signed event.
+    ///
+    /// Works with any signer, local or remote:
+    ///
+    /// ```swift
+    /// let zap = try await bunker.sign(.zapRequest(to: alice, relays: [relay]))
+    /// ```
+    /// - Parameter template: The event to sign.
+    /// - Returns: The signed ``Event``.
+    /// - Throws: Anything resolving ``publicKey`` or signing throws.
+    public func sign(_ template: EventTemplate) async throws -> Event {
+        try await sign(UnsignedEvent(template, publicKey: publicKey))
+    }
+
+    /// Mines `template` to the given NIP-13 difficulty (leading zero bits) as this signer's
+    /// ``publicKey``, then signs it.
+    ///
+    /// Mining runs locally whatever the signer; it is cooperative and cancellable — see
+    /// ``ProofOfWork/mine(event:difficulty:)``.
+    /// https://github.com/nostr-protocol/nips/blob/master/13.md
+    /// - Parameters:
+    ///   - template: The event to mine and sign. Any existing `nonce` tags are replaced.
+    ///   - difficulty: The target number of leading zero bits, in `0...256`.
+    /// - Returns: The signed ``Event``, whose id meets `difficulty`.
+    /// - Throws: `CancellationError` if cancelled; ``NostrError/invalidData`` if `difficulty` is
+    ///   outside `0...256`; anything resolving ``publicKey`` or signing throws.
+    public func sign(_ template: EventTemplate, proofOfWork difficulty: Int) async throws -> Event {
+        let unsigned = UnsignedEvent(template, publicKey: try await publicKey)
+        return try await sign(ProofOfWork.mine(event: unsigned, difficulty: difficulty))
+    }
+}
+
 extension EventSigner: NostrSigning {}

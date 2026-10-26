@@ -34,9 +34,10 @@ struct NIP57ZapReceiptTests {
         -> String
     {
         let sender = EventSigner(keyPair: try KeyPair())
-        let request = try sender.signZapRequest(
-            recipientPublicKey: try PublicKey(hex: recipient), relays: [RelayURL("wss://relay.example.com")!],
-            amountMillisats: amountMillisats, eventID: try eventID.map(EventID.init(hex:)))
+        let request = try sender.sign(
+            .zapRequest(
+                to: try PublicKey(hex: recipient), relays: [RelayURL("wss://relay.example.com")!],
+                amountMillisats: amountMillisats, eventID: try eventID.map(EventID.init(hex:))))
         return String(decoding: try JSONEncoder().encode(request), as: UTF8.self)
     }
 
@@ -220,7 +221,7 @@ struct NIP57ZapReceiptTests {
 
     @Test("init returns nil for a non-9735 event")
     func initRejectsWrongKind() throws {
-        let note = try EventSigner(keyPair: try KeyPair()).signTextNote(content: "hi")
+        let note = try EventSigner(keyPair: try KeyPair()).sign(.textNote("hi"))
         #expect(ZapReceipt(event: note) == nil)
     }
 

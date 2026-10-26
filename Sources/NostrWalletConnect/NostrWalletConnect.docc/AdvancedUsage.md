@@ -174,11 +174,11 @@ let (data, _) = try await URLSession.shared.data(from: serviceURL)
 let lnurlPay = try JSONDecoder().decode(LNURLPayResponse.self, from: data)
 
 let signer = EventSigner(keyPair: try KeyPair(nsec: "nsec1..."))
-let zapRequest = try signer.signZapRequest(
-    recipientPublicKey: try PublicKey(npub: "npub1..."),
+let zapRequest = try signer.sign(.zapRequest(
+    to: try PublicKey(npub: "npub1..."),
     relays: [try RelayURL(string: "wss://relay.example.com")],
     amountMillisats: 21_000,
-    lnurl: LNURL.encode(serviceURL))
+    lnurl: LNURL.encode(serviceURL)))
 
 let zap = try await connection.payZap(
     lnurlPay: lnurlPay,

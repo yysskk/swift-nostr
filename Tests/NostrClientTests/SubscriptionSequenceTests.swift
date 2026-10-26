@@ -13,7 +13,7 @@ struct SubscriptionSequenceTests {
     private func makeEvent(content: String) throws -> Event {
         let keyPair = try KeyPair()
         let signer = EventSigner(keyPair: keyPair)
-        return try signer.signTextNote(content: content)
+        return try signer.sign(.textNote(content))
     }
 
     private func makeSequence(

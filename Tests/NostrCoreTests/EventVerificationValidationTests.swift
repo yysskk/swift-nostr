@@ -14,7 +14,7 @@ struct EventVerificationValidationTests {
     /// The JSON object of a genuine signed event, with `overrides` replacing its fields — what an
     /// attacker sends after taking a real event and rewriting part of it.
     private func eventJSON(overriding overrides: [String: Any] = [:]) throws -> Data {
-        let event = try EventSigner(privateKeyHex: Self.secretKeyHex).signTextNote(content: "gm")
+        let event = try EventSigner(privateKeyHex: Self.secretKeyHex).sign(.textNote("gm"))
         var object = try #require(
             try JSONSerialization.jsonObject(with: JSONEncoder().encode(event)) as? [String: Any])
         object.merge(overrides) { _, new in new }
@@ -68,7 +68,7 @@ struct EventVerificationValidationTests {
     /// could be bypassed while the signature still verified.
     @Test("a signed event does not decode under a padded spelling of its own public key")
     func paddedPublicKeyIsRejected() throws {
-        let event = try EventSigner(privateKeyHex: Self.secretKeyHex).signTextNote(content: "gm")
+        let event = try EventSigner(privateKeyHex: Self.secretKeyHex).sign(.textNote("gm"))
         #expect(try event.verify())
 
         let json = try eventJSON(overriding: ["pubkey": event.publicKey.hex + "00"])
@@ -87,8 +87,8 @@ struct EventVerificationValidationTests {
 
     @Test("an event with a signature from another key does not verify")
     func foreignSignatureDoesNotVerify() throws {
-        let event = try EventSigner(privateKeyHex: Self.secretKeyHex).signTextNote(content: "gm")
-        let other = try EventSigner(keyPair: try KeyPair()).signTextNote(content: "gm")
+        let event = try EventSigner(privateKeyHex: Self.secretKeyHex).sign(.textNote("gm"))
+        let other = try EventSigner(keyPair: try KeyPair()).sign(.textNote("gm"))
         let forged = Event(
             id: event.id, publicKey: event.publicKey, createdAt: event.createdAt, kind: event.kind,
             tags: event.tags, content: event.content, signature: other.signature)

@@ -35,8 +35,8 @@ public protocol NostrIdentityProviding: Sendable {
     /// The public key events are authored under, or nil when no signer is set.
     var publicKey: PublicKey? { get async }
 
-    /// Signs an event with the configured signer.
-    func sign(_ unsignedEvent: UnsignedEvent) async throws -> Event
+    /// Signs an event template with the configured signer.
+    func sign(_ template: EventTemplate) async throws -> Event
     /// Encrypts `plaintext` to `recipientPublicKey` with NIP-44 as the configured signer.
     func nip44Encrypt(_ plaintext: String, to recipientPublicKey: PublicKey) async throws -> String
     /// Decrypts a NIP-44 payload from `senderPublicKey` with the configured signer.

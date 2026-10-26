@@ -76,9 +76,8 @@ struct NostrClientNamespaceTests {
         await identity.setAuthenticationMode(.manual)
         #expect(await identity.authenticationMode == .manual)
 
-        let signed = try await identity.sign(
-            UnsignedEvent(publicKey: keyPair.publicKey, kind: .textNote, content: "signed")
-        )
+        let signed = try await identity.sign(.textNote("signed"))
+        #expect(signed.publicKey == keyPair.publicKey)
         #expect(try signed.verify())
 
         let peer = try KeyPair()
@@ -132,7 +131,7 @@ struct NostrClientNamespaceTests {
         let (client, socket) = try await ConnectedClientFixture.make()
         let fetching: any NostrEventFetching = client.events
         let author = try KeyPair()
-        let note = try EventSigner(keyPair: author).signTextNote(content: "stored")
+        let note = try await EventSigner(keyPair: author).sign(.textNote("stored"))
 
         let events = try await answering(socket, with: [note]) {
             try await fetching.fetch(filters: [Filter(kinds: [.textNote])], from: nil, timeout: .seconds(5))

@@ -283,7 +283,7 @@ struct ContactListEventTests {
         let signer = EventSigner(keyPair: keyPair)
 
         let contactEvent = try signer.signContactList([Contact(publicKey: publicKey1)])
-        let textNote = try signer.signTextNote(content: "Hello")
+        let textNote = try signer.sign(.textNote("Hello"))
 
         #expect(contactEvent.isContactList == true)
         #expect(textNote.isContactList == false)
@@ -294,7 +294,7 @@ struct ContactListEventTests {
         let keyPair = try KeyPair()
         let signer = EventSigner(keyPair: keyPair)
 
-        let textNote = try signer.signTextNote(content: "Hello")
+        let textNote = try signer.sign(.textNote("Hello"))
         #expect(textNote.contacts == nil)
     }
 }

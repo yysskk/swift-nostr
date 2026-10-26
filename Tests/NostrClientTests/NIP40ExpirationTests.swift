@@ -25,14 +25,14 @@ struct NIP40ExpirationTests {
     func eventExpiration() throws {
         let signer = EventSigner(keyPair: try KeyPair())
         let expiry = Timestamp(rawValue: 1_700_000_000)
-        let event = try signer.signTextNote(content: "gm", tags: [.expiration(expiry)])
+        let event = try signer.sign(.textNote("gm", tags: [.expiration(expiry)]))
         #expect(event.expiration == expiry)
     }
 
     @Test("Event.expiration is nil without an expiration tag")
     func eventExpirationAbsent() throws {
         let signer = EventSigner(keyPair: try KeyPair())
-        let event = try signer.signTextNote(content: "gm")
+        let event = try signer.sign(.textNote("gm"))
         #expect(event.expiration == nil)
     }
 
@@ -48,7 +48,7 @@ struct NIP40ExpirationTests {
     @Test("isExpired compares against the given time, expiring at the boundary")
     func isExpired() throws {
         let signer = EventSigner(keyPair: try KeyPair())
-        let event = try signer.signTextNote(content: "gm", tags: [.expiration(Timestamp(rawValue: 1000))])
+        let event = try signer.sign(.textNote("gm", tags: [.expiration(Timestamp(rawValue: 1000))]))
         #expect(event.isExpired(asOf: Timestamp(rawValue: 1001)))
         #expect(event.isExpired(asOf: Timestamp(rawValue: 1000)))
         #expect(!event.isExpired(asOf: Timestamp(rawValue: 999)))
@@ -57,7 +57,7 @@ struct NIP40ExpirationTests {
     @Test("an event without an expiration tag never expires")
     func noExpirationNeverExpires() throws {
         let signer = EventSigner(keyPair: try KeyPair())
-        let event = try signer.signTextNote(content: "gm")
+        let event = try signer.sign(.textNote("gm"))
         #expect(!event.isExpired(asOf: Timestamp(rawValue: 9_999_999_999)))
     }
 

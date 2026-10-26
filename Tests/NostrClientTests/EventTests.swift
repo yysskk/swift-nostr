@@ -69,11 +69,11 @@ struct EventTests {
         #expect(isValid)
     }
 
-    @Test("Sign text note convenience method")
-    func signTextNote() throws {
+    @Test("Sign a text note template")
+    func signedTextNote() throws {
         let signer = try EventSigner(privateKeyHex: "e8f32e723decf4051aefac8e2c93c9c5b214313817cdb01a1494b917c8436b35")
 
-        let event = try signer.signTextNote(content: "Hello!")
+        let event = try signer.sign(.textNote("Hello!"))
 
         #expect(event.kind == 1)
         #expect(event.content == "Hello!")
@@ -99,14 +99,14 @@ struct EventTests {
     }
 
     @Test("Sign reaction event")
-    func signReaction() throws {
+    func signedReaction() throws {
         let keyPair = try KeyPair()
         let signer = EventSigner(keyPair: keyPair)
 
         // Create a target event to react to
-        let targetEvent = try signer.signTextNote(content: "Original post")
+        let targetEvent = try signer.sign(.textNote("Original post"))
 
-        let reaction = try signer.signReaction(to: targetEvent, content: "🤙")
+        let reaction = try signer.sign(.reaction(to: targetEvent, content: "🤙"))
 
         #expect(reaction.kind == 7)
         #expect(reaction.content == "🤙")
@@ -131,7 +131,7 @@ struct EventTests {
     func eventJsonCoding() throws {
         let keyPair = try KeyPair()
         let signer = EventSigner(keyPair: keyPair)
-        let event = try signer.signTextNote(content: "JSON test")
+        let event = try signer.sign(.textNote("JSON test"))
 
         let encoder = JSONEncoder()
         let data = try encoder.encode(event)

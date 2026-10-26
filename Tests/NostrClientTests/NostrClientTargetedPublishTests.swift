@@ -32,7 +32,7 @@ struct NostrClientTargetedPublishTests {
     }
 
     private func makeEvent() throws -> Event {
-        try EventSigner(keyPair: try KeyPair()).signTextNote(content: "targeted")
+        try EventSigner(keyPair: try KeyPair()).sign(.textNote("targeted"))
     }
 
     // MARK: - Targeting

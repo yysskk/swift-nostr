@@ -192,7 +192,7 @@ struct GiftWrapImpersonationTests {
         let bob = try KeyPair()
         let signer = EventSigner(keyPair: alice)
 
-        let original = try signer.signTextNote(content: "Secret message")
+        let original = try await signer.sign(.textNote("Secret message"))
         let giftWrap = try await GiftWrap.wrap(
             event: original, signer: signer, recipientPublicKey: bob.publicKey)
         let unwrapped = try await GiftWrap.unwrap(

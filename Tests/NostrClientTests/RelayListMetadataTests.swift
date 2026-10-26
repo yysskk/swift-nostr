@@ -291,7 +291,7 @@ struct RelayListMetadataEventTests {
         let keyPair = try KeyPair()
         let signer = EventSigner(keyPair: keyPair)
 
-        let textNote = try signer.signTextNote(content: "Hello")
+        let textNote = try signer.sign(.textNote("Hello"))
         #expect(textNote.relayListMetadata == nil)
         #expect(textNote.isRelayListMetadata == false)
     }
@@ -304,7 +304,7 @@ struct RelayListMetadataEventTests {
         let relayListEvent = try signer.signRelayListMetadata(
             RelayListMetadata(entries: [RelayListEntry(url: RelayURL("wss://a.example.com")!)])
         )
-        let textNote = try signer.signTextNote(content: "Hello")
+        let textNote = try signer.sign(.textNote("Hello"))
 
         #expect(relayListEvent.isRelayListMetadata == true)
         #expect(textNote.isRelayListMetadata == false)

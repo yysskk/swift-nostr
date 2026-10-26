@@ -193,13 +193,13 @@ struct NIP23LongFormTests {
         let article = try signer.signLongFormContent(LongFormContent(identifier: "d", title: "T"))
         #expect(article.longFormContent?.title == "T")
 
-        let note = try signer.signTextNote(content: "hi")
+        let note = try signer.sign(.textNote("hi"))
         #expect(note.longFormContent == nil)
     }
 
     @Test("init(event:) returns nil for a non-article kind")
     func initEventNilForOtherKind() throws {
-        let note = try makeSigner().signTextNote(content: "hi")
+        let note = try makeSigner().sign(.textNote("hi"))
         #expect(LongFormContent(event: note) == nil)
     }
 

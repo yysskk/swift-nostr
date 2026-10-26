@@ -109,7 +109,7 @@ struct RelayListStoreTests {
         let keyPair = try KeyPair()
         let signer = EventSigner(keyPair: keyPair)
 
-        let textNote = try signer.signTextNote(content: "Hello")
+        let textNote = try await signer.sign(.textNote("Hello"))
         let ingested = await store.ingest(textNote)
         #expect(ingested == nil)
     }
