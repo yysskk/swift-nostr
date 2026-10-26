@@ -133,6 +133,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `throws(EventTemplate.ZapRequestError)` (`missingRelays`), each instead of `invalidData`. The
   replaced `NostrError` cases are removed, along with the unused `signingFailed` and
   `subscriptionNotFound`.
+- **NIP-19, gift wrap, direct-message, list, and group-reference failures have their own error
+  types** (breaking): `NIP19Entity.decode(_:)`, `encoded`, `init(nostrURI:)`, `nostrURI`, and the
+  `NProfile`, `NEvent`, and `NAddr` initializers and `encoded` are `throws(NIP19Entity.Error)` —
+  `invalidBech32(Bech32.Error)` (was a bare `Bech32.Error`), `unknownPrefix(String)`,
+  `unexpectedPrefix(String)` (another entity's prefix, was `unknownPrefix`), `malformedTLV` (was
+  `invalidTLV`), `missingPublicKey` / `missingEventID` / `missingIdentifier` / `missingAuthor` /
+  `missingKind`, `invalidLength(Int)`, `fieldTooLong(Int)` (was `invalidTLV`), `kindOutOfRange(Int)`,
+  and `invalidHex` (each was `invalidNIP19Entity` or `invalidTLV`), and `missingNostrScheme` /
+  `privateKeyInURI` (were `invalidNostrURI`); `LongFormContent.naddr(author:relays:)` and
+  `NostrListSet.naddr(author:relays:)` throw it too. `GroupReference` is
+  `throws(GroupReference.Error)` — `invalidCoordinate(NIP19Entity.Error)`, `unexpectedKind(Event.Kind)`,
+  `missingRelay`, `unknownRelayPublicKey` — instead of `invalidNIP19Entity`. `GiftWrap.unwrap`
+  throws `GiftWrap.Error`: `unexpectedKind(Event.Kind)` (was `invalidData`), `invalidSealSignature`
+  and `authorMismatch` (were `verificationFailed`), and `invalidRumorID` (was `invalidEventID`).
+  `DirectMessageParser` and `client.messages` `parse`, `parseReaction`, and `parseFile` throw
+  `DirectMessagePayload.Error` — `unexpectedKind(Event.Kind)`, `invalidRecipient`,
+  `missingReactionTarget`, `missingFileURL`, `invalidDecryptionKey`, `invalidDecryptionNonce` —
+  instead of `invalidData`. `EncryptedFile.decrypt` is `throws(EncryptedFile.Error)`:
+  `invalidKeyLength(Int)` and `invalidNonceLength(Int)` (a key that is not 32 bytes or a nonce that is
+  not 12 is now rejected up front), `truncated`, and `authenticationFailed` (were `decryptionFailed`).
+  `NostrListSet` throws `NostrListSet.Error` (`invalidKind(Event.Kind)`, `missingIdentifier`,
+  `malformedPrivateItems`) with typed throws where it can, `NostrList` throws
+  `NostrList.Error.malformedPrivateItems`, and `SimpleGroupList(list:)` is
+  `throws(SimpleGroupList.Error)` (`invalidKind(Event.Kind)`), each instead of `invalidData` or
+  `decryptionFailed`; private items that are not valid JSON now throw `malformedPrivateItems` rather
+  than a `JSONSerialization` error. The replaced `NostrError` cases are removed, along with the
+  unreachable `serializationFailed`.
 - **`Event.id`, `Event.pubkey`, and the event signature are typed** (breaking): `id` is an
   `EventID`, `pubkey` a `PublicKey`, and `sig: String` is now `signature: Signature?` — still the
   `sig` field on the wire. `Event.init` takes `signature:` instead of `sig:`. A `nil` signature is an
@@ -208,7 +235,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `.note` an `EventID` (`nsec` keeps its hex string), `NProfile.publicKey` and `NAddr.author` are
   `PublicKey`, and `NEvent.eventId` / `author` are now `eventID: EventID` and `author: PublicKey?`,
   with `NEvent.init(eventID:relays:author:kind:)`. Their initializers no longer throw `invalidHex`;
-  decoding a key or id payload that is not 32 bytes throws `invalidNIP19Entity`.
+  decoding a key or id payload that is not 32 bytes throws `NIP19Entity.Error.invalidLength`.
 - **NostrClient reads public keys and event ids from third-party data leniently** (breaking):
   `Contact.fromTag(_:)` returns nil, and `Event.contacts` skips the tag, for a `p` value that is not
   canonical hex. NIP-05 resolution treats a `nostr.json` key that is not canonical hex as absent, so
@@ -217,7 +244,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   strings. `ZapReceipt.recipientPubkey`, `senderPubkey`, and `zappedEventId` (now `zappedEventID`)
   are typed and nil for a malformed tag, so `validate(lnurlProviderPubkey:…)` — which takes a
   `PublicKey` — reports a malformed `p` as `missingRecipient`. A received direct message whose `p`
-  tag is malformed, or a reaction whose `e` or `p` tag is, fails to parse as `invalidData`; a reply
+  tag is malformed, or a reaction whose `e` or `p` tag is, fails to parse with a
+  `DirectMessagePayload.Error`; a reply
   marker with a malformed id leaves `replyTo` nil.
 - **NostrConnect and NostrWalletConnect take and return typed keys** (breaking):
   `RemoteSigner.clientPublicKey` is a `PublicKey` and `remoteSignerPubkey` a `PublicKey?`;
@@ -517,8 +545,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `sendFile` move to a protocol extension that gift-wraps the matching `EventTemplate` factory
   through `sendGiftWrapped`, with the same tags, routing, defaults, and errors; `parse`,
   `parseReaction`, and `parseFile` unwrap the matching case of `parsePayload(_:)`, throwing
-  `invalidData` for any other payload; and `subscribe(limit:)` delivers the messages of
-  `payloads(limit:)`. The extension also adds the short forms `sendGiftWrapped(_:to:strategy:)`,
+  `DirectMessagePayload.Error.unexpectedKind` for any other payload; and `subscribe(limit:)`
+  delivers the messages of `payloads(limit:)`. The extension also adds the short forms `sendGiftWrapped(_:to:strategy:)`,
   `sendGiftWrapped(_:to:expiration:strategy:)` for a non-optional `Timestamp`, `payloads()`, and
   `giftWraps()`, so an optional `expiration:` without a `strategy:` no longer compiles: pass
   `strategy: nil` as well, or omit a nil `expiration:`.

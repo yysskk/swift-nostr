@@ -23,22 +23,20 @@ public enum NIP19Entity: Sendable, Hashable {
     case naddr(NAddr)
 
     /// Decodes any NIP-19 bech32 entity, dispatching on its human-readable prefix.
-    /// - Throws: ``NostrError/invalidNIP19Entity`` if an `npub`, `nsec`, or `note` payload is not
-    ///   32 bytes or a TLV entity is missing a required field, ``NostrError/unknownPrefix(_:)`` for
-    ///   any other prefix, a ``Bech32/Error`` if the string is not valid bech32, or the TLV decoding
-    ///   errors.
-    public static func decode(_ bech32String: String) throws -> NIP19Entity {
-        let (hrp, data) = try Bech32.decode(bech32String)
+    /// - Throws: ``NIP19Entity/Error/invalidBech32(_:)`` if the string is not valid bech32,
+    ///   ``NIP19Entity/Error/unknownPrefix(_:)`` for a prefix NIP-19 does not define,
+    ///   ``NIP19Entity/Error/invalidLength(_:)`` if an `npub`, `nsec`, or `note` payload is not
+    ///   32 bytes, or the errors of decoding an `nprofile`, `nevent`, or `naddr` payload.
+    public static func decode(_ bech32String: String) throws(NIP19Entity.Error) -> NIP19Entity {
+        let (hrp, data) = try TLV.decodeBech32(bech32String)
         switch hrp {
         case "npub":
-            guard let publicKey = try? PublicKey(data: data) else { throw NostrError.invalidNIP19Entity }
-            return .npub(publicKey)
+            return .npub(try TLV.publicKey(data))
         case "nsec":
-            guard data.count == 32 else { throw NostrError.invalidNIP19Entity }
+            guard data.count == 32 else { throw .invalidLength(data.count) }
             return .nsec(data.hexEncodedString())
         case "note":
-            guard let eventID = try? EventID(data: data) else { throw NostrError.invalidNIP19Entity }
-            return .note(eventID)
+            return .note(try TLV.eventID(data))
         case "nprofile":
             return .nprofile(try NProfile(tlvData: data))
         case "nevent":
@@ -46,7 +44,7 @@ public enum NIP19Entity: Sendable, Hashable {
         case "naddr":
             return .naddr(try NAddr(tlvData: data))
         default:
-            throw NostrError.unknownPrefix(hrp)
+            throw .unknownPrefix(hrp)
         }
     }
 
@@ -54,19 +52,20 @@ public enum NIP19Entity: Sendable, Hashable {
     ///
     /// ``nsec(_:)`` holds a hex string that nothing validated on the way in — every other case holds
     /// a typed key or id, or a payload built by a validating initializer — so it is checked here.
-    /// - Throws: ``NostrError/invalidNIP19Entity`` if ``nsec(_:)`` does not hold 32 bytes of hex.
+    /// - Throws: ``NIP19Entity/Error/invalidHex`` if ``nsec(_:)`` does not hold hexadecimal digits,
+    ///   ``NIP19Entity/Error/invalidLength(_:)`` if they are not 32 bytes, or the errors of encoding
+    ///   an `nprofile`, `nevent`, or `naddr`.
     public var encoded: String {
-        get throws {
+        get throws(NIP19Entity.Error) {
             switch self {
             case .npub(let publicKey):
                 return publicKey.npub
             case .nsec(let hex):
                 // Without this check, invalid hex encoded as an empty payload: a checksum-valid
                 // `nsec1…` holding no key.
-                guard let data = Data(hexString: hex), data.count == 32 else {
-                    throw NostrError.invalidNIP19Entity
-                }
-                return try Bech32.encode(hrp: "nsec", data: data)
+                guard let data = Data(hexString: hex) else { throw .invalidHex }
+                guard data.count == 32 else { throw .invalidLength(data.count) }
+                return try TLV.encodeBech32(hrp: "nsec", data: data)
             case .note(let eventID):
                 return eventID.note
             case .nprofile(let profile):
@@ -75,6 +74,78 @@ public enum NIP19Entity: Sendable, Hashable {
                 return try event.encoded
             case .naddr(let addr):
                 return try addr.encoded
+            }
+        }
+    }
+
+    /// An error decoding or encoding a NIP-19 entity or a NIP-21 `nostr:` URI.
+    public enum Error: Swift.Error, LocalizedError, Sendable, Equatable {
+        /// The string is not valid bech32.
+        case invalidBech32(Bech32.Error)
+        /// The bech32 prefix is not one NIP-19 defines (payload: the prefix found).
+        case unknownPrefix(String)
+        /// The bech32 prefix is not the one the entity type expects, such as an `npub` given to
+        /// ``NProfile/init(bech32String:)`` (payload: the prefix found).
+        case unexpectedPrefix(String)
+        /// A TLV record runs past the end of the payload.
+        case malformedTLV
+        /// An `nprofile` has no public key record.
+        case missingPublicKey
+        /// An `nevent` has no event id record.
+        case missingEventID
+        /// An `naddr` has no `d`-tag identifier record.
+        case missingIdentifier
+        /// An `naddr` has no author record.
+        case missingAuthor
+        /// An `naddr` has no kind record.
+        case missingKind
+        /// A public key or event id is not 32 bytes, or a kind record is not 1–4 bytes
+        /// (payload: the byte count).
+        case invalidLength(Int)
+        /// A field is longer than the 255 bytes a TLV record can hold (payload: its byte count).
+        case fieldTooLong(Int)
+        /// The event kind does not fit in a 32-bit unsigned integer (payload: the kind).
+        case kindOutOfRange(Int)
+        /// ``NIP19Entity/nsec(_:)`` does not hold a hexadecimal string.
+        case invalidHex
+        /// The string does not start with the `nostr:` scheme.
+        case missingNostrScheme
+        /// The `nostr:` URI holds an `nsec`, or an `nsec` was to be encoded as one; NIP-21 never
+        /// carries private keys.
+        case privateKeyInURI
+
+        public var errorDescription: String? {
+            switch self {
+            case .invalidBech32(let error):
+                return "Invalid NIP-19 entity: \(error.errorDescription ?? "invalid bech32")"
+            case .unknownPrefix(let prefix):
+                return "Unknown NIP-19 prefix: \(prefix)"
+            case .unexpectedPrefix(let prefix):
+                return "Unexpected NIP-19 prefix: \(prefix)"
+            case .malformedTLV:
+                return "A NIP-19 TLV record is truncated"
+            case .missingPublicKey:
+                return "An nprofile must carry a public key"
+            case .missingEventID:
+                return "An nevent must carry an event id"
+            case .missingIdentifier:
+                return "An naddr must carry an identifier"
+            case .missingAuthor:
+                return "An naddr must carry an author"
+            case .missingKind:
+                return "An naddr must carry a kind"
+            case .invalidLength(let count):
+                return "A NIP-19 field has the wrong length: \(count) bytes"
+            case .fieldTooLong(let count):
+                return "A NIP-19 TLV field must be at most 255 bytes, got \(count)"
+            case .kindOutOfRange(let kind):
+                return "A NIP-19 kind must fit in 32 bits, got \(kind)"
+            case .invalidHex:
+                return "An nsec must hold a hexadecimal private key"
+            case .missingNostrScheme:
+                return "A nostr URI must start with nostr:"
+            case .privateKeyInURI:
+                return "A nostr URI must not carry an nsec"
             }
         }
     }

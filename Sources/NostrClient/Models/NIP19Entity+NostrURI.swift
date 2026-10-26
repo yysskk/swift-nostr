@@ -8,10 +8,13 @@ extension NIP19Entity {
     /// emit is tolerated. `nsec` is rejected — private keys must never travel in URIs
     /// (NIP-21 allows only npub, nprofile, note, nevent, naddr).
     /// https://github.com/nostr-protocol/nips/blob/master/21.md
-    public init(nostrURI: String) throws {
+    /// - Throws: ``NIP19Entity/Error/missingNostrScheme`` if the string does not start with
+    ///   `nostr:`, ``NIP19Entity/Error/privateKeyInURI`` if it holds an `nsec`, or the errors of
+    ///   ``NIP19Entity/decode(_:)``.
+    public init(nostrURI: String) throws(NIP19Entity.Error) {
         let trimmed = nostrURI.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.lowercased().hasPrefix("nostr:") else {
-            throw NostrError.invalidNostrURI
+            throw .missingNostrScheme
         }
         var remainder = String(trimmed.dropFirst("nostr:".count))
         if remainder.hasPrefix("//") {
@@ -19,17 +22,17 @@ extension NIP19Entity {
         }
         let entity = try NIP19Entity.decode(remainder)
         if case .nsec = entity {
-            throw NostrError.invalidNostrURI
+            throw .privateKeyInURI
         }
         self = entity
     }
 
     /// The canonical NIP-21 `nostr:` URI for this entity (no `//`).
-    /// - Throws: ``NostrError/invalidNostrURI`` for `nsec`.
+    /// - Throws: ``NIP19Entity/Error/privateKeyInURI`` for `nsec`, or the errors of ``encoded``.
     public var nostrURI: String {
-        get throws {
+        get throws(NIP19Entity.Error) {
             if case .nsec = self {
-                throw NostrError.invalidNostrURI
+                throw .privateKeyInURI
             }
             return try "nostr:" + encoded
         }

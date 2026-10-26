@@ -97,8 +97,12 @@ struct NIP25DirectMessageReactionTests {
         let reaction = try await builder.createReactionWithSelfCopy(
             reaction: "+", to: messageID, author: sender.publicKey, recipientPublicKey: recipient.publicKey)
 
-        await #expect(throws: NostrError.self) { try await parser.parse(reaction.recipientGiftWrap) }
-        await #expect(throws: NostrError.self) { try await parser.parseReaction(message.recipientGiftWrap) }
+        await #expect(throws: DirectMessagePayload.Error.unexpectedKind(.reaction)) {
+            try await parser.parse(reaction.recipientGiftWrap)
+        }
+        await #expect(throws: DirectMessagePayload.Error.unexpectedKind(.privateDirectMessage)) {
+            try await parser.parseReaction(message.recipientGiftWrap)
+        }
     }
 
     @Test("a reaction without an e tag is rejected")
@@ -115,7 +119,9 @@ struct NIP25DirectMessageReactionTests {
             event: rumor, signer: EventSigner(keyPair: sender), recipientPublicKey: recipient.publicKey)
 
         let parser = DirectMessageParser(signer: EventSigner(keyPair: recipient))
-        await #expect(throws: NostrError.self) { try await parser.parseReaction(giftWrap) }
+        await #expect(throws: DirectMessagePayload.Error.missingReactionTarget) {
+            try await parser.parseReaction(giftWrap)
+        }
     }
 
     @Test("a reaction without a p tag is rejected")
@@ -131,7 +137,7 @@ struct NIP25DirectMessageReactionTests {
         let giftWrap = try await GiftWrap.wrap(
             event: rumor, signer: EventSigner(keyPair: sender), recipientPublicKey: recipient.publicKey)
 
-        await #expect(throws: NostrError.self) {
+        await #expect(throws: DirectMessagePayload.Error.missingReactionTarget) {
             try await DirectMessageParser(signer: EventSigner(keyPair: recipient)).parseReaction(giftWrap)
         }
     }
@@ -152,7 +158,7 @@ struct NIP25DirectMessageReactionTests {
         let giftWrap = try await GiftWrap.wrap(
             event: rumor, signer: EventSigner(keyPair: sender), recipientPublicKey: recipient.publicKey)
 
-        await #expect(throws: NostrError.invalidData) {
+        await #expect(throws: DirectMessagePayload.Error.missingReactionTarget) {
             try await DirectMessageParser(signer: EventSigner(keyPair: recipient)).parseReaction(giftWrap)
         }
     }

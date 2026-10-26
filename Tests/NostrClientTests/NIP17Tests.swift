@@ -267,7 +267,7 @@ struct NIP17Tests {
         let giftWrap = try await GiftWrap.wrap(
             event: rumor, signer: EventSigner(keyPair: alice), recipientPublicKey: bob.publicKey)
 
-        await #expect(throws: NostrError.invalidData) {
+        await #expect(throws: DirectMessagePayload.Error.invalidRecipient) {
             try await DirectMessageParser(signer: EventSigner(keyPair: bob)).parse(giftWrap)
         }
     }
@@ -383,8 +383,21 @@ struct NIP17Tests {
 
         let parser = DirectMessageParser(signer: EventSigner(keyPair: bob))
 
-        await #expect(throws: NostrError.self) {
+        await #expect(throws: GiftWrap.Error.unexpectedKind(.textNote)) {
             _ = try await parser.parse(textNote)
+        }
+    }
+
+    @Test("parsePayload rejects a rumor that is not a message, reaction, or file")
+    func parsePayloadRejectsOtherKinds() async throws {
+        let alice = try KeyPair()
+        let bob = try KeyPair()
+        let rumor = try UnsignedEvent(publicKey: alice.publicKey, kind: .textNote, content: "hi").asRumor()
+        let giftWrap = try await GiftWrap.wrap(
+            event: rumor, signer: EventSigner(keyPair: alice), recipientPublicKey: bob.publicKey)
+
+        await #expect(throws: DirectMessagePayload.Error.unexpectedKind(.textNote)) {
+            try await DirectMessageParser(signer: EventSigner(keyPair: bob)).parsePayload(giftWrap)
         }
     }
 }

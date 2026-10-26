@@ -129,7 +129,9 @@ public struct LongFormContent: Sendable, Hashable {
     ///
     /// Articles are the addressable target, so the coordinate always uses kind 30023
     /// (``Event/Kind/longFormContent``); drafts (kind 30024) are not typically addressed by `naddr`.
-    public func naddr(author: PublicKey, relays: [RelayURL] = []) throws -> NAddr {
+    /// - Throws: ``NIP19Entity/Error/fieldTooLong(_:)`` if a relay hint's canonical form is longer
+    ///   than 255 bytes.
+    public func naddr(author: PublicKey, relays: [RelayURL] = []) throws(NIP19Entity.Error) -> NAddr {
         try NAddr(
             identifier: identifier,
             author: author,

@@ -94,28 +94,28 @@ struct NIP21Tests {
 
     // MARK: - nsec is rejected both ways
 
-    @Test("decoding an nsec URI throws invalidNostrURI")
+    @Test("decoding an nsec URI throws privateKeyInURI")
     func nsecURIRejected() throws {
         // Source a valid nsec bech32 by encoding a 32-byte key through the existing API.
         let nsecBech32 = try NIP19Entity.nsec(publicKeyHex).encoded
-        #expect(throws: NostrError.invalidNostrURI) {
+        #expect(throws: NIP19Entity.Error.privateKeyInURI) {
             _ = try NIP19Entity(nostrURI: "nostr:" + nsecBech32)
         }
     }
 
-    @Test("encoding an nsec entity to a nostr: URI throws invalidNostrURI")
+    @Test("encoding an nsec entity to a nostr: URI throws privateKeyInURI")
     func nsecEncodeRejected() {
-        #expect(throws: NostrError.invalidNostrURI) {
+        #expect(throws: NIP19Entity.Error.privateKeyInURI) {
             _ = try NIP19Entity.nsec(publicKeyHex).nostrURI
         }
     }
 
     // MARK: - malformed input
 
-    @Test("a string without the nostr: scheme throws invalidNostrURI")
+    @Test("a string without the nostr: scheme throws missingNostrScheme")
     func missingSchemeThrows() {
         let bare = "npub1sn0wdenkukak0d9dfczzeacvhkrgz92ak56egt7vdgzn8pv2wfqqhrjdv9"
-        #expect(throws: NostrError.invalidNostrURI) {
+        #expect(throws: NIP19Entity.Error.missingNostrScheme) {
             _ = try NIP19Entity(nostrURI: bare)
         }
     }

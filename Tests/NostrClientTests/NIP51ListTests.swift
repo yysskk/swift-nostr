@@ -145,13 +145,13 @@ struct NIP51ListTests {
         }
     }
 
-    @Test("Content that decrypts to something other than a tag array throws decryptionFailed")
+    @Test("Content that decrypts to something other than a tag array throws malformedPrivateItems")
     func nonTagArrayContentThrows() async throws {
         let signer = EventSigner(keyPair: try KeyPair())
         let content = try signer.nip44Encrypt(#"{"not":"a tag array"}"#, to: signer.publicKey)
         let event = try await signer.sign(EventTemplate(kind: .muteList, content: content))
 
-        await #expect(throws: NostrError.decryptionFailed) {
+        await #expect(throws: NostrList.Error.malformedPrivateItems) {
             try await NostrList(event: event, decryptingWith: signer)
         }
     }

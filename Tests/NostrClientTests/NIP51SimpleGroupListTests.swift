@@ -190,7 +190,7 @@ struct NIP51SimpleGroupListTests {
     @Test("A list of another kind is rejected")
     func wrongKindRejected() {
         let list = NostrList(kind: .muteList, publicItems: [.word("spam")])
-        #expect(throws: NostrError.invalidData) {
+        #expect(throws: SimpleGroupList.Error.invalidKind(.muteList)) {
             _ = try SimpleGroupList(list: list)
         }
     }

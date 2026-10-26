@@ -170,9 +170,9 @@ struct NIP19Tests {
         #expect(try TLV.validatedKind(30023) == 30023)
     }
 
-    @Test("a negative kind throws invalidNIP19Entity")
+    @Test("a negative kind throws kindOutOfRange")
     func validatedKindRejectsNegative() {
-        #expect(throws: NostrError.invalidNIP19Entity) {
+        #expect(throws: NIP19Entity.Error.kindOutOfRange(-1)) {
             _ = try TLV.validatedKind(-1)
         }
     }
@@ -184,78 +184,147 @@ struct NIP19Tests {
         // `Int(exactly:)` returns `nil` and this boundary is unreachable there.
         guard let maxKind = Int(exactly: UInt32.max) else { return }
         #expect(try TLV.validatedKind(maxKind) == maxKind)
-        #expect(throws: NostrError.invalidNIP19Entity) {
+        #expect(throws: NIP19Entity.Error.kindOutOfRange(maxKind + 1)) {
             _ = try TLV.validatedKind(maxKind + 1)
         }
     }
 
     // MARK: - error handling
 
-    @Test("decoding with the wrong prefix throws unknownPrefix")
+    @Test("decoding with another entity's prefix throws unexpectedPrefix")
     func wrongPrefixThrows() {
-        #expect(throws: NostrError.unknownPrefix("npub")) {
+        #expect(throws: NIP19Entity.Error.unexpectedPrefix("npub")) {
             _ = try NEvent(bech32String: npubVector)
         }
     }
 
-    @Test(
-        "a bare npub, nsec, or note whose payload is not 32 bytes throws invalidNIP19Entity",
-        arguments: ["npub", "nsec", "note"], [31, 33])
-    func barePayloadOfWrongLengthThrows(prefix: String, byteCount: Int) throws {
-        let encoded = try Bech32.encode(hrp: prefix, data: Data(repeating: 0xAB, count: byteCount))
-        #expect(throws: NostrError.invalidNIP19Entity) {
+    @Test("decoding a prefix NIP-19 does not define throws unknownPrefix")
+    func unknownPrefixThrows() throws {
+        let encoded = try Bech32.encode(hrp: "nfoo", data: Data(repeating: 0xAB, count: 32))
+        #expect(throws: NIP19Entity.Error.unknownPrefix("nfoo")) {
             _ = try NIP19Entity.decode(encoded)
         }
     }
 
-    @Test("an nprofile whose public key is not 32 bytes throws invalidNIP19Entity")
-    func nprofileShortPublicKeyThrows() throws {
-        let tlv = Data([0x00, 0x1F]) + publicKey.data.prefix(31)
-        let encoded = try Bech32.encode(hrp: "nprofile", data: tlv)
-        #expect(throws: NostrError.invalidNIP19Entity) {
-            _ = try NProfile(bech32String: encoded)
+    @Test("decoding a string that is not bech32 throws invalidBech32")
+    func invalidBech32Throws() {
+        #expect(throws: NIP19Entity.Error.invalidBech32(.missingSeparator)) {
+            _ = try NIP19Entity.decode("nothing")
         }
     }
 
-    @Test("an nevent whose event id or author is not 32 bytes throws invalidNIP19Entity")
-    func neventMalformedRecordsThrow() throws {
-        let shortID = Data([0x00, 0x1F]) + eventID.data.prefix(31)
-        let longAuthor = Data([0x00, 0x20]) + eventID.data + Data([0x02, 0x21]) + publicKey.data + Data([0x00])
-        for tlv in [shortID, longAuthor] {
+    @Test("a truncated TLV record throws malformedTLV")
+    func truncatedTLVThrows() throws {
+        // A type byte with no length, then a record whose length runs past the payload.
+        for tlv in [Data([0x00]), Data([0x00, 0x20]) + eventID.data.prefix(10)] {
             let encoded = try Bech32.encode(hrp: "nevent", data: tlv)
-            #expect(throws: NostrError.invalidNIP19Entity) {
+            #expect(throws: NIP19Entity.Error.malformedTLV) {
                 _ = try NEvent(bech32String: encoded)
             }
         }
     }
 
-    @Test("an naddr whose author is not 32 bytes throws invalidNIP19Entity")
+    @Test("a kind record that is not 1 to 4 bytes throws invalidLength")
+    func kindRecordOfWrongLengthThrows() throws {
+        let tlv = Data([0x00, 0x20]) + eventID.data + Data([0x03, 0x05, 0x00, 0x00, 0x00, 0x00, 0x01])
+        let encoded = try Bech32.encode(hrp: "nevent", data: tlv)
+        #expect(throws: NIP19Entity.Error.invalidLength(5)) {
+            _ = try NEvent(bech32String: encoded)
+        }
+    }
+
+    @Test("a relay hint longer than 255 bytes throws fieldTooLong")
+    func longRelayHintThrows() throws {
+        let relay = try RelayURL(string: "wss://relay.example/" + String(repeating: "a", count: 300))
+        let length = relay.description.utf8.count
+        #expect(throws: NIP19Entity.Error.fieldTooLong(length)) {
+            _ = try NProfile(publicKey: publicKey, relays: [relay])
+        }
+    }
+
+    @Test("an naddr identifier longer than 255 bytes throws fieldTooLong when encoded")
+    func longIdentifierThrowsOnEncode() throws {
+        let naddr = try NAddr(identifier: String(repeating: "x", count: 256), author: publicKey, kind: 30023)
+        #expect(throws: NIP19Entity.Error.fieldTooLong(256)) {
+            _ = try naddr.encoded
+        }
+    }
+
+    @Test(
+        "a bare npub, nsec, or note whose payload is not 32 bytes throws invalidLength",
+        arguments: ["npub", "nsec", "note"], [31, 33])
+    func barePayloadOfWrongLengthThrows(prefix: String, byteCount: Int) throws {
+        let encoded = try Bech32.encode(hrp: prefix, data: Data(repeating: 0xAB, count: byteCount))
+        #expect(throws: NIP19Entity.Error.invalidLength(byteCount)) {
+            _ = try NIP19Entity.decode(encoded)
+        }
+    }
+
+    @Test("an nprofile whose public key is not 32 bytes throws invalidLength")
+    func nprofileShortPublicKeyThrows() throws {
+        let tlv = Data([0x00, 0x1F]) + publicKey.data.prefix(31)
+        let encoded = try Bech32.encode(hrp: "nprofile", data: tlv)
+        #expect(throws: NIP19Entity.Error.invalidLength(31)) {
+            _ = try NProfile(bech32String: encoded)
+        }
+    }
+
+    @Test("an nprofile without a public key throws missingPublicKey")
+    func nprofileMissingPublicKeyThrows() throws {
+        let tlv = Data([0x01, 0x13]) + Data("wss://relay.example".utf8)
+        let encoded = try Bech32.encode(hrp: "nprofile", data: tlv)
+        #expect(throws: NIP19Entity.Error.missingPublicKey) {
+            _ = try NProfile(bech32String: encoded)
+        }
+    }
+
+    @Test("an nevent whose event id or author is not 32 bytes throws invalidLength")
+    func neventMalformedRecordsThrow() throws {
+        let shortID = Data([0x00, 0x1F]) + eventID.data.prefix(31)
+        let longAuthor = Data([0x00, 0x20]) + eventID.data + Data([0x02, 0x21]) + publicKey.data + Data([0x00])
+        for (tlv, count) in [(shortID, 31), (longAuthor, 33)] {
+            let encoded = try Bech32.encode(hrp: "nevent", data: tlv)
+            #expect(throws: NIP19Entity.Error.invalidLength(count)) {
+                _ = try NEvent(bech32String: encoded)
+            }
+        }
+    }
+
+    @Test("an naddr whose author is not 32 bytes throws invalidLength")
     func naddrShortAuthorThrows() throws {
         let tlv =
             Data([0x00, 0x03]) + Data("abc".utf8)
             + Data([0x02, 0x1F]) + publicKey.data.prefix(31)
             + Data([0x03, 0x04, 0x00, 0x00, 0x75, 0x27])
         let encoded = try Bech32.encode(hrp: "naddr", data: tlv)
-        #expect(throws: NostrError.invalidNIP19Entity) {
+        #expect(throws: NIP19Entity.Error.invalidLength(31)) {
             _ = try NAddr(bech32String: encoded)
         }
     }
 
-    @Test("an nevent without an event id throws invalidNIP19Entity")
+    @Test("an nevent without an event id throws missingEventID")
     func neventMissingIDThrows() throws {
         let encoded = try Bech32.encode(hrp: "nevent", data: Data([0x02, 0x20]) + publicKey.data)
-        #expect(throws: NostrError.invalidNIP19Entity) {
+        #expect(throws: NIP19Entity.Error.missingEventID) {
             _ = try NEvent(bech32String: encoded)
         }
     }
 
-    @Test("naddr missing required author throws invalidNIP19Entity")
-    func naddrMissingAuthorThrows() throws {
-        // TLV with only a type-0 identifier ("abc"); no author or kind.
-        let tlv = Data([0x00, 0x03]) + Data("abc".utf8)
-        let encoded = try Bech32.encode(hrp: "naddr", data: tlv)
-        #expect(throws: NostrError.invalidNIP19Entity) {
-            _ = try NAddr(bech32String: encoded)
+    @Test("an naddr missing a required record throws the matching missing case")
+    func naddrMissingRecordsThrow() throws {
+        let identifier = Data([0x00, 0x03]) + Data("abc".utf8)
+        let author = Data([0x02, 0x20]) + publicKey.data
+        let kind = Data([0x03, 0x04, 0x00, 0x00, 0x75, 0x27])
+        let cases: [(Data, NIP19Entity.Error)] = [
+            (author + kind, .missingIdentifier),
+            (identifier + kind, .missingAuthor),
+            (identifier + author, .missingKind),
+        ]
+        for (tlv, expected) in cases {
+            let encoded = try Bech32.encode(hrp: "naddr", data: tlv)
+            #expect(throws: expected) {
+                _ = try NAddr(bech32String: encoded)
+            }
         }
     }
 

@@ -36,19 +36,24 @@ struct GiftWrapImpersonationTests {
 
     /// Seals `rumorJSON` as `sender` and wraps it for `recipient` with a fresh ephemeral key —
     /// the same construction `GiftWrap.wrap` performs, but over a rumor chosen by the caller.
+    /// `sealKind` and `alterSeal` let a test break the seal itself.
     private func wrap(
         rumorJSON: String,
         sender: KeyPair,
-        recipientPublicKey: PublicKey
+        recipientPublicKey: PublicKey,
+        sealKind: Event.Kind = .seal,
+        alterSeal: (Event) throws -> Event = { $0 }
     ) throws -> Event {
         let senderSigner = EventSigner(keyPair: sender)
-        let seal = try senderSigner.sign(
-            UnsignedEvent(
-                publicKey: sender.publicKey,
-                createdAt: Timestamp(rawValue: Timestamp.now.rawValue - 60),
-                kind: .seal,
-                tags: [],
-                content: try senderSigner.nip44Encrypt(rumorJSON, to: recipientPublicKey)
+        let seal = try alterSeal(
+            senderSigner.sign(
+                UnsignedEvent(
+                    publicKey: sender.publicKey,
+                    createdAt: Timestamp(rawValue: Timestamp.now.rawValue - 60),
+                    kind: sealKind,
+                    tags: [],
+                    content: try senderSigner.nip44Encrypt(rumorJSON, to: recipientPublicKey)
+                )
             )
         )
 
@@ -93,7 +98,7 @@ struct GiftWrapImpersonationTests {
 
         let giftWrap = try wrap(rumorJSON: rumor, sender: mallory, recipientPublicKey: bob.publicKey)
 
-        await #expect(throws: NostrError.verificationFailed) {
+        await #expect(throws: GiftWrap.Error.authorMismatch) {
             try await GiftWrap.unwrap(giftWrap: giftWrap, recipient: EventSigner(keyPair: bob))
         }
     }
@@ -117,7 +122,7 @@ struct GiftWrapImpersonationTests {
 
         let giftWrap = try wrap(rumorJSON: rumor, sender: alice, recipientPublicKey: bob.publicKey)
 
-        await #expect(throws: NostrError.invalidEventID) {
+        await #expect(throws: GiftWrap.Error.invalidRumorID) {
             try await GiftWrap.unwrap(giftWrap: giftWrap, recipient: EventSigner(keyPair: bob))
         }
     }
@@ -148,7 +153,46 @@ struct GiftWrapImpersonationTests {
 
         let giftWrap = try wrap(rumorJSON: rumor, sender: mallory, recipientPublicKey: bob.publicKey)
 
-        await #expect(throws: NostrError.verificationFailed) {
+        await #expect(throws: GiftWrap.Error.authorMismatch) {
+            try await GiftWrap.unwrap(giftWrap: giftWrap, recipient: EventSigner(keyPair: bob))
+        }
+    }
+
+    @Test("an event that is not a gift wrap is rejected with its kind")
+    func nonGiftWrapIsRejected() async throws {
+        let bob = try KeyPair()
+        let note = try await EventSigner(keyPair: try KeyPair()).sign(.textNote("hello"))
+
+        await #expect(throws: GiftWrap.Error.unexpectedKind(.textNote)) {
+            try await GiftWrap.unwrap(giftWrap: note, recipient: EventSigner(keyPair: bob))
+        }
+    }
+
+    @Test("a gift wrap whose seal is not kind 13 is rejected with the seal's kind")
+    func nonSealLayerIsRejected() async throws {
+        let alice = try KeyPair()
+        let bob = try KeyPair()
+        let giftWrap = try wrap(
+            rumorJSON: "{}", sender: alice, recipientPublicKey: bob.publicKey, sealKind: .textNote)
+
+        await #expect(throws: GiftWrap.Error.unexpectedKind(.textNote)) {
+            try await GiftWrap.unwrap(giftWrap: giftWrap, recipient: EventSigner(keyPair: bob))
+        }
+    }
+
+    @Test("a seal whose signature does not verify is rejected")
+    func sealWithForeignSignatureIsRejected() async throws {
+        let alice = try KeyPair()
+        let bob = try KeyPair()
+        // A valid signature, but over another event's id.
+        let foreignSignature = try await EventSigner(keyPair: alice).sign(.textNote("other")).signature
+        let giftWrap = try wrap(rumorJSON: "{}", sender: alice, recipientPublicKey: bob.publicKey) { seal in
+            Event(
+                id: seal.id, publicKey: seal.publicKey, createdAt: seal.createdAt, kind: seal.kind,
+                tags: seal.tags, content: seal.content, signature: foreignSignature)
+        }
+
+        await #expect(throws: GiftWrap.Error.invalidSealSignature) {
             try await GiftWrap.unwrap(giftWrap: giftWrap, recipient: EventSigner(keyPair: bob))
         }
     }

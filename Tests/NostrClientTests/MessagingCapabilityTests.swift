@@ -246,20 +246,20 @@ struct MessagingCapabilityTests {
             ])
     }
 
-    @Test("a parse helper handed another payload throws invalidData")
+    @Test("a parse helper handed another payload throws unexpectedKind with the payload's kind")
     func parseHelpersRejectOtherPayloads() async throws {
         let messaging: any NostrMessaging = makeStub()
         let message = try await fromAlice.createMessageWithSelfCopy(content: "hi", to: bob.publicKey)
         let reaction = try await fromAlice.createReactionWithSelfCopy(
             to: .fixture("message"), author: bob.publicKey, recipientPublicKey: bob.publicKey)
 
-        await #expect(throws: NostrError.invalidData) {
+        await #expect(throws: DirectMessagePayload.Error.unexpectedKind(.reaction)) {
             try await messaging.parse(reaction.recipientGiftWrap)
         }
-        await #expect(throws: NostrError.invalidData) {
+        await #expect(throws: DirectMessagePayload.Error.unexpectedKind(.privateDirectMessage)) {
             try await messaging.parseReaction(message.recipientGiftWrap)
         }
-        await #expect(throws: NostrError.invalidData) {
+        await #expect(throws: DirectMessagePayload.Error.unexpectedKind(.privateDirectMessage)) {
             try await messaging.parseFile(message.recipientGiftWrap)
         }
     }

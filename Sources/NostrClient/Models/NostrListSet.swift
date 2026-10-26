@@ -34,8 +34,8 @@ public struct NostrListSet: Sendable, Hashable {
     public var privateItems: [Tag]
 
     /// Creates a set.
-    /// - Throws: ``NostrError/invalidData`` when `kind` is not addressable (30000..<40000)
-    ///   or `identifier` is empty.
+    /// - Throws: ``NostrListSet/Error/invalidKind(_:)`` when `kind` is not addressable
+    ///   (30000..<40000), or ``NostrListSet/Error/missingIdentifier`` when `identifier` is empty.
     public init(
         kind: Event.Kind,
         identifier: String,
@@ -44,10 +44,9 @@ public struct NostrListSet: Sendable, Hashable {
         description: String? = nil,
         publicItems: [Tag] = [],
         privateItems: [Tag] = []
-    ) throws {
-        guard kind.isAddressable, !identifier.isEmpty else {
-            throw NostrError.invalidData
-        }
+    ) throws(NostrListSet.Error) {
+        guard kind.isAddressable else { throw .invalidKind(kind) }
+        guard !identifier.isEmpty else { throw .missingIdentifier }
         self.kind = kind
         self.identifier = identifier
         self.title = title
@@ -60,11 +59,11 @@ public struct NostrListSet: Sendable, Hashable {
     /// Reads the public face of a set event: its metadata tags plus every non-metadata public
     /// item. Private items stay empty (decrypting them needs the author's key — see
     /// ``init(event:decryptingWith:)``).
-    /// - Throws: ``NostrError/invalidData`` when the event has no `d` identifier tag.
-    public init(event: Event) throws {
+    /// - Throws: ``NostrListSet/Error/missingIdentifier`` when the event has no `d` identifier tag.
+    public init(event: Event) throws(NostrListSet.Error) {
         let tags = event.structuredTags
         guard let identifier = tags.first(where: { $0.name == "d" })?.primaryValue else {
-            throw NostrError.invalidData
+            throw .missingIdentifier
         }
         self.kind = event.kind
         self.identifier = identifier
@@ -82,13 +81,16 @@ public struct NostrListSet: Sendable, Hashable {
     /// - Parameters:
     ///   - event: The set event.
     ///   - signer: The author's signer, which encrypted the private items to itself.
-    /// - Throws: ``NostrError/invalidData`` if the event has no `d` identifier tag;
-    ///   ``NostrError/decryptionFailed`` if the decrypted content is not a JSON tag array; anything
-    ///   resolving the signer's public key or decrypting throws — for example when the content was
-    ///   not encrypted by `signer` to itself.
+    /// - Throws: ``NostrListSet/Error/missingIdentifier`` if the event has no `d` identifier tag;
+    ///   ``NostrListSet/Error/malformedPrivateItems`` if the decrypted content is not a JSON tag
+    ///   array; anything resolving the signer's public key or decrypting throws — for example when
+    ///   the content was not encrypted by `signer` to itself.
     public init(event: Event, decryptingWith signer: some NostrSigning) async throws {
         try self.init(event: event)
-        privateItems = try await ListItemCipher.open(event.content, with: signer)
+        guard let items = try await ListItemCipher.open(event.content, with: signer) else {
+            throw Error.malformedPrivateItems
+        }
+        privateItems = items
     }
 
     /// Tag names carried by dedicated properties (`d`, `title`, `image`, `description`)
@@ -101,7 +103,30 @@ public struct NostrListSet: Sendable, Hashable {
     }
 
     /// A NIP-19 `naddr` addressing this set for `author`.
-    public func naddr(author: PublicKey, relays: [RelayURL] = []) throws -> NAddr {
+    /// - Throws: ``NIP19Entity/Error/fieldTooLong(_:)`` if a relay hint's canonical form is longer
+    ///   than 255 bytes.
+    public func naddr(author: PublicKey, relays: [RelayURL] = []) throws(NIP19Entity.Error) -> NAddr {
         try NAddr(identifier: identifier, author: author, kind: kind.rawValue, relays: relays)
+    }
+
+    /// An error reading or building a NIP-51 set.
+    public enum Error: Swift.Error, LocalizedError, Sendable, Equatable {
+        /// The kind is not addressable (30000..<40000), so it cannot be a set (payload: the kind).
+        case invalidKind(Event.Kind)
+        /// The set has no `d` identifier: an empty identifier, or an event without a `d` tag.
+        case missingIdentifier
+        /// The decrypted content is not a JSON array of tags.
+        case malformedPrivateItems
+
+        public var errorDescription: String? {
+            switch self {
+            case .invalidKind(let kind):
+                return "A NIP-51 set must have an addressable kind, got \(kind.rawValue)"
+            case .missingIdentifier:
+                return "A NIP-51 set must have a d identifier"
+            case .malformedPrivateItems:
+                return "A NIP-51 set's private items must be a JSON tag array"
+            }
+        }
     }
 }

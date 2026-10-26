@@ -121,11 +121,11 @@ public struct SimpleGroupList: Sendable, Hashable {
     /// ``additionalPrivateTags`` — including out-of-shape "group" and "r" tags and ones whose
     /// relay URL is malformed, so nothing is dropped.
     ///
-    /// - Throws: ``NostrError/invalidData`` when `list.kind` is not
+    /// - Throws: ``SimpleGroupList/Error/invalidKind(_:)`` when `list.kind` is not
     ///   ``Event/Kind/simpleGroupList``.
-    public init(list: NostrList) throws {
+    public init(list: NostrList) throws(SimpleGroupList.Error) {
         guard list.kind == .simpleGroupList else {
-            throw NostrError.invalidData
+            throw .invalidKind(list.kind)
         }
         var publicEntries: [GroupListEntry] = []
         var relayURLs: [RelayURL] = []
@@ -174,5 +174,18 @@ public struct SimpleGroupList: Sendable, Hashable {
             publicItems: publicItems,
             privateItems: privateEntries.map(\.tag) + additionalPrivateTags
         )
+    }
+
+    /// An error reading a NIP-51 simple group list.
+    public enum Error: Swift.Error, LocalizedError, Sendable, Equatable {
+        /// The list is not a kind-10009 simple group list (payload: its kind).
+        case invalidKind(Event.Kind)
+
+        public var errorDescription: String? {
+            switch self {
+            case .invalidKind(let kind):
+                return "A simple group list must be kind 10009, got \(kind.rawValue)"
+            }
+        }
     }
 }

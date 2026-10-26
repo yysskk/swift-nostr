@@ -41,12 +41,28 @@ public struct NostrList: Sendable, Hashable {
     /// - Parameters:
     ///   - event: The list event.
     ///   - signer: The author's signer, which encrypted the private items to itself.
-    /// - Throws: ``NostrError/decryptionFailed`` if the decrypted content is not a JSON tag array;
-    ///   anything resolving the signer's public key or decrypting throws — for example when the
-    ///   content was not encrypted by `signer` to itself.
+    /// - Throws: ``NostrList/Error/malformedPrivateItems`` if the decrypted content is not a JSON
+    ///   tag array; anything resolving the signer's public key or decrypting throws — for example
+    ///   when the content was not encrypted by `signer` to itself.
     public init(event: Event, decryptingWith signer: some NostrSigning) async throws {
         self.init(event: event)
-        privateItems = try await ListItemCipher.open(event.content, with: signer)
+        guard let items = try await ListItemCipher.open(event.content, with: signer) else {
+            throw Error.malformedPrivateItems
+        }
+        privateItems = items
+    }
+
+    /// An error reading a NIP-51 list.
+    public enum Error: Swift.Error, LocalizedError, Sendable, Equatable {
+        /// The decrypted content is not a JSON array of tags.
+        case malformedPrivateItems
+
+        public var errorDescription: String? {
+            switch self {
+            case .malformedPrivateItems:
+                return "A NIP-51 list's private items must be a JSON tag array"
+            }
+        }
     }
 }
 
@@ -63,8 +79,9 @@ enum ListItemCipher {
         return try await signer.nip44Encrypt(json, to: signer.publicKey)
     }
 
-    /// Decrypts content `signer` encrypted to itself into items (empty content → []).
-    static func open(_ content: String, with signer: some NostrSigning) async throws -> [Tag] {
+    /// Decrypts content `signer` encrypted to itself into items (empty content → []), or nil when
+    /// the decrypted content is not a JSON tag array.
+    static func open(_ content: String, with signer: some NostrSigning) async throws -> [Tag]? {
         guard !content.isEmpty else { return [] }
         return try items(fromJSON: await signer.nip44Decrypt(content, from: signer.publicKey))
     }
@@ -82,10 +99,10 @@ enum ListItemCipher {
         return String(decoding: data, as: UTF8.self)
     }
 
-    /// The tags encoded in an opened payload.
-    static func items(fromJSON json: String) throws -> [Tag] {
-        guard let rawArrays = try JSONSerialization.jsonObject(with: Data(json.utf8)) as? [[String]] else {
-            throw NostrError.decryptionFailed
+    /// The tags encoded in an opened payload, or nil when it is not a JSON tag array.
+    static func items(fromJSON json: String) -> [Tag]? {
+        guard let rawArrays = (try? JSONSerialization.jsonObject(with: Data(json.utf8))) as? [[String]] else {
+            return nil
         }
         return rawArrays.compactMap(Tag.init(rawArray:))
     }

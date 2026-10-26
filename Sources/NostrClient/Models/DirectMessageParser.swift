@@ -19,12 +19,13 @@ public struct DirectMessageParser: Sendable {
     /// nil.
     /// - Parameter giftWrap: The gift-wrapped event
     /// - Returns: The parsed DirectMessage
-    /// - Throws: ``NostrError/invalidData`` if the inner rumor is not a kind-14 message or its `p`
-    ///   tag is not a canonical hex public key.
+    /// - Throws: ``DirectMessagePayload/Error/unexpectedKind(_:)`` if the inner rumor is not a
+    ///   kind-14 message, ``DirectMessagePayload/Error/invalidRecipient`` if its `p` tag is not a
+    ///   canonical hex public key, or the errors of ``GiftWrap/unwrap(giftWrap:recipient:)``.
     public func parse(_ giftWrap: Event) async throws -> DirectMessage {
         let unwrapped = try await GiftWrap.unwrap(giftWrap: giftWrap, recipient: signer)
         guard unwrapped.event.kind == .privateDirectMessage else {
-            throw NostrError.invalidData
+            throw DirectMessagePayload.Error.unexpectedKind(unwrapped.event.kind)
         }
         return try await makeMessage(from: unwrapped, giftWrap: giftWrap)
     }
@@ -32,12 +33,14 @@ public struct DirectMessageParser: Sendable {
     /// Parses a gift-wrapped event into a DirectMessageReaction.
     /// - Parameter giftWrap: The gift-wrapped event
     /// - Returns: The parsed reaction
-    /// - Throws: ``NostrError/invalidData`` if the inner rumor is not a kind-7 reaction or does not
-    ///   reference a message and its author by canonical hex id and key.
+    /// - Throws: ``DirectMessagePayload/Error/unexpectedKind(_:)`` if the inner rumor is not a
+    ///   kind-7 reaction, ``DirectMessagePayload/Error/missingReactionTarget`` if it does not
+    ///   reference a message and its author by canonical hex id and key, or the errors of
+    ///   ``GiftWrap/unwrap(giftWrap:recipient:)``.
     public func parseReaction(_ giftWrap: Event) async throws -> DirectMessageReaction {
         let unwrapped = try await GiftWrap.unwrap(giftWrap: giftWrap, recipient: signer)
         guard unwrapped.event.kind == .reaction else {
-            throw NostrError.invalidData
+            throw DirectMessagePayload.Error.unexpectedKind(unwrapped.event.kind)
         }
         return try makeReaction(from: unwrapped, giftWrap: giftWrap)
     }
@@ -45,12 +48,16 @@ public struct DirectMessageParser: Sendable {
     /// Parses a gift-wrapped event into a DirectMessageFile (NIP-17 kind 15).
     /// - Parameter giftWrap: The gift-wrapped event
     /// - Returns: The parsed file message
-    /// - Throws: ``NostrError/invalidData`` if the inner rumor is not a kind-15 file message, is
-    ///   missing a valid decryption key/nonce, or has a `p` tag that is not a canonical hex public key.
+    /// - Throws: ``DirectMessagePayload/Error/unexpectedKind(_:)`` if the inner rumor is not a
+    ///   kind-15 file message, ``DirectMessagePayload/Error/missingFileURL``,
+    ///   ``DirectMessagePayload/Error/invalidDecryptionKey``, or
+    ///   ``DirectMessagePayload/Error/invalidDecryptionNonce`` if it lacks a URL or a valid
+    ///   decryption key or nonce, ``DirectMessagePayload/Error/invalidRecipient`` if its `p` tag is
+    ///   not a canonical hex public key, or the errors of ``GiftWrap/unwrap(giftWrap:recipient:)``.
     public func parseFileMessage(_ giftWrap: Event) async throws -> DirectMessageFile {
         let unwrapped = try await GiftWrap.unwrap(giftWrap: giftWrap, recipient: signer)
         guard unwrapped.event.kind == .fileMessage else {
-            throw NostrError.invalidData
+            throw DirectMessagePayload.Error.unexpectedKind(unwrapped.event.kind)
         }
         return try await makeFile(from: unwrapped, giftWrap: giftWrap)
     }
@@ -59,7 +66,9 @@ public struct DirectMessageParser: Sendable {
     /// message (kind 15).
     /// - Parameter giftWrap: The gift-wrapped event
     /// - Returns: The decrypted payload
-    /// - Throws: ``NostrError/invalidData`` for any other inner kind.
+    /// - Throws: ``DirectMessagePayload/Error/unexpectedKind(_:)`` for any other inner kind, the
+    ///   other ``DirectMessagePayload/Error`` cases for a malformed payload, or the errors of
+    ///   ``GiftWrap/unwrap(giftWrap:recipient:)``.
     public func parsePayload(_ giftWrap: Event) async throws -> DirectMessagePayload {
         let unwrapped = try await GiftWrap.unwrap(giftWrap: giftWrap, recipient: signer)
         switch unwrapped.event.kind {
@@ -70,7 +79,7 @@ public struct DirectMessageParser: Sendable {
         case .fileMessage:
             return .file(try await makeFile(from: unwrapped, giftWrap: giftWrap))
         default:
-            throw NostrError.invalidData
+            throw DirectMessagePayload.Error.unexpectedKind(unwrapped.event.kind)
         }
     }
 
@@ -120,18 +129,12 @@ public struct DirectMessageParser: Sendable {
         if error is Event.VerificationError { return true }
         // NIP-44 refused the payload — the usual outcome for a wrap sealed to someone else.
         if error is SealedMessage.Error { return true }
-
-        switch error as? NostrError {
-        // The wrap is not a gift wrap, its seal is not a seal, or the rumor is not a well-formed
-        // message, reaction, or file.
-        case .invalidData:
-            return true
-        // The seal's signature does not verify, or the rumor's id is not its hash.
-        case .verificationFailed, .invalidEventID:
-            return true
-        default:
-            return false
-        }
+        // The wrap is not a gift wrap or its seal is not a seal, the seal's signature does not
+        // verify, the rumor's id is not its hash, or the rumor claims another author.
+        if error is GiftWrap.Error { return true }
+        // The rumor is not a well-formed message, reaction, or file.
+        if error is DirectMessagePayload.Error { return true }
+        return false
     }
 
     // MARK: - Private builders
@@ -175,7 +178,7 @@ public struct DirectMessageParser: Sendable {
             let messageID = rumor.firstTagValue(named: "e").flatMap(EventID.init),
             let author = rumor.firstTagValue(named: "p").flatMap(PublicKey.init)
         else {
-            throw NostrError.invalidData
+            throw DirectMessagePayload.Error.missingReactionTarget
         }
 
         return DirectMessageReaction(
@@ -196,16 +199,20 @@ public struct DirectMessageParser: Sendable {
 
         // A file message must carry a non-empty URL plus a decodable AES-256 key (32 bytes) and
         // GCM nonce (12 bytes); reject malformed events here rather than failing later at decrypt.
+        guard !rumor.content.isEmpty else {
+            throw DirectMessagePayload.Error.missingFileURL
+        }
         guard
-            !rumor.content.isEmpty,
-            let keyBase64 = rumor.firstTagValue(named: "decryption-key"),
-            let key = Data(base64Encoded: keyBase64),
-            key.count == 32,
-            let nonceBase64 = rumor.firstTagValue(named: "decryption-nonce"),
-            let nonce = Data(base64Encoded: nonceBase64),
+            let key = rumor.firstTagValue(named: "decryption-key").flatMap({ Data(base64Encoded: $0) }),
+            key.count == 32
+        else {
+            throw DirectMessagePayload.Error.invalidDecryptionKey
+        }
+        guard
+            let nonce = rumor.firstTagValue(named: "decryption-nonce").flatMap({ Data(base64Encoded: $0) }),
             nonce.count == 12
         else {
-            throw NostrError.invalidData
+            throw DirectMessagePayload.Error.invalidDecryptionNonce
         }
 
         let recipientPublicKey = try await addressee(of: rumor)
@@ -233,10 +240,11 @@ public struct DirectMessageParser: Sendable {
     /// The gift wrap only reached us because it was sealed to us, so our own key is the right
     /// stand-in — and resolving it lazily keeps a remote signer off the wire for the common case.
     /// A `p` tag that is not a canonical hex key names no one, so the rumor is rejected as
-    /// ``NostrError/invalidData`` rather than attributed to the wrong conversation.
+    /// ``DirectMessagePayload/Error/invalidRecipient`` rather than attributed to the wrong
+    /// conversation.
     private func addressee(of rumor: Event) async throws -> PublicKey {
         if let tagged = rumor.firstTagValue(named: "p") {
-            guard let publicKey = PublicKey(tagged) else { throw NostrError.invalidData }
+            guard let publicKey = PublicKey(tagged) else { throw DirectMessagePayload.Error.invalidRecipient }
             return publicKey
         }
         return try await signer.publicKey

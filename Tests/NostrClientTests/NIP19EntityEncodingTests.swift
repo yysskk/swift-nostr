@@ -13,18 +13,27 @@ struct NIP19EntityEncodingTests {
     private let validHex = String(repeating: "ab", count: 32)
 
     @Test(
-        "encoding an nsec whose payload is not 32 bytes of hex throws",
+        "encoding an nsec that is not hex throws invalidHex",
         arguments: [
             "not-hex",
-            "",
             "abc",  // odd length
             "zz" + String(repeating: "ab", count: 31),  // right length, not hex
-            String(repeating: "ab", count: 31),  // one byte short
-            String(repeating: "ab", count: 33),  // one byte long
         ]
     )
-    func invalidNsecPayloadThrows(hex: String) {
-        #expect(throws: NostrError.invalidNIP19Entity) { _ = try NIP19Entity.nsec(hex).encoded }
+    func nonHexNsecPayloadThrows(hex: String) {
+        #expect(throws: NIP19Entity.Error.invalidHex) { _ = try NIP19Entity.nsec(hex).encoded }
+    }
+
+    @Test(
+        "encoding an nsec whose hex is not 32 bytes throws invalidLength",
+        arguments: [
+            ("", 0),
+            (String(repeating: "ab", count: 31), 31),  // one byte short
+            (String(repeating: "ab", count: 33), 33),  // one byte long
+        ]
+    )
+    func wrongLengthNsecPayloadThrows(hex: String, byteCount: Int) {
+        #expect(throws: NIP19Entity.Error.invalidLength(byteCount)) { _ = try NIP19Entity.nsec(hex).encoded }
     }
 
     @Test("a valid bare entity still encodes and round-trips")
