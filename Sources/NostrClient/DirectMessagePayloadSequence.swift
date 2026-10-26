@@ -31,7 +31,7 @@ public struct DirectMessagePayloadSequence: AsyncSequence, Sendable {
     let base: SubscriptionSequence
     let parser: DirectMessageParser
 
-    /// The subscription ID, usable with ``NostrSubscriptionsAPI/unsubscribe(subscriptionId:)``.
+    /// The subscription ID, usable with ``NostrSubscriptionsAPI/unsubscribe(subscriptionID:)``.
     public var id: String { base.id }
 
     /// The relays that accepted the REQ.

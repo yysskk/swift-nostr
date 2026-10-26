@@ -18,9 +18,9 @@ struct RelayConnectionTransportTests {
         RelayURL("wss://relay-one.example.com")!,
         RelayURL("wss://relay-two.example.com")!,
     ]
-    private static let subscriptionId = "sub-1"
-    private static let eventId = String(repeating: "a", count: 64)
-    private static let otherEventId = String(repeating: "d", count: 64)
+    private static let subscriptionID = "sub-1"
+    private static let eventID = String(repeating: "a", count: 64)
+    private static let otherEventID = String(repeating: "d", count: 64)
 
     /// Thread-safe recorder for the events a ``RelayConnectionTransport/events()`` consumer sees.
     private final class EventLog: @unchecked Sendable {
@@ -145,9 +145,9 @@ struct RelayConnectionTransportTests {
     }
 
     /// An `EVENT` frame as a relay would send it, carrying a syntactically complete event.
-    private static func eventFrame(eventId: String) throws -> String {
+    private static func eventFrame(eventID: String) throws -> String {
         let event: [String: Any] = [
-            "id": eventId,
+            "id": eventID,
             "pubkey": String(repeating: "b", count: 64),
             "created_at": 1_700_000_000,
             "kind": Event.Kind.nostrConnect.rawValue,
@@ -155,7 +155,7 @@ struct RelayConnectionTransportTests {
             "content": "sealed",
             "sig": String(repeating: "c", count: 128),
         ]
-        let frame: [Any] = ["EVENT", subscriptionId, event]
+        let frame: [Any] = ["EVENT", subscriptionID, event]
         return String(decoding: try JSONSerialization.data(withJSONObject: frame), as: UTF8.self)
     }
 
@@ -180,15 +180,15 @@ struct RelayConnectionTransportTests {
         let transport = makeTransport(dispenser: dispenser)
         try await transport.connect()
 
-        try await transport.subscribe(id: Self.subscriptionId, filters: [Filter(kinds: [.nostrConnect])])
-        await transport.unsubscribe(id: Self.subscriptionId)
+        try await transport.subscribe(id: Self.subscriptionID, filters: [Filter(kinds: [.nostrConnect])])
+        await transport.unsubscribe(id: Self.subscriptionID)
 
         for index in Self.relayURLs.indices {
             let mock = try #require(dispenser.socket(at: index))
             let request = try #require(Self.sentFrame("REQ", in: mock))
-            #expect(request[1] as? String == Self.subscriptionId)
+            #expect(request[1] as? String == Self.subscriptionID)
             let close = try #require(Self.sentFrame("CLOSE", in: mock))
-            #expect(close[1] as? String == Self.subscriptionId)
+            #expect(close[1] as? String == Self.subscriptionID)
         }
         await transport.disconnect()
     }
@@ -199,13 +199,13 @@ struct RelayConnectionTransportTests {
         let transport = makeTransport(dispenser: dispenser)
         try await transport.connect()
 
-        try await transport.send(Self.event(id: Self.eventId))
+        try await transport.send(Self.event(id: Self.eventID))
 
         for index in Self.relayURLs.indices {
             let mock = try #require(dispenser.socket(at: index))
             let frame = try #require(Self.sentFrame("EVENT", in: mock))
             let event = try #require(frame[1] as? [String: Any])
-            #expect(event["id"] as? String == Self.eventId)
+            #expect(event["id"] as? String == Self.eventID)
         }
         await transport.disconnect()
     }
@@ -228,10 +228,10 @@ struct RelayConnectionTransportTests {
         let relayTwo = try #require(dispenser.socket(at: 1))
         try await deliverRepeatedly(
             {
-                relayOne.deliver(.string(try Self.eventFrame(eventId: Self.eventId)))
-                relayTwo.deliver(.string(try Self.eventFrame(eventId: Self.otherEventId)))
+                relayOne.deliver(.string(try Self.eventFrame(eventID: Self.eventID)))
+                relayTwo.deliver(.string(try Self.eventFrame(eventID: Self.otherEventID)))
             },
-            until: { received.ids == [Self.eventId, Self.otherEventId] }
+            until: { received.ids == [Self.eventID, Self.otherEventID] }
         )
 
         await transport.disconnect()
@@ -305,7 +305,7 @@ struct RelayConnectionTransportTests {
     func subscribeWithoutRelaysThrows() async {
         let transport = RelayConnectionTransport(relayURLs: [])
         await #expect(throws: NostrError.notConnected) {
-            try await transport.subscribe(id: Self.subscriptionId, filters: [Filter(kinds: [.nostrConnect])])
+            try await transport.subscribe(id: Self.subscriptionID, filters: [Filter(kinds: [.nostrConnect])])
         }
     }
 
@@ -313,7 +313,7 @@ struct RelayConnectionTransportTests {
     func sendWithoutRelaysThrows() async {
         let transport = RelayConnectionTransport(relayURLs: [])
         await #expect(throws: NostrError.notConnected) {
-            try await transport.send(Self.event(id: Self.eventId))
+            try await transport.send(Self.event(id: Self.eventID))
         }
     }
 

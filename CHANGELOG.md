@@ -199,6 +199,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `RemoteSignerError.invalidURI(reason:)` or `WalletConnectError.invalidURI(reason:)`, and a
   `switch_relays` reply with such an entry throws `responseDecodingFailed`. `stringValue` writes each
   relay in canonical form.
+- **`subscriptionId` is spelled `subscriptionID`** (breaking): the acronym is now cased the same way
+  as `groupID`, `eventID`, and `computedID` throughout. This renames the associated values of
+  `ClientMessage.request`, `close`, and `count` and of `RelayMessage.event`, `endOfStoredEvents`,
+  `closed`, and `count`, and the parameters of `RelayConnection.subscribe(subscriptionID:filters:)`,
+  `unsubscribe(subscriptionID:)`, `RelayPool.unsubscribe(subscriptionID:)`, and
+  `NostrSubscriptionsAPI.unsubscribe(subscriptionID:)`. The wire format is unchanged.
 
 ## [0.8.0] - 2026-10-25
 

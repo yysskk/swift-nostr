@@ -189,18 +189,18 @@ struct NIP23LongFormTests {
     }
 
     /// Reads the generated subscription id from a sent REQ frame.
-    private func subscriptionId(fromReqFrame frame: String) throws -> String {
+    private func subscriptionID(fromReqFrame frame: String) throws -> String {
         guard let data = frame.data(using: .utf8),
             let array = try JSONSerialization.jsonObject(with: data) as? [Any],
             array.count >= 2,
-            let subscriptionId = array[1] as? String
+            let subscriptionID = array[1] as? String
         else {
             throw NostrError.invalidMessageFormat
         }
-        return subscriptionId
+        return subscriptionID
     }
 
-    private func eventFrame(subscriptionId: String, event: Event) throws -> String {
+    private func eventFrame(subscriptionID: String, event: Event) throws -> String {
         let eventDict: [String: Any] = [
             "id": event.id.hex,
             "pubkey": event.pubkey.hex,
@@ -210,7 +210,7 @@ struct NIP23LongFormTests {
             "content": event.content,
             "sig": event.signature?.hex ?? "",
         ]
-        let array: [Any] = ["EVENT", subscriptionId, eventDict]
+        let array: [Any] = ["EVENT", subscriptionID, eventDict]
         let data = try JSONSerialization.data(withJSONObject: array)
         return String(decoding: data, as: UTF8.self)
     }
@@ -257,11 +257,11 @@ struct NIP23LongFormTests {
 
         try await pollUntil { mock.sentTextFrames.contains { $0.hasPrefix("[\"REQ\"") } }
         let reqFrame = try #require(mock.sentTextFrames.first { $0.hasPrefix("[\"REQ\"") })
-        let subId = try subscriptionId(fromReqFrame: reqFrame)
+        let receivedID = try subscriptionID(fromReqFrame: reqFrame)
 
-        mock.deliver(.string(try eventFrame(subscriptionId: subId, event: older)))
-        mock.deliver(.string(try eventFrame(subscriptionId: subId, event: newer)))
-        mock.deliver(.string("[\"EOSE\",\"\(subId)\"]"))
+        mock.deliver(.string(try eventFrame(subscriptionID: receivedID, event: older)))
+        mock.deliver(.string(try eventFrame(subscriptionID: receivedID, event: newer)))
+        mock.deliver(.string("[\"EOSE\",\"\(receivedID)\"]"))
 
         let result = try await task.value
         #expect(result?.title == "New")
@@ -292,10 +292,10 @@ struct NIP23LongFormTests {
 
         try await pollUntil { mock.sentTextFrames.contains { $0.hasPrefix("[\"REQ\"") } }
         let reqFrame = try #require(mock.sentTextFrames.first { $0.hasPrefix("[\"REQ\"") })
-        let subId = try subscriptionId(fromReqFrame: reqFrame)
+        let receivedID = try subscriptionID(fromReqFrame: reqFrame)
 
-        mock.deliver(.string(try eventFrame(subscriptionId: subId, event: event)))
-        mock.deliver(.string("[\"EOSE\",\"\(subId)\"]"))
+        mock.deliver(.string(try eventFrame(subscriptionID: receivedID, event: event)))
+        mock.deliver(.string("[\"EOSE\",\"\(receivedID)\"]"))
 
         let result = try await task.value
         #expect(result?.title == "Coordinated")

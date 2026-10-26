@@ -397,7 +397,7 @@ struct NIP29TimelineReferenceTests {
     }
 
     @Test("timestamp ties are broken by id so the window is deterministic")
-    func timestampTiesBreakById() {
+    func timestampTiesBreakByID() {
         let events = (0..<51).map { makeEvent(id: paddedID($0)) }
         var generator = SeededGenerator(seed: 5)
 

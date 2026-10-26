@@ -115,7 +115,7 @@ try await relay.connect()
 try await relay.send(.event(note))
 
 try await relay.subscribe(
-    subscriptionId: "sub1", filters: [Filter(authors: [pubkey], kinds: [.textNote], limit: 20)])
+    subscriptionID: "sub1", filters: [Filter(authors: [pubkey], kinds: [.textNote], limit: 20)])
 for await message in await relay.messages() {
     if case .event(_, let event) = message {
         print(event.content)

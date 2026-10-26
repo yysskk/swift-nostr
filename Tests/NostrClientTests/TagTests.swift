@@ -211,7 +211,7 @@ struct TagTests {
     }
 
     @Test("referenced ids and pubkeys")
-    func referencedIdsAndPubkeys() {
+    func referencedIDsAndPubkeys() {
         let event = makeEvent(tags: [
             ["e", id1.hex], ["e", id2.hex, "wss://r.example"], ["p", pk1.hex], ["e"], ["p", pk2.hex],
         ])

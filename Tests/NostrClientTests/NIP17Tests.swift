@@ -318,7 +318,7 @@ struct NIP17Tests {
     }
 
     @Test("Rumor id matches the id the signing path would produce")
-    func rumorIDMatchesSignedId() throws {
+    func rumorIDMatchesSignedID() throws {
         let alice = try KeyPair()
 
         let unsigned = UnsignedEvent(

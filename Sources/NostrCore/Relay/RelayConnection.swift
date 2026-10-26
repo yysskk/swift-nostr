@@ -440,9 +440,9 @@ public actor RelayConnection {
         guard !awaiting.isEmpty else { return }
 
         Task {
-            for subscriptionId in awaiting {
-                guard let filters = subscriptions[subscriptionId] else { continue }
-                try? await subscribe(subscriptionId: subscriptionId, filters: filters)
+            for subscriptionID in awaiting {
+                guard let filters = subscriptions[subscriptionID] else { continue }
+                try? await subscribe(subscriptionID: subscriptionID, filters: filters)
             }
         }
     }
@@ -497,10 +497,10 @@ public actor RelayConnection {
         // tracked: it is a one-shot request that must never be replayed on
         // reconnect.
         switch message {
-        case .request(let subscriptionId, let filters):
-            subscriptions[subscriptionId] = filters
-        case .close(let subscriptionId):
-            subscriptions.removeValue(forKey: subscriptionId)
+        case .request(let subscriptionID, let filters):
+            subscriptions[subscriptionID] = filters
+        case .close(let subscriptionID):
+            subscriptions.removeValue(forKey: subscriptionID)
         default:
             break
         }
@@ -798,19 +798,19 @@ public actor RelayConnection {
             throw NostrError.notConnected
         }
 
-        let subscriptionId = "count-" + String(UUID().uuidString.prefix(12))
+        let subscriptionID = "count-" + String(UUID().uuidString.prefix(12))
         let (stream, continuation) = AsyncThrowingStream<EventCount, any Error>.makeStream()
-        pendingCountWaiters[subscriptionId] = continuation
+        pendingCountWaiters[subscriptionID] = continuation
 
         do {
-            try await send(.count(subscriptionId: subscriptionId, filters: filters))
+            try await send(.count(subscriptionID: subscriptionID, filters: filters))
         } catch {
-            pendingCountWaiters.removeValue(forKey: subscriptionId)?.finish()
+            pendingCountWaiters.removeValue(forKey: subscriptionID)?.finish()
             throw error
         }
 
         defer {
-            pendingCountWaiters.removeValue(forKey: subscriptionId)?.finish()
+            pendingCountWaiters.removeValue(forKey: subscriptionID)?.finish()
         }
 
         return try await withThrowingTaskGroup(of: EventCount.self) { group in
@@ -835,13 +835,13 @@ public actor RelayConnection {
     }
 
     /// Subscribes to events matching the given filters
-    public func subscribe(subscriptionId: String, filters: [Filter]) async throws {
-        try await send(.request(subscriptionId: subscriptionId, filters: filters))
+    public func subscribe(subscriptionID: String, filters: [Filter]) async throws {
+        try await send(.request(subscriptionID: subscriptionID, filters: filters))
     }
 
     /// Unsubscribes from a subscription
-    public func unsubscribe(subscriptionId: String) async throws {
-        try await send(.close(subscriptionId: subscriptionId))
+    public func unsubscribe(subscriptionID: String) async throws {
+        try await send(.close(subscriptionID: subscriptionID))
     }
 
     /// Returns an async stream of messages from this relay.
@@ -849,7 +849,7 @@ public actor RelayConnection {
     ///
     /// A stream is bound to the connection, not to one socket: it survives automatic reconnections
     /// and keeps delivering from the new session. Taking a stream before connecting is the normal
-    /// way to use it — register first, then ``connect()`` and ``subscribe(subscriptionId:filters:)``
+    /// way to use it — register first, then ``connect()`` and ``subscribe(subscriptionID:filters:)``
     /// — so a stream taken while disconnected stays open and begins delivering when the next
     /// session arrives, rather than finishing on the spot.
     ///
@@ -926,8 +926,8 @@ public actor RelayConnection {
     }
 
     /// Checks if a subscription is active
-    public func hasSubscription(_ subscriptionId: String) -> Bool {
-        subscriptions[subscriptionId] != nil
+    public func hasSubscription(_ subscriptionID: String) -> Bool {
+        subscriptions[subscriptionID] != nil
     }
 
     /// Returns all active subscription IDs

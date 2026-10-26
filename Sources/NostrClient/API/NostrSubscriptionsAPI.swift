@@ -5,7 +5,7 @@ import NostrCore
 /// Reached as ``NostrClient/subscriptions``.
 ///
 /// Iteration termination — breaking out of the loop, task cancellation, or discarding the
-/// sequence — sends CLOSE to the relays, so most call sites never need ``unsubscribe(subscriptionId:)``.
+/// sequence — sends CLOSE to the relays, so most call sites never need ``unsubscribe(subscriptionID:)``.
 /// For a one-time read that ends at EOSE use ``NostrEventsAPI/fetch(filters:to:timeout:)`` instead.
 public struct NostrSubscriptionsAPI: NostrSubscribing {
     let client: NostrClient
@@ -60,8 +60,8 @@ public struct NostrSubscriptionsAPI: NostrSubscribing {
     /// Closes one subscription.
     /// No-op for unknown IDs, so the re-entrant call triggered by ending iteration
     /// cannot send a second CLOSE.
-    public func unsubscribe(subscriptionId: String) async {
-        await client.closeSubscription(id: subscriptionId)
+    public func unsubscribe(subscriptionID: String) async {
+        await client.closeSubscription(id: subscriptionID)
     }
 
     /// Closes every open subscription.
