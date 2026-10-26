@@ -290,7 +290,7 @@ Each of these is covered in depth, with worked examples, in the [documentation](
 - **Lightning Zaps (NIP-57)** — resolve an LNURL-pay endpoint, sign a zap request, fetch the bolt11 invoice, and verify the kind-9735 receipt.
 - **Outbox model (NIP-65)** — publish your read/write relay list and route reads/writes to each user's declared relays with `routing.subscribeOutbox` / `routing.publishGossip`.
 - **Client authentication (NIP-42)** — AUTH challenges are answered automatically once a signer is set, with auth-required publish retry; an opt-in manual mode is available.
-- **HTTP authorization (NIP-98)** — sign requests with `URLRequest.setNostrAuthorization(signer:)` or `HTTPAuth`, and validate incoming headers with `HTTPAuth.validate`.
+- **HTTP authorization (NIP-98)** — sign requests with `URLRequest.setNostrAuthorization(signer:)` or `EventTemplate.httpAuthorization(url:method:payload:)`, and validate incoming headers with `HTTPAuth.validate`.
 - **Relay-based groups (NIP-29)** — parse `naddr` share links with `GroupReference`, join and leave, chat with timeline references, moderate with `Groups.ModerationAction`, fetch validated relay-signed state with `groups.fetchState`, and keep the kind-10009 simple group list fresh.
 - **Relay information (NIP-11)** — fetch a relay's capabilities with `RelayInformation.fetch(from:)`.
 - **NIP-19 entities** — encode/decode `npub`/`nsec`/`note`/`nprofile`/`nevent`/`naddr` via `NIP19Entity`, `NProfile`, `NEvent`, and `NAddr`.

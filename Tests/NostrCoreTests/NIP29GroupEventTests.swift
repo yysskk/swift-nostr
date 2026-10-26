@@ -121,77 +121,65 @@ struct NIP29GroupKindAndTagTests {
     }
 }
 
-@Suite("NIP-29 Group Event Builders")
-struct NIP29GroupEventBuilderTests {
+@Suite("NIP-29 Group Events")
+struct NIP29GroupEventTests {
     let createdAt = Timestamp(rawValue: 1_700_000_000)
 
     // MARK: Join Requests
 
-    @Test("an unsigned join request carries the h tag first, then the invite code")
-    func unsignedJoinRequest() {
-        let unsigned = Groups.joinRequest(
-            groupID: "abcdef",
-            inviteCode: "invite123",
-            reason: "let me in",
-            publicKey: PublicKey.fixture("author"),
-            createdAt: createdAt
-        )
+    @Test("a join request carries the h tag first, then the invite code, with the reason as content")
+    func groupJoinRequest() {
+        let template = EventTemplate.groupJoinRequest(groupID: "abcdef", inviteCode: "invite123", reason: "let me in")
 
-        #expect(unsigned.kind == .groupJoinRequest)
-        #expect(unsigned.publicKey == PublicKey.fixture("author"))
-        #expect(unsigned.createdAt.rawValue == 1_700_000_000)
-        #expect(unsigned.tags == [["h", "abcdef"], ["code", "invite123"]])
-        #expect(unsigned.content == "let me in")
+        #expect(template.kind == .groupJoinRequest)
+        #expect(template.tags.map(\.rawArray) == [["h", "abcdef"], ["code", "invite123"]])
+        #expect(template.content == "let me in")
     }
 
     @Test("a join request without an invite code or reason has one tag and empty content")
-    func unsignedJoinRequestDefaults() {
-        let unsigned = Groups.joinRequest(groupID: "abcdef", publicKey: PublicKey.fixture("author"))
+    func groupJoinRequestDefaults() {
+        let template = EventTemplate.groupJoinRequest(groupID: "abcdef")
 
-        #expect(unsigned.tags == [["h", "abcdef"]])
-        #expect(unsigned.content.isEmpty)
+        #expect(template.kind == .groupJoinRequest)
+        #expect(template.tags.map(\.rawArray) == [["h", "abcdef"]])
+        #expect(template.content.isEmpty)
     }
 
     /// Converting a `Date` that is infinite or beyond `Int64` used to trap inside the builders.
     @Test(
-        "builders take an extreme timestamp without trapping",
+        "group templates sign at an extreme timestamp without trapping",
         arguments: [
             Timestamp(rawValue: Int64.max), Timestamp(rawValue: Int64.min),
             Timestamp(Date(timeIntervalSince1970: .infinity)), Timestamp(Date(timeIntervalSince1970: 1e300)),
         ]
     )
-    func extremeTimestamps(createdAt: Timestamp) async throws {
-        let author = PublicKey.fixture("author")
-        let join = Groups.joinRequest(groupID: "abcdef", publicKey: author, createdAt: createdAt)
-        let leave = Groups.leaveRequest(groupID: "abcdef", publicKey: author, createdAt: createdAt)
-        let content = Groups.contentEvent(
-            groupID: "abcdef", kind: .chatMessage, content: "gm", publicKey: author, createdAt: createdAt)
+    func extremeTimestamps(createdAt: Timestamp) throws {
+        let signer = EventSigner(keyPair: try KeyPair())
+        let templates: [EventTemplate] = [
+            .groupJoinRequest(groupID: "abcdef"),
+            .groupLeaveRequest(groupID: "abcdef"),
+            .groupContent(groupID: "abcdef", kind: .chatMessage, content: "gm"),
+        ]
 
-        #expect(join.createdAt == createdAt)
-        #expect(leave.createdAt == createdAt)
-        #expect(content.createdAt == createdAt)
-
-        let signed = try await Groups.joinRequest(
-            groupID: "abcdef", createdAt: createdAt, signer: EventSigner(keyPair: try KeyPair()))
-        #expect(signed.createdAt == createdAt)
-        #expect(try signed.verify())
+        for var template in templates {
+            template.createdAt = createdAt
+            let signed = try signer.sign(template)
+            #expect(signed.createdAt == createdAt)
+            #expect(try signed.verify())
+        }
     }
 
-    @Test("a signed join request verifies and keeps the unsigned layout")
-    func signedJoinRequest() async throws {
-        let signer = EventSigner(keyPair: try KeyPair())
+    @Test("a join request signed by a remote signer verifies and keeps the template layout")
+    func signedGroupJoinRequest() async throws {
+        let signer = StubRemoteSigner(keyPair: try KeyPair())
+        var template = EventTemplate.groupJoinRequest(groupID: "abcdef", inviteCode: "invite123", reason: "let me in")
+        template.createdAt = createdAt
 
-        let event = try await Groups.joinRequest(
-            groupID: "abcdef",
-            inviteCode: "invite123",
-            reason: "let me in",
-            createdAt: createdAt,
-            signer: signer
-        )
+        let event = try await signer.sign(template)
 
         #expect(event.kind == .groupJoinRequest)
-        #expect(event.publicKey == signer.publicKey)
-        #expect(event.createdAt.rawValue == 1_700_000_000)
+        #expect(event.publicKey == signer.keyPair.publicKey)
+        #expect(event.createdAt == createdAt)
         #expect(event.tags == [["h", "abcdef"], ["code", "invite123"]])
         #expect(event.content == "let me in")
         #expect(try event.verify())
@@ -199,31 +187,24 @@ struct NIP29GroupEventBuilderTests {
 
     // MARK: Leave Requests
 
-    @Test("an unsigned leave request carries only the h tag")
-    func unsignedLeaveRequest() {
-        let unsigned = Groups.leaveRequest(
-            groupID: "abcdef",
-            reason: "goodbye",
-            publicKey: PublicKey.fixture("author"),
-            createdAt: createdAt
-        )
+    @Test("a leave request carries only the h tag, with the reason as content")
+    func groupLeaveRequest() {
+        let template = EventTemplate.groupLeaveRequest(groupID: "abcdef", reason: "goodbye")
 
-        #expect(unsigned.kind == .groupLeaveRequest)
-        #expect(unsigned.publicKey == PublicKey.fixture("author"))
-        #expect(unsigned.createdAt.rawValue == 1_700_000_000)
-        #expect(unsigned.tags == [["h", "abcdef"]])
-        #expect(unsigned.content == "goodbye")
-        #expect(Groups.leaveRequest(groupID: "abcdef", publicKey: PublicKey.fixture("author")).content.isEmpty)
+        #expect(template.kind == .groupLeaveRequest)
+        #expect(template.tags.map(\.rawArray) == [["h", "abcdef"]])
+        #expect(template.content == "goodbye")
+        #expect(EventTemplate.groupLeaveRequest(groupID: "abcdef").content.isEmpty)
     }
 
-    @Test("a signed leave request verifies with kind 9022 and never carries a code tag")
-    func signedLeaveRequest() async throws {
-        let signer = EventSigner(keyPair: try KeyPair())
+    @Test("a leave request signed by a remote signer verifies with kind 9022 and no code tag")
+    func signedGroupLeaveRequest() async throws {
+        let signer = StubRemoteSigner(keyPair: try KeyPair())
 
-        let event = try await Groups.leaveRequest(groupID: "abcdef", createdAt: createdAt, signer: signer)
+        let event = try await signer.sign(.groupLeaveRequest(groupID: "abcdef"))
 
         #expect(event.kind == .groupLeaveRequest)
-        #expect(event.publicKey == signer.publicKey)
+        #expect(event.publicKey == signer.keyPair.publicKey)
         #expect(event.tags == [["h", "abcdef"]])
         #expect(event.content.isEmpty)
         #expect(try event.verify())
@@ -231,22 +212,20 @@ struct NIP29GroupEventBuilderTests {
 
     // MARK: Group-Scoped Content
 
-    @Test("contentEvent puts the h tag first, then custom tags in order, then previous")
-    func contentEventTagOrder() {
-        let unsigned = Groups.contentEvent(
+    @Test("groupContent puts the h tag first, then custom tags in order, then previous")
+    func contentTagOrder() {
+        let template = EventTemplate.groupContent(
             groupID: "abcdef",
             kind: .chatMessage,
             content: "hello",
             tags: [.hashtag("nostr"), .publicKey(PublicKey.fixture("pk1"))],
-            previous: ["00000001", "00000002"],
-            publicKey: PublicKey.fixture("author"),
-            createdAt: createdAt
+            previous: ["00000001", "00000002"]
         )
 
-        #expect(unsigned.kind == .chatMessage)
-        #expect(unsigned.content == "hello")
+        #expect(template.kind == .chatMessage)
+        #expect(template.content == "hello")
         #expect(
-            unsigned.tags == [
+            template.tags.map(\.rawArray) == [
                 ["h", "abcdef"],
                 ["t", "nostr"],
                 ["p", PublicKey.fixture("pk1").hex],
@@ -254,40 +233,34 @@ struct NIP29GroupEventBuilderTests {
             ])
     }
 
-    @Test("contentEvent omits the previous tag when no references are given")
-    func contentEventWithoutPrevious() {
-        let unsigned = Groups.contentEvent(
-            groupID: "abcdef", kind: .chatMessage, content: "hello", publicKey: PublicKey.fixture("author"))
+    @Test("groupContent omits the previous tag when no references are given")
+    func contentWithoutPrevious() {
+        let template = EventTemplate.groupContent(groupID: "abcdef", kind: .chatMessage, content: "hello")
 
-        #expect(unsigned.tags == [["h", "abcdef"]])
+        #expect(template.tags.map(\.rawArray) == [["h", "abcdef"]])
     }
 
-    @Test("contentEvent honors arbitrary content kinds")
-    func contentEventArbitraryKind() {
-        let article = Groups.contentEvent(
-            groupID: "abcdef", kind: Event.Kind(rawValue: 30023), content: "post",
-            publicKey: PublicKey.fixture("author"))
+    @Test("groupContent honors arbitrary content kinds")
+    func contentArbitraryKind() {
+        let article = EventTemplate.groupContent(groupID: "abcdef", kind: Event.Kind(rawValue: 30023), content: "post")
 
         #expect(article.kind.rawValue == 30023)
-        #expect(article.tags.first == ["h", "abcdef"])
+        #expect(article.tags.map(\.rawArray) == [["h", "abcdef"]])
     }
 
-    @Test("a signed content event verifies and keeps the unsigned layout")
-    func signedContentEvent() async throws {
-        let signer = EventSigner(keyPair: try KeyPair())
+    @Test("a content event signed by a remote signer verifies and keeps the template layout")
+    func signedContent() async throws {
+        let signer = StubRemoteSigner(keyPair: try KeyPair())
+        var template = EventTemplate.groupContent(
+            groupID: "abcdef", kind: .chatMessage, content: "hello", previous: ["00000001"])
+        template.createdAt = createdAt
 
-        let event = try await Groups.contentEvent(
-            groupID: "abcdef",
-            kind: .chatMessage,
-            content: "hello",
-            createdAt: createdAt,
-            signer: signer
-        )
+        let event = try await signer.sign(template)
 
         #expect(event.kind == .chatMessage)
-        #expect(event.publicKey == signer.publicKey)
-        #expect(event.createdAt.rawValue == 1_700_000_000)
-        #expect(event.tags == [["h", "abcdef"]])
+        #expect(event.publicKey == signer.keyPair.publicKey)
+        #expect(event.createdAt == createdAt)
+        #expect(event.tags == [["h", "abcdef"], ["previous", "00000001"]])
         #expect(event.content == "hello")
         #expect(try event.verify())
     }

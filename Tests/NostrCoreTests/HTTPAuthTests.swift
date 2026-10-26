@@ -1,6 +1,7 @@
 import Crypto
 import Foundation
 import NostrCore
+import NostrTestSupport
 import Testing
 
 #if canImport(FoundationNetworking)
@@ -11,57 +12,58 @@ import Testing
 struct HTTPAuthTests {
     let url = URL(string: "https://api.example.com/upload?type=media")!
 
-    @Test("authorization event carries the URL and method and verifies")
-    func authorizationEventShape() async throws {
-        let signer = EventSigner(keyPair: try KeyPair())
+    @Test("httpAuthorization is kind 27235 with the u and method tags and empty content")
+    func templateShape() {
+        let template = EventTemplate.httpAuthorization(url: url, method: "GET")
 
-        let event = try await HTTPAuth.authorizationEvent(url: url, method: "GET", signer: signer)
-
-        #expect(event.kind == .httpAuth)
-        #expect(event.content.isEmpty)
-        #expect(event.firstTagValue(named: "u") == "https://api.example.com/upload?type=media")
-        #expect(event.firstTagValue(named: "method") == "GET")
-        #expect(event.firstTagValue(named: "payload") == nil)
-        #expect(event.publicKey == signer.publicKey)
-        #expect(try event.verify())
+        #expect(template.kind == .httpAuth)
+        #expect(template.content.isEmpty)
+        #expect(
+            template.tags.map(\.rawArray) == [
+                ["u", "https://api.example.com/upload?type=media"], ["method", "GET"],
+            ])
     }
 
     @Test("the method is uppercased in the method tag")
-    func methodIsUppercased() async throws {
-        let signer = EventSigner(keyPair: try KeyPair())
+    func methodIsUppercased() {
+        let template = EventTemplate.httpAuthorization(url: url, method: "post")
 
-        let event = try await HTTPAuth.authorizationEvent(url: url, method: "post", signer: signer)
-
-        #expect(event.firstTagValue(named: "method") == "POST")
+        #expect(template.tags.map(\.rawArray) == [["u", url.absoluteString], ["method", "POST"]])
     }
 
-    @Test("a payload adds its SHA-256 hex as a payload tag")
-    func payloadTag() async throws {
-        let signer = EventSigner(keyPair: try KeyPair())
+    @Test("a payload adds its lowercase SHA-256 hex as a trailing payload tag")
+    func payloadTag() {
         let body = Data("{\"name\":\"nostr\"}".utf8)
 
-        let event = try await HTTPAuth.authorizationEvent(
-            url: url, method: "POST", payload: body, signer: signer)
+        let template = EventTemplate.httpAuthorization(url: url, method: "POST", payload: body)
 
-        let expectedHash = Data(SHA256.hash(data: body)).hexEncodedString()
-        #expect(event.firstTagValue(named: "payload") == expectedHash)
+        #expect(
+            template.tags.map(\.rawArray) == [
+                ["u", url.absoluteString],
+                ["method", "POST"],
+                ["payload", "eacc5f0b252fb35f1cea4cdf251b6e6a37cafa151228ca0112520ffe299cb2eb"],
+            ])
     }
 
-    @Test("createdAt stamps the event timestamp")
-    func createdAtIsStamped() async throws {
-        let signer = EventSigner(keyPair: try KeyPair())
-        let createdAt = Timestamp(rawValue: 1_682_327_852)
+    @Test("an authorization event signed by a remote signer keeps the template and verifies")
+    func remoteSignedEvent() async throws {
+        let signer = StubRemoteSigner(keyPair: try KeyPair())
+        var template = EventTemplate.httpAuthorization(url: url, method: "get")
+        template.createdAt = Timestamp(rawValue: 1_682_327_852)
 
-        let event = try await HTTPAuth.authorizationEvent(
-            url: url, method: "GET", createdAt: createdAt, signer: signer)
+        let event = try await signer.sign(template)
 
+        #expect(event.kind == .httpAuth)
+        #expect(event.publicKey == signer.keyPair.publicKey)
         #expect(event.createdAt.rawValue == 1_682_327_852)
+        #expect(event.tags == [["u", url.absoluteString], ["method", "GET"]])
+        #expect(try event.verify())
     }
 
     @Test("the header value is the Nostr scheme plus the base64 event JSON")
-    func headerValueRoundTrips() async throws {
+    func headerValueRoundTrips() throws {
         let signer = EventSigner(keyPair: try KeyPair())
-        let event = try await HTTPAuth.authorizationEvent(url: url, method: "GET", signer: signer)
+        let event = try signer.sign(.httpAuthorization(url: url, method: "GET"))
 
         let value = try HTTPAuth.authorizationHeaderValue(for: event)
 
@@ -74,55 +76,34 @@ struct HTTPAuthTests {
     }
 
     @Test("encoding a non-27235 event as a header is rejected")
-    func headerValueRejectsWrongKind() async throws {
-        let signer = EventSigner(keyPair: try KeyPair())
-        let note = try signer.sign(
-            UnsignedEvent(publicKey: signer.publicKey, kind: .textNote, content: "hi"))
+    func headerValueRejectsWrongKind() throws {
+        let note = try EventSigner(keyPair: try KeyPair()).sign(.textNote("hi"))
 
         #expect(throws: NostrError.invalidData) {
             try HTTPAuth.authorizationHeaderValue(for: note)
         }
     }
 
-    @Test("the one-call header convenience matches the two-step form")
-    func oneCallHeaderConvenience() async throws {
-        let signer = EventSigner(keyPair: try KeyPair())
-
-        let value = try await HTTPAuth.authorizationHeaderValue(
-            url: url, method: "get", signer: signer)
-
-        let parts = value.split(separator: " ")
-        try #require(parts.count == 2)
-        let json = try #require(Data(base64Encoded: String(parts[1])))
-        let event = try JSONDecoder().decode(Event.self, from: json)
-        #expect(event.kind == .httpAuth)
-        #expect(event.firstTagValue(named: "u") == url.absoluteString)
-        #expect(event.firstTagValue(named: "method") == "GET")
-        #expect(try event.verify())
-    }
-
-    @Test("URLRequest convenience signs the URL, method, and body")
+    @Test("URLRequest convenience signs the URL, method, and body into a header that validates")
     func urlRequestConvenience() async throws {
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = StubRemoteSigner(keyPair: try KeyPair())
         let body = Data("payload".utf8)
         var request = URLRequest(url: url)
-        request.httpMethod = "POST"
+        request.httpMethod = "post"
         request.httpBody = body
 
         try await request.setNostrAuthorization(signer: signer)
 
         let value = try #require(request.value(forHTTPHeaderField: "Authorization"))
-        let parts = value.split(separator: " ")
-        try #require(parts.count == 2)
-        #expect(parts[0] == "Nostr")
-        let json = try #require(Data(base64Encoded: String(parts[1])))
-        let event = try JSONDecoder().decode(Event.self, from: json)
-        #expect(event.firstTagValue(named: "u") == url.absoluteString)
-        #expect(event.firstTagValue(named: "method") == "POST")
+        #expect(value.hasPrefix("Nostr "))
+        let event = try HTTPAuth.validate(authorization: value, url: url, method: "POST", payload: body)
+        #expect(event.publicKey == signer.keyPair.publicKey)
         #expect(
-            event.firstTagValue(named: "payload")
-                == Data(SHA256.hash(data: body)).hexEncodedString())
-        #expect(try event.verify())
+            event.tags == [
+                ["u", url.absoluteString],
+                ["method", "POST"],
+                ["payload", Data(SHA256.hash(data: body)).hexEncodedString()],
+            ])
     }
 
     @Test("URLRequest convenience defaults the method to GET")
@@ -133,10 +114,24 @@ struct HTTPAuthTests {
         try await request.setNostrAuthorization(signer: signer)
 
         let value = try #require(request.value(forHTTPHeaderField: "Authorization"))
-        let json = try #require(Data(base64Encoded: String(value.dropFirst("Nostr ".count))))
-        let event = try JSONDecoder().decode(Event.self, from: json)
+        let event = try HTTPAuth.validate(authorization: value, url: url, method: "GET")
         #expect(event.firstTagValue(named: "method") == "GET")
         #expect(event.firstTagValue(named: "payload") == nil)
+    }
+
+    @Test("URLRequest convenience rejects a request without a URL")
+    func urlRequestWithoutURL() async throws {
+        let signer = EventSigner(keyPair: try KeyPair())
+        var request = URLRequest(url: url)
+        request.url = nil
+
+        do {
+            try await request.setNostrAuthorization(signer: signer)
+            Issue.record("Expected NostrError.invalidData")
+        } catch {
+            #expect(error as? NostrError == .invalidData)
+        }
+        #expect(request.value(forHTTPHeaderField: "Authorization") == nil)
     }
 
     @Test("NIP-98 tag constructors produce the spec tag shapes")

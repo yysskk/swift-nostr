@@ -95,6 +95,13 @@ request.httpBody = body
 try await request.setNostrAuthorization(signer: signer)  // any NostrSigning
 ```
 
+Without a `URLRequest`, sign ``EventTemplate/httpAuthorization(url:method:payload:)`` and encode the event with ``HTTPAuth/authorizationHeaderValue(for:)``:
+
+```swift
+let event = try await signer.sign(.httpAuthorization(url: uploadURL, method: "POST", payload: body))
+let header = try HTTPAuth.authorizationHeaderValue(for: event)
+```
+
 A server (or any verifier) runs the full NIP-98 check chain with ``HTTPAuth/validate(authorization:url:method:payload:tolerance:now:)`` and trusts the returned event's ``Event/publicKey`` as the authenticated identity:
 
 ```swift
@@ -105,19 +112,22 @@ let authenticatedPublicKey = event.publicKey
 
 ## Join and Post to a Relay-based Group
 
-``Groups`` builds the client side of NIP-29 relay-based groups. A group lives on a single relay, and everything a user sends carries the group id in an "h" tag. Ask to join (kind 9021, with an invite code for closed groups), then post content of any kind — here a NIP-C7 chat message — with "previous" timeline references sampled from recently seen group events:
+NIP-29 relay-based groups live on a single relay, and everything a user sends carries the group id in an "h" tag. Ask to join with ``EventTemplate/groupJoinRequest(groupID:inviteCode:reason:)`` (kind 9021, with an invite code for closed groups), then post content of any kind with ``EventTemplate/groupContent(groupID:kind:content:tags:previous:)`` — here a NIP-C7 chat message — with "previous" timeline references that ``Groups`` samples from recently seen group events:
 
 ```swift
-let join = try await Groups.joinRequest(groupID: "abcdef", inviteCode: "A7fjq2", signer: signer)
+let join = try await signer.sign(.groupJoinRequest(groupID: "abcdef", inviteCode: "A7fjq2"))
 
-let message = try await Groups.contentEvent(
-    groupID: "abcdef",
-    kind: .chatMessage,
-    content: "hello",
-    previous: Groups.previousReferences(from: recentEvents, excludingAuthor: signer.publicKey),
-    signer: signer
+let message = try await signer.sign(
+    .groupContent(
+        groupID: "abcdef",
+        kind: .chatMessage,
+        content: "hello",
+        previous: Groups.previousReferences(from: recentEvents, excludingAuthor: signer.publicKey)
+    )
 )
 ```
+
+Admins send ``Groups/ModerationAction``s with ``EventTemplate/groupModeration(_:groupID:previous:reason:)``, and ``EventTemplate/groupLeaveRequest(groupID:reason:)`` leaves the group.
 
 The relay answers with the group's state as relay-signed kind-39xxx events, which carry the group id in a "d" tag instead (user-sent events use "h"). Parse them with ``Groups/Metadata`` and its siblings, pinning the author to the relay's public key so an impostor's event is rejected:
 
