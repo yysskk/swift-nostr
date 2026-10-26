@@ -297,7 +297,7 @@ public actor WalletConnection {
     private func handleResponse(_ event: Event) async {
         // The `e` tag names the request this answers. A value that is not a canonical event id
         // cannot name any request this connection sent, so the response is dropped.
-        guard let requestID = event.firstTagValue(named: "e").flatMap(EventID.init) else { return }
+        guard let requestID = event.firstTagValue(named: .event).flatMap(EventID.init) else { return }
         let walletPublicKey = walletPublicKey
         let keyPair = keyPair
 
@@ -353,7 +353,7 @@ public actor WalletConnection {
                 return request.receivedCount >= request.expected ? .resolved(request.collected) : .pending
             }
 
-            request.collected.append(ResponsePart(dTag: event.firstTagValue(named: "d"), content: content))
+            request.collected.append(ResponsePart(dTag: event.firstTagValue(named: .identifier), content: content))
             return request.receivedCount >= request.expected ? .resolved(request.collected) : .pending
         }
     }

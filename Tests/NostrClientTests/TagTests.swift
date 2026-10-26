@@ -46,6 +46,80 @@ struct TagTests {
         #expect(tag == Event.Tag.hashtag("nostr"))
     }
 
+    // MARK: - Tag Name
+
+    @Test(
+        "name constants carry their wire strings",
+        arguments: [
+            (Event.Tag.Name.event, "e"), (.quote, "q"), (.publicKey, "p"), (.hashtag, "t"),
+            (.identifier, "d"), (.subject, "subject"), (.relay, "relay"), (.challenge, "challenge"),
+            (.url, "u"), (.method, "method"), (.payload, "payload"), (.expiration, "expiration"),
+            (.kind, "k"), (.nonce, "nonce"), (.word, "word"), (.address, "a"), (.reference, "r"),
+            (.group, "h"), (.previous, "previous"), (.inviteCode, "code"), (.role, "role"),
+            (.simpleGroup, "group"),
+        ]
+    )
+    func nameConstantsCarryWireStrings(name: Event.Tag.Name, rawValue: String) {
+        #expect(name.rawValue == rawValue)
+        #expect(name.description == rawValue)
+    }
+
+    @Test("names from literals and raw values compare equal")
+    func nameLiteralAndRawValueEquality() {
+        let literal: Event.Tag.Name = "t"
+        #expect(literal == .hashtag)
+        #expect(Event.Tag.Name(rawValue: "t") == .hashtag)
+        #expect(Event.Tag.Name(rawValue: "T") != .hashtag)
+    }
+
+    @Test("names encode as bare JSON strings")
+    func nameEncodesAsBareString() throws {
+        let data = try JSONEncoder().encode(Event.Tag.Name.inviteCode)
+        #expect(String(data: data, encoding: .utf8) == #""code""#)
+        #expect(try JSONDecoder().decode(Event.Tag.Name.self, from: data) == .inviteCode)
+    }
+
+    @Test("an unknown tag name round-trips through Codable")
+    func unknownNameRoundTrips() throws {
+        let json = #"["x-custom","value"]"#
+        let tag = try JSONDecoder().decode(Event.Tag.self, from: Data(json.utf8))
+        #expect(tag.name == Event.Tag.Name(rawValue: "x-custom"))
+        #expect(tag.values == ["value"])
+        #expect(String(data: try JSONEncoder().encode(tag), encoding: .utf8) == json)
+    }
+
+    @Test("typed constructors use the name constants")
+    func typedConstructorsUseNameConstants() {
+        let pairs: [(Event.Tag, Event.Tag.Name)] = [
+            (.event(id1), .event),
+            (.quote(id1), .quote),
+            (.publicKey(pk1), .publicKey),
+            (.publicKey(pk1, roles: ["admin"]), .publicKey),
+            (.hashtag("nostr"), .hashtag),
+            (.identifier("x"), .identifier),
+            (.subject("hello"), .subject),
+            (.relay(relay), .relay),
+            (.challenge("c"), .challenge),
+            (.url("https://example.com"), .url),
+            (.method("GET"), .method),
+            (.payload(sha256: "00"), .payload),
+            (.expiration(Timestamp(rawValue: 1)), .expiration),
+            (.kind(.textNote), .kind),
+            (.nonce("1", target: 8), .nonce),
+            (.word("spam"), .word),
+            (.address(kind: .longFormContent, publicKey: pk1, identifier: "post"), .address),
+            (.reference("https://example.com"), .reference),
+            (.group("g"), .group),
+            (.previous(["abcd1234"]), .previous),
+            (.inviteCode("invite"), .inviteCode),
+            (.role("admin"), .role),
+            (.simpleGroup(id: "g", relayURL: relay), .simpleGroup),
+        ]
+        for (tag, name) in pairs {
+            #expect(tag.name == name)
+        }
+    }
+
     // MARK: - Typed Constructors
 
     @Test("event tag pads skipped middle elements")
@@ -200,6 +274,7 @@ struct TagTests {
         let event = makeEvent(tags: [["e", id1.hex], ["p", pk1.hex], ["e", id2.hex, "", "reply"]])
         #expect(event.tags(named: "e") == [.event(id1), .event(id2, marker: .reply)])
         #expect(event.tags(named: "x").isEmpty)
+        #expect(event.tags(named: .publicKey) == [.publicKey(pk1)])
     }
 
     @Test("firstTagValue returns the first value of the first match")
@@ -208,6 +283,7 @@ struct TagTests {
         #expect(event.firstTagValue(named: "subject") == "greetings")
         #expect(event.firstTagValue(named: "e") == nil)
         #expect(event.firstTagValue(named: "missing") == nil)
+        #expect(event.firstTagValue(named: .subject) == "greetings")
     }
 
     @Test("referenced ids and public keys")

@@ -23,14 +23,14 @@ extension Event {
     /// `Tag` is also expressible as an array literal (`["t", "nostr"]`), so call
     /// sites that passed `[[String]]` literals keep compiling unchanged.
     public struct Tag: Sendable, Hashable {
-        /// The tag name, e.g. "e", "p", "t", "d".
-        public let name: String
+        /// The tag name, e.g. ``Name/event`` ("e") or ``Name/hashtag`` ("t").
+        public let name: Name
 
         /// The elements after the name. Positional per NIP conventions;
         /// empty strings act as placeholders for skipped elements.
         public let values: [String]
 
-        public init(name: String, values: [String] = []) {
+        public init(name: Name, values: [String] = []) {
             self.name = name
             self.values = values
         }
@@ -38,19 +38,106 @@ extension Event {
         /// Parses a raw NIP-01 tag array. Returns nil if the array is empty.
         public init?(rawArray: [String]) {
             guard let name = rawArray.first else { return nil }
-            self.name = name
+            self.name = Name(rawValue: name)
             self.values = Array(rawArray.dropFirst())
         }
 
         /// The raw NIP-01 representation: `[name] + values`.
         public var rawArray: [String] {
-            [name] + values
+            [name.rawValue] + values
         }
 
         /// The first value — the id, public key, or topic for single-value tags.
         public var primaryValue: String? {
             values.first
         }
+    }
+}
+
+// MARK: - Tag Name
+extension Event.Tag {
+    /// A Nostr tag name, the first element of a tag array.
+    ///
+    /// Tag names are open-ended (NIP-01), so this is a `RawRepresentable` struct
+    /// rather than a closed enum: any string can be represented, with the names
+    /// the typed constructors emit available as static constants. String literals
+    /// convert directly (`let name: Tag.Name = "t"`), and the value encodes to and
+    /// from JSON as a bare string.
+    /// https://github.com/nostr-protocol/nips/blob/master/01.md
+    public struct Name: RawRepresentable, Sendable, Hashable, ExpressibleByStringLiteral,
+        CustomStringConvertible
+    {
+        public let rawValue: String
+
+        public init(rawValue: String) {
+            self.rawValue = rawValue
+        }
+
+        public init(stringLiteral value: String) {
+            self.init(rawValue: value)
+        }
+
+        public var description: String {
+            rawValue
+        }
+
+        /// "e": a referenced event (NIP-10).
+        public static let event = Name(rawValue: "e")
+        /// "q": a quoted event (NIP-18).
+        public static let quote = Name(rawValue: "q")
+        /// "p": a referenced public key (NIP-01).
+        public static let publicKey = Name(rawValue: "p")
+        /// "t": a hashtag (NIP-24).
+        public static let hashtag = Name(rawValue: "t")
+        /// "d": the identifier of an addressable event (NIP-01).
+        public static let identifier = Name(rawValue: "d")
+        /// "subject": a message subject (NIP-14).
+        public static let subject = Name(rawValue: "subject")
+        /// "relay": the relay URL being authenticated to (NIP-42).
+        public static let relay = Name(rawValue: "relay")
+        /// "challenge": the relay's AUTH challenge (NIP-42).
+        public static let challenge = Name(rawValue: "challenge")
+        /// "u": the request URL of an HTTP authorization event (NIP-98).
+        public static let url = Name(rawValue: "u")
+        /// "method": the HTTP method of an HTTP authorization event (NIP-98).
+        public static let method = Name(rawValue: "method")
+        /// "payload": the request body hash of an HTTP authorization event (NIP-98).
+        public static let payload = Name(rawValue: "payload")
+        /// "expiration": the time relays should stop serving the event (NIP-40).
+        public static let expiration = Name(rawValue: "expiration")
+        /// "k": the kind of a referenced event (NIP-25).
+        public static let kind = Name(rawValue: "k")
+        /// "nonce": a proof-of-work nonce and target difficulty (NIP-13).
+        public static let nonce = Name(rawValue: "nonce")
+        /// "word": a muted word (NIP-51).
+        public static let word = Name(rawValue: "word")
+        /// "a": an addressable event coordinate (NIP-01).
+        public static let address = Name(rawValue: "a")
+        /// "r": a URL reference (NIP-24).
+        public static let reference = Name(rawValue: "r")
+        /// "h": the group an event belongs to (NIP-29).
+        public static let group = Name(rawValue: "h")
+        /// "previous": recent timeline references of a group event (NIP-29).
+        public static let previous = Name(rawValue: "previous")
+        /// "code": a group invite code (NIP-29).
+        public static let inviteCode = Name(rawValue: "code")
+        /// "role": a group role (NIP-29).
+        public static let role = Name(rawValue: "role")
+        /// "group": an entry of a simple group list (NIP-51).
+        public static let simpleGroup = Name(rawValue: "group")
+    }
+}
+
+extension Event.Tag.Name: Codable {
+    /// Encodes and decodes as a bare string, matching the NIP-01 wire format.
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        self.init(rawValue: try container.decode(String.self))
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
     }
 }
 
@@ -86,7 +173,7 @@ extension Tag {
         if let publicKey {
             values.append(publicKey.hex)
         }
-        return Tag(name: "e", values: values)
+        return Tag(name: .event, values: values)
     }
 
     /// A "q" tag quoting another event (NIP-18): `["q", id, relay, publicKey]`.
@@ -102,7 +189,7 @@ extension Tag {
         if let publicKey {
             values.append(publicKey.hex)
         }
-        return Tag(name: "q", values: values)
+        return Tag(name: .quote, values: values)
     }
 
     /// A "p" tag referencing a public key: `["p", publicKey, relay, petname]`.
@@ -122,7 +209,7 @@ extension Tag {
         if let petname {
             values.append(petname)
         }
-        return Tag(name: "p", values: values)
+        return Tag(name: .publicKey, values: values)
     }
 
     /// A "p" tag carrying trailing role names (NIP-29 kind-9000 put-user events and
@@ -130,55 +217,55 @@ extension Tag {
     /// ``publicKey(_:relayURL:petname:)``, index 1 here is a role, not a relay hint.
     /// https://github.com/nostr-protocol/nips/blob/master/29.md
     public static func publicKey(_ publicKey: PublicKey, roles: [String]) -> Tag {
-        Tag(name: "p", values: [publicKey.hex] + roles)
+        Tag(name: .publicKey, values: [publicKey.hex] + roles)
     }
 
     /// A "t" hashtag tag.
     public static func hashtag(_ topic: String) -> Tag {
-        Tag(name: "t", values: [topic])
+        Tag(name: .hashtag, values: [topic])
     }
 
     /// A "d" identifier tag (addressable events).
     public static func identifier(_ identifier: String) -> Tag {
-        Tag(name: "d", values: [identifier])
+        Tag(name: .identifier, values: [identifier])
     }
 
     /// A "subject" tag (NIP-14 / NIP-17).
     public static func subject(_ subject: String) -> Tag {
-        Tag(name: "subject", values: [subject])
+        Tag(name: .subject, values: [subject])
     }
 
     /// A "relay" tag carrying the URL of the relay the client is
     /// authenticating to (NIP-42), in its canonical form.
     public static func relay(_ url: RelayURL) -> Tag {
-        Tag(name: "relay", values: [url.description])
+        Tag(name: .relay, values: [url.description])
     }
 
     /// A "challenge" tag echoing the challenge string from a relay's
     /// AUTH message (NIP-42).
     public static func challenge(_ challenge: String) -> Tag {
-        Tag(name: "challenge", values: [challenge])
+        Tag(name: .challenge, values: [challenge])
     }
 
     /// A "u" tag carrying the absolute request URL, including any query
     /// parameters, of a NIP-98 HTTP authorization event.
     /// https://github.com/nostr-protocol/nips/blob/master/98.md
     public static func url(_ url: String) -> Tag {
-        Tag(name: "u", values: [url])
+        Tag(name: .url, values: [url])
     }
 
     /// A "method" tag carrying the HTTP request method of a NIP-98 HTTP
     /// authorization event, e.g. "GET" or "POST".
     /// https://github.com/nostr-protocol/nips/blob/master/98.md
     public static func method(_ method: String) -> Tag {
-        Tag(name: "method", values: [method])
+        Tag(name: .method, values: [method])
     }
 
     /// A "payload" tag carrying the lowercase hex SHA-256 of the request body
     /// of a NIP-98 HTTP authorization event.
     /// https://github.com/nostr-protocol/nips/blob/master/98.md
     public static func payload(sha256 hex: String) -> Tag {
-        Tag(name: "payload", values: [hex])
+        Tag(name: .payload, values: [hex])
     }
 
     /// An "expiration" tag marking when relays should stop serving the event (NIP-40).
@@ -187,13 +274,13 @@ extension Tag {
     /// return the event and may delete it.
     /// https://github.com/nostr-protocol/nips/blob/master/40.md
     public static func expiration(_ timestamp: Timestamp) -> Tag {
-        Tag(name: "expiration", values: [timestamp.description])
+        Tag(name: .expiration, values: [timestamp.description])
     }
 
     /// A "k" tag denoting the kind of a referenced event, e.g. on a NIP-25 reaction
     /// to record what kind of event was reacted to. The value is the integer kind.
     public static func kind(_ kind: Event.Kind) -> Tag {
-        Tag(name: "k", values: [String(kind.rawValue)])
+        Tag(name: .kind, values: [String(kind.rawValue)])
     }
 
     /// A "nonce" tag carrying a NIP-13 proof-of-work attempt and its committed target difficulty:
@@ -203,12 +290,12 @@ extension Tag {
     /// validators reject a merely lucky id whose commitment falls short.
     /// https://github.com/nostr-protocol/nips/blob/master/13.md
     public static func nonce(_ nonce: String, target: Int) -> Tag {
-        Tag(name: "nonce", values: [nonce, String(target)])
+        Tag(name: .nonce, values: [nonce, String(target)])
     }
 
     /// A "word" tag carrying a lowercased muted word (NIP-51 mute lists).
     public static func word(_ word: String) -> Tag {
-        Tag(name: "word", values: [word])
+        Tag(name: .word, values: [word])
     }
 
     /// An "a" tag referencing an addressable event coordinate (NIP-01/NIP-51):
@@ -223,33 +310,33 @@ extension Tag {
         if let relayURL {
             values.append(relayURL.description)
         }
-        return Tag(name: "a", values: values)
+        return Tag(name: .address, values: values)
     }
 
     /// An "r" tag carrying a URL reference.
     public static func reference(_ url: String) -> Tag {
-        Tag(name: "r", values: [url])
+        Tag(name: .reference, values: [url])
     }
 
     /// An "h" tag scoping an event to a NIP-29 group. Required on everything a user sends
     /// to a group relay: content, join/leave requests, and moderation events.
     /// https://github.com/nostr-protocol/nips/blob/master/29.md
     public static func group(_ groupID: String) -> Tag {
-        Tag(name: "h", values: [groupID])
+        Tag(name: .group, values: [groupID])
     }
 
     /// A "previous" tag carrying NIP-29 timeline references (the first 8 characters of
     /// recent event ids). See ``Groups/previousReferences(from:excludingAuthor:maxCount:)``.
     /// https://github.com/nostr-protocol/nips/blob/master/29.md
     public static func previous(_ references: [String]) -> Tag {
-        Tag(name: "previous", values: references)
+        Tag(name: .previous, values: references)
     }
 
     /// A "code" tag carrying a NIP-29 invite code (kind-9009 create-invite events and
     /// kind-9021 join requests).
     /// https://github.com/nostr-protocol/nips/blob/master/29.md
     public static func inviteCode(_ code: String) -> Tag {
-        Tag(name: "code", values: [code])
+        Tag(name: .inviteCode, values: [code])
     }
 
     /// A "role" tag of a NIP-29 kind-39003 roles event: `["role", name, description?]`.
@@ -259,7 +346,7 @@ extension Tag {
         if let description {
             values.append(description)
         }
-        return Tag(name: "role", values: values)
+        return Tag(name: .role, values: values)
     }
 
     /// A "group" tag of the NIP-51 kind-10009 simple group list:
@@ -270,7 +357,7 @@ extension Tag {
         if let name {
             values.append(name)
         }
-        return Tag(name: "group", values: values)
+        return Tag(name: .simpleGroup, values: values)
     }
 
     /// An arbitrary raw tag. Returns nil if the array is empty.
@@ -285,7 +372,7 @@ extension Tag: ExpressibleByArrayLiteral {
     /// The literal must contain at least the tag name.
     public init(arrayLiteral elements: String...) {
         precondition(!elements.isEmpty, "A tag array literal requires at least the tag name")
-        self.name = elements[0]
+        self.name = Name(rawValue: elements[0])
         self.values = Array(elements.dropFirst())
     }
 }
@@ -319,12 +406,12 @@ extension Event {
     }
 
     /// All tags with the given name.
-    public func tags(named name: String) -> [Tag] {
+    public func tags(named name: Tag.Name) -> [Tag] {
         structuredTags.filter { $0.name == name }
     }
 
     /// The first value of the first tag with the given name.
-    public func firstTagValue(named name: String) -> String? {
+    public func firstTagValue(named name: Tag.Name) -> String? {
         tags(named: name).first?.primaryValue
     }
 
@@ -349,7 +436,7 @@ extension Event {
     /// After this time, relays should stop serving the event and may delete it.
     /// Returns nil when there is no `expiration` tag or its value is not an integer.
     public var expiration: Timestamp? {
-        guard let value = firstTagValue(named: "expiration"), let seconds = Int64(value) else {
+        guard let value = firstTagValue(named: .expiration), let seconds = Int64(value) else {
             return nil
         }
         return Timestamp(rawValue: seconds)

@@ -83,7 +83,7 @@ public struct NostrListsAPI: NostrListManaging {
     ) async throws -> NostrListSet? {
         let target = try await author(publicKey)
         var filter = Filter(authors: [target], kinds: [kind])
-        filter.addTagQuery("d", values: [identifier])
+        filter.addTagQuery(.identifier, values: [identifier])
         let events = try await client.fetch(filters: [filter], fromURLs: nil, timeout: timeout)
         // Addressable event: the identifier is part of its coordinates, so it is matched alongside
         // the author and kind before the newest signed copy is chosen.
@@ -115,7 +115,7 @@ public struct NostrListsAPI: NostrListManaging {
         // Addressable events: keep the newest event per `d` identifier, ignoring any without one.
         // Each identifier is resolved through the same selection as a single-set fetch, so a copy
         // from another author or with an unverifiable signature cannot win one of the slots.
-        let identifiers = Set(events.compactMap { $0.firstTagValue(named: "d") })
+        let identifiers = Set(events.compactMap { $0.firstTagValue(named: .identifier) })
         var newestByIdentifier: [String: Event] = [:]
         for identifier in identifiers {
             newestByIdentifier[identifier] = VerifiedEventSelection.newest(

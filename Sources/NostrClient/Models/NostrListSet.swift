@@ -62,7 +62,7 @@ public struct NostrListSet: Sendable, Hashable {
     /// - Throws: ``NostrListSet/Error/missingIdentifier`` when the event has no `d` identifier tag.
     public init(event: Event) throws(NostrListSet.Error) {
         let tags = event.structuredTags
-        guard let identifier = tags.first(where: { $0.name == "d" })?.primaryValue else {
+        guard let identifier = tags.first(where: { $0.name == .identifier })?.primaryValue else {
             throw .missingIdentifier
         }
         self.kind = event.kind
@@ -95,7 +95,7 @@ public struct NostrListSet: Sendable, Hashable {
 
     /// Tag names carried by dedicated properties (`d`, `title`, `image`, `description`)
     /// rather than as free-form public items, so they are never emitted twice.
-    static let reservedTagNames: Set<String> = ["d", "title", "image", "description"]
+    static let reservedTagNames: Set<Tag.Name> = [.identifier, "title", "image", "description"]
 
     /// The `kind:pubkey:identifier` coordinate used in `a`-tag references to this set.
     public func coordinate(author: PublicKey) -> String {

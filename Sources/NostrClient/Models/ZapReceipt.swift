@@ -39,7 +39,7 @@ public struct ZapReceipt: Sendable, Hashable {
 
     /// The public key that was zapped (the `p` tag), or nil if the tag is absent or not a canonical hex
     /// public key.
-    public var recipientPublicKey: PublicKey? { event.firstTagValue(named: "p").flatMap(PublicKey.init) }
+    public var recipientPublicKey: PublicKey? { event.firstTagValue(named: .publicKey).flatMap(PublicKey.init) }
 
     /// The public key that sent the zap (the uppercase `P` tag), or nil if the tag is absent or not a
     /// canonical hex public key.
@@ -47,10 +47,10 @@ public struct ZapReceipt: Sendable, Hashable {
 
     /// The id of the event that was zapped (the `e` tag), or nil if the zap targeted no event or
     /// the tag is not a canonical hex event id.
-    public var zappedEventID: EventID? { event.firstTagValue(named: "e").flatMap(EventID.init) }
+    public var zappedEventID: EventID? { event.firstTagValue(named: .event).flatMap(EventID.init) }
 
     /// The coordinate of the addressable event that was zapped (the `a` tag), if any.
-    public var zappedEventCoordinate: String? { event.firstTagValue(named: "a") }
+    public var zappedEventCoordinate: String? { event.firstTagValue(named: .address) }
 
     /// The zapped amount in millisatoshis, taken from the embedded zap request's `amount` tag.
     ///
@@ -219,13 +219,13 @@ extension ZapReceipt {
             throw ValidationError.missingRecipient
         }
         if let zapRequest {
-            if let requestRecipient = zapRequest.firstTagValue(named: "p"),
+            if let requestRecipient = zapRequest.firstTagValue(named: .publicKey),
                 receiptRecipient.hex != requestRecipient
             {
                 throw ValidationError.recipientMismatch
             }
-            if let receiptEvent = event.firstTagValue(named: "e"),
-                let requestEvent = zapRequest.firstTagValue(named: "e"),
+            if let receiptEvent = event.firstTagValue(named: .event),
+                let requestEvent = zapRequest.firstTagValue(named: .event),
                 receiptEvent != requestEvent
             {
                 throw ValidationError.zappedEventMismatch

@@ -31,6 +31,7 @@ let isValid = try event.verify()
 - ``Signature``
 - ``Timestamp``
 - ``Tag``
+- ``Event/Tag/Name``
 - ``Filter``
 
 ### Keys and Identity

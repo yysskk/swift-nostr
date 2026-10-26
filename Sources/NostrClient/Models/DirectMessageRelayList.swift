@@ -41,7 +41,7 @@ public struct DirectMessageRelayList: Codable, Hashable, Sendable {
     /// valid relay URL is skipped, and duplicate relays are removed (first wins).
     public init(tags: [Tag]) {
         let urls = tags.compactMap { tag -> RelayURL? in
-            guard tag.name == "relay" else {
+            guard tag.name == .relay else {
                 return nil
             }
             return tag.primaryValue.flatMap(RelayURL.init)

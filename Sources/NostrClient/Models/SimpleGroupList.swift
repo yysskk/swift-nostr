@@ -45,7 +45,7 @@ public struct GroupListEntry: Sendable, Hashable {
     /// to ``SimpleGroupList``'s additional-tag buckets so its content survives a round
     /// trip. A present-but-empty name is treated as nil.
     public init?(tag: Tag) {
-        guard tag.name == "group", (2...3).contains(tag.values.count) else { return nil }
+        guard tag.name == .simpleGroup, (2...3).contains(tag.values.count) else { return nil }
         let groupID = tag.values[0]
         guard !groupID.isEmpty, let relayURL = RelayURL(tag.values[1]) else { return nil }
         let name = tag.values.count == 3 && !tag.values[2].isEmpty ? tag.values[2] : nil
@@ -133,7 +133,7 @@ public struct SimpleGroupList: Sendable, Hashable {
         for tag in list.publicItems {
             if let entry = GroupListEntry(tag: tag) {
                 publicEntries.append(entry)
-            } else if tag.name == "r", tag.values.count == 1, let relayURL = RelayURL(tag.values[0]) {
+            } else if tag.name == .reference, tag.values.count == 1, let relayURL = RelayURL(tag.values[0]) {
                 relayURLs.append(relayURL)
             } else {
                 additionalPublicTags.append(tag)

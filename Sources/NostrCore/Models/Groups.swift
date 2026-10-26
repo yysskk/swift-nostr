@@ -102,7 +102,7 @@ public enum Groups {
 
     /// The timeline references carried by an event's "previous" tag ([] when absent).
     public static func previousReferences(of event: Event) -> [String] {
-        event.tags(named: "previous").first?.values ?? []
+        event.tags(named: .previous).first?.values ?? []
     }
 
     /// The references of `event` that match none of `knownEventIDs`.
@@ -131,11 +131,11 @@ extension Event {
     /// relay-generated group state (kinds 39000-39005) — the "d" tag value. Nil for events
     /// carrying neither.
     public var groupID: String? {
-        if let groupID = firstTagValue(named: "h") {
+        if let groupID = firstTagValue(named: .group) {
             return groupID
         }
         if (39000...39005).contains(kind.rawValue) {
-            return firstTagValue(named: "d")
+            return firstTagValue(named: .identifier)
         }
         return nil
     }

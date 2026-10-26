@@ -12,7 +12,7 @@ extension Groups {
         /// The event author is not the expected relay public key.
         case unexpectedAuthor(expected: PublicKey, actual: PublicKey)
         /// The event lacks a tag the kind requires (e.g. a kind-9000 without "p").
-        case missingTag(name: String, kind: Event.Kind)
+        case missingTag(name: Tag.Name, kind: Event.Kind)
         /// The kind is not one of the moderation kinds this library models (defined by the
         /// spec: 9000-9002, 9005, 9007-9010).
         case unsupportedModerationKind(Event.Kind)
@@ -46,7 +46,7 @@ extension Groups {
         if let relayPublicKey, event.publicKey != relayPublicKey {
             throw ValidationError.unexpectedAuthor(expected: relayPublicKey, actual: event.publicKey)
         }
-        guard let groupID = event.firstTagValue(named: "d"), !groupID.isEmpty else {
+        guard let groupID = event.firstTagValue(named: .identifier), !groupID.isEmpty else {
             throw ValidationError.missingGroupID(kind)
         }
         return groupID
@@ -184,7 +184,7 @@ extension Groups {
 
             for tag in fieldTags {
                 switch tag.name {
-                case "d":
+                case .identifier:
                     break
                 case "name":
                     if name == nil { name = tag.primaryValue }
@@ -314,7 +314,7 @@ extension Groups {
         public init(event: Event, relayPublicKey: PublicKey? = nil) throws(ValidationError) {
             groupID = try Groups.validatedGroupID(
                 of: event, expecting: .groupAdmins, relayPublicKey: relayPublicKey)
-            admins = event.tags(named: "p").compactMap { tag in
+            admins = event.tags(named: .publicKey).compactMap { tag in
                 guard let publicKey = tag.primaryValue.flatMap(PublicKey.init) else { return nil }
                 return Admin(publicKey: publicKey, roles: Array(tag.values.dropFirst()))
             }
@@ -362,7 +362,7 @@ extension Groups {
         public init(event: Event, relayPublicKey: PublicKey? = nil) throws(ValidationError) {
             groupID = try Groups.validatedGroupID(
                 of: event, expecting: .groupMembers, relayPublicKey: relayPublicKey)
-            members = event.tags(named: "p").compactMap { $0.primaryValue.flatMap(PublicKey.init) }
+            members = event.tags(named: .publicKey).compactMap { $0.primaryValue.flatMap(PublicKey.init) }
         }
 
         /// The complete wire tags of the kind-39002 event: `["d", groupID]` first, then
@@ -417,7 +417,7 @@ extension Groups {
         public init(event: Event, relayPublicKey: PublicKey? = nil) throws(ValidationError) {
             groupID = try Groups.validatedGroupID(
                 of: event, expecting: .groupRoles, relayPublicKey: relayPublicKey)
-            roles = event.tags(named: "role").compactMap { tag in
+            roles = event.tags(named: .role).compactMap { tag in
                 guard let name = tag.primaryValue else { return nil }
                 return Role(name: name, description: tag.values.count > 1 ? tag.values[1] : nil)
             }
@@ -474,9 +474,9 @@ extension Groups {
                 of: event, expecting: .groupPinList, relayPublicKey: relayPublicKey)
             items = event.structuredTags.compactMap { tag in
                 switch tag.name {
-                case "e":
+                case .event:
                     return tag.primaryValue.flatMap(EventID.init).map { PinnedItem.event(id: $0) }
-                case "a":
+                case .address:
                     return tag.primaryValue.map { PinnedItem.address($0) }
                 default:
                     return nil
@@ -493,7 +493,7 @@ extension Groups {
                     case .event(let id):
                         return .event(id)
                     case .address(let address):
-                        return Tag(name: "a", values: [address])
+                        return Tag(name: .address, values: [address])
                     }
                 }
         }
@@ -528,7 +528,7 @@ extension Groups {
     public static func membership(of publicKey: PublicKey, in events: some Sequence<Event>) -> Membership? {
         var latest: (event: Event, roles: [String])?
         for event in events where event.kind == .groupPutUser || event.kind == .groupRemoveUser {
-            guard let target = event.tags(named: "p").first(where: { $0.primaryValue == publicKey.hex }) else {
+            guard let target = event.tags(named: .publicKey).first(where: { $0.primaryValue == publicKey.hex }) else {
                 continue
             }
             if let current = latest?.event {

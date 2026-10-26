@@ -70,7 +70,7 @@ public struct LongFormContent: Sendable, Hashable {
         for tag in event.structuredTags {
             let value = tag.primaryValue
             switch tag.name {
-            case "d":
+            case .identifier:
                 identifier = value ?? ""
             case "title":
                 title = value
@@ -82,7 +82,7 @@ public struct LongFormContent: Sendable, Hashable {
                 if let value, let seconds = Int64(value) {
                     publishedAt = Timestamp(rawValue: seconds)
                 }
-            case "t":
+            case .hashtag:
                 if let value {
                     hashtags.append(value)
                 }

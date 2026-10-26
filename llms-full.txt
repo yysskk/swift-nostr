@@ -456,16 +456,31 @@ Tag.simpleGroup(id: "abcdef", relayURL: try RelayURL(string: "wss://g"), name: "
 Tag.expiration(Timestamp(rawValue: 1_700_000_000))  // ["expiration", "1700000000"] (NIP-40)
 Tag(rawArray: ["custom", "x"])   // failable, nil for []
 tag.rawArray                     // [String] wire form
+tag.name                         // Tag.Name
 // Raw escape hatch when you hold [[String]]:
 UnsignedEvent(publicKey: pk, kind: 1, rawTags: rawArrays, content: "...")
+```
+
+`Tag.name` is a `Tag.Name`, a `RawRepresentable` struct over `String` (tag names are
+open-ended). It is `ExpressibleByStringLiteral` (`Tag(name: "x")`) and encodes as a bare string.
+Constants are named after the builder that emits them: `.event` ("e"), `.quote` ("q"),
+`.publicKey` ("p"), `.hashtag` ("t"), `.identifier` ("d"), `.subject`, `.relay`, `.challenge`,
+`.url` ("u"), `.method`, `.payload`, `.expiration`, `.kind` ("k"), `.nonce`, `.word`,
+`.address` ("a"), `.reference` ("r"), `.group` ("h"), `.previous`, `.inviteCode` ("code"),
+`.role`, `.simpleGroup` ("group").
+
+```swift
+Tag(name: "x-custom", values: ["v"])  // any name via string literal
+Tag.Name(rawValue: "x-custom")
+Tag.Name.hashtag.rawValue        // "t"
 ```
 
 Read accessors on `Event`:
 
 ```swift
 event.structuredTags            // [Tag]
-event.tags(named: "e")          // [Tag]
-event.firstTagValue(named: "subject")  // String?
+event.tags(named: .event)       // [Tag]; takes a Tag.Name, so "e" works too
+event.firstTagValue(named: .subject)  // String?
 event.referencedEventIDs        // [EventID] from "e" tags; malformed values are skipped
 event.referencedPublicKeys         // [PublicKey] from "p" tags; malformed values are skipped
 event.expiration                // Timestamp? from the NIP-40 "expiration" tag
@@ -610,8 +625,9 @@ NIP-01 Subscription Filter (struct: Codable, Sendable, Hashable).
 
 ```swift
 var filter = Filter()
-filter.addTagQuery("t", values: ["nostr", "bitcoin"])  // #t tag
-let values = filter.tagQuery("t")
+filter.addTagQuery(.hashtag, values: ["nostr", "bitcoin"])  // #t tag; takes a Tag.Name
+let values = filter.tagQuery(.hashtag)
+// A leading "#" is ignored: addTagQuery("#t", values:) sets the same #t query.
 ```
 
 ### Convenience Builders
@@ -1337,7 +1353,7 @@ Parsers check the kind, read the group id from the "d" tag, and — when `relayP
 `PublicKey`) is given — reject any other author; they never verify signatures (call
 `event.verify()` yourself). A "p" or "e" entry whose value is not a canonical hex key or id is
 skipped. All are `throws(Groups.ValidationError)` (`invalidEventKind`, `missingGroupID`, `unexpectedAuthor`,
-`missingTag`, `unsupportedModerationKind`).
+`missingTag(name:kind:)` with a `Tag.Name`, `unsupportedModerationKind`).
 
 ```swift
 let meta = try Groups.Metadata(event: e39000, relayPublicKey: relayPublicKey)

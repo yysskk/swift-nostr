@@ -25,7 +25,7 @@ struct FilterSerializationTests {
     )
     func uppercaseTagQueryIsPreserved(letter: String) throws {
         var filter = Filter(kinds: [1111])
-        filter.addTagQuery(letter, values: ["30023"])
+        filter.addTagQuery(Tag.Name(rawValue: letter), values: ["30023"])
 
         let dictionary = try serializedFilter(filter)
 
@@ -53,6 +53,24 @@ struct FilterSerializationTests {
 
         #expect(dictionary["#K"] as? [String] == ["30023"])
         #expect(dictionary["#k"] as? [String] == ["1"])
+    }
+
+    /// A leading `#` is ignored, so a name spelled with or without it addresses the same `#x` key
+    /// rather than producing `##t`.
+    @Test("tag queries encode to the same key with or without a leading #")
+    func tagQueryLeadingHashIsIgnored() throws {
+        var withoutHash = Filter(kinds: [1])
+        withoutHash.addTagQuery(.hashtag, values: ["nostr"])
+        var withHash = Filter(kinds: [1])
+        withHash.addTagQuery("#t", values: ["nostr"])
+
+        let encodedWithoutHash = try serializedFilter(withoutHash)
+        let encodedWithHash = try serializedFilter(withHash)
+
+        #expect(encodedWithoutHash["#t"] as? [String] == ["nostr"])
+        #expect(encodedWithHash["#t"] as? [String] == ["nostr"])
+        #expect(encodedWithHash["##t"] == nil)
+        #expect(withoutHash == withHash)
     }
 
     /// The declared keys already carry their wire spelling, so removing the key strategy must not

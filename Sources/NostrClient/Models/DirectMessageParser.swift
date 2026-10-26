@@ -145,11 +145,11 @@ public struct DirectMessageParser: Sendable {
         let rumor = unwrapped.event
 
         let recipientPublicKey = try await addressee(of: rumor)
-        let subject = rumor.firstTagValue(named: "subject")
+        let subject = rumor.firstTagValue(named: .subject)
 
         // A reply is an "e" tag carrying the NIP-10 "reply" marker at its marker position
         // (["e", id, relay, "reply"]); its primary value is the referenced event id.
-        let replyTo = rumor.tags(named: "e")
+        let replyTo = rumor.tags(named: .event)
             .first { $0.values.count >= 3 && $0.values[2] == Tag.EventMarker.reply.rawValue }?
             .primaryValue
             .flatMap(EventID.init)
@@ -175,8 +175,8 @@ public struct DirectMessageParser: Sendable {
         // A reaction must reference both the message ("e") and its author ("p"). Treat either
         // missing as a parse failure rather than surfacing an empty public key callers can't detect.
         guard
-            let messageID = rumor.firstTagValue(named: "e").flatMap(EventID.init),
-            let author = rumor.firstTagValue(named: "p").flatMap(PublicKey.init)
+            let messageID = rumor.firstTagValue(named: .event).flatMap(EventID.init),
+            let author = rumor.firstTagValue(named: .publicKey).flatMap(PublicKey.init)
         else {
             throw DirectMessagePayload.Error.missingReactionTarget
         }
@@ -243,7 +243,7 @@ public struct DirectMessageParser: Sendable {
     /// ``DirectMessagePayload/Error/invalidRecipient`` rather than attributed to the wrong
     /// conversation.
     private func addressee(of rumor: Event) async throws -> PublicKey {
-        if let tagged = rumor.firstTagValue(named: "p") {
+        if let tagged = rumor.firstTagValue(named: .publicKey) {
             guard let publicKey = PublicKey(tagged) else { throw DirectMessagePayload.Error.invalidRecipient }
             return publicKey
         }

@@ -73,7 +73,7 @@ extension Groups {
                     case .event(let id):
                         return .event(id)
                     case .address(let address):
-                        return Tag(name: "a", values: [address])
+                        return Tag(name: .address, values: [address])
                     }
                 }
             }
@@ -121,33 +121,33 @@ extension Groups {
             guard Self.moderationKinds.contains(event.kind) else {
                 throw ValidationError.unsupportedModerationKind(event.kind)
             }
-            guard let groupID = event.firstTagValue(named: "h"), !groupID.isEmpty else {
+            guard let groupID = event.firstTagValue(named: .group), !groupID.isEmpty else {
                 throw ValidationError.missingGroupID(event.kind)
             }
 
             switch event.kind {
             case .groupPutUser:
-                guard let target = event.tags(named: "p").first,
+                guard let target = event.tags(named: .publicKey).first,
                     let publicKey = target.primaryValue.flatMap(PublicKey.init)
                 else {
-                    throw ValidationError.missingTag(name: "p", kind: event.kind)
+                    throw ValidationError.missingTag(name: .publicKey, kind: event.kind)
                 }
                 action = .putUser(publicKey: publicKey, roles: Array(target.values.dropFirst()))
             case .groupRemoveUser:
-                guard let publicKey = event.firstTagValue(named: "p").flatMap(PublicKey.init) else {
-                    throw ValidationError.missingTag(name: "p", kind: event.kind)
+                guard let publicKey = event.firstTagValue(named: .publicKey).flatMap(PublicKey.init) else {
+                    throw ValidationError.missingTag(name: .publicKey, kind: event.kind)
                 }
                 action = .removeUser(publicKey: publicKey)
             case .groupEditMetadata:
                 action = .editMetadata(
                     Metadata(
                         groupID: groupID,
-                        fieldTags: event.structuredTags.filter { !["h", "previous"].contains($0.name) }
+                        fieldTags: event.structuredTags.filter { ![.group, .previous].contains($0.name) }
                     )
                 )
             case .groupDeleteEvent:
-                guard let id = event.firstTagValue(named: "e").flatMap(EventID.init) else {
-                    throw ValidationError.missingTag(name: "e", kind: event.kind)
+                guard let id = event.firstTagValue(named: .event).flatMap(EventID.init) else {
+                    throw ValidationError.missingTag(name: .event, kind: event.kind)
                 }
                 action = .deleteEvent(id: id)
             case .groupCreation:
@@ -155,17 +155,17 @@ extension Groups {
             case .groupDeletion:
                 action = .deleteGroup
             case .groupCreateInvite:
-                guard let code = event.firstTagValue(named: "code"), !code.isEmpty else {
-                    throw ValidationError.missingTag(name: "code", kind: event.kind)
+                guard let code = event.firstTagValue(named: .inviteCode), !code.isEmpty else {
+                    throw ValidationError.missingTag(name: .inviteCode, kind: event.kind)
                 }
                 action = .createInvite(code: code)
             case .groupUpdatePinList:
                 action = .updatePinList(
                     event.structuredTags.compactMap { tag in
                         switch tag.name {
-                        case "e":
+                        case .event:
                             return tag.primaryValue.flatMap(EventID.init).map { PinnedItem.event(id: $0) }
-                        case "a":
+                        case .address:
                             return tag.primaryValue.map { PinnedItem.address($0) }
                         default:
                             return nil

@@ -63,7 +63,7 @@ enum VerifiedEventSelection {
         if let author, event.publicKey != author { return false }
         // NIP-01 treats a missing `d` tag as an empty one, so an addressable event published
         // without it is still addressed by `""` — dropping it would lose a legitimate event.
-        if let identifier, (event.firstTagValue(named: "d") ?? "") != identifier { return false }
+        if let identifier, (event.firstTagValue(named: .identifier) ?? "") != identifier { return false }
         return true
     }
 }
