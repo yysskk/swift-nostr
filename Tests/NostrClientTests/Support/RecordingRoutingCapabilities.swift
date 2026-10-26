@@ -71,14 +71,16 @@ actor RecordingRoutingCapabilities: NostrRelayRouting {
 
     func publishRelayList(_ relayList: RelayListMetadata, strategy: PublishStrategy?) async throws -> PublishedEvent {
         relayListPublishes.append(RelayListPublish(relayList: relayList, strategy: strategy))
-        return PublishedEvent(event: try await signer.sign(.relayListMetadata(relayList)), result: PublishResult(statuses: [:]))
+        return PublishedEvent(
+            event: try await signer.sign(.relayListMetadata(relayList)), result: PublishResult(statuses: [:]))
     }
 
     func subscribeOutbox(authors: [PublicKey], kinds: [Event.Kind], limit: Int?) async throws -> SubscriptionSequence {
         outboxSubscribes.append(OutboxSubscribe(authors: authors, kinds: kinds, limit: limit))
         let (stream, continuation) = AsyncStream.makeStream(of: SubscriptionEvent.self)
         continuation.finish()
-        return SubscriptionSequence(id: "outbox_\(outboxSubscribes.count)", expectedRelays: [], stream: stream, onClose: {})
+        return SubscriptionSequence(
+            id: "outbox_\(outboxSubscribes.count)", expectedRelays: [], stream: stream, onClose: {})
     }
 
     func publishGossip(_ event: Event, strategy: PublishStrategy?) async throws -> PublishResult {
@@ -86,7 +88,9 @@ actor RecordingRoutingCapabilities: NostrRelayRouting {
         return PublishResult(statuses: [:])
     }
 
-    func fetchDirectMessageRelayList(for publicKey: PublicKey, timeout: Duration?) async throws -> DirectMessageRelayList? {
+    func fetchDirectMessageRelayList(
+        for publicKey: PublicKey, timeout: Duration?
+    ) async throws -> DirectMessageRelayList? {
         directMessageRelayListFetches.append(Fetch(publicKey: publicKey, timeout: timeout))
         return cannedDirectMessageRelayList
     }
