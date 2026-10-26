@@ -468,6 +468,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `giftWraps()`, so an optional `expiration:` without a `strategy:` no longer compiles: pass
   `strategy: nil` as well, or omit a nil `expiration:`.
 
+- **`NostrRelayRouting` and `NostrListManaging` require only their primitives** (breaking):
+  `publishRelayList(read:write:strategy:)` and `publishDirectMessageRelayList(relays:strategy:)` move
+  to a protocol extension that builds the `RelayListMetadata` or `DirectMessageRelayList` and
+  publishes it through `publishRelayList(_:strategy:)` or `publishDirectMessageRelayList(_:strategy:)`,
+  and `fetchSet(naddr:timeout:)` moves to one that fetches the coordinate's kind, identifier, and
+  author through `fetchSet(kind:identifier:for:timeout:)` — the author is named, so private items
+  stay encrypted and relay hints stay unused, as before. The extensions also add short forms with
+  the old defaults: `fetchRelayList(for:)`, `fetchDirectMessageRelayList(for:)`,
+  `publishRelayList(_:)`, `publishDirectMessageRelayList(_:)`, `publishGossip(_:)`,
+  `subscribeOutbox(authors:kinds:)` and `subscribeOutbox(authors:kinds:limit:)` for a non-optional
+  `Int`, `publish(_:)`, `publishSet(_:)`, and, for `fetch`, `fetchSet`, and `fetchSets`, a form
+  without `for:` (the current user) and one taking a non-optional `PublicKey`. An optional
+  `publicKey`, `limit`, or `timeout` therefore needs every argument spelled out: `for: nil` alone no
+  longer compiles — omit it.
+
+- **`NostrGroupManaging` publishes through one primitive** (breaking):
+  `publish(_:in:strategy:)` signs any `EventTemplate` and publishes it to the group's relay only,
+  adding and connecting it on demand after signing, as every group write did. `join`, `leave`,
+  `publishMessage`, and `publishModeration` move to a protocol extension that publishes
+  `groupJoinRequest`, `groupLeaveRequest`, `groupContent`, and `groupModeration` templates through
+  it, with the same tags, defaults, and errors. The reads and the kind-10009 list stay requirements,
+  and the extension adds short forms with the old defaults: `publish(_:in:)`,
+  `fetchMetadata(for:timeout:)` and `fetchState(for:timeout:)` plus forms taking a non-optional
+  `authorPublicKey`, `timeline(_:)`, `timeline(_:kinds:since:limit:)` for non-optional `kinds`,
+  `timeline(_:since:limit:)`, `timeline(_:limit:)`, `fetchSimpleGroupList(timeout:)`,
+  `fetchSimpleGroupList(for:timeout:)` for a non-optional `PublicKey`, and
+  `publishSimpleGroupList(_:)`. An optional `authorPublicKey`, `kinds`, `since`, or `publicKey`
+  therefore needs every argument spelled out.
+
 ### Fixed
 
 - **A subscription or fetch whose targets are not in the pool no longer sends a stray CLOSE**:

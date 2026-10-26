@@ -157,10 +157,11 @@ struct NostrClientNamespaceTests {
         try await client.identity.setPrivateKey(try KeyPair().privateKeyHex)
         let routing: any NostrRelayRouting = client.routing
 
+        // The conveniences live in a protocol extension that carries the defaults, so a call
+        // through the existential is as short as one through the namespace.
         let published = try await PublishAckSupport.acknowledgingPublishes(on: socket) {
             try await routing.publishRelayList(
-                read: [RelayURL("wss://read.example.com")!], write: [RelayURL("wss://write.example.com")!],
-                strategy: nil)
+                read: [RelayURL("wss://read.example.com")!], write: [RelayURL("wss://write.example.com")!])
         }
 
         #expect(published.event.kind == .relayListMetadata)
@@ -207,8 +208,10 @@ struct NostrClientNamespaceTests {
         let list = SimpleGroupList(
             publicEntries: [GroupListEntry(groupID: "abc", relayURL: RelayURL("wss://groups.example.com")!)])
 
+        // The short forms live in a protocol extension that carries the defaults, so a call
+        // through the existential is as short as one through the namespace.
         let published = try await PublishAckSupport.acknowledgingPublishes(on: socket) {
-            try await groups.publishSimpleGroupList(list, strategy: nil)
+            try await groups.publishSimpleGroupList(list)
         }
 
         #expect(published.event.kind == .simpleGroupList)
@@ -223,8 +226,10 @@ struct NostrClientNamespaceTests {
         let lists: any NostrListManaging = client.lists
         let bookmarks = NostrList(kind: .bookmarkList, publicItems: [.event(.fixture("note"))])
 
+        // The short forms live in a protocol extension that carries the defaults, so a call
+        // through the existential is as short as one through the namespace.
         let published = try await PublishAckSupport.acknowledgingPublishes(on: socket) {
-            try await lists.publish(bookmarks, strategy: nil)
+            try await lists.publish(bookmarks)
         }
 
         #expect(published.event.kind == .bookmarkList)

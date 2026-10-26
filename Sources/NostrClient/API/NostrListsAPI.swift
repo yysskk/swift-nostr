@@ -7,15 +7,18 @@ import NostrCore
 /// Private items are NIP-44-encrypted to the author's own key through the configured signer,
 /// local or remote. Fetching your own list or set decrypts them; fetching someone else's
 /// returns only its public items.
+///
+/// Implements the ``NostrListManaging`` primitives over the client's signer and relay pool;
+/// ``NostrListManaging/fetchSet(naddr:timeout:)`` and the short forms come from the protocol's
+/// extension.
 public struct NostrListsAPI: NostrListManaging {
     let client: NostrClient
 
     // MARK: - Lists
 
     /// Signs and publishes a NIP-51 list, replacing the current list of that kind.
-    /// - Returns: The signed event together with the per-relay publish outcome.
     @discardableResult
-    public func publish(_ list: NostrList, strategy: PublishStrategy? = nil) async throws -> PublishedEvent {
+    public func publish(_ list: NostrList, strategy: PublishStrategy?) async throws -> PublishedEvent {
         let template = try await client.withSigner { signer, _ in
             try await EventTemplate.list(list, encryptingWith: signer)
         }
@@ -24,17 +27,12 @@ public struct NostrListsAPI: NostrListManaging {
         return PublishedEvent(event: event, result: result)
     }
 
-    /// Fetches the newest list of `kind`. With no `publicKey` it fetches the current user's list
-    /// and decrypts private items; for another public key only public items are returned.
-    /// - Parameter timeout: How long to wait for relays to finish; `nil` uses
-    ///   ``RelayPoolConfig/queryTimeout``.
-    /// - Throws: when fetching the current user's own list and its private content cannot be
-    ///   decrypted (republishing such a list would silently drop the private items).
-    /// - Returns: The list, or nil if none was found.
+    /// Fetches the newest list of `kind`, decrypting private items for the current user's own list
+    /// (nil `publicKey`).
     public func fetch(
         kind: Event.Kind,
-        for publicKey: PublicKey? = nil,
-        timeout: Duration? = nil
+        for publicKey: PublicKey?,
+        timeout: Duration?
     ) async throws -> NostrList? {
         let target = try await author(publicKey)
         let events = try await client.fetch(
@@ -62,11 +60,10 @@ public struct NostrListsAPI: NostrListManaging {
 
     /// Signs and publishes a NIP-51 set, replacing any prior set with the same kind and `d`
     /// identifier.
-    /// - Returns: The signed event together with the per-relay publish outcome.
     @discardableResult
     public func publishSet(
         _ set: NostrListSet,
-        strategy: PublishStrategy? = nil
+        strategy: PublishStrategy?
     ) async throws -> PublishedEvent {
         let template = try await client.withSigner { signer, _ in
             try await EventTemplate.set(set, encryptingWith: signer)
@@ -76,19 +73,13 @@ public struct NostrListsAPI: NostrListManaging {
         return PublishedEvent(event: event, result: result)
     }
 
-    /// Fetches one set by kind and `d` identifier. With no `publicKey` it fetches the current
-    /// user's set and decrypts its private items; for another public key only public items are
-    /// returned.
-    /// - Parameter timeout: How long to wait for relays to finish; `nil` uses
-    ///   ``RelayPoolConfig/queryTimeout``.
-    /// - Throws: when fetching the current user's own set and its private content cannot be
-    ///   decrypted (republishing such a set would silently drop the private items).
-    /// - Returns: The set, or nil if none was found.
+    /// Fetches one set by kind and `d` identifier, decrypting private items for the current user's
+    /// own set (nil `publicKey`).
     public func fetchSet(
         kind: Event.Kind,
         identifier: String,
-        for publicKey: PublicKey? = nil,
-        timeout: Duration? = nil
+        for publicKey: PublicKey?,
+        timeout: Duration?
     ) async throws -> NostrListSet? {
         let target = try await author(publicKey)
         var filter = Filter(authors: [target], kinds: [kind])
@@ -108,17 +99,12 @@ public struct NostrListsAPI: NostrListManaging {
         return try NostrListSet(event: newest)
     }
 
-    /// Fetches all sets of a kind for an author, keeping the newest per `d` identifier. With no
-    /// `publicKey` it fetches the current user's sets and decrypts their private items; for another
-    /// public key only public items are returned.
-    /// - Parameter timeout: How long to wait for relays to finish; `nil` uses
-    ///   ``RelayPoolConfig/queryTimeout``.
-    /// - Throws: when fetching the current user's own sets and a set's private content cannot be
-    ///   decrypted.
+    /// Fetches all sets of a kind for an author, newest per `d` identifier, decrypting private items
+    /// for the current user's own sets (nil `publicKey`).
     public func fetchSets(
         kind: Event.Kind,
-        for publicKey: PublicKey? = nil,
-        timeout: Duration? = nil
+        for publicKey: PublicKey?,
+        timeout: Duration?
     ) async throws -> [NostrListSet] {
         let target = try await author(publicKey)
         let events = try await client.fetch(
@@ -141,29 +127,6 @@ public struct NostrListsAPI: NostrListManaging {
             sets.append(decrypt ? try await decryptedSet(event) : try NostrListSet(event: event))
         }
         return sets
-    }
-
-    /// Fetches the set addressed by a NIP-19 `naddr`.
-    ///
-    /// Only public items are returned; the current user's private items are available via
-    /// ``fetchSet(kind:identifier:for:timeout:)`` with no `publicKey`.
-    /// - Parameter timeout: How long to wait for relays to finish; `nil` uses
-    ///   ``RelayPoolConfig/queryTimeout``.
-    /// - Returns: The set, or nil if none was found.
-    public func fetchSet(naddr: NAddr, timeout: Duration? = nil) async throws -> NostrListSet? {
-        var filter = Filter(authors: [naddr.author], kinds: [Event.Kind(rawValue: naddr.kind)])
-        filter.addTagQuery("d", values: [naddr.identifier])
-        let events = try await client.fetch(filters: [filter], fromURLs: nil, timeout: timeout)
-        guard
-            let newest = VerifiedEventSelection.newest(
-                in: events,
-                kind: Event.Kind(rawValue: naddr.kind),
-                author: naddr.author,
-                identifier: naddr.identifier)
-        else {
-            return nil
-        }
-        return try NostrListSet(event: newest)
     }
 
     // MARK: - Private

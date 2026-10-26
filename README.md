@@ -87,6 +87,8 @@ struct ChatViewModel {
 ChatViewModel(messages: client.messages)
 ```
 
+A protocol's requirements are only its primitives; the conveniences and their default arguments come from protocol extensions, so a stub implements just the primitives and a call through `any NostrMessaging` is as short as one through `client.messages`.
+
 ## Quick Start
 
 ### Generate keys

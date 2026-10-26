@@ -235,50 +235,101 @@ public protocol NostrSubscribing: Sendable {
 
 /// Discovering where a user's events live (NIP-65) and where their messages go (NIP-17),
 /// and routing by those lists. Implemented by ``NostrRoutingAPI``.
+///
+/// The requirements are the primitives — fetching, caching, and publishing each list, the outbox
+/// subscription, the gossip publish, and connecting the DM inbox;
+/// ``publishRelayList(read:write:strategy:)``, ``publishDirectMessageRelayList(relays:strategy:)``,
+/// and the short forms of the primitives are provided by an extension built on them.
 public protocol NostrRelayRouting: Sendable {
-    /// Fetches and caches a user's NIP-65 relay list.
+    /// Fetches a user's NIP-65 relay list (kind 10002) from the whole pool, caching it (newer wins).
+    ///
+    /// Only a list the public key signed counts, so a relay cannot install a list for someone else.
+    /// - Parameters:
+    ///   - publicKey: The user whose relay list to fetch.
+    ///   - timeout: How long to wait for relays to finish, or nil for
+    ///     ``RelayPoolConfig/queryTimeout``.
+    /// - Returns: The relay list, or nil if none was found.
     func fetchRelayList(for publicKey: PublicKey, timeout: Duration?) async throws -> RelayListMetadata?
     /// The cached NIP-65 relay list for a public key, without a network fetch.
     func cachedRelayList(for publicKey: PublicKey) async -> RelayListMetadata?
-    /// Publishes the current user's NIP-65 relay list.
+    /// Signs and publishes the current user's NIP-65 relay list (kind 10002) to the whole pool for
+    /// discoverability, and caches it.
+    /// - Parameters:
+    ///   - relayList: The relay list to publish.
+    ///   - strategy: How many relay acknowledgments to wait for before returning, or nil for the
+    ///     pool config's ``RelayPoolConfig/defaultPublishStrategy``.
+    /// - Returns: The signed event together with the per-relay publish outcome.
     @discardableResult
     func publishRelayList(
         _ relayList: RelayListMetadata, strategy: PublishStrategy?
     ) async throws -> PublishedEvent
-    /// Publishes the current user's NIP-65 relay list from read/write URLs.
-    @discardableResult
-    func publishRelayList(
-        read: [RelayURL], write: [RelayURL], strategy: PublishStrategy?
-    ) async throws -> PublishedEvent
-    /// Subscribes to authors on their own WRITE relays (the outbox model).
+    /// Subscribes to authors on their own WRITE relays (the NIP-65 outbox model).
+    ///
+    /// Each author's relay list is resolved (fetched when not cached), its WRITE relays are
+    /// connected per the client's ``GossipRelayPolicy``, and one subscription is opened on them.
+    /// If any author has no known relay list, the subscription falls back to the whole pool so no
+    /// author is silently dropped.
+    /// - Parameters:
+    ///   - authors: The authors to follow.
+    ///   - kinds: The event kinds to receive.
+    ///   - limit: How many stored events each relay sends before live ones, or nil for no limit.
+    /// - Returns: The subscription.
+    /// - Throws: ``NostrError/noRelaysInPool`` when the fallback finds the pool empty, or the errors
+    ///   of opening the subscription.
     func subscribeOutbox(
         authors: [PublicKey], kinds: [Event.Kind], limit: Int?
     ) async throws -> SubscriptionSequence
-    /// Publishes a signed event to the author's WRITE relays and its mentions' READ relays.
+    /// Publishes a signed event using the NIP-65 gossip model: to the author's own WRITE relays plus
+    /// the READ (inbox) relays of every public key in its "p" tags, so mentions and replies reach
+    /// their recipients.
+    ///
+    /// Relay lists not cached are fetched first. Falls back to the whole pool when nothing resolves.
+    /// - Parameters:
+    ///   - event: The already-signed event to route.
+    ///   - strategy: How many relay acknowledgments to wait for before returning, or nil for the
+    ///     pool config's ``RelayPoolConfig/defaultPublishStrategy``.
+    /// - Returns: The per-relay outcome of the publish.
+    /// - Throws: ``NostrError/noRelaysInPool`` when the fallback finds the pool empty, or the errors
+    ///   of the publish.
     @discardableResult
     func publishGossip(_ event: Event, strategy: PublishStrategy?) async throws -> PublishResult
 
-    /// Fetches and caches a user's NIP-17 DM relay list.
+    /// Fetches a user's NIP-17 DM relay list (kind 10050) from the whole pool, caching it (newer
+    /// wins) — where to deliver their gift-wrapped direct messages.
+    ///
+    /// Only a list the public key signed counts, so a relay cannot redirect their messages.
+    /// - Parameters:
+    ///   - publicKey: The user whose DM relay list to fetch.
+    ///   - timeout: How long to wait for relays to finish, or nil for
+    ///     ``RelayPoolConfig/queryTimeout``.
+    /// - Returns: The DM relay list, or nil if none was found.
     func fetchDirectMessageRelayList(
         for publicKey: PublicKey, timeout: Duration?
     ) async throws -> DirectMessageRelayList?
     /// The cached NIP-17 DM relay list for a public key, without a network fetch.
     func cachedDirectMessageRelayList(for publicKey: PublicKey) async -> DirectMessageRelayList?
-    /// Publishes the current user's NIP-17 DM relay list.
+    /// Signs and publishes the current user's NIP-17 DM relay list (kind 10050) to the whole pool for
+    /// discoverability, and caches it. NIP-17 recommends keeping the list short (1–3 relays).
+    /// - Parameters:
+    ///   - relayList: The DM relay list to publish.
+    ///   - strategy: How many relay acknowledgments to wait for before returning, or nil for the
+    ///     pool config's ``RelayPoolConfig/defaultPublishStrategy``.
+    /// - Returns: The signed event together with the per-relay publish outcome.
     @discardableResult
     func publishDirectMessageRelayList(
         _ relayList: DirectMessageRelayList, strategy: PublishStrategy?
     ) async throws -> PublishedEvent
-    /// Publishes the current user's NIP-17 DM relay list from relay URLs.
-    @discardableResult
-    func publishDirectMessageRelayList(
-        relays: [RelayURL], strategy: PublishStrategy?
-    ) async throws -> PublishedEvent
-    /// Connects the current user's own DM inbox relays so messages sent there arrive.
+    /// Ensures the current user's own NIP-17 DM inbox relays (kind 10050) are in the pool and
+    /// connected, so gift-wrapped messages addressed there arrive; the list is fetched first when
+    /// not cached.
+    ///
+    /// Call this before subscribing with ``NostrMessaging/subscribe(limit:)`` or
+    /// ``NostrMessaging/giftWraps(limit:)`` so the subscription covers the relays you advertised.
+    /// - Returns: The connected inbox relay URLs (empty if you have advertised no DM relay list).
+    /// - Throws: ``NostrError/signerNotSet`` if no signer is configured.
     @discardableResult
     func connectDirectMessageInboxRelays() async throws -> Set<RelayURL>
 }
-
 // MARK: - Messages
 
 /// Sending and receiving NIP-17 private direct messages. Implemented by ``NostrMessagesAPI``.
@@ -352,53 +403,107 @@ public protocol NostrMessaging: Sendable {
 
 /// Joining, posting to, moderating, and reading NIP-29 relay-based groups.
 /// Implemented by ``NostrGroupsAPI``.
+///
+/// The requirements are the primitives — publishing a template to a group's relay, the reads that
+/// target it, and the kind-10009 group list; ``join(_:inviteCode:reason:strategy:)``,
+/// ``leave(_:reason:strategy:)``, ``publishMessage(_:kind:in:tags:previous:strategy:)``,
+/// ``publishModeration(_:in:previous:reason:strategy:)``, and the short forms of the primitives are
+/// provided by an extension built on them.
 public protocol NostrGroupManaging: Sendable {
-    /// Requests to join a group.
+    /// Signs `template` with the configured signer and publishes it only to the group's relay,
+    /// adding the relay to the pool and connecting it on demand.
+    ///
+    /// Signing comes first, so without a signer ``NostrError/signerNotSet`` is thrown before the
+    /// group's relay is touched. A remote NIP-46 signer works too.
+    /// - Parameters:
+    ///   - template: The event to sign and publish — usually one of the NIP-29 factories such as
+    ///     ``EventTemplate/groupContent(groupID:kind:content:tags:previous:)``.
+    ///   - group: The group whose relay receives the event.
+    ///   - strategy: How many relay acknowledgments to wait for before returning, or nil for the
+    ///     pool config's ``RelayPoolConfig/defaultPublishStrategy``.
+    /// - Returns: The signed event together with the per-relay publish outcome.
+    /// - Throws: ``NostrError/signerNotSet`` without a signer, plus anything the signer,
+    ///   connection, or publish throws.
     @discardableResult
-    func join(
-        _ group: GroupReference, inviteCode: String?, reason: String?, strategy: PublishStrategy?
-    ) async throws -> PublishedEvent
-    /// Requests to leave a group.
-    @discardableResult
-    func leave(
-        _ group: GroupReference, reason: String?, strategy: PublishStrategy?
-    ) async throws -> PublishedEvent
-    /// Publishes a content event into a group.
-    @discardableResult
-    func publishMessage(
-        _ content: String,
-        kind: Event.Kind,
-        in group: GroupReference,
-        tags: [Tag],
-        previous: [String],
-        strategy: PublishStrategy?
-    ) async throws -> PublishedEvent
-    /// Publishes a moderation action into a group.
-    @discardableResult
-    func publishModeration(
-        _ action: Groups.ModerationAction,
-        in group: GroupReference,
-        previous: [String],
-        reason: String?,
-        strategy: PublishStrategy?
+    func publish(
+        _ template: EventTemplate, in group: GroupReference, strategy: PublishStrategy?
     ) async throws -> PublishedEvent
 
-    /// Fetches a group's kind-39000 metadata.
+    /// Fetches the group's kind-39000 metadata from its relay, newest-wins across stale copies.
+    ///
+    /// When `authorPublicKey ?? group.relayPublicKey` is non-nil, candidate events are verified
+    /// (``Event/verify()``) and events by any other author are dropped before the newest-wins pick,
+    /// and the parser applies the same author check; when nil, the newest event is parsed as-is —
+    /// the relay you are already trusting as transport is the authority on its own groups.
+    /// - Parameters:
+    ///   - group: The group to query; its relay is added to the pool and connected on demand.
+    ///   - authorPublicKey: The relay public key to validate against, or nil for
+    ///     `group.relayPublicKey`.
+    ///   - timeout: How long to wait for the relay to finish, or nil for
+    ///     ``RelayPoolConfig/queryTimeout``.
+    /// - Returns: The parsed metadata, or nil when the relay returned no usable event.
+    /// - Throws: ``Groups/ValidationError`` when the winning event does not parse, plus anything the
+    ///   connection or fetch throws.
     func fetchMetadata(
         for group: GroupReference, authorPublicKey: PublicKey?, timeout: Duration?
     ) async throws -> Groups.Metadata?
-    /// Fetches a group's full relay-generated state snapshot.
+    /// Fetches the group's full relay-generated state snapshot — metadata, admins, members, roles,
+    /// and pins — from its relay in one round trip (``Filter/groupState(groupID:kinds:)``).
+    ///
+    /// The newest event per kind wins, with the same author validation as
+    /// ``fetchMetadata(for:authorPublicKey:timeout:)-(_,PublicKey?,_)``. Fields stay nil when the
+    /// relay published nothing for that kind — for example the member list of a private group.
+    /// - Parameters:
+    ///   - group: The group to query; its relay is added to the pool and connected on demand.
+    ///   - authorPublicKey: The relay public key to validate against, or nil for
+    ///     `group.relayPublicKey`.
+    ///   - timeout: How long to wait for the relay to finish, or nil for
+    ///     ``RelayPoolConfig/queryTimeout``.
+    /// - Returns: The snapshot, with a nil field per kind the relay did not answer for.
+    /// - Throws: ``Groups/ValidationError`` when a winning event does not parse, plus anything the
+    ///   connection or fetch throws.
     func fetchState(
         for group: GroupReference, authorPublicKey: PublicKey?, timeout: Duration?
     ) async throws -> GroupState
-    /// Subscribes to a group's live timeline.
+    /// Subscribes to the live timeline of the group's content — events carrying its "h" tag — from
+    /// its relay only.
+    ///
+    /// Iteration termination sends CLOSE, like every subscription from
+    /// ``NostrSubscribing/subscribe(filters:to:bufferingPolicy:)-(_,Set<RelayURL>?,_)``.
+    /// - Parameters:
+    ///   - group: The group to follow; its relay is added to the pool and connected on demand.
+    ///   - kinds: The content kinds to receive, or nil for all kinds.
+    ///   - since: Only events whose `created_at` is at or after this time, or nil for no bound.
+    ///   - limit: The maximum number of stored events the relay should send, or nil for no limit.
+    /// - Returns: The subscription as an async sequence of relay-aware events.
+    /// - Throws: Anything the connection or subscribe throws.
     func timeline(
         _ group: GroupReference, kinds: [Event.Kind]?, since: Timestamp?, limit: Int?
     ) async throws -> SubscriptionSequence
 
-    /// Fetches the kind-10009 list of groups a user is in.
+    /// Fetches the newest kind-10009 simple group list — the NIP-29 groups a user is in.
+    ///
+    /// For the current user's list (nil) private entries are decrypted, and a list whose private
+    /// content cannot be decrypted throws (republishing it would silently drop the private
+    /// entries); for another public key only public entries are returned.
+    /// - Parameters:
+    ///   - publicKey: The list's author, or nil for the current user.
+    ///   - timeout: How long to wait for relays to finish, or nil for
+    ///     ``RelayPoolConfig/queryTimeout``.
+    /// - Returns: The typed list, or nil if none was found.
     func fetchSimpleGroupList(for publicKey: PublicKey?, timeout: Duration?) async throws -> SimpleGroupList?
-    /// Publishes the current user's kind-10009 group list.
+    /// Signs and publishes the current user's kind-10009 group list, replacing the current one.
+    ///
+    /// Unlike the group flows, which target a group's single relay, this broadcasts to the whole
+    /// pool — a replaceable list lives everywhere. Private entries are NIP-44-encrypted to the
+    /// user's own key through the configured signer.
+    /// - Parameters:
+    ///   - list: The list to publish.
+    ///   - strategy: How many relay acknowledgments to wait for before returning, or nil for the
+    ///     pool config's ``RelayPoolConfig/defaultPublishStrategy``.
+    /// - Returns: The signed event together with the per-relay publish outcome.
+    /// - Throws: ``NostrError/signerNotSet`` without a signer, plus anything the signer or publish
+    ///   throws.
     @discardableResult
     func publishSimpleGroupList(
         _ list: SimpleGroupList, strategy: PublishStrategy?
@@ -408,22 +513,78 @@ public protocol NostrGroupManaging: Sendable {
 // MARK: - Lists
 
 /// Reading and writing NIP-51 lists and sets. Implemented by ``NostrListsAPI``.
+///
+/// The requirements are the primitives — publishing and fetching lists and sets, which encrypt and
+/// decrypt private items through the configured signer; ``fetchSet(naddr:timeout:)`` and the short
+/// forms of the primitives are provided by an extension built on them.
 public protocol NostrListManaging: Sendable {
-    /// Publishes a NIP-51 list, replacing the current list of that kind.
+    /// Signs and publishes a NIP-51 list to the whole pool, replacing the current list of that kind.
+    ///
+    /// Private items are NIP-44-encrypted to the author's own key through the configured signer.
+    /// - Parameters:
+    ///   - list: The list to publish.
+    ///   - strategy: How many relay acknowledgments to wait for before returning, or nil for the
+    ///     pool config's ``RelayPoolConfig/defaultPublishStrategy``.
+    /// - Returns: The signed event together with the per-relay publish outcome.
+    /// - Throws: ``NostrError/signerNotSet`` without a signer, plus anything the signer or publish
+    ///   throws.
     @discardableResult
     func publish(_ list: NostrList, strategy: PublishStrategy?) async throws -> PublishedEvent
-    /// Fetches the newest list of a kind.
+    /// Fetches the newest list of `kind` from the whole pool.
+    ///
+    /// For the current user's list (nil) private items are decrypted; for another public key only
+    /// public items are returned.
+    /// - Parameters:
+    ///   - kind: The list kind.
+    ///   - publicKey: The list's author, or nil for the current user.
+    ///   - timeout: How long to wait for relays to finish, or nil for
+    ///     ``RelayPoolConfig/queryTimeout``.
+    /// - Returns: The list, or nil if none was found.
+    /// - Throws: ``NostrError/signerNotSet`` when fetching the current user's list without a signer,
+    ///   or a decryption error when the current user's private items cannot be decrypted
+    ///   (republishing such a list would silently drop them).
     func fetch(kind: Event.Kind, for publicKey: PublicKey?, timeout: Duration?) async throws -> NostrList?
 
-    /// Publishes a NIP-51 set, replacing any prior set with the same kind and `d` identifier.
+    /// Signs and publishes a NIP-51 set to the whole pool, replacing any prior set with the same
+    /// kind and `d` identifier.
+    ///
+    /// Private items are NIP-44-encrypted to the author's own key through the configured signer.
+    /// - Parameters:
+    ///   - set: The set to publish.
+    ///   - strategy: How many relay acknowledgments to wait for before returning, or nil for the
+    ///     pool config's ``RelayPoolConfig/defaultPublishStrategy``.
+    /// - Returns: The signed event together with the per-relay publish outcome.
+    /// - Throws: ``NostrError/signerNotSet`` without a signer, plus anything the signer or publish
+    ///   throws.
     @discardableResult
     func publishSet(_ set: NostrListSet, strategy: PublishStrategy?) async throws -> PublishedEvent
-    /// Fetches one set by kind and `d` identifier.
+    /// Fetches one set by kind and `d` identifier from the whole pool.
+    ///
+    /// For the current user's set (nil) private items are decrypted; for another public key only
+    /// public items are returned.
+    /// - Parameters:
+    ///   - kind: The set kind.
+    ///   - identifier: The set's `d` identifier.
+    ///   - publicKey: The set's author, or nil for the current user.
+    ///   - timeout: How long to wait for relays to finish, or nil for
+    ///     ``RelayPoolConfig/queryTimeout``.
+    /// - Returns: The set, or nil if none was found.
+    /// - Throws: ``NostrError/signerNotSet`` when fetching the current user's set without a signer,
+    ///   or a decryption error when the current user's private items cannot be decrypted.
     func fetchSet(
         kind: Event.Kind, identifier: String, for publicKey: PublicKey?, timeout: Duration?
     ) async throws -> NostrListSet?
-    /// Fetches every set of a kind for an author, newest per `d` identifier.
+    /// Fetches every set of a kind for an author from the whole pool, newest per `d` identifier.
+    ///
+    /// For the current user's sets (nil) private items are decrypted; for another public key only
+    /// public items are returned.
+    /// - Parameters:
+    ///   - kind: The set kind.
+    ///   - publicKey: The sets' author, or nil for the current user.
+    ///   - timeout: How long to wait for relays to finish, or nil for
+    ///     ``RelayPoolConfig/queryTimeout``.
+    /// - Returns: The sets, in no guaranteed order.
+    /// - Throws: ``NostrError/signerNotSet`` when fetching the current user's sets without a signer,
+    ///   or a decryption error when a set's private items cannot be decrypted.
     func fetchSets(kind: Event.Kind, for publicKey: PublicKey?, timeout: Duration?) async throws -> [NostrListSet]
-    /// Fetches the set addressed by a NIP-19 `naddr`.
-    func fetchSet(naddr: NAddr, timeout: Duration?) async throws -> NostrListSet?
 }

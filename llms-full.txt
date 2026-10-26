@@ -115,9 +115,17 @@ over its own `AsyncStream`. `NostrMessaging` requires `sendGiftWrapped(_:to:expi
 for an `EventTemplate`, `parsePayload(_:)`, `payloads(limit:)`, and `giftWraps(limit:)`; `send`,
 `react`, `sendFile`, `parse`, `parseReaction`, `parseFile`, `subscribe(limit:)`, and the short forms
 (`sendGiftWrapped(_:to:)`, `payloads()`, `giftWraps()`) come from its extension, and a stub returns a
-`DirectMessagePayloadSequence(subscription:parser:)`. The other protocols still spell out every parameter of every
-requirement; the concrete namespaces supply the defaults, and calls through those protocols pass the
-full argument list. `NostrRelayManaging` deliberately omits `pool`: the pool carries publish,
+`DirectMessagePayloadSequence(subscription:parser:)`. `NostrRelayRouting` requires the list
+fetches, caches, and publishes, `subscribeOutbox(authors:kinds:limit:)`, `publishGossip(_:strategy:)`,
+and `connectDirectMessageInboxRelays()`; `publishRelayList(read:write:strategy:)`,
+`publishDirectMessageRelayList(relays:strategy:)`, and the short forms come from its extension.
+`NostrListManaging` requires `publish`, `fetch`, `publishSet`, `fetchSet(kind:identifier:for:timeout:)`,
+and `fetchSets`; `fetchSet(naddr:timeout:)` and the short forms (omit `for:` for the current user)
+come from its extension. `NostrGroupManaging` requires `publish(_:in:strategy:)` for an
+`EventTemplate`, the reads (`fetchMetadata`, `fetchState`, `timeline`), and the kind-10009 list;
+`join`, `leave`, `publishMessage`, and `publishModeration` come from its extension, built on the
+`EventTemplate.group*` factories. Every protocol follows this rule, so a stub implements only the
+primitives. `NostrRelayManaging` deliberately omits `pool`: the pool carries publish,
 subscribe, and count too, so it stays on the concrete `NostrRelaysAPI`.
 
 `NostrClient` itself exposes only its initializers and these namespaces.
