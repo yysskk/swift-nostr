@@ -668,18 +668,23 @@ CustomStringConvertible). `rawValue: Int64` is the number exactly as on the wire
 re-encoding never changes an event or its id; the JSON encoding is a bare integer and decoding a
 non-integer fails. `description` is the decimal seconds. Used by `Event.createdAt`,
 `UnsignedEvent.createdAt`, `Filter.since`/`until`, `Tag.expiration`, `Event.expiration`,
-`isExpired(asOf:)`, the `createdAt:` parameters of `Groups` and `HTTPAuth` (default `.now`),
+`isExpired(asOf:)`, the `createdAt:` parameters of `Groups` and `HTTPAuth` (default `.now`), the
+`now:` of `HTTPAuth.validate` (default `.now`, checked against a `Duration` `tolerance:`),
 `DirectMessage`/`DirectMessageReaction`/`DirectMessageFile` `createdAt` and `expiresAt`, the
 `expiration:` parameters of `client.messages`, `DirectMessageBuilder`, and `GiftWrap.wrap`,
 `LongFormContent.publishedAt`, `client.groups.timeline(_:kinds:since:limit:)`,
 `Bolt11Invoice.timestamp`, and the NIP-47 `WalletConnectTransaction` times and
-`ListTransactionsParams` `from`/`until`.
+`ListTransactionsParams` `from`/`until`. Periods, by contrast, are `Duration`: `Bolt11Invoice.expiry`,
+`MakeInvoiceParams.expiry` (whole seconds on the wire, truncated toward zero), and the NIP-11
+`Limitation.createdAtLowerLimit`/`createdAtUpperLimit` offsets.
 
 ```swift
 let ts = Timestamp(rawValue: 1_700_000_000)  // kept as is, any Int64
 let fromDate = Timestamp(someDate)           // truncated toward zero, clamped to ±2^53 (inf/NaN safe)
 let now = Timestamp.now
 let date = ts.date                           // clamped to ±2^53, never traps
+let later = ts.advanced(by: .seconds(90))    // whole seconds (fraction truncated toward zero), saturating
+let gap = ts.duration(to: later)             // Duration.seconds(90); negative when earlier
 ```
 
 ## EncryptedPrivateKey
@@ -920,7 +925,7 @@ let result = try await builder.createMessageWithSelfCopy(
     to: recipientPubkey,
     subject: "Greetings",
     replyTo: nil,
-    expiration: Timestamp(Date().addingTimeInterval(3600))  // optional NIP-40 expiration on both wraps
+    expiration: Timestamp.now.advanced(by: .seconds(3600))  // optional NIP-40 expiration on both wraps
 )
 
 // Group message (one gift wrap per recipient + sender copy)
@@ -1298,6 +1303,7 @@ print(info.name)            // String?
 print(info.supportedNIPs)   // [Int]?
 print(info.pubkey)          // PublicKey? -- nil when absent or not canonical hex (decoded leniently)
 print(info.limitation?.authRequired)
+print(info.limitation?.createdAtLowerLimit)  // Duration? -- how far in the past created_at may be
 
 // From an existing RelayConnection
 let info = try await connection.fetchInformation()
@@ -1307,6 +1313,8 @@ let httpURL = RelayInformation.informationURL(from: relay)  // URL
 ```
 
 Nested types: `Limitation`, `Fees`, `FeeSchedule`, `Retention`, `KindSpec` (`.single(Int)` / `.range(Int, Int)`).
+`FeeSchedule.period` and `Retention.time` are `Duration?` (integer seconds on the wire); a retention
+`time` of `.zero` means not stored, `nil` means no time limit.
 
 Errors: `FetchError.networkError(String)`, `.invalidResponse`, `.decodingFailed(String)`.
 
@@ -1353,7 +1361,7 @@ Manages connections to multiple Nostr relays (actor).
 ```swift
 let config = RelayPoolConfig(
     maxDeduplicationCacheSize: 10000,
-    deduplicationCacheTTL: 300
+    deduplicationCacheTTL: .seconds(300)
 )
 ```
 
@@ -1401,17 +1409,19 @@ Manages WebSocket connection to a single relay (actor).
 
 ```swift
 let config = RelayConnectionConfig(
-    connectionTimeout: 10,           // seconds (also bounds keepalive pong waits)
-    sendTimeout: 10,                 // seconds per WebSocket frame send
-    publishAckTimeout: 30,           // seconds to wait for the relay's OK
-    pingInterval: 30,                // seconds between keepalive pings
+    connectionTimeout: .seconds(10),     // also bounds keepalive pong waits
+    sendTimeout: .seconds(10),           // per WebSocket frame send
+    publishAckTimeout: .seconds(30),     // wait for the relay's OK
+    pingInterval: .seconds(30),          // between keepalive pings
     autoReconnect: true,
     maxReconnectAttempts: 10,
-    initialReconnectDelay: 1,        // seconds
-    maxReconnectDelay: 60,           // seconds
+    initialReconnectDelay: .seconds(1),  // floored at RelayConnectionConfig.minimumReconnectDelay (100 ms)
+    maxReconnectDelay: .seconds(60),
     reconnectBackoffMultiplier: 2
 )
 ```
+
+Every period is a `Duration`.
 
 ### Methods
 
@@ -1520,8 +1530,8 @@ let signer = try RemoteSigner(bunker: bunker)
 
 // Session behavior.
 let config = RemoteSigner.Config(
-    requestTimeout: 30,          // seconds to wait for a response before failing
-    authChallengeTimeout: 300)   // seconds a request may stay pending after an auth_url challenge
+    requestTimeout: .seconds(30),         // wait for a response before failing
+    authChallengeTimeout: .seconds(300))  // a request may stay pending after an auth_url challenge
 let tuned = try RemoteSigner(bunker: bunker, config: config)
 
 // Ask the signer to grant operations up front (sent as NIP-46 `perms` in the connect request), so

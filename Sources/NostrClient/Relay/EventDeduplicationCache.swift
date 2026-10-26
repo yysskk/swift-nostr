@@ -17,13 +17,13 @@ struct EventDeduplicationCache {
     let maxSize: Int
 
     /// How long an entry survives after it is recorded.
-    let ttl: TimeInterval
+    let ttl: Duration
 
     /// One recorded delivery.
     private struct Entry {
         let subscriptionID: String
         let eventID: EventID
-        let recordedAt: Date
+        let recordedAt: ContinuousClock.Instant
     }
 
     /// The event ids each subscription has seen: the membership test on the hot path, and what
@@ -40,9 +40,9 @@ struct EventDeduplicationCache {
     /// ``compact()``.
     private var oldestIndex = 0
 
-    /// Creates a cache holding at most `maxSize` entries, each surviving `ttl` seconds.
+    /// Creates a cache holding at most `maxSize` entries, each surviving for `ttl`.
     /// A `maxSize` below 1 is clamped to 0, which turns deduplication off.
-    init(maxSize: Int, ttl: TimeInterval) {
+    init(maxSize: Int, ttl: Duration) {
         self.maxSize = max(0, maxSize)
         self.ttl = ttl
     }
@@ -62,7 +62,7 @@ struct EventDeduplicationCache {
     ///
     /// Recording beyond ``maxSize`` evicts as many of the oldest entries as it takes to stay
     /// within the limit, so the bound holds on return.
-    mutating func record(eventID: EventID, subscriptionID: String, now: Date = Date()) -> Bool {
+    mutating func record(eventID: EventID, subscriptionID: String, now: ContinuousClock.Instant = .now) -> Bool {
         guard seenEventIDs[subscriptionID]?.contains(eventID) != true else { return false }
         seenEventIDs[subscriptionID, default: []].insert(eventID)
         entries.append(Entry(subscriptionID: subscriptionID, eventID: eventID, recordedAt: now))
@@ -85,8 +85,8 @@ struct EventDeduplicationCache {
     }
 
     /// Removes every entry recorded more than ``ttl`` before `now`.
-    mutating func removeExpired(now: Date = Date()) {
-        let cutoff = now.addingTimeInterval(-ttl)
+    mutating func removeExpired(now: ContinuousClock.Instant = .now) {
+        let cutoff = now - ttl
         while oldestIndex < entries.count, entries[oldestIndex].recordedAt <= cutoff {
             removeOldest()
         }

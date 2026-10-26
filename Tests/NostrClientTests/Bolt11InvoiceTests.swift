@@ -28,6 +28,7 @@ struct Bolt11InvoiceTests {
         #expect(invoice.description == "Please consider supporting this project")
         #expect(invoice.paymentHash?.hexEncodedString() == paymentHashHex)
         #expect(invoice.descriptionHash == nil)
+        #expect(invoice.expiry == nil)
     }
 
     @Test("decodes the 2500u coffee invoice with amount and expiry")
@@ -39,7 +40,7 @@ struct Bolt11InvoiceTests {
 
         #expect(invoice.amountMillisats == 250_000_000)
         #expect(invoice.description == "1 cup coffee")
-        #expect(invoice.expirySeconds == 60)
+        #expect(invoice.expiry == .seconds(60))
         #expect(invoice.paymentHash?.hexEncodedString() == paymentHashHex)
     }
 

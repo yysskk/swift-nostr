@@ -19,7 +19,8 @@ struct RelayConnectionSocketTests {
             webSocketFactory: MockWebSocketSessionFactory(makeSession: { mock }),
             // No auto-reconnect and a long ping interval keep the test's background
             // tasks inert; the connection is torn down explicitly at the end.
-            config: RelayConnectionConfig(connectionTimeout: 1, pingInterval: 60, autoReconnect: false)
+            config: RelayConnectionConfig(
+                connectionTimeout: .seconds(1), pingInterval: .seconds(60), autoReconnect: false)
         )
         return (connection, mock)
     }

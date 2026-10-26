@@ -12,7 +12,7 @@ struct RelayConnectionConnectTests {
     private func makeUnreachableConnection() -> RelayConnection {
         RelayConnection(
             url: RelayURL("ws://127.0.0.1:9")!,
-            config: RelayConnectionConfig(connectionTimeout: 1)
+            config: RelayConnectionConfig(connectionTimeout: .seconds(1))
         )
     }
 

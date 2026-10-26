@@ -6,7 +6,7 @@ import Testing
 
 @Suite("WalletConnection Round-Trip Tests")
 struct WalletConnectionRoundTripTests {
-    private func makeConnection(timeout: TimeInterval = 2) throws -> (
+    private func makeConnection(timeout: Duration = .seconds(2)) throws -> (
         connection: WalletConnection, transport: FakeWalletConnectTransport, client: KeyPair, wallet: KeyPair
     ) {
         let wallet = try KeyPair()
@@ -37,6 +37,13 @@ struct WalletConnectionRoundTripTests {
         #expect(payment.feesPaid == 10)
     }
 
+    @Test("the default configuration waits 30 seconds and negotiates encryption")
+    func configDefaults() {
+        let config = WalletConnection.Config()
+        #expect(config.requestTimeout == .seconds(30))
+        #expect(config.preferredEncryption == nil)
+    }
+
     @Test("the request event carries p, encryption, and expiration tags")
     func requestTags() async throws {
         let (connection, transport, client, wallet) = try makeConnection()
@@ -57,7 +64,7 @@ struct WalletConnectionRoundTripTests {
 
     @Test("the request expires shortly after the response timeout")
     func requestExpiration() async throws {
-        let (connection, transport, client, wallet) = try makeConnection(timeout: 2)
+        let (connection, transport, client, wallet) = try makeConnection(timeout: .seconds(2))
         let before = Timestamp.now
 
         async let result = connection.payInvoice("lnbc1")
@@ -188,7 +195,7 @@ struct WalletConnectionRoundTripTests {
 
     @Test("a request times out when no response arrives")
     func requestTimeout() async throws {
-        let (connection, _, _, _) = try makeConnection(timeout: 0.2)
+        let (connection, _, _, _) = try makeConnection(timeout: .milliseconds(200))
         await #expect(throws: WalletConnectError.timedOut) {
             _ = try await connection.payInvoice("lnbc1")
         }
@@ -196,7 +203,7 @@ struct WalletConnectionRoundTripTests {
 
     @Test("multi_pay_invoice correlates by d tag and surfaces partial completion")
     func multiPayPartial() async throws {
-        let (connection, transport, client, wallet) = try makeConnection(timeout: 0.4)
+        let (connection, transport, client, wallet) = try makeConnection(timeout: .milliseconds(400))
 
         async let results = connection.multiPayInvoice([
             .init(id: "a", invoice: "lnbc1"),
@@ -220,7 +227,7 @@ struct WalletConnectionRoundTripTests {
 
     @Test("multi_pay_invoice completes promptly when a response cannot be decrypted")
     func multiPayUndecryptableCompletesPromptly() async throws {
-        let (connection, transport, client, wallet) = try makeConnection(timeout: 5)
+        let (connection, transport, client, wallet) = try makeConnection(timeout: .seconds(5))
 
         async let results = connection.multiPayInvoice([
             .init(id: "a", invoice: "lnbc1"),

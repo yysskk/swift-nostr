@@ -18,7 +18,8 @@ struct DependencyInjectionTests {
 
     private var noReconnectConfig: RelayPoolConfig {
         RelayPoolConfig(
-            defaultRelayConfig: RelayConnectionConfig(connectionTimeout: 1, pingInterval: 60, autoReconnect: false)
+            defaultRelayConfig: RelayConnectionConfig(
+                connectionTimeout: .seconds(1), pingInterval: .seconds(60), autoReconnect: false)
         )
     }
 

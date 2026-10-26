@@ -13,7 +13,7 @@ enum ConnectedClientFixture {
 
     /// A relay config that fails fast and never reconnects, keeping tests deterministic.
     static var noReconnectConfig: RelayConnectionConfig {
-        RelayConnectionConfig(connectionTimeout: 1, pingInterval: 60, autoReconnect: false)
+        RelayConnectionConfig(connectionTimeout: .seconds(1), pingInterval: .seconds(60), autoReconnect: false)
     }
 
     /// Returns a client whose pool holds one connected relay at `relayURL`; every

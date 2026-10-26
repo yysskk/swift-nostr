@@ -18,7 +18,7 @@ struct TerminalDropStreamTests {
             url: RelayURL("wss://relay.example.com")!,
             webSocketFactory: MockWebSocketSessionFactory(makeSession: { socket }),
             config: RelayConnectionConfig(
-                connectionTimeout: 0.2, pingInterval: 0.1, autoReconnect: autoReconnect)
+                connectionTimeout: .milliseconds(200), pingInterval: .milliseconds(100), autoReconnect: autoReconnect)
         )
     }
 

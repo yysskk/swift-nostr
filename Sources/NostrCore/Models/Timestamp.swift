@@ -67,6 +67,42 @@ public struct Timestamp: RawRepresentable, Sendable, Hashable {
     }
 }
 
+extension Timestamp {
+    /// Returns the timestamp `duration` later, or earlier for a negative `duration`.
+    ///
+    /// A timestamp holds whole seconds, so the sub-second part of `duration` is dropped — truncated
+    /// toward zero — before it is applied: advancing by 1.9 seconds moves one second forward, and
+    /// by −1.9 seconds one second back. The result saturates at the bounds of ``rawValue`` rather
+    /// than trapping on overflow.
+    /// - Parameter duration: How far to move the timestamp.
+    /// - Returns: The moved timestamp.
+    public func advanced(by duration: Duration) -> Timestamp {
+        // `Duration` reaches far past `Int64` seconds, where `components` traps, so a long one is
+        // applied in steps that fit. Each step is whole seconds of the same sign as `duration`,
+        // leaving the sub-second part for the last step to truncate.
+        let step = Duration.seconds(Int64.max)
+        let saturated = Timestamp(rawValue: duration < .zero ? .min : .max)
+        var value = rawValue
+        var remaining = duration
+        while remaining > step || remaining < .zero - step {
+            let (sum, overflow) = value.addingReportingOverflow(remaining < .zero ? -Int64.max : Int64.max)
+            guard !overflow else { return saturated }
+            value = sum
+            remaining -= remaining < .zero ? .zero - step : step
+        }
+        let (sum, overflow) = value.addingReportingOverflow(remaining.components.seconds)
+        return overflow ? saturated : Timestamp(rawValue: sum)
+    }
+
+    /// Returns the duration from this timestamp to `other`, negative when `other` is earlier.
+    /// - Parameter other: The timestamp to measure to.
+    /// - Returns: The whole seconds from `self` to `other`.
+    public func duration(to other: Timestamp) -> Duration {
+        // `Duration` spans far more than twice `Int64`'s seconds, so this cannot overflow.
+        .seconds(other.rawValue) - .seconds(rawValue)
+    }
+}
+
 extension Timestamp: Comparable {
     /// Orders timestamps chronologically.
     public static func < (lhs: Timestamp, rhs: Timestamp) -> Bool {

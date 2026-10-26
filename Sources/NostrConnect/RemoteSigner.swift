@@ -27,13 +27,18 @@ public actor RemoteSigner {
     /// Session behavior.
     public struct Config: Sendable {
         /// How long to wait for a response before failing a request. Default: 30 seconds.
-        public var requestTimeout: TimeInterval
+        public var requestTimeout: Duration
 
         /// How long a request may stay pending after an `auth_url` challenge, giving the user time
         /// to authorize. Default: 300 seconds.
-        public var authChallengeTimeout: TimeInterval
+        public var authChallengeTimeout: Duration
 
-        public init(requestTimeout: TimeInterval = 30, authChallengeTimeout: TimeInterval = 300) {
+        /// Creates a session configuration.
+        /// - Parameters:
+        ///   - requestTimeout: How long to wait for a response before failing a request.
+        ///   - authChallengeTimeout: How long a request may stay pending after an `auth_url`
+        ///     challenge.
+        public init(requestTimeout: Duration = .seconds(30), authChallengeTimeout: Duration = .seconds(300)) {
             self.requestTimeout = requestTimeout
             self.authChallengeTimeout = authChallengeTimeout
         }
@@ -80,7 +85,7 @@ public actor RemoteSigner {
 
     /// When each challenged request stops being extendable, keyed by request id. Set by the first
     /// `auth_url` for a request so that repeats cannot postpone it indefinitely.
-    private var authChallengeDeadlines: [String: Date] = [:]
+    private var authChallengeDeadlines: [String: ContinuousClock.Instant] = [:]
 
     /// The number of challenged requests still holding a deadline (for tests).
     var authChallengeDeadlineCount: Int { authChallengeDeadlines.count }
@@ -359,15 +364,15 @@ public actor RemoteSigner {
         // hold a caller suspended with no end. The first one fixes a deadline for the request, and
         // later ones may only postpone it up to that — the window stays the one the caller
         // configured however many challenges arrive.
+        let now = ContinuousClock.now
         let deadline = challengeURL.map { _ in
-            authChallengeDeadlines[response.id]
-                ?? Date().addingTimeInterval(config.authChallengeTimeout)
+            authChallengeDeadlines[response.id] ?? now + config.authChallengeTimeout
         }
-        let remainingAfterChallenge = deadline?.timeIntervalSinceNow ?? 0
+        let remainingAfterChallenge = deadline.map { now.duration(to: $0) } ?? .zero
 
         let method = await session.withPendingRequest(response.id) { _ in
             guard challengeURL != nil else { return .resolved(response) }
-            guard remainingAfterChallenge > 0 else {
+            guard remainingAfterChallenge > .zero else {
                 return .failed(RemoteSignerError.timedOut)
             }
             return .pendingFor(remainingAfterChallenge)
@@ -377,7 +382,7 @@ public actor RemoteSigner {
         // a stray or duplicate `auth_url` — one whose id matches nothing in flight, or whose
         // request has already finished and run its cleanup — leave behind an entry with no
         // `sendRequest` left to remove it.
-        if method != nil, let deadline, remainingAfterChallenge > 0 {
+        if method != nil, let deadline, remainingAfterChallenge > .zero {
             authChallengeDeadlines[response.id] = deadline
         } else {
             authChallengeDeadlines.removeValue(forKey: response.id)
@@ -417,7 +422,7 @@ public actor RemoteSigner {
             signerPubkey = try await withCheckedThrowingContinuation { continuation in
                 connectionWaiter = continuation
                 connectionTimeoutTask = Task { [weak self] in
-                    try? await Task.sleep(for: .seconds(timeout))
+                    try? await Task.sleep(for: timeout)
                     guard !Task.isCancelled else { return }
                     await self?.failConnection(with: .timedOut)
                 }

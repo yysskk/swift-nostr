@@ -206,10 +206,12 @@ extension RelayInformation {
         public var paymentRequired: Bool?
         /// Whether writes are restricted (e.g. to paid or allow-listed pubkeys).
         public var restrictedWrites: Bool?
-        /// Oldest `created_at` (Unix seconds) the relay accepts; events older than this are rejected.
-        public var createdAtLowerLimit: Int64?
-        /// Newest `created_at` (Unix seconds) the relay accepts; events further in the future are rejected.
-        public var createdAtUpperLimit: Int64?
+        /// How far in the past an event's `created_at` may be, relative to the relay's current
+        /// time; older events are rejected.
+        public var createdAtLowerLimit: Duration?
+        /// How far in the future an event's `created_at` may be, relative to the relay's current
+        /// time; events further ahead are rejected.
+        public var createdAtUpperLimit: Duration?
         /// Number of events returned when a filter omits an explicit `limit`.
         public var defaultLimit: Int?
 
@@ -242,8 +244,8 @@ extension RelayInformation {
             authRequired: Bool? = nil,
             paymentRequired: Bool? = nil,
             restrictedWrites: Bool? = nil,
-            createdAtLowerLimit: Int64? = nil,
-            createdAtUpperLimit: Int64? = nil,
+            createdAtLowerLimit: Duration? = nil,
+            createdAtUpperLimit: Duration? = nil,
             defaultLimit: Int? = nil
         ) {
             self.maxMessageLength = maxMessageLength
@@ -260,6 +262,50 @@ extension RelayInformation {
             self.createdAtLowerLimit = createdAtLowerLimit
             self.createdAtUpperLimit = createdAtUpperLimit
             self.defaultLimit = defaultLimit
+        }
+
+        /// Decodes the limitations, reading the `created_at` limits as integer numbers of seconds.
+        /// - Throws: `DecodingError` if a field has the wrong type.
+        public init(from decoder: any Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            func seconds(_ key: CodingKeys) throws -> Duration? {
+                try container.decodeIfPresent(Int64.self, forKey: key).map(Duration.seconds)
+            }
+            self.init(
+                maxMessageLength: try container.decodeIfPresent(Int.self, forKey: .maxMessageLength),
+                maxSubscriptions: try container.decodeIfPresent(Int.self, forKey: .maxSubscriptions),
+                maxFilters: try container.decodeIfPresent(Int.self, forKey: .maxFilters),
+                maxLimit: try container.decodeIfPresent(Int.self, forKey: .maxLimit),
+                maxSubidLength: try container.decodeIfPresent(Int.self, forKey: .maxSubidLength),
+                maxEventTags: try container.decodeIfPresent(Int.self, forKey: .maxEventTags),
+                maxContentLength: try container.decodeIfPresent(Int.self, forKey: .maxContentLength),
+                minPowDifficulty: try container.decodeIfPresent(Int.self, forKey: .minPowDifficulty),
+                authRequired: try container.decodeIfPresent(Bool.self, forKey: .authRequired),
+                paymentRequired: try container.decodeIfPresent(Bool.self, forKey: .paymentRequired),
+                restrictedWrites: try container.decodeIfPresent(Bool.self, forKey: .restrictedWrites),
+                createdAtLowerLimit: try seconds(.createdAtLowerLimit),
+                createdAtUpperLimit: try seconds(.createdAtUpperLimit),
+                defaultLimit: try container.decodeIfPresent(Int.self, forKey: .defaultLimit))
+        }
+
+        /// Encodes the limitations, writing the `created_at` limits as whole seconds truncated
+        /// toward zero.
+        public func encode(to encoder: any Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encodeIfPresent(maxMessageLength, forKey: .maxMessageLength)
+            try container.encodeIfPresent(maxSubscriptions, forKey: .maxSubscriptions)
+            try container.encodeIfPresent(maxFilters, forKey: .maxFilters)
+            try container.encodeIfPresent(maxLimit, forKey: .maxLimit)
+            try container.encodeIfPresent(maxSubidLength, forKey: .maxSubidLength)
+            try container.encodeIfPresent(maxEventTags, forKey: .maxEventTags)
+            try container.encodeIfPresent(maxContentLength, forKey: .maxContentLength)
+            try container.encodeIfPresent(minPowDifficulty, forKey: .minPowDifficulty)
+            try container.encodeIfPresent(authRequired, forKey: .authRequired)
+            try container.encodeIfPresent(paymentRequired, forKey: .paymentRequired)
+            try container.encodeIfPresent(restrictedWrites, forKey: .restrictedWrites)
+            try container.encodeIfPresent(createdAtLowerLimit?.wholeSeconds, forKey: .createdAtLowerLimit)
+            try container.encodeIfPresent(createdAtUpperLimit?.wholeSeconds, forKey: .createdAtUpperLimit)
+            try container.encodeIfPresent(defaultLimit, forKey: .defaultLimit)
         }
     }
 
@@ -291,22 +337,55 @@ extension RelayInformation {
         /// Unit of the amount (e.g. "msats").
         public var unit: String?
 
-        /// Period in seconds (for subscriptions).
-        public var period: Int?
+        /// How long one payment lasts (for subscriptions).
+        public var period: Duration?
 
         /// Event kinds this fee applies to (for publication).
         public var kinds: [Int]?
 
+        enum CodingKeys: String, CodingKey {
+            case amount
+            case unit
+            case period
+            case kinds
+        }
+
+        /// Creates a fee entry.
+        /// - Parameters:
+        ///   - amount: The amount of the fee, in `unit`.
+        ///   - unit: The unit of the amount, e.g. "msats".
+        ///   - period: How long one payment lasts, for subscriptions; sent as whole seconds.
+        ///   - kinds: The event kinds the fee applies to, for publication.
         public init(
             amount: Int? = nil,
             unit: String? = nil,
-            period: Int? = nil,
+            period: Duration? = nil,
             kinds: [Int]? = nil
         ) {
             self.amount = amount
             self.unit = unit
             self.period = period
             self.kinds = kinds
+        }
+
+        /// Decodes the fee entry, reading `period` as an integer number of seconds.
+        /// - Throws: `DecodingError` if a field has the wrong type.
+        public init(from decoder: any Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self.init(
+                amount: try container.decodeIfPresent(Int.self, forKey: .amount),
+                unit: try container.decodeIfPresent(String.self, forKey: .unit),
+                period: try container.decodeIfPresent(Int.self, forKey: .period).map(Duration.seconds),
+                kinds: try container.decodeIfPresent([Int].self, forKey: .kinds))
+        }
+
+        /// Encodes the fee entry, writing `period` as whole seconds truncated toward zero.
+        public func encode(to encoder: any Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encodeIfPresent(amount, forKey: .amount)
+            try container.encodeIfPresent(unit, forKey: .unit)
+            try container.encodeIfPresent(period?.wholeSeconds, forKey: .period)
+            try container.encodeIfPresent(kinds, forKey: .kinds)
         }
     }
 
@@ -315,20 +394,51 @@ extension RelayInformation {
         /// Event kinds this retention policy applies to. Omit to apply to all kinds.
         public var kinds: [KindSpec]?
 
-        /// Retention time in seconds. 0 means "never retained".
-        public var time: Int?
+        /// How long matching events are kept: `.zero` means they are not stored at all, and `nil`
+        /// means there is no time limit.
+        public var time: Duration?
 
         /// Maximum number of events retained.
         public var count: Int?
 
+        enum CodingKeys: String, CodingKey {
+            case kinds
+            case time
+            case count
+        }
+
+        /// Creates a retention policy entry.
+        /// - Parameters:
+        ///   - kinds: The event kinds the policy applies to, or `nil` for all kinds.
+        ///   - time: How long matching events are kept — `.zero` for not at all, `nil` for no time
+        ///     limit; sent as whole seconds.
+        ///   - count: The maximum number of events retained.
         public init(
             kinds: [KindSpec]? = nil,
-            time: Int? = nil,
+            time: Duration? = nil,
             count: Int? = nil
         ) {
             self.kinds = kinds
             self.time = time
             self.count = count
+        }
+
+        /// Decodes the retention entry, reading `time` as an integer number of seconds.
+        /// - Throws: `DecodingError` if a field has the wrong type.
+        public init(from decoder: any Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self.init(
+                kinds: try container.decodeIfPresent([KindSpec].self, forKey: .kinds),
+                time: try container.decodeIfPresent(Int.self, forKey: .time).map(Duration.seconds),
+                count: try container.decodeIfPresent(Int.self, forKey: .count))
+        }
+
+        /// Encodes the retention entry, writing `time` as whole seconds truncated toward zero.
+        public func encode(to encoder: any Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encodeIfPresent(kinds, forKey: .kinds)
+            try container.encodeIfPresent(time?.wholeSeconds, forKey: .time)
+            try container.encodeIfPresent(count, forKey: .count)
         }
     }
 

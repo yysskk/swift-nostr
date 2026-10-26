@@ -8,9 +8,9 @@ import Testing
 @Suite("Event Deduplication Cache Tests")
 struct EventDeduplicationCacheTests {
 
-    private let now = Date(timeIntervalSince1970: 1_700_000_000)
+    private let now = ContinuousClock.now
 
-    private func makeCache(maxSize: Int = 10, ttl: TimeInterval = 300) -> EventDeduplicationCache {
+    private func makeCache(maxSize: Int = 10, ttl: Duration = .seconds(300)) -> EventDeduplicationCache {
         EventDeduplicationCache(maxSize: maxSize, ttl: ttl)
     }
 
@@ -92,7 +92,7 @@ struct EventDeduplicationCacheTests {
         var cache = makeCache(maxSize: 1)
 
         _ = cache.record(eventID: .fixture("older"), subscriptionID: "sub_1", now: now)
-        _ = cache.record(eventID: .fixture("newer"), subscriptionID: "sub_2", now: now.addingTimeInterval(1))
+        _ = cache.record(eventID: .fixture("newer"), subscriptionID: "sub_2", now: now + .seconds(1))
 
         // The bound holds on return from `record`, with no sweep in between.
         #expect(cache.count == 1)
@@ -102,7 +102,7 @@ struct EventDeduplicationCacheTests {
         // The evicted entry is genuinely forgotten, so its event is new again — and taking it
         // back in evicts the entry that displaced it.
         let evictedIsNewAgain = cache.record(
-            eventID: .fixture("older"), subscriptionID: "sub_1", now: now.addingTimeInterval(2))
+            eventID: .fixture("older"), subscriptionID: "sub_1", now: now + .seconds(2))
         #expect(evictedIsNewAgain)
         #expect(cache.count == 1)
         #expect(cache.count(forSubscription: "sub_2") == 0)
@@ -116,7 +116,7 @@ struct EventDeduplicationCacheTests {
             let isNew = cache.record(
                 eventID: .fixture("event_\(index)"),
                 subscriptionID: "sub_\(index % 4)",
-                now: now.addingTimeInterval(TimeInterval(index))
+                now: now + .seconds(index)
             )
             #expect(isNew)
             #expect(cache.count == min(index + 1, 10))
@@ -153,15 +153,15 @@ struct EventDeduplicationCacheTests {
 
     @Test("expiry removes entries past the TTL and keeps newer ones")
     func expiryRemovesEntriesPastTheTTL() {
-        var cache = makeCache(ttl: 300)
+        var cache = makeCache(ttl: .seconds(300))
         _ = cache.record(eventID: .fixture("older"), subscriptionID: "sub_1", now: now)
-        _ = cache.record(eventID: .fixture("newer"), subscriptionID: "sub_1", now: now.addingTimeInterval(200))
+        _ = cache.record(eventID: .fixture("newer"), subscriptionID: "sub_1", now: now + .seconds(200))
 
-        cache.removeExpired(now: now.addingTimeInterval(301))
+        cache.removeExpired(now: now + .seconds(301))
         let expiredIsNewAgain = cache.record(
-            eventID: .fixture("older"), subscriptionID: "sub_1", now: now.addingTimeInterval(301))
+            eventID: .fixture("older"), subscriptionID: "sub_1", now: now + .seconds(301))
         let survivorIsRemembered = cache.record(
-            eventID: .fixture("newer"), subscriptionID: "sub_1", now: now.addingTimeInterval(301))
+            eventID: .fixture("newer"), subscriptionID: "sub_1", now: now + .seconds(301))
 
         #expect(expiredIsNewAgain)
         #expect(!survivorIsRemembered)
@@ -169,10 +169,10 @@ struct EventDeduplicationCacheTests {
 
     @Test("expiry inside the TTL keeps every entry")
     func expiryInsideTheTTLKeepsEveryEntry() {
-        var cache = makeCache(ttl: 300)
+        var cache = makeCache(ttl: .seconds(300))
         _ = cache.record(eventID: .fixture("event"), subscriptionID: "sub_1", now: now)
 
-        cache.removeExpired(now: now.addingTimeInterval(299))
+        cache.removeExpired(now: now + .seconds(299))
 
         #expect(cache.count == 1)
         #expect(cache.count(forSubscription: "sub_1") == 1)
@@ -180,10 +180,10 @@ struct EventDeduplicationCacheTests {
 
     @Test("expiry drops a subscription once its last entry expires")
     func expiryDropsASubscriptionOnceItsLastEntryExpires() {
-        var cache = makeCache(ttl: 300)
+        var cache = makeCache(ttl: .seconds(300))
         _ = cache.record(eventID: .fixture("event"), subscriptionID: "sub_1", now: now)
 
-        cache.removeExpired(now: now.addingTimeInterval(301))
+        cache.removeExpired(now: now + .seconds(301))
 
         #expect(cache.count == 0)
         #expect(cache.count(forSubscription: "sub_1") == 0)
