@@ -412,7 +412,7 @@ public key is resolved once and cached, so ``NostrIdentityAPI/publicKey`` stays 
 hop.
 
 Every feature runs through the signer, so a remote one is a drop-in for a local key: the generic
-``NostrIdentityAPI/sign(_:)`` and ``NostrEventsAPI/publish(_:to:strategy:)``, the convenience `publish*`
+``NostrIdentityAPI/sign(_:)`` and ``NostrEventPublishing/publish(_:to:strategy:)-(EventTemplate,Set<RelayURL>?,_)``, the convenience `publish*`
 helpers, NIP-17 direct messages, NIP-51 private list items, and NIP-42 authentication all work
 unchanged. Set the signer and use the same API you would with an `nsec`:
 
@@ -426,10 +426,13 @@ try await client.events.publishTextNote(content: "Signed by my bunker")
 try await client.messages.send("and gift-wrapped by it too", to: recipientPublicKey)
 ```
 
-To author an event this library has no helper for, describe it with an ``EventTemplate``, sign it
-as ``NostrIdentityAPI/publicKey``, and publish it:
+To author an event this library has no helper for, describe it with an ``EventTemplate`` and
+publish it: the template is signed as ``NostrIdentityAPI/publicKey`` first. Sign it yourself with
+``NostrIdentityAPI/sign(_:)`` when you need the event before it is sent:
 
 ```swift
+try await client.events.publish(EventTemplate(kind: .textNote, content: "Signed by my bunker"))
+
 let signed = try await client.identity.sign(EventTemplate(kind: .textNote, content: "Signed by my bunker"))
 try await client.events.publish(signed)
 ```
@@ -747,7 +750,8 @@ print("failed:", result.failedRelays)
 print("still in flight:", result.pendingRelays)
 ```
 
-To send an already-signed event to chosen relays rather than the whole pool, pass `to:`.
+To send an event to chosen relays rather than the whole pool, pass `to:` — with an
+already-signed event, or with an ``EventTemplate`` that is signed by the configured signer first.
 Targets must already be in the pool; ones that are not are skipped, and an empty set throws
 rather than broadcasting:
 
@@ -755,10 +759,11 @@ rather than broadcasting:
 let relay = try RelayURL(string: "wss://relay.example.com")
 await client.relays.add(relay)
 try await client.events.publish(event, to: [relay], strategy: .allSettled)
+let published = try await client.events.publish(.textNote("Only here"), to: [relay])  // PublishedEvent
 ```
 
-The convenience publish methods (``NostrEventsAPI/publishTextNote(content:tags:strategy:)``,
-``NostrEventsAPI/publishReaction(to:content:strategy:)``, ...) accept the same `strategy:`
+The convenience publish methods (``NostrEventPublishing/publishTextNote(content:tags:strategy:)``,
+``NostrEventPublishing/publishReaction(to:content:strategy:)``, ...) accept the same `strategy:`
 parameter and return a ``PublishedEvent`` carrying both the signed event and its
 ``PublishResult``:
 
@@ -831,7 +836,7 @@ let opened = try await NostrList(event: listEvent, decryptingWith: signer)
 ``RelayPool`` automatically deduplicates events across relays using an in-memory cache.
 Deduplication is scoped to a single subscription: an event stored on several relays is
 delivered once, while an event matching two subscriptions is delivered to both — so
-overlapping feeds and repeated ``NostrEventsAPI/fetch(filters:from:timeout:)`` calls each see it.
+overlapping feeds and repeated ``NostrEventFetching/fetch(filters:from:timeout:)-(_,Set<RelayURL>?,_)`` calls each see it.
 A subscription's cache is discarded when it ends, so a later subscription receives events its
 predecessor already delivered.
 

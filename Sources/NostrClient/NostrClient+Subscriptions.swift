@@ -86,8 +86,16 @@ extension NostrClient {
             return (subscriptionID, expectedRelayURLs)
         } catch {
             openSubscriptions.removeValue(forKey: subscriptionID)
-            // Drop the pool-side handler and message tasks registered before the failure.
-            await pool.unsubscribe(subscriptionID: subscriptionID)
+            switch error as? NostrError {
+            case .noRelaysInPool?, .noMatchingRelays?:
+                // Thrown while resolving the targets, before the pool registered anything or sent
+                // a REQ: there is nothing to tear down, and a CLOSE would reach relays that never
+                // saw the subscription.
+                break
+            default:
+                // Drop the pool-side handler and message tasks registered before the failure.
+                await pool.unsubscribe(subscriptionID: subscriptionID)
+            }
             throw error
         }
     }

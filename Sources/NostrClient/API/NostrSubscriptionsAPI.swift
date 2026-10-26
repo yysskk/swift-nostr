@@ -6,7 +6,8 @@ import NostrCore
 ///
 /// Iteration termination — breaking out of the loop, task cancellation, or discarding the
 /// sequence — sends CLOSE to the relays, so most call sites never need ``unsubscribe(subscriptionID:)``.
-/// For a one-time read that ends at EOSE use ``NostrEventsAPI/fetch(filters:from:timeout:)`` instead.
+/// For a one-time read that ends at EOSE use
+/// ``NostrEventFetching/fetch(filters:from:timeout:)-(_,Set<RelayURL>?,_)`` instead.
 public struct NostrSubscriptionsAPI: NostrSubscribing {
     let client: NostrClient
 

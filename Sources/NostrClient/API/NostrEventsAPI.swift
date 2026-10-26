@@ -4,344 +4,61 @@ import NostrCore
 /// Authoring and publishing events, and fetching them one time.
 /// Reached as ``NostrClient/events``.
 ///
-/// Every `publish*` helper signs through the configured signer — local or remote NIP-46 — and
-/// broadcasts to the whole pool; ``publish(_:to:strategy:)`` sends an already-signed event to the
-/// whole pool or to chosen relays. Use ``NostrRoutingAPI/publishGossip(_:strategy:)`` instead to
-/// route by NIP-65, and ``NostrSubscriptionsAPI`` for live streams rather than one-time fetches.
+/// Implements the ``NostrEventPublishing`` and ``NostrEventFetching`` primitives over the client's
+/// signer and relay pool, and inherits every convenience from their extensions. Each `publish*`
+/// helper signs through the configured signer — local or remote NIP-46 — and broadcasts to the
+/// whole pool; ``NostrEventPublishing/publish(_:to:strategy:)-(EventTemplate,Set<RelayURL>?,_)`` signs and sends a
+/// template of your own, and ``NostrEventPublishing/publish(_:to:strategy:)-(Event,Set<RelayURL>?,_)`` an
+/// already-signed event, to the whole pool or to chosen relays. Use
+/// ``NostrRoutingAPI/publishGossip(_:strategy:)`` instead to route by NIP-65, and
+/// ``NostrSubscriptionsAPI`` for live streams rather than one-time fetches.
 public struct NostrEventsAPI: NostrEventPublishing, NostrEventFetching {
     let client: NostrClient
 
     // MARK: - Publishing
 
-    /// Publishes a text note
-    /// - Parameters:
-    ///   - content: The note's text.
-    ///   - tags: Tags to attach to the note.
-    ///   - strategy: How many relay acknowledgments to wait for before returning
-    ///     (default: the pool config's ``RelayPoolConfig/defaultPublishStrategy``).
-    /// - Returns: The signed event together with the per-relay publish outcome.
+    /// Signs `template` with the configured signer and publishes it to the whole pool (nil) or to the
+    /// given relays.
     @discardableResult
-    public func publishTextNote(
-        content: String,
-        tags: [Tag] = [],
-        strategy: PublishStrategy? = nil
+    public func publish(
+        _ template: EventTemplate,
+        to relayURLs: Set<RelayURL>?,
+        strategy: PublishStrategy?
     ) async throws -> PublishedEvent {
-        try await signAndPublish(.textNote(content, tags: tags), strategy: strategy)
+        let event = try await client.sign(template)
+        let result = try await client.pool.publish(event, to: relayURLs, strategy: strategy)
+        return PublishedEvent(event: event, result: result)
     }
 
-    /// Publishes a reply to an event
-    /// - Parameters:
-    ///   - event: The event being replied to; its thread root and author are carried over. A
-    ///     relay hint on a root in NIP-10's positional form is carried over only when it is a
-    ///     valid relay URL.
-    ///   - content: The reply's text.
-    ///   - relayURL: The relay where the replied-to event can be found, recorded in the
-    ///     NIP-10 `e` tag.
-    ///   - strategy: How many relay acknowledgments to wait for before returning
-    ///     (default: the pool config's ``RelayPoolConfig/defaultPublishStrategy``).
-    /// - Returns: The signed event together with the per-relay publish outcome.
-    @discardableResult
-    public func publishReply(
-        to event: Event,
-        content: String,
-        relayURL: RelayURL? = nil,
-        strategy: PublishStrategy? = nil
-    ) async throws -> PublishedEvent {
-        var tags: [Tag] = []
-
-        // Carry over the thread root (NIP-10). The marker lives at a fixed position —
-        // ["e", id, relay, marker] — so it is read there rather than searched for anywhere in
-        // the tag: a relay hint or public key that happens to read "root" is not a marker.
-        let parentEventTags = event.tags(named: "e")
-        let markedRoot = parentEventTags.first {
-            $0.values.count >= 3 && $0.values[2] == Tag.EventMarker.root.rawValue
-        }
-
-        // NIP-10's deprecated positional form carries no markers, and there the first "e" tag
-        // is the root. Without this the parent looked rootless and the reply started a second
-        // thread alongside the one it was answering.
-        let positionalRoot =
-            parentEventTags.allSatisfy { $0.values.count < 3 } ? parentEventTags.first : nil
-
-        if let markedRoot {
-            tags.append(markedRoot)
-            tags.append(.event(event.id, relayURL: relayURL, marker: .reply))
-        } else if let positionalRoot, let rootID = positionalRoot.primaryValue.flatMap(EventID.init) {
-            // Re-emitted with an explicit "root" marker rather than copied through. Appending
-            // the unmarked tag verbatim would leave a mixed set — one marked "reply", one with
-            // no marker — which marked-scheme readers take to mean a mention, losing the very
-            // thread this recovery exists to preserve.
-            // The hint is the parent author's third-party content: kept only when it is a
-            // valid relay URL.
-            let hint = positionalRoot.values.count >= 2 ? RelayURL(positionalRoot.values[1]) : nil
-            tags.append(.event(rootID, relayURL: hint, marker: .root))
-            tags.append(.event(event.id, relayURL: relayURL, marker: .reply))
-        } else {
-            // This is a reply to a root event
-            tags.append(.event(event.id, relayURL: relayURL, marker: .root))
-        }
-
-        // Add p tag for the author we're replying to
-        tags.append(.publicKey(event.publicKey))
-
-        return try await signAndPublish(.textNote(content, tags: tags), strategy: strategy)
-    }
-
-    /// Publishes user metadata
-    /// - Returns: The signed event together with the per-relay publish outcome.
-    @discardableResult
-    public func publishMetadata(
-        _ metadata: UserMetadata,
-        strategy: PublishStrategy? = nil
-    ) async throws -> PublishedEvent {
-        try await signAndPublish(.metadata(metadata), strategy: strategy)
-    }
-
-    /// Publishes a reaction to an event
-    /// - Returns: The signed event together with the per-relay publish outcome.
-    @discardableResult
-    public func publishReaction(
-        to event: Event,
-        content: String = "+",
-        strategy: PublishStrategy? = nil
-    ) async throws -> PublishedEvent {
-        try await signAndPublish(.reaction(to: event, content: content), strategy: strategy)
-    }
-
-    /// Publishes a repost
-    /// - Parameters:
-    ///   - event: The event being reposted.
-    ///   - relayURL: The relay where the reposted event can be found, recorded in the `e` tag.
-    ///   - strategy: How many relay acknowledgments to wait for before returning
-    ///     (default: the pool config's ``RelayPoolConfig/defaultPublishStrategy``).
-    /// - Returns: The signed event together with the per-relay publish outcome.
-    @discardableResult
-    public func publishRepost(
-        of event: Event,
-        relayURL: RelayURL? = nil,
-        strategy: PublishStrategy? = nil
-    ) async throws -> PublishedEvent {
-        try await signAndPublish(.repost(of: event, relayURL: relayURL), strategy: strategy)
-    }
-
-    /// Publishes a deletion request (kind 5, NIP-09) for events the signer authored.
-    /// - Returns: The signed event together with the per-relay publish outcome.
-    @discardableResult
-    public func publishDeletion(
-        eventIDs: [EventID],
-        reason: String = "",
-        strategy: PublishStrategy? = nil
-    ) async throws -> PublishedEvent {
-        try await signAndPublish(.deletion(of: eventIDs, reason: reason), strategy: strategy)
-    }
-
-    /// Publishes a report of a public key (kind 1984, NIP-56).
-    /// - Returns: The signed event together with the per-relay publish outcome.
-    @discardableResult
-    public func publishReport(
-        publicKey target: PublicKey,
-        type: ReportType,
-        reason: String = "",
-        strategy: PublishStrategy? = nil
-    ) async throws -> PublishedEvent {
-        try await signAndPublish(.report(target, type: type, reason: reason), strategy: strategy)
-    }
-
-    /// Publishes a report of an event and its author (kind 1984, NIP-56).
-    /// - Returns: The signed event together with the per-relay publish outcome.
-    @discardableResult
-    public func publishReport(
-        event: Event,
-        type: ReportType,
-        reason: String = "",
-        strategy: PublishStrategy? = nil
-    ) async throws -> PublishedEvent {
-        try await signAndPublish(.report(event, type: type, reason: reason), strategy: strategy)
-    }
-
-    /// Publishes an already-signed event, to the whole pool or to chosen relays.
-    ///
-    /// `relayURLs` is nil (the default) to broadcast to the whole pool, or the relays to target a
-    /// subset — for example, an event signed by a separate key that should reach only a few named
-    /// relays. An empty set always throws, so an accidentally-empty computed list never fans out
-    /// to the whole pool. Targets not in the pool are skipped, not connected on demand: add them
-    /// with ``NostrRelaysAPI/add(_:config:)`` first.
-    /// - Parameters:
-    ///   - event: The already-signed event to publish.
-    ///   - relayURLs: The relays to publish to, or nil for the whole pool.
-    ///   - strategy: How many relay acknowledgments to wait for before returning
-    ///     (default: the pool config's ``RelayPoolConfig/defaultPublishStrategy``).
-    /// - Returns: The per-relay outcome of the publish, keyed by relay URL.
-    /// - Throws: ``NostrError/noRelaysInPool`` when broadcasting to an empty pool,
-    ///   ``NostrError/noMatchingRelays(_:)`` when none of the targeted URLs are in the pool
-    ///   (including an empty set), the last relay error if no targeted relay accepts the event,
-    ///   or ``NostrError/relayError(_:)`` if a `.quorum` strategy cannot be satisfied.
+    /// Publishes an already-signed event to the whole pool (nil) or to the given relays.
     @discardableResult
     public func publish(
         _ event: Event,
-        to relayURLs: Set<RelayURL>? = nil,
-        strategy: PublishStrategy? = nil
+        to relayURLs: Set<RelayURL>?,
+        strategy: PublishStrategy?
     ) async throws -> PublishResult {
         try await client.pool.publish(event, to: relayURLs, strategy: strategy)
     }
 
-    // MARK: - Long-form content (NIP-23)
+    // MARK: - Fetching
 
-    /// Signs and publishes a long-form article; the same identifier replaces the previous version.
-    /// - Parameters:
-    ///   - article: The article to publish; its `identifier` addresses the replaceable event.
-    ///   - draft: Publishes as a kind 30024 draft instead of a kind 30023 article.
-    ///   - strategy: How many relay acknowledgments to wait for before returning
-    ///     (default: the pool config's ``RelayPoolConfig/defaultPublishStrategy``).
-    /// - Returns: The signed event together with the per-relay publish outcome.
-    @discardableResult
-    public func publishLongFormContent(
-        _ article: LongFormContent,
-        draft: Bool = false,
-        strategy: PublishStrategy? = nil
-    ) async throws -> PublishedEvent {
-        try await signAndPublish(.longFormContent(article, draft: draft), strategy: strategy)
-    }
-
-    /// Fetches an article by author and identifier, keeping the newest copy across relays.
-    /// - Parameter timeout: How long to wait for relays to finish; `nil` uses
-    ///   ``RelayPoolConfig/queryTimeout``.
-    /// - Returns: The article, or nil if none was found.
-    public func fetchLongFormContent(
-        author: PublicKey,
-        identifier: String,
-        timeout: Duration? = nil
-    ) async throws -> LongFormContent? {
-        var filter = Filter(authors: [author], kinds: [.longFormContent])
-        filter.addTagQuery("d", values: [identifier])
-        let events = try await client.fetch(filters: [filter], fromURLs: nil, timeout: timeout)
-        // Addressable event: the newest copy the named author signed under this identifier.
-        guard
-            let newest = VerifiedEventSelection.newest(
-                in: events, kind: .longFormContent, author: author, identifier: identifier)
-        else {
-            return nil
-        }
-        return LongFormContent(event: newest)
-    }
-
-    /// Fetches the article addressed by an `naddr` coordinate.
-    ///
-    /// Any relay hints carried by the coordinate are used only when they are already in the pool;
-    /// otherwise the whole pool is queried.
-    /// - Parameter timeout: How long to wait for relays to finish; `nil` uses
-    ///   ``RelayPoolConfig/queryTimeout``.
-    /// - Returns: The article, or nil if none was found.
-    public func fetchLongFormContent(naddr: NAddr, timeout: Duration? = nil) async throws -> LongFormContent? {
-        var filter = Filter(authors: [naddr.author], kinds: [Event.Kind(rawValue: naddr.kind)])
-        filter.addTagQuery("d", values: [naddr.identifier])
-
-        // Use the coordinate's relay hints only where they are already connected in the pool.
-        var hinted: Set<RelayURL> = []
-        for relay in naddr.relays where await client.pool.relay(for: relay) != nil {
-            hinted.insert(relay)
-        }
-
-        let events = try await client.fetch(
-            filters: [filter], fromURLs: hinted.isEmpty ? nil : hinted, timeout: timeout
-        )
-        // Addressable event: the coordinate names the author, kind, and identifier, so all three
-        // are checked — a relay hint the coordinate carries is not a reason to trust what it sends.
-        guard
-            let newest = VerifiedEventSelection.newest(
-                in: events,
-                kind: Event.Kind(rawValue: naddr.kind),
-                author: naddr.author,
-                identifier: naddr.identifier)
-        else {
-            return nil
-        }
-        return LongFormContent(event: newest)
-    }
-
-    // MARK: - One-time fetches
-
-    /// Fetches events matching the given filters (one-time)
-    /// Waits for all subscribed relays to send EOSE, or until timeout (whichever comes first).
-    ///
-    /// Pass relay URLs to scope the fetch to a subset of relays (e.g. `naddr` relay hints);
-    /// the default `nil` fetches from all relays in the pool. Targets not in the pool are
-    /// skipped; an empty set always throws.
-    /// - Parameter timeout: How long to wait for relays to finish; `nil` uses
-    ///   ``RelayPoolConfig/queryTimeout``.
-    /// - Throws: ``NostrError/noRelaysInPool`` or ``NostrError/noMatchingRelays(_:)``
-    ///   (via the underlying subscribe) when nothing can be targeted.
+    /// Fetches events matching `filters` from the whole pool (nil) or the given relays.
     public func fetch(
         filters: [Filter],
-        from relayURLs: Set<RelayURL>? = nil,
-        timeout: Duration? = nil
+        from relayURLs: Set<RelayURL>?,
+        timeout: Duration?
     ) async throws -> [Event] {
-        try await client.fetch(
-            filters: filters,
-            fromURLs: relayURLs,
-            timeout: timeout
-        )
+        try await client.fetch(filters: filters, fromURLs: relayURLs, timeout: timeout)
     }
 
-    /// Requests the number of events matching `filters` (NIP-45 COUNT).
-    ///
-    /// Queries the targeted relays and returns the maximum reported count — each relay's
-    /// count is a lower bound on the events it holds, so the maximum is the best single estimate.
-    /// `relayURLs` is nil (the default) to query the whole pool, or the relays to target a
-    /// subset; an empty set always throws. For per-relay results use
-    /// ``RelayPool/countEvents(matching:from:timeout:)`` on ``NostrRelaysAPI/pool``.
-    /// - Parameter timeout: How long to wait for relays to finish; `nil` uses
-    ///   ``RelayPoolConfig/queryTimeout``.
-    /// - Throws: ``NostrError/noRelaysInPool`` when the pool is empty, or
-    ///   ``NostrError/noMatchingRelays(_:)`` when none of the targeted URLs are in the pool.
+    /// Requests the NIP-45 count of events matching `filters` from the whole pool (nil) or the
+    /// given relays, returning the highest count reported.
     public func countEvents(
         matching filters: [Filter],
-        from relayURLs: Set<RelayURL>? = nil,
-        timeout: Duration? = nil
+        from relayURLs: Set<RelayURL>?,
+        timeout: Duration?
     ) async throws -> Int {
-        let results = try await client.pool.countEvents(
-            matching: filters,
-            from: relayURLs,
-            timeout: timeout
-        )
+        let results = try await client.pool.countEvents(matching: filters, from: relayURLs, timeout: timeout)
         return results.values.map(\.value).max() ?? 0
-    }
-
-    /// Fetches a single event by ID.
-    ///
-    /// The returned event is the one that was asked for: a relay that ignores the id filter can
-    /// answer with anything, and its signature is checked before it is handed back.
-    /// - Parameter timeout: How long to wait for relays to finish; `nil` uses
-    ///   ``RelayPoolConfig/queryTimeout``.
-    public func fetchEvent(id: EventID, timeout: Duration? = nil) async throws -> Event? {
-        let events = try await client.fetch(filters: [Filter(ids: [id])], fromURLs: nil, timeout: timeout)
-        return VerifiedEventSelection.event(withID: id, in: events)
-    }
-
-    /// Fetches user metadata.
-    ///
-    /// Kind 0 is replaceable, so the newest profile the named public key signed wins; taking whichever
-    /// copy arrived first made the result depend on which relay answered soonest.
-    /// - Parameter timeout: How long to wait for relays to finish; `nil` uses
-    ///   ``RelayPoolConfig/queryTimeout``.
-    public func fetchMetadata(publicKey: PublicKey, timeout: Duration? = nil) async throws -> UserMetadata? {
-        let events = try await client.fetch(
-            filters: [.metadata(publicKeys: [publicKey])], fromURLs: nil, timeout: timeout
-        )
-
-        guard let event = VerifiedEventSelection.newest(in: events, kind: .setMetadata, author: publicKey)
-        else { return nil }
-
-        return try? JSONDecoder().decode(UserMetadata.self, from: Data(event.content.utf8))
-    }
-
-    // MARK: - Private
-
-    /// Signs `template` with the configured signer and broadcasts it to the whole pool — the shape
-    /// every convenience `publish*` helper above shares.
-    private func signAndPublish(_ template: EventTemplate, strategy: PublishStrategy?) async throws -> PublishedEvent {
-        let event = try await client.sign(template)
-        let result = try await client.pool.publish(event, strategy: strategy)
-        return PublishedEvent(event: event, result: result)
     }
 }

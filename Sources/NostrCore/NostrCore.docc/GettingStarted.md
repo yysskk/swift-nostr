@@ -56,6 +56,7 @@ let signer = EventSigner(keyPair: keyPair)
 
 let note = try signer.sign(.textNote("Hello, Nostr!"))
 let reaction = try signer.sign(.reaction(to: note, content: "🤙"))
+let reply = try signer.sign(.reply(to: note, content: "gm to you too"))  // NIP-10 threading
 
 // Or build any event yourself. Tags that reference an event or a key take the typed value.
 let custom = try signer.sign(
