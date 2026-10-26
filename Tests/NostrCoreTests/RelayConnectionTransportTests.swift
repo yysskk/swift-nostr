@@ -96,7 +96,7 @@ struct RelayConnectionTransportTests {
             if condition() { return }
             try await Task.sleep(for: .milliseconds(5))
         }
-        throw NostrError.timeout
+        throw RelayConnection.Error.timedOut
     }
 
     /// Repeats `deliver` until `condition` holds, bounded like ``pollUntil(_:)``.
@@ -116,7 +116,7 @@ struct RelayConnectionTransportTests {
             try deliver()
             try await Task.sleep(for: .milliseconds(5))
         }
-        throw NostrError.timeout
+        throw RelayConnection.Error.timedOut
     }
 
     /// The first frame the transport put on `mock` whose message type is `type` (`"REQ"`,
@@ -297,7 +297,7 @@ struct RelayConnectionTransportTests {
     @Test("connect throws notConnected when there are no relays")
     func connectWithoutRelaysThrows() async {
         let transport = RelayConnectionTransport(relayURLs: [])
-        await #expect(throws: NostrError.notConnected) {
+        await #expect(throws: RelayConnection.Error.notConnected) {
             try await transport.connect()
         }
     }
@@ -305,7 +305,7 @@ struct RelayConnectionTransportTests {
     @Test("subscribe throws notConnected when there are no relays")
     func subscribeWithoutRelaysThrows() async {
         let transport = RelayConnectionTransport(relayURLs: [])
-        await #expect(throws: NostrError.notConnected) {
+        await #expect(throws: RelayConnection.Error.notConnected) {
             try await transport.subscribe(id: Self.subscriptionID, filters: [Filter(kinds: [.nostrConnect])])
         }
     }
@@ -313,7 +313,7 @@ struct RelayConnectionTransportTests {
     @Test("send throws notConnected when there are no relays")
     func sendWithoutRelaysThrows() async {
         let transport = RelayConnectionTransport(relayURLs: [])
-        await #expect(throws: NostrError.notConnected) {
+        await #expect(throws: RelayConnection.Error.notConnected) {
             try await transport.send(Self.event(id: Self.eventID))
         }
     }

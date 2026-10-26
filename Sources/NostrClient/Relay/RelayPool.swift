@@ -181,8 +181,9 @@ public actor RelayPool {
     ///   strategy was satisfied are reported as ``PublishRelayStatus/pending``.
     /// - Throws: ``NostrError/noRelaysInPool`` when the pool is empty,
     ///   ``NostrError/noMatchingRelays(_:)`` when none of the targeted URLs are in the
-    ///   pool, the last relay error if no targeted relay accepts the event, or
-    ///   ``NostrError/relayError(_:)`` if a `.quorum` strategy cannot be satisfied.
+    ///   pool, the last relay's error (a ``RelayRejection`` or a ``RelayConnection/Error``) if no
+    ///   targeted relay accepts the event, or ``NostrError/relayError(_:)`` if a `.quorum` strategy
+    ///   cannot be satisfied.
     @discardableResult
     public func publish(
         _ event: Event,
@@ -284,7 +285,8 @@ public actor RelayPool {
     /// - Returns: the per-relay count for every relay that answered, keyed by relay URL.
     /// - Throws: ``NostrError/noRelaysInPool`` when the pool is empty,
     ///   ``NostrError/noMatchingRelays(_:)`` when none of the targeted URLs are in the
-    ///   pool, or the last relay error when no targeted relay answered.
+    ///   pool, or the last relay's error (a ``RelayRejection`` or a ``RelayConnection/Error``) when
+    ///   no targeted relay answered.
     public func countEvents(
         matching filters: [Filter],
         from relayURLs: Set<RelayURL>? = nil,

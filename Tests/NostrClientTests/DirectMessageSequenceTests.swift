@@ -14,15 +14,15 @@ private struct UnreachableSigner: NostrSigning {
     }
 
     func sign(_ event: UnsignedEvent) async throws -> Event {
-        throw NostrError.timeout
+        throw RelayConnection.Error.timedOut
     }
 
     func nip44Encrypt(_ plaintext: String, to recipientPublicKey: PublicKey) async throws -> String {
-        throw NostrError.timeout
+        throw RelayConnection.Error.timedOut
     }
 
     func nip44Decrypt(_ ciphertext: String, from senderPublicKey: PublicKey) async throws -> String {
-        throw NostrError.timeout
+        throw RelayConnection.Error.timedOut
     }
 }
 
@@ -111,7 +111,7 @@ struct DirectMessageSequenceTests {
             signer: UnreachableSigner(keyPair: bob)
         )
 
-        await #expect(throws: NostrError.timeout) {
+        await #expect(throws: RelayConnection.Error.timedOut) {
             for try await _ in sequence {
                 Issue.record("the unreachable signer must not yield a message")
             }
@@ -135,7 +135,7 @@ struct DirectMessageSequenceTests {
             parser: DirectMessageParser(signer: UnreachableSigner(keyPair: bob))
         )
 
-        await #expect(throws: NostrError.timeout) {
+        await #expect(throws: RelayConnection.Error.timedOut) {
             for try await _ in sequence {
                 Issue.record("the unreachable signer must not yield a payload")
             }

@@ -111,7 +111,7 @@ struct NIP42RelayConnectionTests {
             if await condition() { return }
             try await Task.sleep(for: .milliseconds(5))
         }
-        throw NostrError.timeout
+        throw RelayConnection.Error.timedOut
     }
 
     private func signedAuthEvent(signer: EventSigner, challenge: String = "challengestringhere") throws -> Event {
@@ -200,7 +200,10 @@ struct NIP42RelayConnectionTests {
         try await pollUntil { mock.sentTextFrames.contains { $0.contains("\"AUTH\"") } }
         mock.deliver(.string("[\"OK\",\"\(event.id)\",false,\"restricted: not allowed\"]"))
 
-        await #expect(throws: NostrError.authenticationFailed("restricted: not allowed")) {
+        await #expect(
+            throws: RelayConnection.Error.authenticationRejected(
+                RelayRejection(prefix: .restricted, message: "not allowed"))
+        ) {
             try await authTask.value
         }
         #expect(await connection.isAuthenticated == false)
@@ -215,7 +218,7 @@ struct NIP42RelayConnectionTests {
         let signer = EventSigner(keyPair: try KeyPair())
         let note = try await signer.sign(.textNote("not an auth event"))
 
-        await #expect(throws: NostrError.self) {
+        await #expect(throws: RelayConnection.Error.invalidAuthenticationEventKind(.textNote)) {
             try await connection.authenticate(with: note)
         }
         #expect(!mock.sentTextFrames.contains { $0.contains("\"AUTH\"") })
@@ -229,7 +232,7 @@ struct NIP42RelayConnectionTests {
         let signer = EventSigner(keyPair: try KeyPair())
         let event = try signedAuthEvent(signer: signer)
 
-        await #expect(throws: NostrError.notConnected) {
+        await #expect(throws: RelayConnection.Error.notConnected) {
             try await connection.authenticate(with: event)
         }
     }
@@ -291,7 +294,7 @@ struct NIP42RelayConnectionTests {
 
         let signer = EventSigner(keyPair: try KeyPair())
 
-        await #expect(throws: NostrError.authenticationFailed("The relay has not sent an AUTH challenge")) {
+        await #expect(throws: RelayConnection.Error.missingAuthenticationChallenge) {
             try await connection.authenticate(using: signer)
         }
         #expect(!mock.sentTextFrames.contains { $0.contains("\"AUTH\"") })
@@ -326,7 +329,7 @@ struct NIP42RelayConnectionTests {
         let signer = EventSigner(keyPair: try KeyPair())
         let event = try signedAuthEvent(signer: signer)
 
-        await #expect(throws: NostrError.timeout) {
+        await #expect(throws: RelayConnection.Error.timedOut) {
             try await connection.authenticate(with: event)
         }
 
@@ -360,7 +363,7 @@ struct NIP42RelayConnectionTests {
         #expect(await connection.isAuthenticated == false)
     }
 
-    @Test("publish rejection still surfaces a relay error")
+    @Test("publish rejection still surfaces the relay rejection")
     func publishRejectionSurfacesRelayError() async throws {
         let (connection, mock) = makeConnection()
         try await connection.connect()
@@ -374,7 +377,7 @@ struct NIP42RelayConnectionTests {
         mock.deliver(.string("[\"OK\",\"\(event.id)\",false,\"blocked: you are banned\"]"))
 
         await #expect(
-            throws: NostrError.relayError("Relay rejected event \(event.id): blocked: you are banned")
+            throws: RelayRejection(prefix: .blocked, message: "you are banned")
         ) {
             try await publishTask.value
         }

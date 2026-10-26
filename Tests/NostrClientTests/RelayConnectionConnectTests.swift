@@ -50,12 +50,12 @@ struct RelayConnectionConnectTests {
     func settledAttemptIsNotReused() async {
         let connection = makeUnreachableConnection()
 
-        await #expect(throws: NostrError.self) {
+        await #expect(throws: RelayConnection.Error.connectionFailed) {
             try await connection.connect()
         }
         // The first attempt has settled; a fresh call must start (and fail) anew
         // rather than reuse the finished task or hang.
-        await #expect(throws: NostrError.self) {
+        await #expect(throws: RelayConnection.Error.connectionFailed) {
             try await connection.connect()
         }
     }

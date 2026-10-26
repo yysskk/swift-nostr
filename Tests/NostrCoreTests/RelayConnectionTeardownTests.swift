@@ -25,7 +25,7 @@ struct RelayConnectionTeardownTests {
             if await condition() { return }
             try await Task.sleep(for: .milliseconds(5))
         }
-        throw NostrError.timeout
+        throw RelayConnection.Error.timedOut
     }
 
     /// Drops the transport so the receive loop fails and the connection lands in `.failed`.
@@ -52,7 +52,7 @@ struct RelayConnectionTeardownTests {
         try await failConnection(connection, socket: socket)
         await connection.disconnect()
 
-        await #expect(throws: NostrError.notConnected) { try await publish.value }
+        await #expect(throws: RelayConnection.Error.notConnected) { try await publish.value }
     }
 
     @Test("disconnecting from failed clears tracked subscriptions")

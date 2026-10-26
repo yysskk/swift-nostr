@@ -403,9 +403,36 @@ print(await connection.isAuthenticated)
 ```
 
 ``RelayConnection/authenticate(using:)`` takes any `NostrSigning`, local or remote. A pre-signed
-event can be sent with ``RelayConnection/authenticate(with:)``. Detect why a relay denied an
-operation with ``RelayResponsePrefix`` — `auth-required:` means authenticate and retry,
-`restricted:` means the public key is not allowed even when authenticated.
+event can be sent with ``RelayConnection/authenticate(with:)``. A relay that refuses the AUTH event
+throws ``RelayConnection/Error/authenticationRejected(_:)`` carrying its ``RelayRejection``.
+
+### Relay Rejections
+
+A relay that answers a publish with OK `false`, or a COUNT with CLOSED, throws a
+``RelayRejection``. Its ``RelayRejection/prefix`` is the machine-readable reason
+(``RelayResponsePrefix``) and its ``RelayRejection/message`` the human-readable rest, so the
+reaction can depend on why the relay said no — `auth-required:` means authenticate and retry,
+`restricted:` means the public key is not allowed even when authenticated:
+
+```swift
+do {
+    try await connection.publish(event)
+} catch let rejection as RelayRejection {
+    switch rejection.prefix {
+    case .pow?:
+        // Mine the event to the relay's difficulty (NIP-13) and publish again.
+        break
+    case .rateLimited?:
+        // Back off before retrying.
+        break
+    default:
+        print("Rejected:", rejection.message)
+    }
+}
+```
+
+Through ``NostrClient``, each relay's rejection is the error in its
+``PublishRelayStatus/failed(_:)`` status, and it is thrown when no relay accepted the event.
 
 ## Remote Signing (NIP-46)
 
@@ -777,7 +804,7 @@ print("id:", note.id)  // Event properties are forwarded
 print("accepted:", note.result.acceptedRelays)
 ```
 
-Publishing fails fast with ``NostrError/notConnected`` on relays that are not
+Publishing fails fast with ``RelayConnection/Error/notConnected`` on relays that are not
 connected — the publish path never connects inline. Connect relays up front with
 ``NostrRelaysAPI/connect()`` and let auto-reconnect handle drops.
 

@@ -160,6 +160,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `decryptionFailed`; private items that are not valid JSON now throw `malformedPrivateItems` rather
   than a `JSONSerialization` error. The replaced `NostrError` cases are removed, along with the
   unreachable `serializationFailed`.
+- **Relay rejections and connection failures have their own error types** (breaking): a relay's
+  OK `false` to `RelayConnection.publish(_:)` (after the NIP-42 auth retry) and CLOSED to
+  `countEvents(matching:timeout:)` throw `RelayRejection`, whose `prefix: RelayResponsePrefix?` and
+  `message` split the status string, so callers can `catch let rejection as RelayRejection` and
+  branch on `rejection.prefix == .pow`; `RelayRejection(status:)` parses a raw status string. It
+  replaces `NostrError.relayError("Relay rejected event <id>: …")` and the CLOSED `relayError`, and
+  is the error in a pool publish's `PublishRelayStatus.failed`. Everything else `RelayConnection`
+  detects throws `RelayConnection.Error`: `notConnected` (was `NostrError.notConnected`), `timedOut`
+  (was `timeout`), `connectionFailed` (was `connectionFailed(String)`; the reason stays in
+  `state`), `missingAuthenticationChallenge`, `invalidAuthenticationEventKind(Event.Kind)`, and
+  `authenticationRejected(RelayRejection)` (each was `authenticationFailed(String)`), and
+  `unsupportedFrame` (was `connectionFailed("Unsupported WebSocket frame")`).
+  `RelayConnection.connect()` and `reconnect()` are `throws(RelayConnection.Error)`,
+  `lastAuthenticationError` is an `(any Error)?` that usually holds a `RelayConnection.Error`, `RelayConnectionTransport` throws
+  `RelayConnection.Error.notConnected` with typed throws, and `NostrIdentityAPI.authenticate(relayURL:)`
+  throws `missingAuthenticationChallenge`. `NostrError.authenticationFailed` and `timeout` are
+  removed; the pool keeps `NostrError` for its own failures.
 - **`Event.id`, `Event.pubkey`, and the event signature are typed** (breaking): `id` is an
   `EventID`, `pubkey` a `PublicKey`, and `sig: String` is now `signature: Signature?` — still the
   `sig` field on the wire. `Event.init` takes `signature:` instead of `sig:`. A `nil` signature is an

@@ -69,8 +69,9 @@ public actor RelayConnection {
     /// stays parked in `receive()` keeping the connection alive through its own capture of `self`.
     var receiveTask: Task<Void, Never>?
 
-    /// In-flight connection attempt, shared by concurrent connect() callers
-    private var connectTask: Task<Void, any Error>?
+    /// In-flight connection attempt, shared by concurrent connect() callers. The attempt's outcome
+    /// is carried as a `Result` so every sharer receives the typed ``Error``.
+    private var connectTask: Task<Result<Void, Error>, Never>?
 
     /// Identifies the in-flight connect attempt, so a finishing attempt only clears
     /// ``connectTask`` if it is still the one stored there.
@@ -85,13 +86,13 @@ public actor RelayConnection {
     /// Pending continuations waiting for OK response after publish,
     /// keyed by event id and then by a per-publish token so concurrent
     /// publishes of the same event don't clobber each other's waiters
-    private var pendingPublishWaiters: [EventID: [UUID: AsyncThrowingStream<Void, any Error>.Continuation]] = [:]
+    private var pendingPublishWaiters: [EventID: [UUID: AsyncThrowingStream<Void, any Swift.Error>.Continuation]] = [:]
 
     /// Continuations waiting for a NIP-45 COUNT response, keyed by the generated
     /// COUNT subscription id. One waiter per subid: the ids are unique per
     /// request, so a reply correlates to exactly one in-flight ``countEvents(matching:timeout:)``.
     /// `internal` (not `private`) because the receive loop in `+Receiving` settles them.
-    var pendingCountWaiters: [String: AsyncThrowingStream<EventCount, any Error>.Continuation] = [:]
+    var pendingCountWaiters: [String: AsyncThrowingStream<EventCount, any Swift.Error>.Continuation] = [:]
 
     /// The most recent challenge received in an AUTH message from the relay (NIP-42).
     ///
@@ -113,12 +114,16 @@ public actor RelayConnection {
     /// The error from the most recent automatic NIP-42 authentication attempt driven
     /// by the ``AuthenticationResponder``, or nil when none has failed.
     ///
+    /// Usually a ``RelayConnection/Error`` — ``RelayConnection/Error/authenticationRejected(_:)``
+    /// when the relay refused the AUTH event — but any failure of the attempt is recorded, so
+    /// it is never silently lost.
+    ///
     /// Cleared when an authentication later succeeds and whenever the session is torn
     /// down or re-established (challenges are per-session). A responder that returns
     /// nil declines the challenge and is not recorded as an error. Manual
     /// ``authenticate(with:)`` callers observe failures as thrown errors instead and
     /// are not recorded here.
-    public private(set) var lastAuthenticationError: NostrError?
+    public private(set) var lastAuthenticationError: (any Swift.Error)?
 
     /// Public keys of in-flight AUTH events keyed by event id, so the receive loop
     /// can mark them authenticated the moment the relay's OK arrives. An entry
@@ -143,7 +148,7 @@ public actor RelayConnection {
 
     /// Continuations suspended in ``waitForAuthentication()``, settled by the
     /// receive loop when an AUTH round-trip concludes.
-    private var authenticationWaiters: [UUID: AsyncThrowingStream<Void, any Error>.Continuation] = [:]
+    private var authenticationWaiters: [UUID: AsyncThrowingStream<Void, any Swift.Error>.Continuation] = [:]
 
     /// Whether at least one public key is authenticated on this connection (NIP-42).
     public var isAuthenticated: Bool {
@@ -217,11 +222,16 @@ public actor RelayConnection {
     /// another task is still connecting awaits that attempt's real outcome instead
     /// of returning early with the socket not yet established. Every sharer sees
     /// the same success or failure.
-    public func connect() async throws {
+    ///
+    /// - Throws: ``RelayConnection/Error/connectionFailed`` when the socket cannot be opened or
+    ///   does not answer the verifying ping within ``RelayConnectionConfig/connectionTimeout``, or
+    ///   ``RelayConnection/Error/notConnected`` when ``disconnect()`` or a newer attempt discards
+    ///   the socket before the attempt completes.
+    public func connect() async throws(Error) {
         if state == .connected { return }
 
         if let existing = connectTask {
-            try await existing.value
+            try await existing.value.get()
             return
         }
 
@@ -239,14 +249,19 @@ public actor RelayConnection {
         // from the caller would be tied to the caller's lifetime instead.
         connectAttempt &+= 1
         let attempt = connectAttempt
-        let task = Task {
+        let task = Task { () -> Result<Void, Error> in
             // Only clear the slot if it still holds this attempt: a `disconnect()` during the
             // attempt may already have replaced or cleared it.
             defer { if connectAttempt == attempt { connectTask = nil } }
-            try await performConnect()
+            do throws(Error) {
+                try await performConnect()
+                return .success(())
+            } catch {
+                return .failure(error)
+            }
         }
         connectTask = task
-        try await task.value
+        try await task.value.get()
     }
 
     /// Installs `socket` as the live transport, returning the generation that identifies it.
@@ -267,7 +282,7 @@ public actor RelayConnection {
     }
 
     /// Establishes the WebSocket connection and verifies it with a ping.
-    private func performConnect() async throws {
+    private func performConnect() async throws(Error) {
         updateState(.connecting)
 
         // NIP-42 challenges and authentications are scoped to a WebSocket
@@ -291,7 +306,7 @@ public actor RelayConnection {
             // session that no longer exists — and, since `connect()` returns early while the state
             // says connected, nothing would ever repair it.
             guard isCurrentSocket(generation) else {
-                throw NostrError.notConnected
+                throw Error.notConnected
             }
 
             updateState(.connected)
@@ -302,11 +317,11 @@ public actor RelayConnection {
             // A superseded attempt reports its own failure without touching the session that
             // replaced it.
             guard isCurrentSocket(generation) else {
-                throw NostrError.notConnected
+                throw .notConnected
             }
             updateState(.failed(error.localizedDescription))
             discardSocket()
-            throw NostrError.connectionFailed(error.localizedDescription)
+            throw .connectionFailed
         }
     }
 
@@ -323,8 +338,9 @@ public actor RelayConnection {
     /// The teardown is the same from every state, including
     /// ``RelayConnectionState/failed(_:)`` — the state a connection sits in after any dropped
     /// connection. Callers waiting on a publish or a count are failed with
-    /// ``NostrError/notConnected`` rather than left to their timeouts, tracked subscriptions are
-    /// dropped so a later ``connect()`` does not replay them, and NIP-42 session state is cleared.
+    /// ``RelayConnection/Error/notConnected`` rather than left to their timeouts, tracked
+    /// subscriptions are dropped so a later ``connect()`` does not replay them, and NIP-42 session
+    /// state is cleared.
     ///
     /// Terminal for ``messages()`` streams: every open stream finishes so
     /// `for await` consumers end. A stream taken after this point belongs to the next session and
@@ -372,12 +388,12 @@ public actor RelayConnection {
         subscriptions.removeAll()
         for waiters in pendingPublishWaiters.values {
             for waiter in waiters.values {
-                waiter.finish(throwing: NostrError.notConnected)
+                waiter.finish(throwing: Error.notConnected)
             }
         }
         pendingPublishWaiters.removeAll()
         for waiter in pendingCountWaiters.values {
-            waiter.finish(throwing: NostrError.notConnected)
+            waiter.finish(throwing: Error.notConnected)
         }
         pendingCountWaiters.removeAll()
         resetAuthenticationState()
@@ -403,21 +419,22 @@ public actor RelayConnection {
         let waiters = authenticationWaiters.values
         authenticationWaiters.removeAll()
         for waiter in waiters {
-            waiter.finish(throwing: NostrError.notConnected)
+            waiter.finish(throwing: Error.notConnected)
         }
     }
 
     /// Applies the outcome of an AUTH round-trip observed by the receive loop:
     /// a success records the public key, wakes ``waitForAuthentication()`` callers,
     /// and re-requests subscriptions the relay closed with `auth-required:`; a
-    /// rejection fails the waiters with the relay's status string.
+    /// rejection fails the waiters with ``RelayConnection/Error/authenticationRejected(_:)``.
     func settleAuthentication(publicKey: PublicKey, accepted: Bool, message: String) {
         let waiters = authenticationWaiters.values
         authenticationWaiters.removeAll()
 
         guard accepted else {
+            let error = Error.authenticationRejected(RelayRejection(status: message))
             for waiter in waiters {
-                waiter.finish(throwing: NostrError.authenticationFailed(message))
+                waiter.finish(throwing: error)
             }
             return
         }
@@ -447,7 +464,12 @@ public actor RelayConnection {
         }
     }
 
-    /// Sends a client message to the relay
+    /// Sends a client message to the relay, connecting first when the connection is not established.
+    ///
+    /// - Throws: Everything ``connect()`` throws, the error ``ClientMessage/serialize()`` throws,
+    ///   ``RelayConnection/Error/timedOut`` when the send does not complete within
+    ///   ``RelayConnectionConfig/sendTimeout``, or ``RelayConnection/Error/notConnected`` when there
+    ///   is no socket or the socket fails the send.
     public func send(_ message: ClientMessage) async throws {
         // Reconnect if not connected
         if state != .connected {
@@ -455,7 +477,7 @@ public actor RelayConnection {
         }
 
         guard let task = webSocketTask else {
-            throw NostrError.notConnected
+            throw Error.notConnected
         }
         let generation = socketGeneration
 
@@ -469,7 +491,7 @@ public actor RelayConnection {
 
                 group.addTask {
                     try await Task.sleep(for: self.config.sendTimeout)
-                    throw NostrError.timeout
+                    throw Error.timedOut
                 }
 
                 try await group.next()
@@ -486,10 +508,10 @@ public actor RelayConnection {
                 discardSocket()
                 scheduleReconnectIfNeeded()
             }
-            if let nostrError = error as? NostrError {
-                throw nostrError
+            if let error = error as? Error {
+                throw error
             } else {
-                throw NostrError.notConnected
+                throw Error.notConnected
             }
         }
 
@@ -508,7 +530,7 @@ public actor RelayConnection {
 
     /// Publishes an event to the relay and waits for OK from the relay.
     ///
-    /// Fails fast with ``NostrError/notConnected`` when the connection is not established —
+    /// Fails fast with ``RelayConnection/Error/notConnected`` when the connection is not established —
     /// the publish path never connects inline, so a dead relay fails immediately instead of
     /// spending up to `connectionTimeout` on a reconnect attempt. Reconnection is owned by
     /// the background auto-reconnect with exponential backoff.
@@ -518,18 +540,23 @@ public actor RelayConnection {
     /// installed, an AUTH round-trip is in flight, or one already succeeded —
     /// the publish waits for the authentication to conclude and retries once.
     ///
-    /// Throws if the relay responds with accepted: false or if no OK is received within the
-    /// publish ack timeout. When the NIP-42 retry path is active and the relay rejects the
-    /// AUTH event itself, the publish throws ``NostrError/authenticationFailed(_:)`` — the
-    /// root cause — instead of the auth-required rejection.
+    /// When the NIP-42 retry path is active and the relay rejects the AUTH event itself, the
+    /// publish throws ``RelayConnection/Error/authenticationRejected(_:)`` — the root cause —
+    /// instead of the auth-required rejection.
+    ///
+    /// - Throws: ``RelayRejection`` when the relay answers OK `false` (branch on its
+    ///   ``RelayRejection/prefix``), ``RelayConnection/Error/notConnected`` when the connection is
+    ///   not established or is torn down while waiting, ``RelayConnection/Error/timedOut`` when no
+    ///   OK arrives within ``RelayConnectionConfig/publishAckTimeout``,
+    ///   ``RelayConnection/Error/authenticationRejected(_:)`` as above, or what ``send(_:)`` throws.
     public func publish(_ event: Event) async throws {
         guard state == .connected else {
-            throw NostrError.notConnected
+            throw Error.notConnected
         }
 
         do {
             try await sendAndAwaitOK(.event(event), eventID: event.id)
-        } catch let rejection as EventRejection {
+        } catch let rejection as RelayRejection {
             try await retryPublishAfterAuthentication(event, rejection: rejection)
         }
     }
@@ -541,32 +568,20 @@ public actor RelayConnection {
     /// resending delivers the event without the caller doing anything.
     ///
     /// Any other rejection — including a second one from the retry — surfaces
-    /// as ``NostrError/relayError(_:)`` exactly as before.
-    private func retryPublishAfterAuthentication(_ event: Event, rejection: EventRejection) async throws {
-        guard RelayResponsePrefix(message: rejection.message) == .authRequired,
-            canExpectAuthentication
-        else {
-            throw Self.rejectionError(rejection)
+    /// as the ``RelayRejection`` itself.
+    private func retryPublishAfterAuthentication(_ event: Event, rejection: RelayRejection) async throws {
+        guard rejection.prefix == .authRequired, canExpectAuthentication else {
+            throw rejection
         }
 
         do {
             try await waitForAuthentication()
-        } catch NostrError.timeout {
+        } catch Error.timedOut {
             // Authentication never concluded, so the original rejection stands.
-            throw Self.rejectionError(rejection)
+            throw rejection
         }
 
-        do {
-            try await sendAndAwaitOK(.event(event), eventID: event.id)
-        } catch let rejection as EventRejection {
-            throw Self.rejectionError(rejection)
-        }
-    }
-
-    /// The public error for an OK `false`, shared by every publish path so the
-    /// message format stays identical with and without the NIP-42 retry.
-    private static func rejectionError(_ rejection: EventRejection) -> NostrError {
-        NostrError.relayError("Relay rejected event \(rejection.eventID): \(rejection.message)")
+        try await sendAndAwaitOK(.event(event), eventID: event.id)
     }
 
     /// Suspends until an AUTH round-trip on this connection succeeds, bounded
@@ -577,14 +592,14 @@ public actor RelayConnection {
     /// publish take up to 3× the ack timeout end to end: the rejected attempt,
     /// this wait, and the retried attempt each get the full bound.
     ///
-    /// - Throws: ``NostrError/authenticationFailed(_:)`` when the relay rejects
-    ///   the AUTH event, ``NostrError/timeout`` when no round-trip concludes in
-    ///   time, ``NostrError/notConnected`` when the session is torn down.
+    /// - Throws: ``RelayConnection/Error/authenticationRejected(_:)`` when the relay
+    ///   rejects the AUTH event, ``RelayConnection/Error/timedOut`` when no round-trip
+    ///   concludes in time, ``RelayConnection/Error/notConnected`` when the session is torn down.
     private func waitForAuthentication() async throws {
         if isAuthenticated { return }
 
         let token = UUID()
-        let (stream, continuation) = AsyncThrowingStream<Void, any Error>.makeStream()
+        let (stream, continuation) = AsyncThrowingStream<Void, any Swift.Error>.makeStream()
         authenticationWaiters[token] = continuation
 
         defer {
@@ -600,7 +615,7 @@ public actor RelayConnection {
 
             group.addTask {
                 try await Task.sleep(for: self.config.publishAckTimeout)
-                throw NostrError.timeout
+                throw Error.timedOut
             }
 
             try await group.next()
@@ -620,17 +635,17 @@ public actor RelayConnection {
     ///
     /// - Parameter event: A signed ``Event/Kind/clientAuthentication`` event
     ///   carrying `relay` and `challenge` tags.
-    /// - Throws: ``NostrError/authenticationFailed(_:)`` when the event is not
-    ///   kind 22242 or the relay rejects it, ``NostrError/notConnected`` when
-    ///   the connection is not established, or ``NostrError/timeout`` when no
-    ///   OK arrives within ``RelayConnectionConfig/publishAckTimeout``.
+    /// - Throws: ``RelayConnection/Error/invalidAuthenticationEventKind(_:)`` when the event is
+    ///   not kind 22242, ``RelayConnection/Error/authenticationRejected(_:)`` when the relay
+    ///   answers OK `false`, ``RelayConnection/Error/notConnected`` when the connection is not
+    ///   established or is torn down while waiting, ``RelayConnection/Error/timedOut`` when no
+    ///   OK arrives within ``RelayConnectionConfig/publishAckTimeout``, or what ``send(_:)`` throws.
     public func authenticate(with event: Event) async throws {
         guard event.kind == .clientAuthentication else {
-            throw NostrError.authenticationFailed(
-                "An authentication event must be kind \(Event.Kind.clientAuthentication), got kind \(event.kind)")
+            throw Error.invalidAuthenticationEventKind(event.kind)
         }
         guard state == .connected else {
-            throw NostrError.notConnected
+            throw Error.notConnected
         }
 
         // Recorded before sending so the receive loop can mark the public key as
@@ -639,8 +654,8 @@ public actor RelayConnection {
 
         do {
             try await sendAndAwaitOK(.auth(event), eventID: event.id)
-        } catch let rejection as EventRejection {
-            throw NostrError.authenticationFailed(rejection.message)
+        } catch let rejection as RelayRejection {
+            throw Error.authenticationRejected(rejection)
         } catch {
             // Once a failure (timeout, send error, cancellation) is reported to
             // the caller, a late OK must not silently flip the connection to
@@ -654,12 +669,12 @@ public actor RelayConnection {
     /// challenge, then waits for the relay's OK (NIP-42).
     ///
     /// - Parameter signer: The signer for the identity to authenticate, local or remote.
-    /// - Throws: ``NostrError/authenticationFailed(_:)`` when the relay has not
-    ///   sent a challenge yet or rejects the authentication, anything the signer
-    ///   throws, plus everything ``authenticate(with:)`` throws.
+    /// - Throws: ``RelayConnection/Error/missingAuthenticationChallenge`` when the relay has not
+    ///   sent a challenge yet, anything the signer throws, plus everything
+    ///   ``authenticate(with:)`` throws.
     public func authenticate(using signer: some NostrSigning) async throws {
         guard let challenge = authenticationChallenge else {
-            throw NostrError.authenticationFailed("The relay has not sent an AUTH challenge")
+            throw Error.missingAuthenticationChallenge
         }
         let event = try await signer.sign(.clientAuthentication(relayURL: url, challenge: challenge))
         try await authenticate(with: event)
@@ -718,7 +733,7 @@ public actor RelayConnection {
                 // suspended, a late failure must not resurrect a stale error — the
                 // field is scoped to the current session.
                 guard authenticationChallenge == challenge else { return }
-                lastAuthenticationError = (error as? NostrError) ?? .authenticationFailed(error.localizedDescription)
+                lastAuthenticationError = error
             }
         }
     }
@@ -727,11 +742,11 @@ public actor RelayConnection {
     /// bounded by ``RelayConnectionConfig/publishAckTimeout``. Shared by
     /// ``publish(_:)`` and ``authenticate(with:)``.
     ///
-    /// - Throws: ``EventRejection`` when the relay answers OK `false`,
-    ///   ``NostrError/timeout`` when no OK arrives in time.
+    /// - Throws: ``RelayRejection`` when the relay answers OK `false`,
+    ///   ``RelayConnection/Error/timedOut`` when no OK arrives in time.
     private func sendAndAwaitOK(_ message: ClientMessage, eventID: EventID) async throws {
         let token = UUID()
-        let (stream, continuation) = AsyncThrowingStream<Void, any Error>.makeStream()
+        let (stream, continuation) = AsyncThrowingStream<Void, any Swift.Error>.makeStream()
         pendingPublishWaiters[eventID, default: [:]][token] = continuation
 
         do {
@@ -754,7 +769,7 @@ public actor RelayConnection {
 
             group.addTask {
                 try await Task.sleep(for: self.config.publishAckTimeout)
-                throw NostrError.timeout
+                throw Error.timedOut
             }
 
             try await group.next()
@@ -767,7 +782,7 @@ public actor RelayConnection {
     private func removePublishWaiter(
         eventID: EventID,
         token: UUID
-    ) -> AsyncThrowingStream<Void, any Error>.Continuation? {
+    ) -> AsyncThrowingStream<Void, any Swift.Error>.Continuation? {
         guard var waiters = pendingPublishWaiters[eventID] else { return nil }
         let continuation = waiters.removeValue(forKey: token)
         if waiters.isEmpty {
@@ -780,7 +795,7 @@ public actor RelayConnection {
 
     /// Removes and returns all publish waiters for an event id —
     /// one OK from the relay satisfies every pending publish of that event.
-    func removeAllPublishWaiters(eventID: EventID) -> [AsyncThrowingStream<Void, any Error>.Continuation] {
+    func removeAllPublishWaiters(eventID: EventID) -> [AsyncThrowingStream<Void, any Swift.Error>.Continuation] {
         guard let waiters = pendingPublishWaiters.removeValue(forKey: eventID) else { return [] }
         return Array(waiters.values)
     }
@@ -789,20 +804,23 @@ public actor RelayConnection {
     /// the relay's response.
     ///
     /// Relays that do not implement NIP-45 usually never reply; the call then fails with
-    /// ``NostrError/timeout`` after `timeout`. A CLOSED for the COUNT subscription fails
-    /// fast with ``NostrError/relayError(_:)``.
+    /// ``RelayConnection/Error/timedOut`` after `timeout`. A CLOSED for the COUNT subscription
+    /// fails fast with a ``RelayRejection``.
     /// - Parameter timeout: How long to wait for the relay to answer; `nil` uses
     ///   ``RelayConnectionConfig/queryTimeout``.
-    /// - Throws: ``NostrError/notConnected`` when not connected or torn down while waiting.
+    /// - Throws: ``RelayRejection`` when the relay answers CLOSED,
+    ///   ``RelayConnection/Error/timedOut`` when no answer arrives within `timeout`,
+    ///   ``RelayConnection/Error/notConnected`` when not connected or torn down while waiting, or
+    ///   what ``send(_:)`` throws.
     /// https://github.com/nostr-protocol/nips/blob/master/45.md
     public func countEvents(matching filters: [Filter], timeout: Duration? = nil) async throws -> EventCount {
         guard state == .connected else {
-            throw NostrError.notConnected
+            throw Error.notConnected
         }
 
         let timeout = timeout ?? config.queryTimeout
         let subscriptionID = "count-" + String(UUID().uuidString.prefix(12))
-        let (stream, continuation) = AsyncThrowingStream<EventCount, any Error>.makeStream()
+        let (stream, continuation) = AsyncThrowingStream<EventCount, any Swift.Error>.makeStream()
         pendingCountWaiters[subscriptionID] = continuation
 
         do {
@@ -821,16 +839,16 @@ public actor RelayConnection {
                 for try await count in stream {
                     return count
                 }
-                throw NostrError.notConnected
+                throw Error.notConnected
             }
 
             group.addTask {
                 try await Task.sleep(for: timeout)
-                throw NostrError.timeout
+                throw Error.timedOut
             }
 
             guard let result = try await group.next() else {
-                throw NostrError.notConnected
+                throw Error.notConnected
             }
             group.cancelAll()
             return result
@@ -970,19 +988,49 @@ extension RelayConnection {
     }
 }
 
-// MARK: - OK Rejection
+// MARK: - Error
+extension RelayConnection {
+    /// Why an operation on a ``RelayConnection`` failed.
+    ///
+    /// A relay that answers a request with OK `false` or CLOSED throws a ``RelayRejection``
+    /// instead, except for a rejected AUTH event, which is ``authenticationRejected(_:)``.
+    public enum Error: Swift.Error, LocalizedError, Sendable, Equatable {
+        /// The connection is not established, or was torn down while the operation waited.
+        case notConnected
+        /// The relay did not answer — a send, an OK, a COUNT, a ping, or an AUTH round-trip —
+        /// within its configured timeout.
+        case timedOut
+        /// A connection attempt failed: the socket could not be opened or did not answer the
+        /// verifying ping in time. ``RelayConnection/state`` describes the underlying failure.
+        case connectionFailed
+        /// The relay has not sent an AUTH challenge to answer (NIP-42).
+        case missingAuthenticationChallenge
+        /// The event passed to ``RelayConnection/authenticate(with:)`` is not a
+        /// ``Event/Kind/clientAuthentication`` event (payload: the event's kind).
+        case invalidAuthenticationEventKind(Event.Kind)
+        /// The relay answered the AUTH event with OK `false` (payload: the relay's rejection).
+        case authenticationRejected(RelayRejection)
+        /// The WebSocket delivered a frame that is neither text nor binary.
+        case unsupportedFrame
 
-/// The relay answered an EVENT or AUTH with OK `false`.
-///
-/// Internal carrier between the receive loop and the operations awaiting the
-/// OK: ``RelayConnection/publish(_:)`` rewraps it as
-/// ``NostrError/relayError(_:)`` and ``RelayConnection/authenticate(with:)``
-/// as ``NostrError/authenticationFailed(_:)``, so each surfaces an error in
-/// its own vocabulary from the same wire response.
-struct EventRejection: Error, Sendable {
-    /// The id of the rejected event.
-    let eventID: EventID
-
-    /// The relay's status string, e.g. `"restricted: not allowed to write"`.
-    let message: String
+        public var errorDescription: String? {
+            switch self {
+            case .notConnected:
+                return "Not connected to relay"
+            case .timedOut:
+                return "The relay did not answer in time"
+            case .connectionFailed:
+                return "Could not connect to the relay"
+            case .missingAuthenticationChallenge:
+                return "The relay has not sent an AUTH challenge"
+            case .invalidAuthenticationEventKind(let kind):
+                return
+                    "An authentication event must be kind \(Event.Kind.clientAuthentication), got kind \(kind)"
+            case .authenticationRejected(let rejection):
+                return "The relay rejected the authentication event: \(rejection.status)"
+            case .unsupportedFrame:
+                return "The WebSocket delivered an unsupported frame"
+            }
+        }
+    }
 }

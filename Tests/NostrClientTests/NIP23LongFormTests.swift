@@ -209,7 +209,7 @@ struct NIP23LongFormTests {
             if condition() { return }
             try await Task.sleep(for: .milliseconds(5))
         }
-        throw NostrError.timeout
+        throw RelayConnection.Error.timedOut
     }
 
     /// Reads the generated subscription id from a sent REQ frame.

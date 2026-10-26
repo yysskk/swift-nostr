@@ -140,7 +140,7 @@ extension WebSocketMessage {
         case .string(let text): self = .string(text)
         case .data(let data): self = .data(data)
         @unknown default:
-            throw NostrError.connectionFailed("Unsupported WebSocket frame")
+            throw RelayConnection.Error.unsupportedFrame
         }
     }
 }

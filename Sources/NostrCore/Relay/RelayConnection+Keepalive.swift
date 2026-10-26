@@ -19,7 +19,7 @@ extension RelayConnection {
         let watchdogBox = PingWatchdogBox()
         defer { watchdogBox.cancel() }
         try await withTaskCancellationHandler {
-            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Swift.Error>) in
                 guard cancellationBox.register(continuation) else {
                     // The task was cancelled before the wait began; onCancel found
                     // nothing to resume, so it is this path's job.
@@ -31,7 +31,7 @@ extension RelayConnection {
                     Task {
                         try? await Task.sleep(for: timeout)
                         guard resumeGuard.claim() else { return }
-                        continuation.resume(throwing: NostrError.timeout)
+                        continuation.resume(throwing: Error.timedOut)
                     })
                 task.sendPing { error in
                     guard resumeGuard.claim() else { return }
@@ -81,7 +81,7 @@ extension RelayConnection {
     }
 
     /// Tears the connection down after a failed keepalive ping and schedules a reconnect.
-    private func handleKeepaliveFailure(_ error: any Error) {
+    private func handleKeepaliveFailure(_ error: any Swift.Error) {
         updateState(.failed(error.localizedDescription))
         // Cancel the socket so the receive loop's pending receive() exits promptly.
         discardSocket()
@@ -128,12 +128,12 @@ private final class PingWatchdogBox: @unchecked Sendable {
 /// handler, the watchdog, and cancellation remains the job of ``ResumeOnceGuard``.
 private final class PingCancellationBox: @unchecked Sendable {
     private let lock = NSLock()
-    private var continuation: CheckedContinuation<Void, any Error>?
+    private var continuation: CheckedContinuation<Void, any Swift.Error>?
     private var isCancelled = false
 
     /// Stores the continuation for a later `cancel`; returns `false` if the task
     /// was already cancelled (the continuation is not stored).
-    func register(_ continuation: CheckedContinuation<Void, any Error>) -> Bool {
+    func register(_ continuation: CheckedContinuation<Void, any Swift.Error>) -> Bool {
         lock.lock()
         defer { lock.unlock() }
         if isCancelled { return false }
@@ -142,7 +142,7 @@ private final class PingCancellationBox: @unchecked Sendable {
     }
 
     /// Marks the box cancelled and returns the registered continuation, if any.
-    func cancel() -> CheckedContinuation<Void, any Error>? {
+    func cancel() -> CheckedContinuation<Void, any Swift.Error>? {
         lock.lock()
         defer { lock.unlock() }
         isCancelled = true

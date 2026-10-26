@@ -721,6 +721,23 @@ RelayResponsePrefix(message: "auth-required: do auth first")  // .authRequired, 
 relayMessage.responsePrefix                                   // for .ok / .closed messages
 ```
 
+## RelayRejection
+
+A relay's refusal (struct: Error, LocalizedError, Sendable, Hashable): thrown when a relay answers a
+publish with OK `false` or a COUNT with CLOSED. `prefix: RelayResponsePrefix?` is the machine-readable
+reason, `message: String` the human-readable rest (prefix stripped). `init(prefix:message:)`, and
+`init(status:)` parses a raw status string with `RelayResponsePrefix(message:)`'s rules (prose with a
+colon keeps the whole string as `message`).
+
+```swift
+do {
+    try await connection.publish(event)
+} catch let rejection as RelayRejection where rejection.prefix == .pow {
+    // mine to the relay's difficulty and publish again
+}
+RelayRejection(status: "pow: difficulty 28 required")  // prefix .pow, message "difficulty 28 required"
+```
+
 ## UserMetadata
 
 User profile metadata (NIP-01) (struct: Codable, Sendable).
@@ -1583,6 +1600,7 @@ Manages WebSocket connection to a single relay (actor).
 - `config: RelayConnectionConfig`
 - `authenticationChallenge: String?` -- latest NIP-42 AUTH challenge (session-scoped)
 - `authenticatedPublicKeys: Set<PublicKey>` / `isAuthenticated: Bool` -- NIP-42 session state
+- `lastAuthenticationError: (any Error)?` -- failure of the latest automatic NIP-42 answer (usually a `RelayConnection.Error`)
 
 ### Configuration
 
@@ -1622,6 +1640,15 @@ Features: automatic reconnection with exponential backoff, subscription resubscr
 reconnect, automatic NIP-42 authentication with auth-required publish retry and subscription
 re-request.
 
+### Errors
+
+A relay's OK `false` to `publish` or CLOSED to `countEvents` throws `RelayRejection`. Everything else
+the connection itself detects is `RelayConnection.Error` (`connect()` and `reconnect()` are
+`throws(RelayConnection.Error)`): `notConnected`, `timedOut` (send, OK, COUNT, ping, or AUTH wait),
+`connectionFailed` (socket or verifying ping failed; `state` carries the reason),
+`missingAuthenticationChallenge`, `invalidAuthenticationEventKind(Event.Kind)`,
+`authenticationRejected(RelayRejection)`, `unsupportedFrame`.
+
 ## RelayConnectionState
 
 Connection state (enum: Sendable, Equatable).
@@ -1638,7 +1665,7 @@ both protocols are ephemeral, so `send(_:)` is fire-and-forget -- the matching r
 is the completion signal, not a relay `OK`.
 
 `RelayConnectionTransport` is the default implementation (actor): one `RelayConnection` per URL, each
-request fanned out to all of them, their events merged into one stream, and `NostrError.notConnected`
+request fanned out to all of them, their events merged into one stream, and `RelayConnection.Error.notConnected`
 thrown when an operation reaches no relay.
 
 ```swift
@@ -1805,7 +1832,7 @@ for await challenge in await signer.authChallenges() {
 
 Error types (enum: Error, LocalizedError, Sendable, Equatable).
 
-Cases: `signerNotSet`, `connectionFailed(String)`, `notConnected`, `relayError(String)`, `noRelaysInPool`, `noMatchingRelays([RelayURL])`, `authenticationFailed(String)`, `cannotPublishAuthenticationEvent`, `timeout`.
+Cases: `signerNotSet`, `connectionFailed(String)`, `notConnected`, `relayError(String)`, `noRelaysInPool`, `noMatchingRelays([RelayURL])`, `cannotPublishAuthenticationEvent`.
 
 ## Supported NIPs
 

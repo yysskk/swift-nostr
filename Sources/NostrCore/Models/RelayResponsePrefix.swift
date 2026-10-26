@@ -7,6 +7,7 @@ import Foundation
 /// `": "`, e.g. `"auth-required: we only accept events from registered users"`.
 /// The prefix tells clients *why* the request was denied so they can react
 /// programmatically — for example by authenticating (NIP-42) and retrying.
+/// A ``RelayRejection`` thrown for a refused publish or COUNT carries the parsed prefix.
 ///
 /// Prefixes are open-ended like event kinds, so this is a `RawRepresentable`
 /// struct rather than a closed enum: the prefixes standardized in NIP-01 and
