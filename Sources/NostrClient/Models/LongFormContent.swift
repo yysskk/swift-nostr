@@ -26,7 +26,7 @@ public struct LongFormContent: Sendable, Hashable {
 
     /// Tags on the event this model does not interpret, preserved so editing an article
     /// does not drop them.
-    public var additionalTags: [[String]]
+    public var additionalTags: [Tag]
 
     /// The article body in Markdown.
     public var content: String
@@ -39,7 +39,7 @@ public struct LongFormContent: Sendable, Hashable {
         imageURL: String? = nil,
         publishedAt: Date? = nil,
         hashtags: [String] = [],
-        additionalTags: [[String]] = [],
+        additionalTags: [Tag] = [],
         content: String = ""
     ) {
         self.identifier = identifier
@@ -64,12 +64,11 @@ public struct LongFormContent: Sendable, Hashable {
         var imageURL: String?
         var publishedAt: Date?
         var hashtags: [String] = []
-        var additionalTags: [[String]] = []
+        var additionalTags: [Tag] = []
 
-        for tag in event.tags {
-            guard let name = tag.first else { continue }
-            let value = tag.count > 1 ? tag[1] : nil
-            switch name {
+        for tag in event.structuredTags {
+            let value = tag.primaryValue
+            switch tag.name {
             case "d":
                 identifier = value ?? ""
             case "title":
@@ -104,22 +103,22 @@ public struct LongFormContent: Sendable, Hashable {
     }
 
     /// The full tag array for the article event (d, title, summary, image, published_at, t…, then additionalTags).
-    public func toTags() -> [[String]] {
-        var tags: [[String]] = [["d", identifier]]
+    public var tags: [Tag] {
+        var tags: [Tag] = [.identifier(identifier)]
         if let title {
-            tags.append(["title", title])
+            tags.append(Tag(name: "title", values: [title]))
         }
         if let summary {
-            tags.append(["summary", summary])
+            tags.append(Tag(name: "summary", values: [summary]))
         }
         if let imageURL {
-            tags.append(["image", imageURL])
+            tags.append(Tag(name: "image", values: [imageURL]))
         }
         if let publishedAt {
-            tags.append(["published_at", Timestamp(publishedAt).description])
+            tags.append(Tag(name: "published_at", values: [Timestamp(publishedAt).description]))
         }
         for hashtag in hashtags {
-            tags.append(["t", hashtag])
+            tags.append(.hashtag(hashtag))
         }
         tags.append(contentsOf: additionalTags)
         return tags

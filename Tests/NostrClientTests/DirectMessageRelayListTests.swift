@@ -8,31 +8,31 @@ import Testing
 @Suite("Direct Message Relay List Tests (NIP-17, kind 10050)")
 struct DirectMessageRelayListTests {
 
-    // MARK: - toTags / parse round-trip
+    // MARK: - tags / parse round-trip
 
-    @Test("toTags produces NIP-17 relay tags")
-    func toTagsFormat() {
+    @Test("tags produces NIP-17 relay tags")
+    func tagsFormat() {
         let list = DirectMessageRelayList(relays: [
             RelayURL("wss://inbox.example.com")!,
             RelayURL("wss://dm.example.com")!,
         ])
 
         #expect(
-            list.toTags() == [
+            list.tags == [
                 ["relay", "wss://inbox.example.com"],
                 ["relay", "wss://dm.example.com"],
             ]
         )
     }
 
-    @Test("Round-trip toTags then init(tags:)")
+    @Test("Round-trip tags then init(tags:)")
     func roundTrip() {
         let original = DirectMessageRelayList(relays: [
             RelayURL("wss://a.example.com")!,
             RelayURL("wss://b.example.com")!,
         ])
 
-        let parsed = DirectMessageRelayList(tags: original.toTags())
+        let parsed = DirectMessageRelayList(tags: original.tags)
         #expect(parsed.relays == original.relays)
     }
 
@@ -105,7 +105,7 @@ struct DirectMessageRelayListTests {
     func parsedURLIsCanonical() {
         let list = DirectMessageRelayList(tags: [["relay", "wss://Inbox.Example.com/"]])
         #expect(list.relays == [RelayURL("wss://inbox.example.com")!])
-        #expect(list.toTags() == [["relay", "wss://inbox.example.com"]])
+        #expect(list.tags == [["relay", "wss://inbox.example.com"]])
     }
 
     @Test("A relay tag whose URL is not a relay URL is skipped")
@@ -133,7 +133,7 @@ struct DirectMessageRelayListTests {
 
         #expect(event.kind == 10050)
         #expect(event.content == "")
-        #expect(event.tags == list.toTags())
+        #expect(event.structuredTags == list.tags)
         #expect(try event.verify())
     }
 

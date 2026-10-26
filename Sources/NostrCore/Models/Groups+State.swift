@@ -62,7 +62,7 @@ extension Groups {
     /// explicit "public" and "open" complements as false. Tags the model does not
     /// interpret are preserved in ``additionalTags`` for lossless re-emission; duplicate
     /// occurrences of recognized scalar tags (e.g. a second "name") are dropped — the first
-    /// wins — so ``toTags`` re-emission is not byte-lossless for such duplicates.
+    /// wins — so ``tags`` re-emission is not byte-lossless for such duplicates.
     /// https://github.com/nostr-protocol/nips/blob/master/29.md
     public struct Metadata: Sendable, Hashable {
         /// The group's id on its relay (the event's "d" tag).
@@ -238,7 +238,7 @@ extension Groups {
 
         /// The complete wire tags of the kind-39000 event: `["d", groupID]` first, then
         /// ``fieldTags``.
-        public var toTags: [Tag] {
+        public var tags: [Tag] {
             [.identifier(groupID)] + fieldTags
         }
 
@@ -322,7 +322,7 @@ extension Groups {
 
         /// The complete wire tags of the kind-39001 event: `["d", groupID]` first, then
         /// one `["p", pubkey, role...]` tag per admin.
-        public var toTags: [Tag] {
+        public var tags: [Tag] {
             [.identifier(groupID)] + admins.map { .pubkey($0.pubkey, roles: $0.roles) }
         }
     }
@@ -367,7 +367,7 @@ extension Groups {
 
         /// The complete wire tags of the kind-39002 event: `["d", groupID]` first, then
         /// one `["p", pubkey]` tag per member.
-        public var toTags: [Tag] {
+        public var tags: [Tag] {
             [.identifier(groupID)] + members.map { .pubkey($0) }
         }
     }
@@ -425,7 +425,7 @@ extension Groups {
 
         /// The complete wire tags of the kind-39003 event: `["d", groupID]` first, then
         /// one `["role", name, description?]` tag per role.
-        public var toTags: [Tag] {
+        public var tags: [Tag] {
             [.identifier(groupID)] + roles.map { .role($0.name, description: $0.description) }
         }
     }
@@ -486,7 +486,7 @@ extension Groups {
 
         /// The complete wire tags of the kind-39005 event: `["d", groupID]` first, then
         /// one `["e", id]` or `["a", address]` tag per item, in pin order.
-        public var toTags: [Tag] {
+        public var tags: [Tag] {
             [.identifier(groupID)]
                 + items.map { item in
                     switch item {

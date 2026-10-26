@@ -24,13 +24,13 @@ public enum ClientMessage: Sendable {
 
         switch self {
         case .event(let event):
-            let eventDict = try event.toDictionary()
+            let eventDict = try event.jsonObject()
             array = ["EVENT", eventDict]
 
         case .request(let subscriptionID, let filters):
             var arr: [Any] = ["REQ", subscriptionID]
             for filter in filters {
-                let filterDict = try filter.toDictionary()
+                let filterDict = try filter.jsonObject()
                 arr.append(filterDict)
             }
             array = arr
@@ -39,13 +39,13 @@ public enum ClientMessage: Sendable {
             array = ["CLOSE", subscriptionID]
 
         case .auth(let event):
-            let eventDict = try event.toDictionary()
+            let eventDict = try event.jsonObject()
             array = ["AUTH", eventDict]
 
         case .count(let subscriptionID, let filters):
             var arr: [Any] = ["COUNT", subscriptionID]
             for filter in filters {
-                let filterDict = try filter.toDictionary()
+                let filterDict = try filter.jsonObject()
                 arr.append(filterDict)
             }
             array = arr
@@ -112,7 +112,7 @@ public enum RelayMessage: Sendable {
             else {
                 throw NostrError.invalidMessageFormat
             }
-            let event = try Event.from(dictionary: eventDict)
+            let event = try Event(jsonObject: eventDict)
             return .event(subscriptionID: subscriptionID, event: event)
 
         case "EOSE":
@@ -179,7 +179,8 @@ public enum RelayMessage: Sendable {
 
 // MARK: - Codable Helpers
 extension Encodable {
-    fileprivate func toDictionary() throws -> [String: Any] {
+    /// Encodes the value and reads it back as a JSON object for `JSONSerialization`.
+    fileprivate func jsonObject() throws -> [String: Any] {
         // No key strategy: every declared key already carries its NIP-01 wire spelling
         // (`created_at`, `#e`, `#p`), so converting would be a no-op for them — while corrupting
         // the dynamic keys `Filter` emits for generic tag queries. Converting to snake case turns
@@ -196,9 +197,10 @@ extension Encodable {
 }
 
 extension Event {
-    fileprivate static func from(dictionary: [String: Any]) throws -> Event {
-        let data = try JSONSerialization.data(withJSONObject: dictionary)
+    /// Decodes an event from a JSON object produced by `JSONSerialization`.
+    fileprivate init(jsonObject: [String: Any]) throws {
+        let data = try JSONSerialization.data(withJSONObject: jsonObject)
         let decoder = JSONDecoder()
-        return try decoder.decode(Event.self, from: data)
+        self = try decoder.decode(Event.self, from: data)
     }
 }

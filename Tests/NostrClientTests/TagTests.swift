@@ -88,8 +88,8 @@ struct TagTests {
         #expect(Event.Tag.relay(spelled).rawArray == ["relay", "wss://r.example"])
     }
 
-    @Test("pubkey tag matches Contact.toTag output")
-    func pubkeyTagMatchesContactToTag() throws {
+    @Test("pubkey tag matches Contact.tag")
+    func pubkeyTagMatchesContactTag() throws {
         let contacts = [
             Contact(pubkey: pk1),
             Contact(pubkey: pk1, relayURL: relay),
@@ -98,7 +98,7 @@ struct TagTests {
         ]
         for contact in contacts {
             let tag = Event.Tag.pubkey(contact.pubkey, relayURL: contact.relayURL, petname: contact.petname)
-            #expect(tag.rawArray == contact.toTag())
+            #expect(tag == contact.tag)
         }
     }
 

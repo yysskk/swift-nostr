@@ -60,7 +60,7 @@ public struct PayKeysendResult: Codable, Sendable, Hashable {
     }
 }
 
-/// The result of `get_balance`.
+/// The result of `get_balance`, returned by ``WalletConnection/fetchBalance()``.
 public struct GetBalanceResult: Codable, Sendable, Hashable {
     /// The balance in millisatoshis.
     public let balance: Int64
@@ -70,7 +70,7 @@ public struct GetBalanceResult: Codable, Sendable, Hashable {
     }
 }
 
-/// The result of `get_info`.
+/// The result of `get_info`, returned by ``WalletConnection/fetchNodeInfo()``.
 public struct GetInfoResult: Codable, Sendable, Hashable {
     /// The node alias.
     public let alias: String?

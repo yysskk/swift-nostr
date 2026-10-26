@@ -225,7 +225,7 @@ let restored = try KeyPair(
 
 // Work with Mnemonic directly
 let mnemonic = try Mnemonic.generate(wordCount: 12)
-let seed = try mnemonic.toSeed(passphrase: "optional passphrase")
+let seed = mnemonic.seed(passphrase: "optional passphrase")
 let privateKey = try KeyDerivation.deriveNostrKey(seed: seed, account: 0)
 ```
 
@@ -323,7 +323,7 @@ if let contacts = event.contacts {
 ```swift
 // Attach OTS attestation to an event
 let ots = OpenTimestamps(base64EncodedOTS: "...")
-let tags = [ots.toTag()]
+let tags = [ots.tag]
 
 // Check for OTS on received events
 if let ots = event.openTimestamps {

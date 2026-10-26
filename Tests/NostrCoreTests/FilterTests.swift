@@ -251,15 +251,4 @@ struct FilterTests {
         #expect(filter.tagQuery("r") == nil)
         #expect(Filter(kinds: [1]).tagQuery("t") == nil)
     }
-
-    // Deprecated on purpose: pins the forwarding alias until it is removed.
-    @available(*, deprecated)
-    @Test("Deprecated getTagQuery alias forwards to tagQuery")
-    func deprecatedGetTagQueryAlias() {
-        var filter = Filter(kinds: [1])
-        filter.addTagQuery("t", values: ["nostr", "bitcoin"])
-
-        #expect(filter.getTagQuery("t") == ["nostr", "bitcoin"])
-        #expect(filter.getTagQuery("#t") == ["nostr", "bitcoin"])
-    }
 }

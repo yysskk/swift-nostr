@@ -31,43 +31,43 @@ struct ContactTests {
         #expect(contact.petname == nil)
     }
 
-    @Test("Contact to tag - all fields")
-    func contactToTagAllFields() {
+    @Test("Contact tag - all fields")
+    func contactTagAllFields() {
         let contact = Contact(
             pubkey: alice,
             relayURL: RelayURL("wss://relay.example.com")!,
             petname: "alice"
         )
 
-        let tag = contact.toTag()
+        let tag = contact.tag
         #expect(tag == ["p", alice.hex, "wss://relay.example.com", "alice"])
     }
 
-    @Test("Contact to tag - pubkey only")
-    func contactToTagPubkeyOnly() {
+    @Test("Contact tag - pubkey only")
+    func contactTagPubkeyOnly() {
         let contact = Contact(pubkey: alice)
-        let tag = contact.toTag()
+        let tag = contact.tag
         #expect(tag == ["p", alice.hex])
     }
 
-    @Test("Contact to tag - with relay only")
-    func contactToTagWithRelayOnly() {
+    @Test("Contact tag - with relay only")
+    func contactTagWithRelayOnly() {
         let contact = Contact(pubkey: alice, relayURL: RelayURL("wss://relay.example.com")!)
-        let tag = contact.toTag()
+        let tag = contact.tag
         #expect(tag == ["p", alice.hex, "wss://relay.example.com"])
     }
 
-    @Test("Contact to tag - with petname only")
-    func contactToTagWithPetnameOnly() {
+    @Test("Contact tag - with petname only")
+    func contactTagWithPetnameOnly() {
         let contact = Contact(pubkey: alice, petname: "alice")
-        let tag = contact.toTag()
+        let tag = contact.tag
         #expect(tag == ["p", alice.hex, "", "alice"])
     }
 
-    @Test("Contact from tag - all fields")
-    func contactFromTagAllFields() {
-        let tag = ["p", alice.hex, "wss://relay.example.com", "alice"]
-        let contact = Contact.fromTag(tag)
+    @Test("Contact init(tag:) - all fields")
+    func contactInitTagAllFields() {
+        let tag: Event.Tag = ["p", alice.hex, "wss://relay.example.com", "alice"]
+        let contact = Contact(tag: tag)
 
         #expect(contact != nil)
         #expect(contact?.pubkey == alice)
@@ -75,10 +75,10 @@ struct ContactTests {
         #expect(contact?.petname == "alice")
     }
 
-    @Test("Contact from tag - pubkey only")
-    func contactFromTagPubkeyOnly() {
-        let tag = ["p", alice.hex]
-        let contact = Contact.fromTag(tag)
+    @Test("Contact init(tag:) - pubkey only")
+    func contactInitTagPubkeyOnly() {
+        let tag: Event.Tag = ["p", alice.hex]
+        let contact = Contact(tag: tag)
 
         #expect(contact != nil)
         #expect(contact?.pubkey == alice)
@@ -86,10 +86,10 @@ struct ContactTests {
         #expect(contact?.petname == nil)
     }
 
-    @Test("Contact from tag - with empty relay")
-    func contactFromTagWithEmptyRelay() {
-        let tag = ["p", alice.hex, "", "alice"]
-        let contact = Contact.fromTag(tag)
+    @Test("Contact init(tag:) - with empty relay")
+    func contactInitTagWithEmptyRelay() {
+        let tag: Event.Tag = ["p", alice.hex, "", "alice"]
+        let contact = Contact(tag: tag)
 
         #expect(contact != nil)
         #expect(contact?.pubkey == alice)
@@ -98,43 +98,57 @@ struct ContactTests {
     }
 
     @Test(
-        "Contact from tag - reads a malformed relay hint as absent",
+        "Contact init(tag:) - reads a malformed relay hint as absent",
         arguments: ["not a relay", "https://relay.example.com", "wss://relay.example.com/#frag"])
-    func contactFromTagWithMalformedRelay(relay: String) {
-        let contact = Contact.fromTag(["p", alice.hex, relay, "alice"])
+    func contactInitTagWithMalformedRelay(relay: String) {
+        let contact = Contact(tag: ["p", alice.hex, relay, "alice"])
 
         #expect(contact?.pubkey == alice)
         #expect(contact?.relayURL == nil)
         #expect(contact?.petname == "alice")
     }
 
-    @Test("Contact from tag - writes the relay hint back in canonical form")
-    func contactFromTagCanonicalizesRelay() {
-        let contact = Contact.fromTag(["p", alice.hex, "WSS://Relay.Example.com/"])
+    @Test("Contact init(tag:) - writes the relay hint back in canonical form")
+    func contactInitTagCanonicalizesRelay() {
+        let contact = Contact(tag: ["p", alice.hex, "WSS://Relay.Example.com/"])
 
         #expect(contact?.relayURL == RelayURL("wss://relay.example.com"))
-        #expect(contact?.toTag() == ["p", alice.hex, "wss://relay.example.com"])
+        #expect(contact?.tag == ["p", alice.hex, "wss://relay.example.com"])
     }
 
-    @Test("Contact from tag - invalid tag type")
-    func contactFromTagInvalidType() {
-        let tag = ["e", alice.hex]
-        let contact = Contact.fromTag(tag)
+    @Test("Contact init(tag:) - invalid tag type")
+    func contactInitTagInvalidType() {
+        let tag: Event.Tag = ["e", alice.hex]
+        let contact = Contact(tag: tag)
         #expect(contact == nil)
     }
 
-    @Test("Contact from tag - too short")
-    func contactFromTagTooShort() {
-        let tag = ["p"]
-        let contact = Contact.fromTag(tag)
+    @Test("Contact init(tag:) - too short")
+    func contactInitTagTooShort() {
+        let tag: Event.Tag = ["p"]
+        let contact = Contact(tag: tag)
         #expect(contact == nil)
     }
 
     @Test(
-        "Contact from tag - rejects a pubkey that is not canonical hex",
+        "Contact init(tag:) - rejects a pubkey that is not canonical hex",
         arguments: ["abc123", String(repeating: "A", count: 64), "", String(repeating: "a", count: 66)])
-    func contactFromTagRejectsMalformedPubkey(pubkey: String) {
-        #expect(Contact.fromTag(["p", pubkey, "wss://relay.example.com", "alice"]) == nil)
+    func contactInitTagRejectsMalformedPubkey(pubkey: String) {
+        #expect(Contact(tag: ["p", pubkey, "wss://relay.example.com", "alice"]) == nil)
+    }
+
+    @Test("Contact round-trips through tag and init(tag:)")
+    func contactTagRoundTrip() throws {
+        let relay = try #require(RelayURL("wss://relay.example.com"))
+        let contacts = [
+            Contact(pubkey: alice),
+            Contact(pubkey: alice, relayURL: relay),
+            Contact(pubkey: alice, petname: "alice"),
+            Contact(pubkey: alice, relayURL: relay, petname: "alice"),
+        ]
+        for contact in contacts {
+            #expect(Contact(tag: contact.tag) == contact)
+        }
     }
 
     @Test("Contact encodes the relay URL under the relayURL key")
