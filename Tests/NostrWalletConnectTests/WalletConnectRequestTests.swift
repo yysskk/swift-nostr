@@ -22,10 +22,34 @@ struct WalletConnectRequestTests {
 
     private enum WireError: Error { case notAnObject }
 
+    /// The envelope `send(_:)` builds: the request's own `method` with the request as `params`.
+    private func envelope<Request: WalletConnectRequest>(_ request: Request) throws -> [String: JSONValue] {
+        try wire(RequestEnvelope(method: Request.method, params: request))
+    }
+
+    @Test("built-in requests are sent under their NIP-47 methods")
+    func builtInRequestMethods() throws {
+        #expect(try envelope(PayInvoiceRequest(invoice: "lnbc1"))["method"] == .string("pay_invoice"))
+        #expect(
+            try envelope(PayKeysendRequest(amount: 1, nodePublicKey: "02abc"))["method"] == .string("pay_keysend"))
+        #expect(try envelope(MakeInvoiceRequest(amount: 1))["method"] == .string("make_invoice"))
+        #expect(try envelope(LookupInvoiceRequest.invoice("lnbc1"))["method"] == .string("lookup_invoice"))
+        #expect(try envelope(ListTransactionsRequest())["method"] == .string("list_transactions"))
+        #expect(try envelope(GetBalanceRequest())["method"] == .string("get_balance"))
+        #expect(try envelope(GetInfoRequest())["method"] == .string("get_info"))
+    }
+
+    @Test("get_balance and get_info send empty params")
+    func emptyRequests() throws {
+        #expect(try wire(GetBalanceRequest()).isEmpty)
+        #expect(try wire(GetInfoRequest()).isEmpty)
+        #expect(try envelope(GetBalanceRequest())["params"] == .object([:]))
+        #expect(try envelope(GetInfoRequest())["params"] == .object([:]))
+    }
+
     @Test("pay_invoice encodes method and params")
     func payInvoice() throws {
-        let root = try wire(
-            WalletConnectRequest(method: .payInvoice, params: PayInvoiceParams(invoice: "lnbc1", amount: 123)))
+        let root = try envelope(PayInvoiceRequest(invoice: "lnbc1", amount: 123))
         #expect(root["method"] == .string("pay_invoice"))
         let params = try params(root)
         #expect(params["invoice"] == .string("lnbc1"))
@@ -34,7 +58,7 @@ struct WalletConnectRequestTests {
 
     @Test("nil optional params are omitted from the wire form")
     func omitsNilParams() throws {
-        let root = try wire(WalletConnectRequest(method: .payInvoice, params: PayInvoiceParams(invoice: "lnbc1")))
+        let root = try wire(RequestEnvelope(method: .payInvoice, params: PayInvoiceRequest(invoice: "lnbc1")))
         let params = try params(root)
         #expect(params["amount"] == nil)
         #expect(params["metadata"] == nil)
@@ -43,8 +67,8 @@ struct WalletConnectRequestTests {
     @Test("make_invoice uses snake_case keys")
     func makeInvoiceSnakeCase() throws {
         let root = try wire(
-            WalletConnectRequest(
-                method: .makeInvoice, params: MakeInvoiceParams(amount: 1000, descriptionHash: "abcd")))
+            RequestEnvelope(
+                method: .makeInvoice, params: MakeInvoiceRequest(amount: 1000, descriptionHash: "abcd")))
         let params = try params(root)
         #expect(params["description_hash"] == .string("abcd"))
         #expect(params["descriptionHash"] == nil)
@@ -52,31 +76,31 @@ struct WalletConnectRequestTests {
 
     @Test("make_invoice encodes expiry as whole seconds, truncating a fraction")
     func makeInvoiceExpiryEncodesSeconds() throws {
-        let hour = try wire(MakeInvoiceParams(amount: 1000, expiry: .seconds(3600)))
+        let hour = try wire(MakeInvoiceRequest(amount: 1000, expiry: .seconds(3600)))
         #expect(hour["expiry"] == .int(3600))
 
-        let fractional = try wire(MakeInvoiceParams(amount: 1000, expiry: .milliseconds(90_900)))
+        let fractional = try wire(MakeInvoiceRequest(amount: 1000, expiry: .milliseconds(90_900)))
         #expect(fractional["expiry"] == .int(90))
 
-        let absent = try wire(MakeInvoiceParams(amount: 1000))
+        let absent = try wire(MakeInvoiceRequest(amount: 1000))
         #expect(absent["expiry"] == nil)
     }
 
     @Test("make_invoice decodes expiry from integer seconds")
     func makeInvoiceExpiryDecodesSeconds() throws {
         let json = Data(#"{"amount":1000,"description":"coffee","expiry":600}"#.utf8)
-        let params = try JSONDecoder().decode(MakeInvoiceParams.self, from: json)
+        let params = try JSONDecoder().decode(MakeInvoiceRequest.self, from: json)
 
-        #expect(params == MakeInvoiceParams(amount: 1000, description: "coffee", expiry: .seconds(600)))
-        #expect(try JSONDecoder().decode(MakeInvoiceParams.self, from: Data(#"{"amount":1}"#.utf8)).expiry == nil)
+        #expect(params == MakeInvoiceRequest(amount: 1000, description: "coffee", expiry: .seconds(600)))
+        #expect(try JSONDecoder().decode(MakeInvoiceRequest.self, from: Data(#"{"amount":1}"#.utf8)).expiry == nil)
     }
 
     @Test("pay_keysend encodes tlv_records with a numeric type")
     func payKeysendTLV() throws {
         let root = try wire(
-            WalletConnectRequest(
+            RequestEnvelope(
                 method: .payKeysend,
-                params: PayKeysendParams(
+                params: PayKeysendRequest(
                     amount: 1000, nodePublicKey: "02abc", tlvRecords: [TLVRecord(type: 696_969, value: "deadbeef")])))
         let params = try params(root)
         guard case .array(let records)? = params["tlv_records"], case .object(let first)? = records.first else {
@@ -91,8 +115,8 @@ struct WalletConnectRequestTests {
     func payKeysendNodePublicKeyWireKey() throws {
         let params = try params(
             wire(
-                WalletConnectRequest(
-                    method: .payKeysend, params: PayKeysendParams(amount: 1000, nodePublicKey: "02abc"))))
+                RequestEnvelope(
+                    method: .payKeysend, params: PayKeysendRequest(amount: 1000, nodePublicKey: "02abc"))))
         #expect(params["pubkey"] == .string("02abc"))
         #expect(params["nodePublicKey"] == nil)
     }
@@ -101,7 +125,7 @@ struct WalletConnectRequestTests {
     func multiPayKeysendNodePublicKeyWireKey() throws {
         let params = try params(
             wire(
-                WalletConnectRequest(
+                RequestEnvelope(
                     method: .multiPayKeysend,
                     params: MultiPayKeysendParams(keysends: [.init(nodePublicKey: "02abc", amount: 1000)]))))
         guard case .array(let keysends)? = params["keysends"], case .object(let first)? = keysends.first else {
@@ -115,7 +139,7 @@ struct WalletConnectRequestTests {
     @Test("multi_pay_invoice encodes each invoice and omits a nil id")
     func multiPayInvoice() throws {
         let root = try wire(
-            WalletConnectRequest(
+            RequestEnvelope(
                 method: .multiPayInvoice,
                 params: MultiPayInvoiceParams(invoices: [
                     .init(id: "a", invoice: "lnbc1", amount: 100),
@@ -136,7 +160,7 @@ struct WalletConnectRequestTests {
     @Test("lookup_invoice by payment hash sends only payment_hash")
     func lookupByPaymentHash() throws {
         let root = try wire(
-            WalletConnectRequest(method: .lookupInvoice, params: LookupInvoiceParams.paymentHash("aa")))
+            RequestEnvelope(method: .lookupInvoice, params: LookupInvoiceRequest.paymentHash("aa")))
         let params = try params(root)
         #expect(params["payment_hash"] == .string("aa"))
         #expect(params["invoice"] == nil)
@@ -145,7 +169,7 @@ struct WalletConnectRequestTests {
     @Test("list_transactions encodes the transaction type")
     func listTransactionsType() throws {
         let root = try wire(
-            WalletConnectRequest(method: .listTransactions, params: ListTransactionsParams(type: .incoming)))
+            RequestEnvelope(method: .listTransactions, params: ListTransactionsRequest(type: .incoming)))
         let params = try params(root)
         #expect(params["type"] == .string("incoming"))
     }
@@ -153,9 +177,9 @@ struct WalletConnectRequestTests {
     @Test("list_transactions encodes from and until as integer Unix seconds")
     func listTransactionsTimeRange() throws {
         let root = try wire(
-            WalletConnectRequest(
+            RequestEnvelope(
                 method: .listTransactions,
-                params: ListTransactionsParams(
+                params: ListTransactionsRequest(
                     from: Timestamp(rawValue: 1_700_000_000), until: Timestamp(rawValue: 1_700_086_400))))
         let params = try params(root)
         #expect(params["from"] == .int(1_700_000_000))
@@ -165,7 +189,7 @@ struct WalletConnectRequestTests {
     @Test("list_transactions omits an unset time range")
     func listTransactionsOmitsTimeRange() throws {
         let params = try params(
-            wire(WalletConnectRequest(method: .listTransactions, params: ListTransactionsParams())))
+            wire(RequestEnvelope(method: .listTransactions, params: ListTransactionsRequest())))
         #expect(params["from"] == nil)
         #expect(params["until"] == nil)
     }
@@ -177,7 +201,7 @@ struct WalletConnectRequestTests {
             "nested": .object(["fooBar": .int(5)]),
         ]
         let root = try wire(
-            WalletConnectRequest(method: .payInvoice, params: PayInvoiceParams(invoice: "lnbc1", metadata: metadata)))
+            RequestEnvelope(method: .payInvoice, params: PayInvoiceRequest(invoice: "lnbc1", metadata: metadata)))
         let params = try params(root)
         guard case .object(let decoded)? = params["metadata"] else {
             Issue.record("expected metadata object")

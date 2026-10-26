@@ -15,7 +15,8 @@ connection closes the gap: it asks a remote wallet to pay the invoice and return
 preimage.
 
 - Actor-based ``WalletConnection`` with full `Sendable` compliance.
-- The complete NIP-47 command set: pay, multi-pay, keysend, invoices, balance, info, and history.
+- The complete NIP-47 command set: pay, multi-pay, keysend, invoices, balance, info, and history —
+  plus ``WalletConnection/send(_:)`` for any other command, defined as a ``WalletConnectRequest``.
 - NIP-44 (preferred) and NIP-04 (legacy) payload encryption, negotiated from the wallet's info event.
 - A wallet notification stream and a one-call end-to-end zap payment.
 - Relay I/O behind `NostrCore`'s `RelayTransport` seam: the default `RelayConnectionTransport`
@@ -44,17 +45,20 @@ print(payment.preimage)
 - ``WalletConnection``
 - ``WalletConnectURI``
 
-### Commands and Parameters
+### Commands and Requests
 
 - ``WalletConnectMethod``
-- ``PayInvoiceParams``
-- ``MultiPayInvoiceParams``
-- ``PayKeysendParams``
-- ``MultiPayKeysendParams``
-- ``MakeInvoiceParams``
-- ``LookupInvoiceParams``
-- ``ListTransactionsParams``
-- ``EmptyParams``
+- ``WalletConnectRequest``
+- ``WalletConnection/send(_:)``
+- ``PayInvoiceRequest``
+- ``PayKeysendRequest``
+- ``MakeInvoiceRequest``
+- ``LookupInvoiceRequest``
+- ``ListTransactionsRequest``
+- ``GetBalanceRequest``
+- ``GetInfoRequest``
+- ``MultiPayInvoiceItem``
+- ``MultiPayKeysendItem``
 - ``TLVRecord``
 - ``TransactionType``
 

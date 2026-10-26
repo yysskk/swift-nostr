@@ -4,9 +4,9 @@ public import NostrCore
 /// A connection to a remote Lightning wallet over NIP-47 Nostr Wallet Connect.
 ///
 /// Build one from a ``WalletConnectURI`` and call the typed commands (see
-/// `WalletConnection+Commands`). Each command encrypts a request, signs a kind-23194 event with the
-/// URI's secret key, sends it to the wallet's relay, and awaits the matching kind-23195 response,
-/// correlated by the response's `e` tag.
+/// `WalletConnection+Commands`), or ``send(_:)`` for any other ``WalletConnectRequest``. Each
+/// command encrypts a request, signs a kind-23194 event with the URI's secret key, sends it to the
+/// wallet's relay, and awaits the matching kind-23195 response, correlated by the response's `e` tag.
 ///
 /// ### Encryption
 /// By default the connection encrypts with NIP-44 (which NIP-47 says clients should prefer). To talk
@@ -183,6 +183,32 @@ public actor WalletConnection {
         notificationStreams[id] = nil
     }
 
+    // MARK: - Sending
+
+    /// Sends a single-response NIP-47 command and returns its decoded result.
+    ///
+    /// The built-in commands have typed wrappers such as ``payInvoice(_:amount:)``; this sends any
+    /// ``WalletConnectRequest``, including one this package does not define. The request is encoded
+    /// as the `params` object under `Request.method`, and a response whose `result_type` names
+    /// another method is rejected rather than decoded.
+    /// - Parameter request: The command to send.
+    /// - Returns: The response's `result`, decoded as `Request.Response`.
+    /// - Throws: ``WalletConnectError/walletError(code:message:)`` when the wallet answers with an
+    ///   error; ``WalletConnectError/timedOut`` when no response arrives within
+    ///   ``Config/requestTimeout``; ``WalletConnectError/unexpectedResultType(expected:received:)``
+    ///   when the response names another method; ``WalletConnectError/missingResult`` when it carries
+    ///   neither a `result` nor an `error`; ``WalletConnectError/responseDecodingFailed`` when it
+    ///   cannot be decrypted or its `result` does not decode as `Request.Response`;
+    ///   ``WalletConnectError/unsupportedEncryption(_:)`` when it uses a scheme this package does not
+    ///   implement; ``WalletConnectError/requestEncodingFailed`` when the request cannot be encoded,
+    ///   encrypted, or signed; and ``WalletConnectError/notConnected`` when the connection is torn
+    ///   down while waiting. Connecting to or sending through the relay transport throws its own
+    ///   errors.
+    public func send<Request: WalletConnectRequest>(_ request: Request) async throws -> Request.Response {
+        let content = try await performSingle(method: Request.method, params: request)
+        return try decodeResult(content, as: Request.Response.self)
+    }
+
     // MARK: - Requests
 
     /// Sends a request and collects its response(s), correlated by the request event's id.
@@ -246,7 +272,7 @@ public actor WalletConnection {
     private func buildRequestEvent(
         method: WalletConnectMethod, params: some Encodable, scheme: WalletConnectEncryption
     ) throws -> Event {
-        let request = WalletConnectRequest(method: method, params: params)
+        let request = RequestEnvelope(method: method, params: params)
         let content: String
         do {
             let json = String(decoding: try JSONEncoder().encode(request), as: UTF8.self)
