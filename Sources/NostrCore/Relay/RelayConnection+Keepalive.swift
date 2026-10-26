@@ -10,7 +10,7 @@ extension RelayConnection {
     /// ``ResumeOnceGuard`` arbitrates every resume site to fire exactly once.
     /// Cancelling the waiting task resumes immediately with `CancellationError`
     /// instead of staying suspended until the pong or the watchdog fires.
-    static func pingSocket(_ task: any WebSocketSession, timeout: TimeInterval) async throws {
+    static func pingSocket(_ task: any WebSocketSession, timeout: Duration) async throws {
         let resumeGuard = ResumeOnceGuard()
         let cancellationBox = PingCancellationBox()
         // Held outside the continuation so the cancellation handler can stop the watchdog too.
@@ -29,7 +29,7 @@ extension RelayConnection {
                 }
                 watchdogBox.store(
                     Task {
-                        try? await Task.sleep(for: .seconds(timeout))
+                        try? await Task.sleep(for: timeout)
                         guard resumeGuard.claim() else { return }
                         continuation.resume(throwing: NostrError.timeout)
                     })
@@ -59,7 +59,7 @@ extension RelayConnection {
         let pongTimeout = config.connectionTimeout
         keepaliveTask = Task {
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(interval))
+                try? await Task.sleep(for: interval)
                 // Re-check after every suspension: the connection may have been
                 // disconnected, failed, or replaced while this task slept.
                 guard !Task.isCancelled, state == .connected, isCurrentSocket(generation),

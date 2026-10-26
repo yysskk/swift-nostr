@@ -124,7 +124,7 @@ so clients can hide it once it lapses.
 try await client.messages.send(
     "This self-destructs in an hour",
     to: recipient,
-    expiration: Timestamp(Date().addingTimeInterval(3600))
+    expiration: Timestamp.now.advanced(by: .seconds(3600))
 )
 ```
 
@@ -653,7 +653,7 @@ let bolt11 = try await pay.fetchInvoice(
     amountMillisats: 21_000, zapRequest: zapRequest, lnurl: LNURL.encode(serviceURL))
 // …pay `bolt11` with your wallet. You can also decode it on its own (the initializer is failable):
 if let invoice = Bolt11Invoice(bolt11) {
-    // invoice.amountMillisats, .timestamp (a Timestamp), .paymentHash, .descriptionHash, .expirySeconds
+    // invoice.amountMillisats, .timestamp (a Timestamp), .paymentHash, .descriptionHash, .expiry (a Duration)
 }
 
 // 4. When the kind-9735 zap receipt arrives over relays, verify it is authentic.
@@ -680,14 +680,14 @@ so you can adopt only the parts of the flow you need.
 
 ```swift
 let config = RelayConnectionConfig(
-    connectionTimeout: 10,
-    sendTimeout: 10,
-    publishAckTimeout: 30,
-    pingInterval: 30,
+    connectionTimeout: .seconds(10),
+    sendTimeout: .seconds(10),
+    publishAckTimeout: .seconds(30),
+    pingInterval: .seconds(30),
     autoReconnect: true,
     maxReconnectAttempts: 10,
-    initialReconnectDelay: 1,
-    maxReconnectDelay: 60,
+    initialReconnectDelay: .seconds(1),
+    maxReconnectDelay: .seconds(60),
     reconnectBackoffMultiplier: 2
 )
 await client.relays.add(try RelayURL(string: "wss://relay.example.com"), config: config)
@@ -702,7 +702,7 @@ by `connectionTimeout`.
 ```swift
 let poolConfig = RelayPoolConfig(
     maxDeduplicationCacheSize: 10000,
-    deduplicationCacheTTL: 300
+    deduplicationCacheTTL: .seconds(300)
 )
 let client = NostrClient(config: poolConfig)
 ```

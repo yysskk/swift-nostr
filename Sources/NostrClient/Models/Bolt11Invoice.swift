@@ -25,8 +25,8 @@ public struct Bolt11Invoice: Sendable, Hashable {
     /// The short description (the `d` field), if present.
     public let description: String?
 
-    /// The number of seconds after ``timestamp`` at which the invoice expires (the `x` field), if present.
-    public let expirySeconds: Int64?
+    /// How long after ``timestamp`` the invoice expires (the `x` field), if present.
+    public let expiry: Duration?
 
     /// Parses a BOLT-11 invoice string (e.g. `lnbc2500u1...`).
     ///
@@ -60,7 +60,7 @@ public struct Bolt11Invoice: Sendable, Hashable {
         var paymentHash: Data?
         var descriptionHash: Data?
         var description: String?
-        var expirySeconds: Int64?
+        var expiry: Duration?
 
         let fieldsEnd = words.count - Self.signatureWordCount
         var index = Self.timestampWordCount
@@ -94,8 +94,8 @@ public struct Bolt11Invoice: Sendable, Hashable {
             case FieldType.expiry:
                 // Cap at 12 words (60 bits) so an oversized field can't fold into a truncated,
                 // garbage value; a real expiry is only a few words.
-                if expirySeconds == nil, field.count <= 12 {
-                    expirySeconds = Int64(exactly: Self.integer(from: field))
+                if expiry == nil, field.count <= 12, let seconds = Int64(exactly: Self.integer(from: field)) {
+                    expiry = .seconds(seconds)
                 }
             default:
                 break  // A field this parser does not need.
@@ -106,7 +106,7 @@ public struct Bolt11Invoice: Sendable, Hashable {
         self.paymentHash = paymentHash
         self.descriptionHash = descriptionHash
         self.description = description
-        self.expirySeconds = expirySeconds
+        self.expiry = expiry
     }
 }
 

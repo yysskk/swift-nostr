@@ -15,7 +15,7 @@ struct RelayPoolDeduplicationTests {
 
     /// A relay config that fails fast and never reconnects, keeping tests deterministic.
     private var noReconnectConfig: RelayConnectionConfig {
-        RelayConnectionConfig(connectionTimeout: 1, pingInterval: 60, autoReconnect: false)
+        RelayConnectionConfig(connectionTimeout: .seconds(1), pingInterval: .seconds(60), autoReconnect: false)
     }
 
     /// A pool holding one connected relay per URL, paired with the socket driving it.
@@ -23,7 +23,7 @@ struct RelayPoolDeduplicationTests {
     private func makeConnectedPool(
         relayURLs: [RelayURL],
         maxDeduplicationCacheSize: Int = 10000,
-        deduplicationCacheTTL: TimeInterval = 300
+        deduplicationCacheTTL: Duration = .seconds(300)
     ) async throws -> (pool: RelayPool, sockets: [MockWebSocketSession]) {
         let sockets = relayURLs.map { _ in MockWebSocketSession() }
         let counter = SocketCounter()
@@ -71,6 +71,12 @@ struct RelayPoolDeduplicationTests {
     }
 
     // MARK: - Per-subscription scope
+
+    @Test("the default configuration remembers event ids for five minutes")
+    func defaultTTL() {
+        #expect(RelayPoolConfig.default.deduplicationCacheTTL == .seconds(300))
+        #expect(RelayPoolConfig().deduplicationCacheTTL == .seconds(300))
+    }
 
     @Test("an event matching two subscriptions is delivered to both")
     func eventMatchingTwoSubscriptionsReachesBoth() async throws {
@@ -158,7 +164,7 @@ struct RelayPoolDeduplicationTests {
 
     @Test("the TTL sweep expires entries and drops emptied subscriptions")
     func sweepExpiresEntriesPastTheTTL() async throws {
-        let (pool, sockets) = try await makeConnectedPool(relayURLs: [urlA], deduplicationCacheTTL: 300)
+        let (pool, sockets) = try await makeConnectedPool(relayURLs: [urlA], deduplicationCacheTTL: .seconds(300))
         let socket = sockets[0]
         let collector = try await subscribe(pool, subscriptionID: "sub_1", sockets: sockets)
 
@@ -167,9 +173,9 @@ struct RelayPoolDeduplicationTests {
         try await NIP42TestSupport.pollUntil { collector.recorded == [event] }
 
         // A sweep inside the TTL keeps the entry; one past it clears the subscription.
-        await pool.expireCachedEvents(now: Date().addingTimeInterval(299))
+        await pool.expireCachedEvents(now: ContinuousClock.now + .seconds(299))
         #expect(await pool.deduplicationCacheSize == 1)
-        await pool.expireCachedEvents(now: Date().addingTimeInterval(301))
+        await pool.expireCachedEvents(now: ContinuousClock.now + .seconds(301))
         #expect(await pool.deduplicationCacheSize == 0)
         #expect(await pool.deduplicationCacheSize(forSubscription: "sub_1") == 0)
 

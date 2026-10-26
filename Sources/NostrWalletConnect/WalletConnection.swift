@@ -19,13 +19,17 @@ public actor WalletConnection {
     /// Connection behavior.
     public struct Config: Sendable {
         /// How long to wait for a response before failing a request. Default: 30 seconds.
-        public var requestTimeout: TimeInterval
+        public var requestTimeout: Duration
 
         /// Forces an encryption scheme instead of negotiating. Default: `nil` (prefer NIP-44, or the
         /// scheme negotiated by ``WalletConnection/fetchInfo()``).
         public var preferredEncryption: WalletConnectEncryption?
 
-        public init(requestTimeout: TimeInterval = 30, preferredEncryption: WalletConnectEncryption? = nil) {
+        /// Creates a connection configuration.
+        /// - Parameters:
+        ///   - requestTimeout: How long to wait for a response before failing a request.
+        ///   - preferredEncryption: An encryption scheme to force instead of negotiating one.
+        public init(requestTimeout: Duration = .seconds(30), preferredEncryption: WalletConnectEncryption? = nil) {
             self.requestTimeout = requestTimeout
             self.preferredEncryption = preferredEncryption
         }
@@ -134,7 +138,7 @@ public actor WalletConnection {
 
         let timeout = config.requestTimeout
         let timeoutTask = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(timeout))
+            try? await Task.sleep(for: timeout)
             // If this call was superseded/finished, its timeout was cancelled — don't end the
             // continuation that now belongs to a concurrent fetchInfo().
             guard !Task.isCancelled else { return }
@@ -254,7 +258,7 @@ public actor WalletConnection {
 
         // The request expires shortly after this connection stops waiting for the response, so a
         // wallet that sees it late does not pay an invoice nobody is listening for anymore.
-        let expiration = Timestamp(Date().addingTimeInterval(config.requestTimeout + 10))
+        let expiration = Timestamp.now.advanced(by: config.requestTimeout + .seconds(10))
         let tags: [Tag] = [
             .pubkey(walletPubkey),
             Tag(name: "encryption", values: [scheme.rawValue]),

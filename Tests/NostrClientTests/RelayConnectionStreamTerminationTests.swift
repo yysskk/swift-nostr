@@ -75,14 +75,14 @@ struct RelayConnectionStreamTerminationTests {
         dispenser: SocketDispenser,
         maxReconnectAttempts: Int,
         autoReconnect: Bool = true,
-        initialReconnectDelay: TimeInterval = 0.001
+        initialReconnectDelay: Duration = .milliseconds(1)
     ) -> RelayConnection {
         RelayConnection(
             url: relayURL,
             webSocketFactory: MockWebSocketSessionFactory(makeSession: { dispenser.next() }),
             config: RelayConnectionConfig(
-                connectionTimeout: 1,
-                pingInterval: 60,
+                connectionTimeout: .seconds(1),
+                pingInterval: .seconds(60),
                 autoReconnect: autoReconnect,
                 maxReconnectAttempts: maxReconnectAttempts,
                 initialReconnectDelay: initialReconnectDelay
@@ -140,7 +140,7 @@ struct RelayConnectionStreamTerminationTests {
         let dispenser = SocketDispenser { _ in MockWebSocketSession() }
         // A long backoff parks the reconnect task, leaving no receive loop alive.
         let connection = makeConnection(
-            dispenser: dispenser, maxReconnectAttempts: 0, initialReconnectDelay: 60)
+            dispenser: dispenser, maxReconnectAttempts: 0, initialReconnectDelay: .seconds(60))
         try await connection.connect()
 
         let finished = consume(await connection.messages())

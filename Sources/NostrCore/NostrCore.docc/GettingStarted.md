@@ -39,10 +39,10 @@ let id = try EventID(hex: "4cd665db042864ee600ee976d6cfcc7c5ce743859462f94a347cd
 print(id.note)
 ```
 
-Times are ``Timestamp`` values: whole Unix seconds, kept exactly as on the wire and encoded to JSON as a bare number. ``Event/createdAt``, ``Filter/since``, ``Filter/until``, and NIP-40 expirations use it, and converting to and from `Date` clamps an out-of-range value instead of trapping:
+Times are ``Timestamp`` values: whole Unix seconds, kept exactly as on the wire and encoded to JSON as a bare number. ``Event/createdAt``, ``Filter/since``, ``Filter/until``, and NIP-40 expirations use it, converting to and from `Date` clamps an out-of-range value instead of trapping, and ``Timestamp/advanced(by:)`` and ``Timestamp/duration(to:)`` do arithmetic with `Duration`:
 
 ```swift
-let dayAgo = Timestamp(Date().addingTimeInterval(-86_400))
+let dayAgo = Timestamp.now.advanced(by: .seconds(-86_400))
 let filter = Filter(kinds: [.textNote], since: dayAgo)
 print(Timestamp.now.rawValue, dayAgo.date)
 ```

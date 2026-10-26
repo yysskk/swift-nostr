@@ -210,7 +210,7 @@ package actor RequestResponseSession<Key: Hashable & Sendable, State: Sendable, 
         _ event: Event,
         key: Key,
         state: State,
-        timeout: TimeInterval,
+        timeout: Duration,
         partialResult: PartialResult? = nil
     ) async throws -> Response {
         // Overwriting an entry would drop the first request's continuation without resolving it and
@@ -278,10 +278,10 @@ package actor RequestResponseSession<Key: Hashable & Sendable, State: Sendable, 
         return request.state
     }
 
-    /// A task that resolves the request under `key` once `timeout` seconds have elapsed.
-    private func makeTimeoutTask(key: Key, timeout: TimeInterval) -> Task<Void, Never> {
+    /// A task that resolves the request under `key` once `timeout` has elapsed.
+    private func makeTimeoutTask(key: Key, timeout: Duration) -> Task<Void, Never> {
         Task { [weak self] in
-            try? await Task.sleep(for: .seconds(timeout))
+            try? await Task.sleep(for: timeout)
             guard !Task.isCancelled else { return }
             await self?.timeOut(key)
         }
@@ -324,9 +324,9 @@ package enum RequestResolution<Response: Sendable>: Sendable {
     /// collecting one part of a `multi_pay_*` reply that is still incomplete.
     case pending
 
-    /// Keep it pending and restart its timeout to run for this many seconds from now: NIP-46
+    /// Keep it pending and restart its timeout to run for this long from now: NIP-46
     /// extending a request that drew an `auth_url` challenge, to give the user time to authorize.
-    case pendingFor(TimeInterval)
+    case pendingFor(Duration)
 
     /// Resolve the waiter with this response.
     case resolved(Response)

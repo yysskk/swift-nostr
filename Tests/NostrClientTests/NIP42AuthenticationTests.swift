@@ -86,7 +86,7 @@ struct NIP42RelayConnectionTests {
 
     private let relayURL = RelayURL("wss://relay.example.com")!
 
-    private func makeConnection(publishAckTimeout: TimeInterval = 30) -> (RelayConnection, MockWebSocketSession) {
+    private func makeConnection(publishAckTimeout: Duration = .seconds(30)) -> (RelayConnection, MockWebSocketSession) {
         let mock = MockWebSocketSession()
         let connection = RelayConnection(
             url: relayURL,
@@ -94,9 +94,9 @@ struct NIP42RelayConnectionTests {
             // No auto-reconnect and a long ping interval keep the test's background
             // tasks inert; the connection is torn down explicitly at the end.
             config: RelayConnectionConfig(
-                connectionTimeout: 1,
+                connectionTimeout: .seconds(1),
                 publishAckTimeout: publishAckTimeout,
-                pingInterval: 60,
+                pingInterval: .seconds(60),
                 autoReconnect: false
             )
         )
@@ -294,7 +294,7 @@ struct NIP42RelayConnectionTests {
 
     @Test("a late OK after a timed-out authenticate does not authenticate")
     func lateOKAfterTimeoutDoesNotAuthenticate() async throws {
-        let (connection, mock) = makeConnection(publishAckTimeout: 0.05)
+        let (connection, mock) = makeConnection(publishAckTimeout: .milliseconds(50))
         try await connection.connect()
 
         let signer = EventSigner(keyPair: try KeyPair())

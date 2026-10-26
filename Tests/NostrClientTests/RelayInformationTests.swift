@@ -195,9 +195,32 @@ struct RelayInformationTests {
         #expect(limitation.authRequired == true)
         #expect(limitation.paymentRequired == false)
         #expect(limitation.restrictedWrites == true)
-        #expect(limitation.createdAtLowerLimit == 31_536_000)
-        #expect(limitation.createdAtUpperLimit == 3)
+        #expect(limitation.createdAtLowerLimit == .seconds(31_536_000))
+        #expect(limitation.createdAtUpperLimit == .seconds(3))
         #expect(limitation.defaultLimit == 500)
+    }
+
+    @Test("created_at limits are relative offsets that round-trip as integer seconds")
+    func createdAtLimitsRoundTrip() throws {
+        let limitation = RelayInformation.Limitation(
+            createdAtLowerLimit: .seconds(94_608_000), createdAtUpperLimit: .milliseconds(900_500))
+
+        let data = try JSONEncoder().encode(limitation)
+        let object = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        #expect(object["created_at_lower_limit"] as? Int == 94_608_000)
+        #expect(object["created_at_upper_limit"] as? Int == 900)
+
+        let decoded = try JSONDecoder().decode(RelayInformation.Limitation.self, from: data)
+        #expect(decoded.createdAtLowerLimit == .seconds(94_608_000))
+        #expect(decoded.createdAtUpperLimit == .seconds(900))
+    }
+
+    @Test("a non-integer created_at limit fails decoding", arguments: ["1.5", "\"60\""])
+    func nonIntegerCreatedAtLimitFails(value: String) {
+        let json = Data(#"{"created_at_lower_limit":\#(value)}"#.utf8)
+        #expect(throws: DecodingError.self) {
+            try JSONDecoder().decode(RelayInformation.Limitation.self, from: json)
+        }
     }
 
     @Test("Decode fees with all categories")
@@ -218,7 +241,7 @@ struct RelayInformationTests {
 
         #expect(fees.admission?.first?.amount == 1_000_000)
         #expect(fees.admission?.first?.unit == "msats")
-        #expect(fees.subscription?.first?.period == 2_592_000)
+        #expect(fees.subscription?.first?.period == .seconds(2_592_000))
         #expect(fees.publication?.first?.kinds == [4])
         #expect(fees.publication?.first?.amount == 100)
     }
@@ -249,7 +272,7 @@ struct RelayInformationTests {
         #expect(first.kinds?[1] == .single(1))
         #expect(first.kinds?[2] == .range(5, 7))
         #expect(first.kinds?[3] == .range(40, 49))
-        #expect(first.time == 3600)
+        #expect(first.time == .seconds(3600))
         #expect(first.count == nil)
 
         // Second entry: single range
@@ -257,11 +280,61 @@ struct RelayInformationTests {
 
         // Third entry: no kinds (applies to all)
         #expect(retention[2].kinds == nil)
-        #expect(retention[2].time == 3600)
+        #expect(retention[2].time == .seconds(3600))
 
         // Fourth entry: single kind with count
         #expect(retention[3].kinds?[0] == .single(4))
         #expect(retention[3].count == 1000)
+    }
+
+    @Test("retention time keeps 0 as zero and an absent time as no limit")
+    func retentionTimeSemantics() throws {
+        let json = Data(#"{"retention":[{"kinds":[4],"time":0},{"kinds":[1]}]}"#.utf8)
+        let retention = try #require(try JSONDecoder().decode(RelayInformation.self, from: json).retention)
+
+        #expect(retention[0].time == .zero)
+        #expect(retention[1].time == nil)
+    }
+
+    @Test("retention time and fee period round-trip as integer seconds")
+    func periodsRoundTripAsSeconds() throws {
+        let original = RelayInformation(
+            fees: RelayInformation.Fees(
+                subscription: [RelayInformation.FeeSchedule(amount: 5000, unit: "msats", period: .seconds(2_592_000))]
+            ),
+            retention: [
+                RelayInformation.Retention(kinds: [.single(4)], time: .zero),
+                RelayInformation.Retention(time: .milliseconds(3_600_900)),
+                RelayInformation.Retention(count: 10),
+            ]
+        )
+
+        let data = try JSONEncoder().encode(original)
+        let object = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let fees = try #require(object["fees"] as? [String: Any])
+        let subscription = try #require((fees["subscription"] as? [[String: Any]])?.first)
+        #expect(subscription["period"] as? Int == 2_592_000)
+        let retention = try #require(object["retention"] as? [[String: Any]])
+        #expect(retention[0]["time"] as? Int == 0)
+        #expect(retention[1]["time"] as? Int == 3600)
+        #expect(retention[2]["time"] == nil)
+
+        let decoded = try JSONDecoder().decode(RelayInformation.self, from: data)
+        #expect(decoded.fees?.subscription?.first?.period == .seconds(2_592_000))
+        #expect(decoded.retention?.map(\.time) == [.zero, .seconds(3600), nil])
+    }
+
+    @Test("a non-integer retention time or fee period fails decoding")
+    func nonIntegerPeriodsFail() {
+        let documents = [
+            #"{"retention":[{"time":1.5}]}"#,
+            #"{"fees":{"subscription":[{"period":"30"}]}}"#,
+        ]
+        for document in documents {
+            #expect(throws: DecodingError.self) {
+                try JSONDecoder().decode(RelayInformation.self, from: Data(document.utf8))
+            }
+        }
     }
 
     @Test("Decode full NIP-11 example document")
@@ -355,7 +428,7 @@ struct RelayInformationTests {
     func kindSpecRoundTrip() throws {
         let retention = RelayInformation.Retention(
             kinds: [.single(0), .single(1), .range(5, 7), .range(30000, 39999)],
-            time: 3600
+            time: .seconds(3600)
         )
         let info = RelayInformation(retention: [retention])
 
@@ -381,7 +454,7 @@ struct RelayInformationTests {
             fees: RelayInformation.Fees(
                 admission: [RelayInformation.FeeSchedule(amount: 100, unit: "msats")]
             ),
-            retention: [RelayInformation.Retention(kinds: [.range(1000, 1999)], time: 0)]
+            retention: [RelayInformation.Retention(kinds: [.range(1000, 1999)], time: .zero)]
         )
 
         let data = try JSONEncoder().encode(original)

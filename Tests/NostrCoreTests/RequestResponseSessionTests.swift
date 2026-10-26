@@ -63,7 +63,7 @@ struct RequestResponseSessionTests {
         let session = makeSession(transport)
         try await start(session)
 
-        async let response = session.perform(request("a"), key: "a", state: [], timeout: 1)
+        async let response = session.perform(request("a"), key: "a", state: [], timeout: .seconds(1))
         try await transport.waitForSends(1)
         await transport.deliver(self.response(for: "a", content: "ok"))
         #expect(try await response == ["ok"])
@@ -117,7 +117,7 @@ struct RequestResponseSessionTests {
         let session = makeSession(transport)
         try await start(session)
 
-        let pending = Task { try await session.perform(self.request("a"), key: "a", state: [], timeout: 5) }
+        let pending = Task { try await session.perform(self.request("a"), key: "a", state: [], timeout: .seconds(5)) }
         try await transport.waitForSends(1)
         await session.disconnect()
 
@@ -134,8 +134,8 @@ struct RequestResponseSessionTests {
         let session = makeSession(transport)
         try await start(session)
 
-        async let first = session.perform(request("a"), key: "a", state: [], timeout: 1)
-        async let second = session.perform(request("b"), key: "b", state: [], timeout: 1)
+        async let first = session.perform(request("a"), key: "a", state: [], timeout: .seconds(1))
+        async let second = session.perform(request("b"), key: "b", state: [], timeout: .seconds(1))
         try await transport.waitForSends(2)
 
         await transport.deliver(response(for: "b", content: "second"))
@@ -151,7 +151,9 @@ struct RequestResponseSessionTests {
         let session = makeSession(transport)
         try await start(session)
 
-        let pending = Task { try await session.perform(self.request("a"), key: "a", state: [], timeout: 0.3) }
+        let pending = Task {
+            try await session.perform(self.request("a"), key: "a", state: [], timeout: .milliseconds(300))
+        }
         try await transport.waitForSends(1)
         await transport.deliver(response(for: "unknown", content: "stray"))
 
@@ -164,7 +166,9 @@ struct RequestResponseSessionTests {
         let session = makeSession(transport)
         try await start(session)
 
-        let pending = Task { try await session.perform(self.request("a"), key: "a", state: ["one"], timeout: 1) }
+        let pending = Task {
+            try await session.perform(self.request("a"), key: "a", state: ["one"], timeout: .seconds(1))
+        }
         try await transport.waitForSends(1)
 
         // The first response is folded in but does not complete the request…
@@ -201,7 +205,7 @@ struct RequestResponseSessionTests {
         let session = makeSession(transport)
         try await start(session)
 
-        let pending = Task { try await session.perform(self.request("a"), key: "a", state: [], timeout: 5) }
+        let pending = Task { try await session.perform(self.request("a"), key: "a", state: [], timeout: .seconds(5)) }
         try await transport.waitForSends(1)
         await session.withPendingRequest("a") { _ in .failed(TestError.rejected) }
 
@@ -217,7 +221,7 @@ struct RequestResponseSessionTests {
         try await start(session)
 
         await #expect(throws: TestError.timedOut) {
-            _ = try await session.perform(self.request("a"), key: "a", state: [], timeout: 0.2)
+            _ = try await session.perform(self.request("a"), key: "a", state: [], timeout: .milliseconds(200))
         }
     }
 
@@ -229,7 +233,7 @@ struct RequestResponseSessionTests {
 
         let pending = Task {
             try await session.perform(
-                self.request("a"), key: "a", state: [], timeout: 0.3, partialResult: { $0 })
+                self.request("a"), key: "a", state: [], timeout: .milliseconds(300), partialResult: { $0 })
         }
         try await transport.waitForSends(1)
         // One part arrives before the deadline but does not complete the request, so the timeout
@@ -248,9 +252,11 @@ struct RequestResponseSessionTests {
         let session = makeSession(transport)
         try await start(session)
 
-        let pending = Task { try await session.perform(self.request("a"), key: "a", state: [], timeout: 0.2) }
+        let pending = Task {
+            try await session.perform(self.request("a"), key: "a", state: [], timeout: .milliseconds(200))
+        }
         try await transport.waitForSends(1)
-        await session.withPendingRequest("a") { _ in .pendingFor(5) }
+        await session.withPendingRequest("a") { _ in .pendingFor(.seconds(5)) }
 
         // Wait out the original timeout, then answer: the request is still waiting.
         try await Task.sleep(for: .milliseconds(400))
@@ -270,7 +276,7 @@ struct RequestResponseSessionTests {
         let session = makeSession(transport)
         try await start(session)
 
-        let pending = Task { try await session.perform(self.request("a"), key: "a", state: [], timeout: 60) }
+        let pending = Task { try await session.perform(self.request("a"), key: "a", state: [], timeout: .seconds(60)) }
         try await transport.waitForSend("a")
 
         await transport.endEvents()
@@ -293,7 +299,7 @@ struct RequestResponseSessionTests {
         try await start(session)
         #expect(await transport.connectCount == connectsBefore + 1)
 
-        async let response = session.perform(request("b"), key: "b", state: [], timeout: 2)
+        async let response = session.perform(request("b"), key: "b", state: [], timeout: .seconds(2))
         try await transport.waitForSend("b")
         await transport.deliver(self.response(for: "b", content: "b-done"))
         #expect(try await response == ["b-done"])
@@ -319,7 +325,7 @@ struct RequestResponseSessionTests {
         try await start(session)
         #expect(await session.isStarted)
 
-        let pending = Task { try await session.perform(self.request("a"), key: "a", state: [], timeout: 5) }
+        let pending = Task { try await session.perform(self.request("a"), key: "a", state: [], timeout: .seconds(5)) }
         try await transport.waitForSend("a")
 
         // Give the stale reader every chance to wake up and clobber this session.
@@ -349,11 +355,11 @@ struct RequestResponseSessionTests {
         let session = makeSession(transport)
         try await start(session)
 
-        let first = Task { try await session.perform(self.request("a"), key: "a", state: [], timeout: 5) }
+        let first = Task { try await session.perform(self.request("a"), key: "a", state: [], timeout: .seconds(5)) }
         try await transport.waitForSend("a")
 
         await #expect(throws: RequestResponseSessionError.duplicateRequestKey) {
-            try await session.perform(self.request("a"), key: "a", state: [], timeout: 5)
+            try await session.perform(self.request("a"), key: "a", state: [], timeout: .seconds(5))
         }
 
         // The request already in flight is untouched and still answerable.
@@ -379,7 +385,7 @@ struct RequestResponseSessionTests {
         // Wait for this request's own send: an earlier request under the same key is already in
         // the log, and answering before this one is registered would leave it to time out.
         let sent = await transport.sendCount(of: key)
-        async let response = session.perform(request(key), key: key, state: [], timeout: 2)
+        async let response = session.perform(request(key), key: key, state: [], timeout: .seconds(2))
         try await transport.waitForSend(key, count: sent + 1)
         await transport.deliver(self.response(for: key, content: "\(key)-done"))
         return try await response

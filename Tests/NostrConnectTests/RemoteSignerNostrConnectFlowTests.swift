@@ -20,7 +20,7 @@ struct RemoteSignerNostrConnectFlowTests {
     }
 
     private func makeSigner(
-        invitation: NostrConnectURI, transport: FakeRemoteSignerTransport, requestTimeout: TimeInterval = 1
+        invitation: NostrConnectURI, transport: FakeRemoteSignerTransport, requestTimeout: Duration = .seconds(1)
     ) throws -> RemoteSigner {
         try RemoteSigner(
             invitation: invitation,
@@ -129,7 +129,7 @@ struct RemoteSignerNostrConnectFlowTests {
     func commandRoundTripsAfterConnection() async throws {
         let invitation = try makeInvitation()
         let transport = FakeRemoteSignerTransport()
-        let remote = try makeSigner(invitation: invitation, transport: transport, requestTimeout: 2)
+        let remote = try makeSigner(invitation: invitation, transport: transport, requestTimeout: .seconds(2))
 
         let connection = Task { try await remote.awaitConnection() }
         try await waitForSubscription(transport)
@@ -156,7 +156,7 @@ struct RemoteSignerNostrConnectFlowTests {
     func awaitConnectionTimesOut() async throws {
         let invitation = try makeInvitation()
         let transport = FakeRemoteSignerTransport()
-        let remote = try makeSigner(invitation: invitation, transport: transport, requestTimeout: 0.2)
+        let remote = try makeSigner(invitation: invitation, transport: transport, requestTimeout: .milliseconds(200))
 
         await #expect(throws: RemoteSignerError.timedOut) {
             try await remote.awaitConnection()
@@ -169,7 +169,7 @@ struct RemoteSignerNostrConnectFlowTests {
     func concurrentAwaitConnectionIsRejected() async throws {
         let invitation = try makeInvitation()
         let transport = FakeRemoteSignerTransport()
-        let remote = try makeSigner(invitation: invitation, transport: transport, requestTimeout: 2)
+        let remote = try makeSigner(invitation: invitation, transport: transport, requestTimeout: .seconds(2))
 
         // The first call suspends, waiting for the signer's connect ack.
         let connection = Task { try await remote.awaitConnection() }

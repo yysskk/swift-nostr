@@ -16,7 +16,9 @@ struct RemoteSignerCommandsTests {
     }
 
     /// A connected ``RemoteSigner`` with its fake transport, ready for command tests.
-    private func connected(requestTimeout: TimeInterval = 1) async throws -> (RemoteSigner, FakeRemoteSignerTransport) {
+    private func connected(requestTimeout: Duration = .seconds(1)) async throws -> (
+        RemoteSigner, FakeRemoteSignerTransport
+    ) {
         let transport = FakeRemoteSignerTransport()
         let remote = try RemoteSigner(
             bunker: RemoteSignerFixtures.bunker(signer: signer),

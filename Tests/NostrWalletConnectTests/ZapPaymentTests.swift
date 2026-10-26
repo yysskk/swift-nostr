@@ -25,7 +25,7 @@ struct ZapPaymentTests {
         let connection = WalletConnection(
             uri: try NWCFixtures.uri(wallet: wallet, client: client),
             transport: transport,
-            config: .init(requestTimeout: 2, preferredEncryption: .nip44))
+            config: .init(requestTimeout: .seconds(2), preferredEncryption: .nip44))
 
         MockURLProtocol.statusCode = 200
         MockURLProtocol.responseBody = Data(#"{"pr":"lnbc210n1pzapinvoice"}"#.utf8)
@@ -64,7 +64,7 @@ struct ZapPaymentTests {
         let connection = WalletConnection(
             uri: try NWCFixtures.uri(wallet: wallet, client: client),
             transport: transport,
-            config: .init(requestTimeout: 2, preferredEncryption: .nip44))
+            config: .init(requestTimeout: .seconds(2), preferredEncryption: .nip44))
 
         MockURLProtocol.statusCode = 200
         MockURLProtocol.responseBody = Data(#"{"pr":"lnbc210n1pzapinvoice"}"#.utf8)

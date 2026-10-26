@@ -10,7 +10,7 @@ import Testing
 /// silently overwrote each other.
 @Suite("Multi-Pay Response Matching Tests")
 struct MultiPayMatchingTests {
-    private func makeConnection(timeout: TimeInterval = 2) throws -> (
+    private func makeConnection(timeout: Duration = .seconds(2)) throws -> (
         connection: WalletConnection, transport: FakeWalletConnectTransport, client: KeyPair, wallet: KeyPair
     ) {
         let wallet = try KeyPair()
@@ -29,7 +29,7 @@ struct MultiPayMatchingTests {
     /// nowhere to go: the caller was told an invoice had no result while it may have been paid.
     @Test("a response delivered twice is counted once")
     func duplicateResponseIsCountedOnce() async throws {
-        let (connection, transport, client, wallet) = try makeConnection(timeout: 2)
+        let (connection, transport, client, wallet) = try makeConnection(timeout: .seconds(2))
 
         async let results = connection.multiPayInvoice([
             .init(id: "a", invoice: "lnbc1"),
@@ -60,7 +60,7 @@ struct MultiPayMatchingTests {
     /// fewer results than invoices, with nothing saying which had been lost.
     @Test("a duplicate d tag is reported rather than overwriting a result")
     func duplicateDTagIsReported() async throws {
-        let (connection, transport, client, wallet) = try makeConnection(timeout: 0.4)
+        let (connection, transport, client, wallet) = try makeConnection(timeout: .milliseconds(400))
 
         async let results = connection.multiPayInvoice([
             .init(id: "a", invoice: "lnbc1"),
@@ -96,7 +96,7 @@ struct MultiPayMatchingTests {
     /// A response naming a `d` tag no invoice asked for still describes a payment that happened.
     @Test("a response for an unknown item is surfaced as unmatched")
     func unknownDTagIsUnmatched() async throws {
-        let (connection, transport, client, wallet) = try makeConnection(timeout: 0.4)
+        let (connection, transport, client, wallet) = try makeConnection(timeout: .milliseconds(400))
 
         async let results = connection.multiPayInvoice([.init(id: "a", invoice: "lnbc1")])
 
@@ -117,7 +117,7 @@ struct MultiPayMatchingTests {
     /// whole timeout before returning nothing.
     @Test("an empty multi-pay returns immediately")
     func emptyMultiPayReturnsImmediately() async throws {
-        let (connection, _, _, _) = try makeConnection(timeout: 30)
+        let (connection, _, _, _) = try makeConnection(timeout: .seconds(30))
 
         let clock = ContinuousClock()
         let start = clock.now
@@ -135,7 +135,7 @@ struct MultiPayMatchingTests {
     /// let a body of the wrong shape satisfy this one whenever it happened to decode.
     @Test("a response for another command is not folded into a multi-pay")
     func mismatchedResultTypeIsRejected() async throws {
-        let (connection, transport, client, wallet) = try makeConnection(timeout: 0.4)
+        let (connection, transport, client, wallet) = try makeConnection(timeout: .milliseconds(400))
 
         async let results = connection.multiPayInvoice([
             .init(id: "a", invoice: "lnbc1"),
@@ -158,7 +158,7 @@ struct MultiPayMatchingTests {
     /// rather than left to time out — and it says what actually went wrong.
     @Test("a single-response command reports a mismatched result_type")
     func singleResponseMismatchedResultTypeIsReported() async throws {
-        let (connection, transport, client, wallet) = try makeConnection(timeout: 2)
+        let (connection, transport, client, wallet) = try makeConnection(timeout: .seconds(2))
 
         let payment = Task { try await connection.payInvoice("lnbc1") }
 
@@ -178,7 +178,7 @@ struct MultiPayMatchingTests {
 
     @Test("the matching result_type is accepted")
     func matchingResultTypeIsAccepted() async throws {
-        let (connection, transport, client, wallet) = try makeConnection(timeout: 2)
+        let (connection, transport, client, wallet) = try makeConnection(timeout: .seconds(2))
 
         async let results = connection.multiPayInvoice([.init(id: "a", invoice: "lnbc1")])
 

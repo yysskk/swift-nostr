@@ -186,9 +186,9 @@ extension HTTPAuth {
     ///   - payload: The received request body; when non-nil the event must
     ///     commit to it with a matching "payload" tag, so a request whose body
     ///     was not signed is rejected. Pass nil to skip the payload check.
-    ///   - tolerance: How many seconds, in either direction, the event
-    ///     timestamp may deviate from `now`. Defaults to the NIP-98
-    ///     suggestion of 60 seconds.
+    ///   - tolerance: How far, in either direction, the event timestamp may
+    ///     deviate from `now`. Defaults to the NIP-98 suggestion of 60
+    ///     seconds.
     ///   - now: The server's current time; injectable for testing.
     /// - Returns: The verified authorization event.
     /// - Throws: ``ValidationError`` naming the first failed check.
@@ -197,8 +197,8 @@ extension HTTPAuth {
         url: URL,
         method: String,
         payload: Data? = nil,
-        tolerance: TimeInterval = 60,
-        now: Date = Date()
+        tolerance: Duration = .seconds(60),
+        now: Timestamp = .now
     ) throws -> Event {
         let event = try event(fromAuthorizationHeader: authorization)
 
@@ -208,7 +208,8 @@ extension HTTPAuth {
         guard (try? event.verify()) == true else {
             throw ValidationError.invalidSignature
         }
-        guard abs(event.createdAt.date.timeIntervalSince(now)) <= tolerance else {
+        let skew = now.duration(to: event.createdAt)
+        guard skew <= tolerance, skew >= .zero - tolerance else {
             throw ValidationError.timestampOutOfTolerance(createdAt: event.createdAt)
         }
         let urlTag = event.firstTagValue(named: "u")

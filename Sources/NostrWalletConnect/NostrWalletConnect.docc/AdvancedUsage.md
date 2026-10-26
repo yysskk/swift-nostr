@@ -8,7 +8,7 @@ Encryption negotiation, the full command set, notifications, custom transports, 
 
 ```swift
 let config = WalletConnection.Config(
-    requestTimeout: 30,             // seconds to wait for a response before failing
+    requestTimeout: .seconds(30),   // wait for a response before failing
     preferredEncryption: nil)       // nil negotiates; set to force a scheme
 let connection = WalletConnection(uri: uri, config: config)
 ```
@@ -61,7 +61,7 @@ print("Notifications:", info.notifications)   // e.g. ["payment_received", "paym
 ```swift
 // Create an invoice to receive a payment.
 let created = try await connection.makeInvoice(
-    MakeInvoiceParams(amount: 21_000, description: "coffee", expiry: 3600))
+    MakeInvoiceParams(amount: 21_000, description: "coffee", expiry: .seconds(3600)))
 print(created.invoice ?? "")   // a WalletConnectTransaction
 
 // Look up an invoice — by payment hash or by BOLT-11 string. The type guarantees exactly one key.
@@ -82,7 +82,7 @@ paid/unpaid, and paginate with `limit` / `offset`. A transaction's `createdAt`, 
 `settledAt` are `Timestamp` values too:
 
 ```swift
-let lastWeek = Timestamp(Date().addingTimeInterval(-7 * 24 * 60 * 60))
+let lastWeek = Timestamp.now.advanced(by: .seconds(-7 * 24 * 60 * 60))
 let outgoing = try await connection.listTransactions(
     ListTransactionsParams(from: lastWeek, limit: 50, type: .outgoing))
 for tx in outgoing {

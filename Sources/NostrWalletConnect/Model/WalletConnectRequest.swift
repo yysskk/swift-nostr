@@ -149,8 +149,11 @@ public struct MakeInvoiceParams: Codable, Sendable, Hashable {
     public let description: String?
     /// An optional invoice description hash.
     public let descriptionHash: String?
-    /// An optional expiry in seconds from creation.
-    public let expiry: Int64?
+    /// How long after creation the invoice expires, if set.
+    ///
+    /// The wire carries whole seconds, so the sub-second part is truncated toward zero when
+    /// encoding: an expiry never comes out longer than the one asked for.
+    public let expiry: Duration?
     /// Optional application-defined metadata.
     public let metadata: [String: JSONValue]?
 
@@ -162,15 +165,44 @@ public struct MakeInvoiceParams: Codable, Sendable, Hashable {
         case metadata
     }
 
+    /// Creates `make_invoice` parameters.
+    /// - Parameters:
+    ///   - amount: The invoice amount in millisatoshis.
+    ///   - description: An optional invoice description.
+    ///   - descriptionHash: An optional invoice description hash.
+    ///   - expiry: How long after creation the invoice expires; sent as whole seconds.
+    ///   - metadata: Optional application-defined metadata.
     public init(
         amount: Int64, description: String? = nil, descriptionHash: String? = nil,
-        expiry: Int64? = nil, metadata: [String: JSONValue]? = nil
+        expiry: Duration? = nil, metadata: [String: JSONValue]? = nil
     ) {
         self.amount = amount
         self.description = description
         self.descriptionHash = descriptionHash
         self.expiry = expiry
         self.metadata = metadata
+    }
+
+    /// Decodes the parameters, reading `expiry` as an integer number of seconds.
+    /// - Throws: `DecodingError` if a field has the wrong type.
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            amount: try container.decode(Int64.self, forKey: .amount),
+            description: try container.decodeIfPresent(String.self, forKey: .description),
+            descriptionHash: try container.decodeIfPresent(String.self, forKey: .descriptionHash),
+            expiry: try container.decodeIfPresent(Int64.self, forKey: .expiry).map(Duration.seconds),
+            metadata: try container.decodeIfPresent([String: JSONValue].self, forKey: .metadata))
+    }
+
+    /// Encodes the parameters, writing `expiry` as whole seconds truncated toward zero.
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(amount, forKey: .amount)
+        try container.encodeIfPresent(description, forKey: .description)
+        try container.encodeIfPresent(descriptionHash, forKey: .descriptionHash)
+        try container.encodeIfPresent(expiry?.wholeSeconds, forKey: .expiry)
+        try container.encodeIfPresent(metadata, forKey: .metadata)
     }
 }
 

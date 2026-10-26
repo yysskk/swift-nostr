@@ -22,7 +22,7 @@ struct RemoteSignerNostrSigningConformanceTests {
             bunker: RemoteSignerFixtures.bunker(signer: signer),
             clientKeyPair: client,
             transport: transport,
-            config: .init(requestTimeout: 1))
+            config: .init(requestTimeout: .seconds(1)))
         async let connect: Void = remote.connect()
         let sent = try await RemoteSignerFixtures.waitForSentEvents(transport, count: 1)
         let request = try RemoteSignerFixtures.decryptRequest(sent[0], client: client, signer: signer)

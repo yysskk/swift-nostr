@@ -22,7 +22,7 @@ public actor RelayPool {
     private var eventCache: EventDeduplicationCache
 
     /// Last time expired cache entries were swept
-    private var lastCacheCleanup: Date = Date()
+    private var lastCacheCleanup: ContinuousClock.Instant = .now
 
     /// Message listener tasks for subscriptions (keyed by subscription ID)
     private var subscriptionTasks: [String: [Task<Void, Never>]] = [:]
@@ -616,15 +616,15 @@ extension RelayPool {
     /// handling. Only the TTL needs sweeping: ``EventDeduplicationCache`` holds the pool-wide
     /// size limit as events are recorded.
     private func expireCachedEventsIfNeeded() {
-        let now = Date()
-        guard now.timeIntervalSince(lastCacheCleanup) > 60 else { return }
+        let now = ContinuousClock.now
+        guard now - lastCacheCleanup > .seconds(60) else { return }
         lastCacheCleanup = now
         expireCachedEvents(now: now)
     }
 
     /// Removes cache entries past ``RelayPoolConfig/deduplicationCacheTTL`` (test hook: called
     /// directly with the `now` the sweep should see, rather than waiting out the interval).
-    func expireCachedEvents(now: Date = Date()) {
+    func expireCachedEvents(now: ContinuousClock.Instant = .now) {
         eventCache.removeExpired(now: now)
     }
 
