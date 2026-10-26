@@ -18,7 +18,7 @@ public struct InternetIdentifier: Sendable {
         public let identifier: String
 
         /// The verified public key
-        public let pubkey: PublicKey
+        public let publicKey: PublicKey
 
         /// Relay URLs the server recommends for this user, in the order listed. The server's
         /// `relays` entries are third-party content, so one that is not a valid relay URL is
@@ -28,11 +28,11 @@ public struct InternetIdentifier: Sendable {
         /// Creates a verification result.
         /// - Parameters:
         ///   - identifier: The full identifier (e.g., "alice@example.com").
-        ///   - pubkey: The public key the identifier resolved to.
+        ///   - publicKey: The public key the identifier resolved to.
         ///   - relays: Relay URLs the server recommends for this user.
-        public init(identifier: String, pubkey: PublicKey, relays: [RelayURL] = []) {
+        public init(identifier: String, publicKey: PublicKey, relays: [RelayURL] = []) {
             self.identifier = identifier
-            self.pubkey = pubkey
+            self.publicKey = publicKey
             self.relays = relays
         }
     }
@@ -42,8 +42,8 @@ public struct InternetIdentifier: Sendable {
         case invalidIdentifier
         case networkError(String)
         case invalidResponse
-        case pubkeyNotFound
-        case pubkeyMismatch
+        case publicKeyNotFound
+        case publicKeyMismatch
 
         public var errorDescription: String? {
             switch self {
@@ -53,9 +53,9 @@ public struct InternetIdentifier: Sendable {
                 return "Network error: \(message)"
             case .invalidResponse:
                 return "Invalid response from server"
-            case .pubkeyNotFound:
+            case .publicKeyNotFound:
                 return "Public key not found for identifier"
-            case .pubkeyMismatch:
+            case .publicKeyMismatch:
                 return "Public key does not match"
             }
         }
@@ -129,9 +129,9 @@ public struct InternetIdentifier: Sendable {
     ///
     /// The server's `names` entry must be a canonical hex public key (64 lowercase hex digits, as
     /// NIP-05 requires); any other value names no key, so it is reported as
-    /// ``VerificationError/pubkeyNotFound``.
+    /// ``VerificationError/publicKeyNotFound``.
     /// - Parameter identifier: The identifier (e.g., "alice@example.com")
-    /// - Returns: The verification result containing pubkey and optional relays
+    /// - Returns: The verification result containing public key and optional relays
     public static func verify(_ identifier: String) async throws -> VerificationResult {
         guard let (name, domain) = parse(identifier) else {
             throw VerificationError.invalidIdentifier
@@ -165,7 +165,7 @@ public struct InternetIdentifier: Sendable {
     /// The document is third-party data: a `names` value that is not a canonical hex public key
     /// is treated as absent.
     /// - Throws: ``VerificationError/invalidResponse`` if `data` is not a `nostr.json` document, or
-    ///   ``VerificationError/pubkeyNotFound`` if it has no usable key for `name`.
+    ///   ``VerificationError/publicKeyNotFound`` if it has no usable key for `name`.
     static func result(for identifier: String, name: String, in data: Data) throws -> VerificationResult {
         let response: InternetIdentifierResponse
         do {
@@ -175,28 +175,28 @@ public struct InternetIdentifier: Sendable {
         }
 
         guard let hex = response.names[name.lowercased()] ?? response.names[name],
-            let pubkey = PublicKey(hex)
+            let publicKey = PublicKey(hex)
         else {
-            throw VerificationError.pubkeyNotFound
+            throw VerificationError.publicKeyNotFound
         }
 
         return VerificationResult(
             identifier: identifier,
-            pubkey: pubkey,
-            relays: (response.relays?[pubkey.hex] ?? []).compactMap(RelayURL.init)
+            publicKey: publicKey,
+            relays: (response.relays?[publicKey.hex] ?? []).compactMap(RelayURL.init)
         )
     }
 
     /// Verifies an internet identifier matches an expected public key
     /// - Parameters:
     ///   - identifier: The identifier
-    ///   - expectedPubkey: The expected public key
+    ///   - expectedPublicKey: The expected public key
     /// - Returns: The verification result if successful
-    public static func verify(_ identifier: String, expectedPubkey: PublicKey) async throws -> VerificationResult {
+    public static func verify(_ identifier: String, expectedPublicKey: PublicKey) async throws -> VerificationResult {
         let result = try await verify(identifier)
 
-        guard result.pubkey == expectedPubkey else {
-            throw VerificationError.pubkeyMismatch
+        guard result.publicKey == expectedPublicKey else {
+            throw VerificationError.publicKeyMismatch
         }
 
         return result
@@ -205,9 +205,9 @@ public struct InternetIdentifier: Sendable {
     /// Looks up a public key from an internet identifier
     /// - Parameter identifier: The identifier
     /// - Returns: The public key the identifier resolves to
-    public static func lookupPubkey(_ identifier: String) async throws -> PublicKey {
+    public static func lookupPublicKey(_ identifier: String) async throws -> PublicKey {
         let result = try await verify(identifier)
-        return result.pubkey
+        return result.publicKey
     }
 
     /// Looks up recommended relays for an internet identifier
@@ -240,10 +240,10 @@ extension String {
         try await InternetIdentifier.verify(self)
     }
 
-    /// Verifies this string as an internet identifier against an expected pubkey
+    /// Verifies this string as an internet identifier against an expected public key
     public func verifyAsInternetIdentifier(
-        expectedPubkey: PublicKey
+        expectedPublicKey: PublicKey
     ) async throws -> InternetIdentifier.VerificationResult {
-        try await InternetIdentifier.verify(self, expectedPubkey: expectedPubkey)
+        try await InternetIdentifier.verify(self, expectedPublicKey: expectedPublicKey)
     }
 }

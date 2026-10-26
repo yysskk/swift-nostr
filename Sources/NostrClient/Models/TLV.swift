@@ -7,12 +7,12 @@ import NostrCore
 /// https://github.com/nostr-protocol/nips/blob/master/19.md
 enum TLV {
     enum Kind: UInt8 {
-        /// The entity's primary value: the pubkey (`nprofile`), event id (`nevent`),
+        /// The entity's primary value: the public key (`nprofile`), event id (`nevent`),
         /// or `d`-tag identifier (`naddr`).
         case special = 0
         /// A relay-hint URL. May appear multiple times.
         case relay = 1
-        /// The author's pubkey (32 bytes).
+        /// The author's public key (32 bytes).
         case author = 2
         /// The event kind, big-endian.
         case kind = 3

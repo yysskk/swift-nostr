@@ -8,7 +8,7 @@ import NostrCore
 ///
 /// ```swift
 /// for try await message in try await client.messages.subscribe() {
-///     print("\(message.senderPubkey): \(message.content)")
+///     print("\(message.senderPublicKey): \(message.content)")
 /// }
 /// ```
 ///

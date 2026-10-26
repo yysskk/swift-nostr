@@ -15,7 +15,7 @@ enum RemoteSignerFixtures {
     /// Builds a `bunker://` token pointing at `signer`, with an optional connection secret.
     static func bunker(signer: KeyPair, secret: String? = nil) throws -> BunkerURI {
         try BunkerURI(
-            remoteSignerPubkey: signer.publicKey,
+            remoteSignerPublicKey: signer.publicKey,
             relays: [RelayURL("wss://relay.example")!],
             secret: secret)
     }
@@ -58,7 +58,7 @@ enum RemoteSignerFixtures {
     }
 
     /// Reconstructs the unsigned event a `sign_event` request carries in its first parameter, as the
-    /// signer would to sign it. Uses the client's pubkey as the author.
+    /// signer would to sign it. Uses the client's public key as the author.
     static func unsignedEvent(from request: RemoteSignerRequest, author: PublicKey) throws -> UnsignedEvent {
         guard let param = request.params.first,
             let object = try JSONSerialization.jsonObject(with: Data(param.utf8)) as? [String: Any]

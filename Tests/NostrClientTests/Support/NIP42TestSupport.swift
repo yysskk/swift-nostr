@@ -31,7 +31,7 @@ enum NIP42TestSupport {
     }
 
     /// Waits for the next AUTH frame `connection` sends, delivers the relay's
-    /// OK `true` for it, and waits for the pubkey to be recorded.
+    /// OK `true` for it, and waits for the public key to be recorded.
     @discardableResult
     static func acknowledgeAuth(
         on connection: RelayConnection, mock: MockWebSocketSession

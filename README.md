@@ -132,7 +132,7 @@ Subscriptions are async sequences — iterate them with `for await`. The subscri
 ```swift
 // Live timeline
 let alice = try PublicKey(npub: "npub1...")
-let timeline = try await client.subscriptions.userTimeline(pubkey: alice)
+let timeline = try await client.subscriptions.userTimeline(publicKey: alice)
 for await event in timeline.events {
     print(event.content)
 }
@@ -144,7 +144,7 @@ for await event in try await client.subscriptions.events(filters: [filter]) {
 }
 
 // One-shot fetch
-let metadata = try await client.events.fetchMetadata(pubkey: alice)
+let metadata = try await client.events.fetchMetadata(publicKey: alice)
 print(metadata?.name ?? "Unknown")
 ```
 
@@ -160,7 +160,7 @@ try await client.routing.connectDirectMessageInboxRelays()
 // Receive — already decrypted and parsed. Wraps meant for someone else are skipped;
 // a signer that cannot be reached throws, so a failure is never mistaken for silence.
 for try await message in try await client.messages.subscribe() {
-    print("\(message.senderPubkey): \(message.content)")
+    print("\(message.senderPublicKey): \(message.content)")
 }
 
 // Send (encrypted, gift-wrapped, routed to each party's DM relays).
@@ -207,20 +207,20 @@ import NostrConnect
 let signer = try RemoteSigner(bunker: try BunkerURI(string: "bunker://..."))
 
 // Prove the user's key and sign an event remotely — the signed event is verified locally.
-let userPubkey = try await signer.userPublicKey()
+let userPublicKey = try await signer.userPublicKey()
 let signed = try await signer.sign(
-    UnsignedEvent(publicKey: userPubkey, kind: .textNote, content: "Signed by my bunker"))
+    UnsignedEvent(publicKey: userPublicKey, kind: .textNote, content: "Signed by my bunker"))
 print(signed.id, try signed.verify())
 ```
 
-Or start the handshake from the client: generate a `nostrconnect://` invitation, show it as a QR code or link, and wait for the signer to accept — its pubkey is discovered from the response, which is validated against the invitation secret.
+Or start the handshake from the client: generate a `nostrconnect://` invitation, show it as a QR code or link, and wait for the signer to accept — its public key is discovered from the response, which is validated against the invitation secret.
 
 ```swift
 let invitation = try NostrConnectURI.invitation(clientKeyPair: clientKeyPair, relays: [relayURL])
 displayQRCode(invitation.stringValue)
 
 let signer = try RemoteSigner(invitation: invitation, clientKeyPair: clientKeyPair)
-let remotePubkey = try await signer.awaitConnection()   // the signer's PublicKey, once it accepts
+let remotePublicKey = try await signer.awaitConnection()   // the signer's PublicKey, once it accepts
 ```
 
 `ping`, NIP-44/NIP-04 encrypt and decrypt, `switch_relays`, and `logout` are available too, along with an `authChallenges()` stream for `auth_url` approvals.
@@ -229,9 +229,9 @@ A `RemoteSigner` can also drive a `NostrClient`: `client.identity.setSigner(_:)`
 
 ```swift
 try await client.identity.setSigner(signer)   // any NostrSigning — a RemoteSigner or a local EventSigner
-let userPubkey = try await signer.publicKey
+let userPublicKey = try await signer.publicKey
 let signed = try await client.identity.sign(
-    UnsignedEvent(publicKey: userPubkey, kind: .textNote, content: "Signed by my bunker"))
+    UnsignedEvent(publicKey: userPublicKey, kind: .textNote, content: "Signed by my bunker"))
 try await client.events.publish(signed)
 ```
 

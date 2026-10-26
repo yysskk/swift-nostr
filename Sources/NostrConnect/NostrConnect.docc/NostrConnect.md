@@ -36,8 +36,8 @@ let bunker = try BunkerURI(string: "bunker://...")
 let signer = try RemoteSigner(bunker: bunker)
 
 // Prove the user's key and sign an event remotely.
-let pubkey = try await signer.userPublicKey()
-let unsigned = UnsignedEvent(publicKey: pubkey, kind: .textNote, content: "Signed by my bunker")
+let publicKey = try await signer.userPublicKey()
+let unsigned = UnsignedEvent(publicKey: publicKey, kind: .textNote, content: "Signed by my bunker")
 let signed = try await signer.sign(unsigned)
 print(signed.id, try signed.verify())
 ```

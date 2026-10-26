@@ -39,7 +39,7 @@ throws out of the loop rather than silently dropping messages. Resubscribe to re
 
 ```swift
 for try await message in try await client.messages.subscribe() {
-    print("From: \(message.senderPubkey)")
+    print("From: \(message.senderPublicKey)")
     print("Content: \(message.content)")
 }
 ```
@@ -51,7 +51,7 @@ and parse manually:
 let giftWraps = try await client.messages.giftWraps()
 for await giftWrap in giftWraps.events {
     let dm = try await client.messages.parse(giftWrap)
-    print("From: \(dm.senderPubkey): \(dm.content)")
+    print("From: \(dm.senderPublicKey): \(dm.content)")
 }
 ```
 
@@ -103,13 +103,13 @@ under the signer's public key and is never signed:
 
 ```swift
 let rumor = UnsignedEvent(
-    publicKey: myPubkey, kind: Event.Kind(rawValue: 30_999),
+    publicKey: myPublicKey, kind: Event.Kind(rawValue: 30_999),
     tags: [.publicKey(recipient)], content: payload
 )
 try await client.messages.sendGiftWrapped(rumor, to: recipient)
 ```
 
-To build the gift wrap without publishing, use ``GiftWrap/wrap(event:signer:recipientPubkey:expiration:)``.
+To build the gift wrap without publishing, use ``GiftWrap/wrap(event:signer:recipientPublicKey:expiration:)``.
 On the receiving side, read the raw stream from ``NostrMessagesAPI/giftWraps(limit:)`` and open each
 event with ``GiftWrap/unwrap(giftWrap:recipient:)``; the parsing helpers understand only kinds 14, 15,
 and 7.
@@ -137,9 +137,9 @@ together as a ``DirectMessagePayload``, so one loop can handle every kind:
 for try await payload in try await client.messages.payloads() {
     switch payload {
     case .message(let message):
-        print("\(message.senderPubkey): \(message.content)")
+        print("\(message.senderPublicKey): \(message.content)")
     case .reaction(let reaction):
-        print("\(reaction.senderPubkey) reacted \(reaction.content) to \(reaction.messageID)")
+        print("\(reaction.senderPublicKey) reacted \(reaction.content) to \(reaction.messageID)")
     case .file(let file):
         let blob = try await download(file.url)  // your transport
         let data = try EncryptedFile.decrypt(blob, key: file.decryptionKey, nonce: file.decryptionNonce)
@@ -174,18 +174,18 @@ For lower-level access to encryption primitives:
 
 ```swift
 let senderKeyPair = try KeyPair()
-let recipientPubkey = try PublicKey(npub: "npub1...")
+let recipientPublicKey = try PublicKey(npub: "npub1...")
 
 // Seal a message (NIP-44)
 let sealed = try SealedMessage.seal(
     "secret message",
-    for: recipientPubkey,
+    for: recipientPublicKey,
     using: senderKeyPair
 )
 
 // Open a sealed message
 let plaintext = try sealed.open(
-    from: senderPubkey,
+    from: senderPublicKey,
     using: recipientKeyPair
 )
 
@@ -199,7 +199,7 @@ let groupPlaintext = try groupSealed.open(conversationKey: groupKey)
 let wrapped = try await GiftWrap.wrap(
     event: rumorEvent,
     signer: EventSigner(keyPair: senderKeyPair),
-    recipientPubkey: recipientPubkey
+    recipientPublicKey: recipientPublicKey
 )
 
 // Unwrap
@@ -234,21 +234,21 @@ let privateKey = try KeyDerivation.deriveNostrKey(seed: seed, account: 0)
 ```swift
 // Verify an internet identifier
 let result = try await InternetIdentifier.verify("alice@example.com")
-print("Pubkey: \(result.pubkey)")
+print("Public key: \(result.publicKey)")
 print("Relays: \(result.relays)")
 
-// Verify against expected pubkey
+// Verify against expected public key
 try await InternetIdentifier.verify(
     "alice@example.com",
-    expectedPubkey: try PublicKey(npub: "npub1...")
+    expectedPublicKey: try PublicKey(npub: "npub1...")
 )
 
-// Look up pubkey only
-let pubkey = try await InternetIdentifier.lookupPubkey("alice@example.com")
+// Look up public key only
+let publicKey = try await InternetIdentifier.lookupPublicKey("alice@example.com")
 ```
 
 A `nostr.json` entry that is not a canonical hex key (64 lowercase hex digits) names no key, so the
-lookup throws ``InternetIdentifier/VerificationError/pubkeyNotFound``.
+lookup throws ``InternetIdentifier/VerificationError/publicKeyNotFound``.
 
 ## NIP-19 Entities
 
@@ -282,7 +282,7 @@ directly:
 ```swift
 switch try NIP19Entity.decode(nprofile) {
 case .nprofile(let p):
-    print("pubkey: \(p.publicKey), relays: \(p.relays)")
+    print("publicKey: \(p.publicKey), relays: \(p.relays)")
 case .nevent(let e):
     print("event: \(e.eventID), kind: \(String(describing: e.kind))")
 case .naddr(let a):
@@ -303,8 +303,8 @@ let parsed = try NEvent(bech32String: nevent)
 
 ```swift
 let contacts = [
-    Contact(pubkey: alice, relayURL: try RelayURL(string: "wss://relay.example.com"), petname: "alice"),
-    Contact(pubkey: bob)
+    Contact(publicKey: alice, relayURL: try RelayURL(string: "wss://relay.example.com"), petname: "alice"),
+    Contact(publicKey: bob)
 ]
 // A contact list is built and signed by the signer, then published like any event.
 let signed = try signer.signContactList(contacts)
@@ -313,7 +313,7 @@ try await client.events.publish(signed)
 // Extract contacts from a kind-3 event; a `p` tag that is not a canonical hex key is skipped
 if let contacts = event.contacts {
     for contact in contacts {
-        print("\(contact.petname ?? contact.pubkey.npub)")
+        print("\(contact.petname ?? contact.publicKey.npub)")
     }
 }
 ```
@@ -362,7 +362,7 @@ let client = NostrClient()
 try await client.identity.setNsec("nsec1...")  // automatic from here on
 ```
 
-Automatic authentication reveals the signer's pubkey to any relay that asks. Switch to
+Automatic authentication reveals the signer's public key to any relay that asks. Switch to
 manual mode when that link should only be made deliberately:
 
 ```swift
@@ -400,7 +400,7 @@ print(await connection.isAuthenticated)
 A pre-signed event (e.g. from a remote signer) can be sent with
 ``RelayConnection/authenticate(with:)``. Detect why a relay denied an operation with
 ``RelayResponsePrefix`` — `auth-required:` means authenticate and retry, `restricted:`
-means the pubkey is not allowed even when authenticated.
+means the public key is not allowed even when authenticated.
 
 ## Remote Signing (NIP-46)
 
@@ -422,16 +422,16 @@ let signer = try RemoteSigner(bunker: try BunkerURI(string: "bunker://..."))
 try await client.identity.setSigner(signer)   // any NostrSigning
 
 try await client.events.publishTextNote(content: "Signed by my bunker")
-try await client.messages.send("and gift-wrapped by it too", to: recipientPubkey)
+try await client.messages.send("and gift-wrapped by it too", to: recipientPublicKey)
 ```
 
 To author an event this library has no helper for, build an ``UnsignedEvent`` under
 ``NostrIdentityAPI/publicKey``, sign it, and publish it:
 
 ```swift
-guard let pubkey = await client.identity.publicKey else { return }
+guard let publicKey = await client.identity.publicKey else { return }
 let signed = try await client.identity.sign(
-    UnsignedEvent(publicKey: pubkey, kind: .textNote, content: "Signed by my bunker"))
+    UnsignedEvent(publicKey: publicKey, kind: .textNote, content: "Signed by my bunker"))
 try await client.events.publish(signed)
 ```
 
@@ -440,8 +440,8 @@ To encrypt an app payload to a peer outside the direct-message path, use
 NIP-44 v2 through the active signer, so with a remote signer each call is a relay round-trip:
 
 ```swift
-let payload = try await client.identity.nip44Encrypt("for your eyes only", to: peerPubkey)
-let plaintext = try await client.identity.nip44Decrypt(reply, from: peerPubkey)
+let payload = try await client.identity.nip44Encrypt("for your eyes only", to: peerPublicKey)
+let plaintext = try await client.identity.nip44Decrypt(reply, from: peerPublicKey)
 ```
 
 NIP-17 is the one place where a remote signer costs an extra round-trip per message: the gift wrap
@@ -512,7 +512,7 @@ invite code, and update the pin list:
 
 ```swift
 try await client.groups.publishModeration(
-    .putUser(publicKey: newMemberPubkey, roles: ["moderator"]),
+    .putUser(publicKey: newMemberPublicKey, roles: ["moderator"]),
     in: group,
     reason: "welcome aboard"
 )
@@ -525,8 +525,8 @@ Parse received moderation events for an admin or audit UI with
 
 The relay publishes each group's current state as relay-signed kind-39xxx events: metadata
 (39000), admins (39001), members (39002), roles (39003), and pins (39005).
-``NostrGroupsAPI/fetchState(for:authorPubkey:timeout:)`` fetches a snapshot in one round
-trip, newest event per kind. With a known ``GroupReference/relayPubkey`` — an `naddr` share
+``NostrGroupsAPI/fetchState(for:authorPublicKey:timeout:)`` fetches a snapshot in one round
+trip, newest event per kind. With a known ``GroupReference/relayPublicKey`` — an `naddr` share
 link carries it as the coordinate's author — events by any other author or with an invalid
 signature are dropped before the pick:
 
@@ -539,14 +539,14 @@ print("admins:", state.admins?.admins.map(\.publicKey) ?? [])
 
 Never treat ``GroupState/members`` as exhaustive — relays may withhold or truncate the member
 list. To check your own standing, derive it from the kind-9000/9001 moderation history with
-`Groups.membership(of:in:)` instead (the latest event targeting the pubkey wins):
+`Groups.membership(of:in:)` instead (the latest event targeting the public key wins):
 
 ```swift
-if let pubkey = await client.identity.publicKey {
+if let publicKey = await client.identity.publicKey {
     var filter = Filter.groupTimeline(groupID: group.id, kinds: [.groupPutUser, .groupRemoveUser])
-    filter.publicKeyReferences = [pubkey]
+    filter.publicKeyReferences = [publicKey]
     let history = try await client.events.fetch(filters: [filter])
-    switch Groups.membership(of: pubkey, in: history) {
+    switch Groups.membership(of: publicKey, in: history) {
     case .member(let roles):
         print("member, roles: \(roles)")
     case .removed:
@@ -611,7 +611,7 @@ for await event in outbox.events {
 ```
 
 A **gossip publish** routes an event to the author's write relays plus the inbox (read) relays of
-every pubkey it mentions in `p` tags, with ``NostrRoutingAPI/publishGossip(_:strategy:)``:
+every public key it mentions in `p` tags, with ``NostrRoutingAPI/publishGossip(_:strategy:)``:
 
 ```swift
 let signer = EventSigner(keyPair: keyPair)
@@ -636,7 +636,7 @@ is the caller's job (use a Lightning wallet).
 guard let serviceURL = LNURL.payServiceURL(forLightningAddress: "alice@example.com") else { return }
 let (data, _) = try await URLSession.shared.data(from: serviceURL)
 let pay = try JSONDecoder().decode(LNURLPayResponse.self, from: data)
-guard pay.supportsZaps, let providerPubkey = pay.nostrPublicKey else { return }
+guard pay.supportsZaps, let providerPublicKey = pay.nostrPublicKey else { return }
 
 // 2. Sign a zap request (kind 9734) — note it is NOT published to relays.
 let signer = EventSigner(keyPair: keyPair)
@@ -658,8 +658,8 @@ if let invoice = Bolt11Invoice(bolt11) {
 
 // 4. When the kind-9735 zap receipt arrives over relays, verify it is authentic.
 if let receipt = ZapReceipt(event: receiptEvent) {
-    try receipt.validate(lnurlProviderPubkey: providerPubkey, expectedAmountMillisats: 21_000)
-    // receipt.recipientPubkey, receipt.amountMillisats, receipt.zappedEventID, …
+    try receipt.validate(lnurlProviderPublicKey: providerPublicKey, expectedAmountMillisats: 21_000)
+    // receipt.recipientPublicKey, receipt.amountMillisats, receipt.zappedEventID, …
 }
 ```
 
@@ -671,7 +671,7 @@ for a provider known to omit it, accepting the loss of that binding.
 
 The ``EventSigner/signZapRequest(recipientPublicKey:relays:amountMillisats:lnurl:eventID:eventCoordinate:comment:)``,
 ``LNURLPayResponse/fetchInvoice(amountMillisats:zapRequest:lnurl:urlSession:)``, ``Bolt11Invoice``,
-and ``ZapReceipt/validate(lnurlProviderPubkey:expectedAmountMillisats:requiringDescriptionHash:)`` APIs each work standalone,
+and ``ZapReceipt/validate(lnurlProviderPublicKey:expectedAmountMillisats:requiringDescriptionHash:)`` APIs each work standalone,
 so you can adopt only the parts of the flow you need.
 
 ## Relay Configuration

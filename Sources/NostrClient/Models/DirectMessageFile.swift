@@ -16,10 +16,10 @@ public struct DirectMessageFile: Sendable, Identifiable, Hashable {
     public let rumorID: EventID
 
     /// The sender's public key.
-    public let senderPubkey: PublicKey
+    public let senderPublicKey: PublicKey
 
     /// The recipient's public key.
-    public let recipientPubkey: PublicKey
+    public let recipientPublicKey: PublicKey
 
     /// URL of the encrypted file (the kind-15 content).
     public let url: String
@@ -58,8 +58,8 @@ public struct DirectMessageFile: Sendable, Identifiable, Hashable {
     /// Creates a file message from its parsed parts.
     public init(
         rumorID: EventID,
-        senderPubkey: PublicKey,
-        recipientPubkey: PublicKey,
+        senderPublicKey: PublicKey,
+        recipientPublicKey: PublicKey,
         url: String,
         mimeType: String?,
         decryptionKey: Data,
@@ -73,8 +73,8 @@ public struct DirectMessageFile: Sendable, Identifiable, Hashable {
         expiresAt: Timestamp? = nil
     ) {
         self.rumorID = rumorID
-        self.senderPubkey = senderPubkey
-        self.recipientPubkey = recipientPubkey
+        self.senderPublicKey = senderPublicKey
+        self.recipientPublicKey = recipientPublicKey
         self.url = url
         self.mimeType = mimeType
         self.decryptionKey = decryptionKey

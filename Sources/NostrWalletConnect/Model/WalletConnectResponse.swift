@@ -76,8 +76,8 @@ public struct GetInfoResult: Codable, Sendable, Hashable {
     public let alias: String?
     /// The node color (hex).
     public let color: String?
-    /// The Lightning node's public key (hex) — a node key, not a Nostr `PublicKey`.
-    public let pubkey: String?
+    /// The Lightning node's hex public key: a node key, not a Nostr `PublicKey`.
+    public let nodePublicKey: String?
     /// The network, e.g. `"mainnet"`.
     public let network: String?
     /// The current block height.
@@ -92,7 +92,7 @@ public struct GetInfoResult: Codable, Sendable, Hashable {
     enum CodingKeys: String, CodingKey {
         case alias
         case color
-        case pubkey
+        case nodePublicKey = "pubkey"
         case network
         case blockHeight = "block_height"
         case blockHash = "block_hash"
@@ -101,13 +101,13 @@ public struct GetInfoResult: Codable, Sendable, Hashable {
     }
 
     public init(
-        alias: String? = nil, color: String? = nil, pubkey: String? = nil, network: String? = nil,
+        alias: String? = nil, color: String? = nil, nodePublicKey: String? = nil, network: String? = nil,
         blockHeight: Int64? = nil, blockHash: String? = nil, methods: [String] = [],
         notifications: [String]? = nil
     ) {
         self.alias = alias
         self.color = color
-        self.pubkey = pubkey
+        self.nodePublicKey = nodePublicKey
         self.network = network
         self.blockHeight = blockHeight
         self.blockHash = blockHash
@@ -120,7 +120,7 @@ public struct GetInfoResult: Codable, Sendable, Hashable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         alias = try container.decodeIfPresent(String.self, forKey: .alias)
         color = try container.decodeIfPresent(String.self, forKey: .color)
-        pubkey = try container.decodeIfPresent(String.self, forKey: .pubkey)
+        nodePublicKey = try container.decodeIfPresent(String.self, forKey: .nodePublicKey)
         network = try container.decodeIfPresent(String.self, forKey: .network)
         blockHeight = try container.decodeIfPresent(Int64.self, forKey: .blockHeight)
         blockHash = try container.decodeIfPresent(String.self, forKey: .blockHash)

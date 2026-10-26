@@ -7,20 +7,20 @@ import Testing
 @Suite("GroupReference Tests (NIP-29)")
 struct GroupReferenceTests {
 
-    /// A valid 32-byte hex pubkey standing in for a group relay's key.
-    private let relayPubkey = try! PublicKey(hex: "3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d")
+    /// A valid 32-byte hex public key standing in for a group relay's key.
+    private let relayPublicKey = try! PublicKey(hex: "3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d")
 
     private func groupNAddr(
         identifier: String = "abcdef",
         kind: Int = 39000,
         relays: [RelayURL] = [RelayURL("wss://groups.example.com")!]
     ) throws -> NAddr {
-        try NAddr(identifier: identifier, author: relayPubkey, kind: kind, relays: relays)
+        try NAddr(identifier: identifier, author: relayPublicKey, kind: kind, relays: relays)
     }
 
     // MARK: - Building from an naddr
 
-    @Test("a kind-39000 naddr maps to relay, id, and relay pubkey")
+    @Test("a kind-39000 naddr maps to relay, id, and relay public key")
     func naddrRoundTrip() throws {
         let naddr = try groupNAddr(relays: [
             RelayURL("wss://groups.example.com")!, RelayURL("wss://mirror.example.com")!,
@@ -29,7 +29,7 @@ struct GroupReferenceTests {
 
         #expect(reference.relayURL == RelayURL("wss://groups.example.com"))
         #expect(reference.id == "abcdef")
-        #expect(reference.relayPubkey == relayPubkey)
+        #expect(reference.relayPublicKey == relayPublicKey)
         #expect(reference.inviteCode == nil)
 
         let invited = try GroupReference(naddr: naddr, inviteCode: "A7fjq2")
@@ -47,7 +47,7 @@ struct GroupReferenceTests {
     /// An `naddr` string for the group whose relay hints are written as `relays`, verbatim.
     private func rawGroupNAddr(relays: [String]) throws -> String {
         try RawTLV.bech32(
-            prefix: "naddr", special: Data("abcdef".utf8), relays: relays, author: relayPubkey, kind: 39000)
+            prefix: "naddr", special: Data("abcdef".utf8), relays: relays, author: relayPublicKey, kind: 39000)
     }
 
     @Test("an naddr without a valid relay hint is rejected")
@@ -75,7 +75,7 @@ struct GroupReferenceTests {
 
         #expect(reference.relayURL == RelayURL("wss://groups.example.com"))
         #expect(reference.id == "abcdef")
-        #expect(reference.relayPubkey == relayPubkey)
+        #expect(reference.relayPublicKey == relayPublicKey)
         #expect(reference.inviteCode == nil)
     }
 
@@ -108,8 +108,8 @@ struct GroupReferenceTests {
 
     // MARK: - Emitting an naddr
 
-    @Test("naddr() requires the relay pubkey")
-    func naddrRequiresRelayPubkey() throws {
+    @Test("naddr() requires the relay public key")
+    func naddrRequiresRelayPublicKey() throws {
         let reference = GroupReference(relayURL: RelayURL("wss://groups.example.com")!, id: "abcdef")
         #expect(throws: NostrError.invalidNIP19Entity) {
             _ = try reference.naddr()
@@ -122,11 +122,11 @@ struct GroupReferenceTests {
     @Test("naddr() rebuilds the group coordinate")
     func naddrRebuildsCoordinate() throws {
         let reference = GroupReference(
-            relayURL: RelayURL("wss://groups.example.com")!, id: "abcdef", relayPubkey: relayPubkey)
+            relayURL: RelayURL("wss://groups.example.com")!, id: "abcdef", relayPublicKey: relayPublicKey)
         let naddr = try reference.naddr()
 
         #expect(naddr.identifier == "abcdef")
-        #expect(naddr.author == relayPubkey)
+        #expect(naddr.author == relayPublicKey)
         #expect(naddr.kind == 39000)
         #expect(naddr.relays == [RelayURL("wss://groups.example.com")!])
     }
@@ -136,7 +136,7 @@ struct GroupReferenceTests {
         let reference = GroupReference(
             relayURL: RelayURL("wss://groups.example.com")!,
             id: "abcdef",
-            relayPubkey: relayPubkey,
+            relayPublicKey: relayPublicKey,
             inviteCode: "top/secret code+1"
         )
         let shared = try reference.shareableString()
@@ -146,7 +146,7 @@ struct GroupReferenceTests {
         #expect(try GroupReference(naddrString: shared) == reference)
 
         let bare = GroupReference(
-            relayURL: RelayURL("wss://groups.example.com")!, id: "abcdef", relayPubkey: relayPubkey)
+            relayURL: RelayURL("wss://groups.example.com")!, id: "abcdef", relayPublicKey: relayPublicKey)
         #expect(try GroupReference(naddrString: bare.shareableString()) == bare)
     }
 
@@ -157,17 +157,17 @@ struct GroupReferenceTests {
         let reference = GroupReference(
             relayURL: RelayURL("wss://groups.example.com")!,
             id: "abcdef",
-            relayPubkey: relayPubkey,
+            relayPublicKey: relayPublicKey,
             inviteCode: "A7fjq2"
         )
 
         #expect(reference.relayURL == RelayURL("wss://groups.example.com"))
         #expect(reference.id == "abcdef")
-        #expect(reference.relayPubkey == relayPubkey)
+        #expect(reference.relayPublicKey == relayPublicKey)
         #expect(reference.inviteCode == "A7fjq2")
 
         let minimal = GroupReference(relayURL: RelayURL("wss://groups.example.com")!, id: "abcdef")
-        #expect(minimal.relayPubkey == nil)
+        #expect(minimal.relayPublicKey == nil)
         #expect(minimal.inviteCode == nil)
     }
 }

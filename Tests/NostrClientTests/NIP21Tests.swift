@@ -13,7 +13,7 @@ struct NIP21Tests {
         "nostr:nprofile1qqsrhuxx8l9ex335q7he0f09aej04zpazpl0ne2cgukyawd24mayt8gpp4mhxue69uhhytnc9e3k7mgpz4mhxue69uhkg6nzv9ejuumpv34kytnrdaksjlyr9p"
     let noteURI = "nostr:note1fntxtkcy9pjwucqwa9mddn7v03wwwsu9j330jj350nvhpky2tuaspk6nqc"
 
-    let pubkeyHex = "3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d"
+    let publicKeyHex = "3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d"
     let eventID = EventID("5c83da77af1dec6d7289834998ad7aafbd9e2191396d75ec3cc27f5a77226f36")!
 
     // MARK: - spec examples round-trip
@@ -55,7 +55,7 @@ struct NIP21Tests {
         let event = try NEvent(
             eventID: eventID,
             relays: [RelayURL("wss://relay.example.com")!],
-            author: PublicKey(pubkeyHex)!,
+            author: PublicKey(publicKeyHex)!,
             kind: 1
         )
         let uri = try NIP19Entity.nevent(event).nostrURI
@@ -67,7 +67,7 @@ struct NIP21Tests {
     func naddrRoundTrip() throws {
         let addr = try NAddr(
             identifier: "1700847963",
-            author: PublicKey(pubkeyHex)!,
+            author: PublicKey(publicKeyHex)!,
             kind: 30023,
             relays: [RelayURL("wss://relay3.example.com")!]
         )
@@ -97,7 +97,7 @@ struct NIP21Tests {
     @Test("decoding an nsec URI throws invalidNostrURI")
     func nsecURIRejected() throws {
         // Source a valid nsec bech32 by encoding a 32-byte key through the existing API.
-        let nsecBech32 = try NIP19Entity.nsec(pubkeyHex).encoded
+        let nsecBech32 = try NIP19Entity.nsec(publicKeyHex).encoded
         #expect(throws: NostrError.invalidNostrURI) {
             _ = try NIP19Entity(nostrURI: "nostr:" + nsecBech32)
         }
@@ -106,7 +106,7 @@ struct NIP21Tests {
     @Test("encoding an nsec entity to a nostr: URI throws invalidNostrURI")
     func nsecEncodeRejected() {
         #expect(throws: NostrError.invalidNostrURI) {
-            _ = try NIP19Entity.nsec(pubkeyHex).nostrURI
+            _ = try NIP19Entity.nsec(publicKeyHex).nostrURI
         }
     }
 

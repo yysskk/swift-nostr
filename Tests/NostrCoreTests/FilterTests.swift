@@ -145,7 +145,7 @@ struct FilterTests {
         "Filter JSON decoding rejects a malformed id or public key",
         arguments: ["ids", "authors", "#e", "#p"])
     func filterJsonDecodingRejectsMalformedValues(key: String) {
-        let json = #"{"\#(key)": ["pubkey1"]}"#
+        let json = #"{"\#(key)": ["not-hex"]}"#
 
         #expect(throws: DecodingError.self) {
             try JSONDecoder().decode(Filter.self, from: Data(json.utf8))

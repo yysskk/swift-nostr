@@ -151,8 +151,8 @@ struct PublishedEventTests {
         #expect(published.event.kind == .relayListMetadata)
         #expect(published.result.acceptedRelays == [relayURL])
 
-        let pubkey = await client.identity.publicKey
-        let cached = await client.routing.cachedRelayList(for: pubkey!)
+        let publicKey = await client.identity.publicKey
+        let cached = await client.routing.cachedRelayList(for: publicKey!)
         #expect(cached != nil)
         await client.relays.disconnect()
     }

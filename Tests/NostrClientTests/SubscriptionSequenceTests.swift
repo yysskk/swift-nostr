@@ -212,11 +212,11 @@ struct SubscriptionSequenceTests {
     func convenienceSubscriptionsReturnSequences() async throws {
         let (client, _) = try await makeConnectedClient()
 
-        let pubkey = PublicKey.fixture("author")
-        let timeline = try await client.subscriptions.userTimeline(pubkey: pubkey)
+        let publicKey = PublicKey.fixture("author")
+        let timeline = try await client.subscriptions.userTimeline(publicKey: publicKey)
         let global = try await client.subscriptions.globalFeed(limit: 10)
-        let mentions = try await client.subscriptions.mentions(pubkey: pubkey)
-        let metadata = try await client.subscriptions.metadata(pubkeys: [pubkey])
+        let mentions = try await client.subscriptions.mentions(publicKey: publicKey)
+        let metadata = try await client.subscriptions.metadata(publicKeys: [publicKey])
 
         #expect(await client.activeSubscriptionCount == 4)
 

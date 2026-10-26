@@ -23,7 +23,7 @@ struct NIP25DirectMessageReactionTests {
         let builder = DirectMessageBuilder(signer: EventSigner(keyPair: sender))
 
         let result = try await builder.createReactionWithSelfCopy(
-            reaction: "🤙", to: messageID, author: authorKey, recipientPubkey: recipient.publicKey)
+            reaction: "🤙", to: messageID, author: authorKey, recipientPublicKey: recipient.publicKey)
 
         #expect(result.rumor.kind == .reaction)
         #expect(result.rumor.content == "🤙")
@@ -42,14 +42,14 @@ struct NIP25DirectMessageReactionTests {
 
         let result = try await builder.createReactionWithSelfCopy(
             reaction: "+", to: messageID, author: recipient.publicKey,
-            recipientPubkey: recipient.publicKey)
+            recipientPublicKey: recipient.publicKey)
 
         let reaction = try await DirectMessageParser(signer: EventSigner(keyPair: recipient)).parseReaction(
             result.recipientGiftWrap)
         #expect(reaction.content == "+")
         #expect(reaction.messageID == messageID)
-        #expect(reaction.messageAuthorPubkey == recipient.publicKey)
-        #expect(reaction.senderPubkey == sender.publicKey)
+        #expect(reaction.messageAuthorPublicKey == recipient.publicKey)
+        #expect(reaction.senderPublicKey == sender.publicKey)
 
         // The self-copy decrypts with the sender's own key and carries the identical reaction,
         // guarding against a wrong-key regression when wrapping the self-copy.
@@ -58,7 +58,7 @@ struct NIP25DirectMessageReactionTests {
         #expect(selfCopy.rumorID == reaction.rumorID)
         #expect(selfCopy.content == "+")
         #expect(selfCopy.messageID == messageID)
-        #expect(selfCopy.senderPubkey == sender.publicKey)
+        #expect(selfCopy.senderPublicKey == sender.publicKey)
     }
 
     @Test("parsePayload classifies messages and reactions")
@@ -77,7 +77,7 @@ struct NIP25DirectMessageReactionTests {
 
         let reaction = try await builder.createReactionWithSelfCopy(
             reaction: "❤️", to: parsedMessage.rumorID, author: sender.publicKey,
-            recipientPubkey: recipient.publicKey)
+            recipientPublicKey: recipient.publicKey)
         guard case .reaction(let parsedReaction) = try await parser.parsePayload(reaction.recipientGiftWrap) else {
             Issue.record("expected a reaction payload")
             return
@@ -95,7 +95,7 @@ struct NIP25DirectMessageReactionTests {
 
         let message = try await builder.createMessageWithSelfCopy(content: "hi", to: recipient.publicKey)
         let reaction = try await builder.createReactionWithSelfCopy(
-            reaction: "+", to: messageID, author: sender.publicKey, recipientPubkey: recipient.publicKey)
+            reaction: "+", to: messageID, author: sender.publicKey, recipientPublicKey: recipient.publicKey)
 
         await #expect(throws: NostrError.self) { try await parser.parse(reaction.recipientGiftWrap) }
         await #expect(throws: NostrError.self) { try await parser.parseReaction(message.recipientGiftWrap) }
@@ -112,7 +112,7 @@ struct NIP25DirectMessageReactionTests {
             tags: [.publicKey(sender.publicKey)], content: "+"
         ).asRumor()
         let giftWrap = try await GiftWrap.wrap(
-            event: rumor, signer: EventSigner(keyPair: sender), recipientPubkey: recipient.publicKey)
+            event: rumor, signer: EventSigner(keyPair: sender), recipientPublicKey: recipient.publicKey)
 
         let parser = DirectMessageParser(signer: EventSigner(keyPair: recipient))
         await #expect(throws: NostrError.self) { try await parser.parseReaction(giftWrap) }
@@ -129,7 +129,7 @@ struct NIP25DirectMessageReactionTests {
             tags: [.event(messageID)], content: "+"
         ).asRumor()
         let giftWrap = try await GiftWrap.wrap(
-            event: rumor, signer: EventSigner(keyPair: sender), recipientPubkey: recipient.publicKey)
+            event: rumor, signer: EventSigner(keyPair: sender), recipientPublicKey: recipient.publicKey)
 
         await #expect(throws: NostrError.self) {
             try await DirectMessageParser(signer: EventSigner(keyPair: recipient)).parseReaction(giftWrap)
@@ -150,7 +150,7 @@ struct NIP25DirectMessageReactionTests {
             publicKey: sender.publicKey, kind: .reaction, rawTags: rawTags, content: "+"
         ).asRumor()
         let giftWrap = try await GiftWrap.wrap(
-            event: rumor, signer: EventSigner(keyPair: sender), recipientPubkey: recipient.publicKey)
+            event: rumor, signer: EventSigner(keyPair: sender), recipientPublicKey: recipient.publicKey)
 
         await #expect(throws: NostrError.invalidData) {
             try await DirectMessageParser(signer: EventSigner(keyPair: recipient)).parseReaction(giftWrap)
@@ -166,7 +166,7 @@ struct NIP25DirectMessageReactionTests {
 
         let result = try await builder.createReactionWithSelfCopy(
             reaction: "+", to: messageID, author: sender.publicKey,
-            recipientPubkey: recipient.publicKey, expiration: expiry)
+            recipientPublicKey: recipient.publicKey, expiration: expiry)
 
         #expect(result.recipientGiftWrap.expiration == expiry)
         let parsed = try await DirectMessageParser(signer: EventSigner(keyPair: recipient)).parseReaction(
@@ -180,15 +180,15 @@ struct NIP25DirectMessageReactionTests {
         try await client.identity.setPrivateKey(String(repeating: "1", count: 64))
         let author = try KeyPair()
 
-        let myPubkey = try #require(await client.identity.publicKey)
+        let myPublicKey = try #require(await client.identity.publicKey)
         let message = DirectMessage(
-            rumorID: messageID, senderPubkey: author.publicKey,
-            recipientPubkey: myPubkey, content: "hi", createdAt: .now)
+            rumorID: messageID, senderPublicKey: author.publicKey,
+            recipientPublicKey: myPublicKey, content: "hi", createdAt: .now)
 
         // Confirmed-absent DM relay lists: both copies fall back to the pool's relay
         // without a discovery fetch.
         await client.dmRelayListStore.markNoList(for: author.publicKey)
-        await client.dmRelayListStore.markNoList(for: myPubkey)
+        await client.dmRelayListStore.markNoList(for: myPublicKey)
 
         let result = try await PublishAckSupport.acknowledgingPublishes(2, on: socket) {
             try await client.messages.react(to: message, reaction: "+")

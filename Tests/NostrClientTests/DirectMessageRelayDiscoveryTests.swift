@@ -27,8 +27,8 @@ struct DirectMessageRelayDiscoveryTests {
         #expect(try published.event.verify())
         #expect(published.result.acceptedRelays == [ConnectedClientFixture.defaultRelayURL])
 
-        let pubkey = await client.identity.publicKey
-        let cached = await client.routing.cachedDirectMessageRelayList(for: pubkey!)
+        let publicKey = await client.identity.publicKey
+        let cached = await client.routing.cachedDirectMessageRelayList(for: publicKey!)
         #expect(cached?.relays == [RelayURL("wss://inbox.example.com")!])
         await client.relays.disconnect()
     }
@@ -48,7 +48,7 @@ struct DirectMessageRelayDiscoveryTests {
     @Test("cachedDirectMessageRelayList is nil before any fetch or publish")
     func cachedNilInitially() async {
         let client = NostrClient()
-        #expect(await client.routing.cachedDirectMessageRelayList(for: .fixture("somepubkey")) == nil)
+        #expect(await client.routing.cachedDirectMessageRelayList(for: .fixture("somepublickey")) == nil)
     }
 
     @Test("routing.publishDirectMessageRelayList without a signer throws signerNotSet")

@@ -76,8 +76,8 @@ public struct MultiPayInvoiceParams: Codable, Sendable, Hashable {
 public struct PayKeysendParams: Codable, Sendable, Hashable {
     /// The amount to send in millisatoshis.
     public let amount: Int64
-    /// The recipient Lightning node's public key (hex) — a node key, not a Nostr `PublicKey`.
-    public let pubkey: String
+    /// The recipient Lightning node's hex public key: a node key, not a Nostr `PublicKey`.
+    public let nodePublicKey: String
     /// An optional preimage for the payment.
     public let preimage: String?
     /// Optional TLV records to include with the payment.
@@ -85,14 +85,14 @@ public struct PayKeysendParams: Codable, Sendable, Hashable {
 
     enum CodingKeys: String, CodingKey {
         case amount
-        case pubkey
+        case nodePublicKey = "pubkey"
         case preimage
         case tlvRecords = "tlv_records"
     }
 
-    public init(amount: Int64, pubkey: String, preimage: String? = nil, tlvRecords: [TLVRecord]? = nil) {
+    public init(amount: Int64, nodePublicKey: String, preimage: String? = nil, tlvRecords: [TLVRecord]? = nil) {
         self.amount = amount
-        self.pubkey = pubkey
+        self.nodePublicKey = nodePublicKey
         self.preimage = preimage
         self.tlvRecords = tlvRecords
     }
@@ -104,8 +104,8 @@ public struct MultiPayKeysendParams: Codable, Sendable, Hashable {
     public struct Keysend: Codable, Sendable, Hashable {
         /// An optional client-chosen id used to correlate this keysend's response.
         public let id: String?
-        /// The recipient Lightning node's public key (hex) — a node key, not a Nostr `PublicKey`.
-        public let pubkey: String
+        /// The recipient Lightning node's hex public key: a node key, not a Nostr `PublicKey`.
+        public let nodePublicKey: String
         /// The amount to send in millisatoshis.
         public let amount: Int64
         /// An optional preimage for the payment.
@@ -115,18 +115,18 @@ public struct MultiPayKeysendParams: Codable, Sendable, Hashable {
 
         enum CodingKeys: String, CodingKey {
             case id
-            case pubkey
+            case nodePublicKey = "pubkey"
             case amount
             case preimage
             case tlvRecords = "tlv_records"
         }
 
         public init(
-            id: String? = nil, pubkey: String, amount: Int64, preimage: String? = nil,
+            id: String? = nil, nodePublicKey: String, amount: Int64, preimage: String? = nil,
             tlvRecords: [TLVRecord]? = nil
         ) {
             self.id = id
-            self.pubkey = pubkey
+            self.nodePublicKey = nodePublicKey
             self.amount = amount
             self.preimage = preimage
             self.tlvRecords = tlvRecords

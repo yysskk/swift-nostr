@@ -5,7 +5,7 @@ import NostrCore
 ///
 /// Models replaceable-event semantics — when relays return stale copies of an
 /// author's replaceable event, the highest `createdAt` is kept and older copies
-/// are ignored. Used by the per-pubkey relay-list stores, keyed by author pubkey.
+/// are ignored. Used by the per-public-key relay-list stores, keyed by author public key.
 ///
 /// This is a plain value type; callers provide isolation (the relay-list stores
 /// own it inside an actor).

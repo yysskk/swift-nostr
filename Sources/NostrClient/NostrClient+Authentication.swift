@@ -8,7 +8,7 @@ public enum AuthenticationMode: Sendable, Hashable {
     ///
     /// This is the default: relays that require authentication — typically to
     /// serve DMs or accept writes — work without further code. Note that
-    /// authenticating reveals the signer's pubkey to the relay; choose
+    /// authenticating reveals the signer's public key to the relay; choose
     /// ``manual`` when that link should only be made deliberately.
     case automatic
 

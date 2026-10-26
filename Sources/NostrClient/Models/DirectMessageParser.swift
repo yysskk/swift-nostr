@@ -139,7 +139,7 @@ public struct DirectMessageParser: Sendable {
     ) async throws -> DirectMessage {
         let rumor = unwrapped.event
 
-        let recipientPubkey = try await addressee(of: rumor)
+        let recipientPublicKey = try await addressee(of: rumor)
         let subject = rumor.firstTagValue(named: "subject")
 
         // A reply is an "e" tag carrying the NIP-10 "reply" marker at its marker position
@@ -151,8 +151,8 @@ public struct DirectMessageParser: Sendable {
 
         return DirectMessage(
             rumorID: rumor.id,
-            senderPubkey: unwrapped.senderPubkey,
-            recipientPubkey: recipientPubkey,
+            senderPublicKey: unwrapped.senderPublicKey,
+            recipientPublicKey: recipientPublicKey,
             content: rumor.content,
             createdAt: rumor.createdAt,
             subject: subject,
@@ -168,7 +168,7 @@ public struct DirectMessageParser: Sendable {
         let rumor = unwrapped.event
 
         // A reaction must reference both the message ("e") and its author ("p"). Treat either
-        // missing as a parse failure rather than surfacing an empty pubkey callers can't detect.
+        // missing as a parse failure rather than surfacing an empty public key callers can't detect.
         guard
             let messageID = rumor.firstTagValue(named: "e").flatMap(EventID.init),
             let author = rumor.firstTagValue(named: "p").flatMap(PublicKey.init)
@@ -178,9 +178,9 @@ public struct DirectMessageParser: Sendable {
 
         return DirectMessageReaction(
             rumorID: rumor.id,
-            senderPubkey: unwrapped.senderPubkey,
+            senderPublicKey: unwrapped.senderPublicKey,
             messageID: messageID,
-            messageAuthorPubkey: author,
+            messageAuthorPublicKey: author,
             content: rumor.content,
             createdAt: rumor.createdAt,
             expiresAt: giftWrap.expiration
@@ -206,12 +206,12 @@ public struct DirectMessageParser: Sendable {
             throw NostrError.invalidData
         }
 
-        let recipientPubkey = try await addressee(of: rumor)
+        let recipientPublicKey = try await addressee(of: rumor)
 
         return DirectMessageFile(
             rumorID: rumor.id,
-            senderPubkey: unwrapped.senderPubkey,
-            recipientPubkey: recipientPubkey,
+            senderPublicKey: unwrapped.senderPublicKey,
+            recipientPublicKey: recipientPublicKey,
             url: rumor.content,
             mimeType: rumor.firstTagValue(named: "file-type"),
             decryptionKey: key,

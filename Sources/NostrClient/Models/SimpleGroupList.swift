@@ -32,7 +32,7 @@ public struct GroupListEntry: Sendable, Hashable {
 
     /// Builds an entry from a group reference.
     ///
-    /// The name is a display convenience; the reference's `relayPubkey` and `inviteCode`
+    /// The name is a display convenience; the reference's `relayPublicKey` and `inviteCode`
     /// are not part of the list format and are dropped.
     public init(_ reference: GroupReference, name: String? = nil) {
         self.init(groupID: reference.id, relayURL: reference.relayURL, name: name)
@@ -60,7 +60,7 @@ public struct GroupListEntry: Sendable, Hashable {
 
     /// The entry as a ``GroupReference``.
     ///
-    /// The list format carries no relay pubkey or invite code, so both are nil.
+    /// The list format carries no relay public key or invite code, so both are nil.
     public var reference: GroupReference {
         GroupReference(relayURL: relayURL, id: groupID)
     }

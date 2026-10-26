@@ -24,9 +24,9 @@ struct EventTests {
 
     @Test("Serialize unsigned event for hashing")
     func serializeForHashing() throws {
-        let pubkey = "a".padding(toLength: 64, withPad: "0", startingAt: 0)
+        let publicKey = "a".padding(toLength: 64, withPad: "0", startingAt: 0)
         let unsigned = UnsignedEvent(
-            publicKey: try PublicKey(hex: pubkey),
+            publicKey: try PublicKey(hex: publicKey),
             createdAt: Timestamp(rawValue: 1_234_567_890),
             kind: 1,
             tags: [["p", "test"]],

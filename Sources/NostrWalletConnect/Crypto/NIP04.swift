@@ -28,20 +28,20 @@ enum NIP04 {
     /// from NIP-44.
     /// - Parameters:
     ///   - privateKey: The local 32-byte private key.
-    ///   - peerPubkeyXOnly: The peer's 32-byte x-only public key.
-    static func sharedKey(privateKey: Data, peerPubkeyXOnly: Data) throws -> SymmetricKey {
+    ///   - peerPublicKeyXOnly: The peer's 32-byte x-only public key.
+    static func sharedKey(privateKey: Data, peerPublicKeyXOnly: Data) throws -> SymmetricKey {
         let agreementKey = try P256K.KeyAgreement.PrivateKey(dataRepresentation: privateKey)
-        let publicKey = try liftXOnly(peerPubkeyXOnly)
+        let publicKey = try liftXOnly(peerPublicKeyXOnly)
         let sharedSecret = agreementKey.sharedSecretFromKeyAgreement(with: publicKey, format: .compressed)
         // The compressed shared point is `parity (1 byte) || X (32 bytes)`; NIP-04 keys on the bare X.
         let sharedX = sharedSecret.withUnsafeBytes { Data($0.dropFirst()) }
         return SymmetricKey(data: sharedX)
     }
 
-    /// Encrypts `plaintext` for `peerPubkeyXOnly`.
+    /// Encrypts `plaintext` for `peerPublicKeyXOnly`.
     /// - Returns: NIP-04 content `"<base64 ciphertext>?iv=<base64 iv>"` with a random IV.
-    static func encrypt(_ plaintext: String, privateKey: Data, peerPubkeyXOnly: Data) throws -> String {
-        let key = try sharedKey(privateKey: privateKey, peerPubkeyXOnly: peerPubkeyXOnly)
+    static func encrypt(_ plaintext: String, privateKey: Data, peerPublicKeyXOnly: Data) throws -> String {
+        let key = try sharedKey(privateKey: privateKey, peerPublicKeyXOnly: peerPublicKeyXOnly)
         let iv = AES._CBC.IV()
         let ciphertext = try AES._CBC.encrypt(Array(plaintext.utf8), using: key, iv: iv)
         return ciphertext.base64EncodedString() + "?iv=" + Data(iv).base64EncodedString()
@@ -50,7 +50,7 @@ enum NIP04 {
     /// Decrypts NIP-04 content of the form `"<base64 ciphertext>?iv=<base64 iv>"`.
     /// - Throws: ``DecodingError`` if the content is malformed, or a crypto error if the key/IV are
     ///   rejected.
-    static func decrypt(_ content: String, privateKey: Data, peerPubkeyXOnly: Data) throws -> String {
+    static func decrypt(_ content: String, privateKey: Data, peerPublicKeyXOnly: Data) throws -> String {
         let parts = content.components(separatedBy: "?iv=")
         guard parts.count == 2 else {
             throw DecodingError.malformedContent
@@ -66,7 +66,7 @@ enum NIP04 {
             throw DecodingError.malformedContent
         }
 
-        let key = try sharedKey(privateKey: privateKey, peerPubkeyXOnly: peerPubkeyXOnly)
+        let key = try sharedKey(privateKey: privateKey, peerPublicKeyXOnly: peerPublicKeyXOnly)
         let iv = try AES._CBC.IV(ivBytes: ivData)
         let plaintextData = try AES._CBC.decrypt(ciphertext, using: key, iv: iv)
         guard let plaintext = String(data: plaintextData, encoding: .utf8) else {

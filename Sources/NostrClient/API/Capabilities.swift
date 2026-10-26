@@ -37,10 +37,10 @@ public protocol NostrIdentityProviding: Sendable {
 
     /// Signs an event with the configured signer.
     func sign(_ unsignedEvent: UnsignedEvent) async throws -> Event
-    /// Encrypts `plaintext` to `recipientPubkey` with NIP-44 as the configured signer.
-    func nip44Encrypt(_ plaintext: String, to recipientPubkey: PublicKey) async throws -> String
-    /// Decrypts a NIP-44 payload from `senderPubkey` with the configured signer.
-    func nip44Decrypt(_ ciphertext: String, from senderPubkey: PublicKey) async throws -> String
+    /// Encrypts `plaintext` to `recipientPublicKey` with NIP-44 as the configured signer.
+    func nip44Encrypt(_ plaintext: String, to recipientPublicKey: PublicKey) async throws -> String
+    /// Decrypts a NIP-44 payload from `senderPublicKey` with the configured signer.
+    func nip44Decrypt(_ ciphertext: String, from senderPublicKey: PublicKey) async throws -> String
 
     /// How the client reacts to relay AUTH challenges.
     var authenticationMode: AuthenticationMode { get async }
@@ -115,10 +115,10 @@ public protocol NostrEventPublishing: Sendable {
     func publishDeletion(
         eventIDs: [EventID], reason: String, strategy: PublishStrategy?
     ) async throws -> PublishedEvent
-    /// Publishes a NIP-56 report of a pubkey.
+    /// Publishes a NIP-56 report of a public key.
     @discardableResult
     func publishReport(
-        pubkey: PublicKey, type: ReportType, reason: String, strategy: PublishStrategy?
+        publicKey: PublicKey, type: ReportType, reason: String, strategy: PublishStrategy?
     ) async throws -> PublishedEvent
     /// Publishes a NIP-56 report of an event.
     @discardableResult
@@ -146,7 +146,7 @@ public protocol NostrEventFetching: Sendable {
     /// Fetches a single event by id.
     func fetchEvent(id: EventID, timeout: Duration?) async throws -> Event?
     /// Fetches a user's metadata.
-    func fetchMetadata(pubkey: PublicKey, timeout: Duration?) async throws -> UserMetadata?
+    func fetchMetadata(publicKey: PublicKey, timeout: Duration?) async throws -> UserMetadata?
     /// Fetches a NIP-23 article by author and identifier.
     func fetchLongFormContent(
         author: PublicKey, identifier: String, timeout: Duration?
@@ -177,13 +177,13 @@ public protocol NostrSubscribing: Sendable {
     func unsubscribeAll() async
 
     /// Subscribes to a user's timeline.
-    func userTimeline(pubkey: PublicKey, limit: Int) async throws -> SubscriptionSequence
+    func userTimeline(publicKey: PublicKey, limit: Int) async throws -> SubscriptionSequence
     /// Subscribes to the global feed.
     func globalFeed(limit: Int) async throws -> SubscriptionSequence
     /// Subscribes to mentions of a user.
-    func mentions(pubkey: PublicKey, limit: Int) async throws -> SubscriptionSequence
-    /// Subscribes to metadata updates for a list of pubkeys.
-    func metadata(pubkeys: [PublicKey]) async throws -> SubscriptionSequence
+    func mentions(publicKey: PublicKey, limit: Int) async throws -> SubscriptionSequence
+    /// Subscribes to metadata updates for a list of public keys.
+    func metadata(publicKeys: [PublicKey]) async throws -> SubscriptionSequence
 }
 
 // MARK: - Routing
@@ -192,9 +192,9 @@ public protocol NostrSubscribing: Sendable {
 /// and routing by those lists. Implemented by ``NostrRoutingAPI``.
 public protocol NostrRelayRouting: Sendable {
     /// Fetches and caches a user's NIP-65 relay list.
-    func fetchRelayList(for pubkey: PublicKey, timeout: Duration?) async throws -> RelayListMetadata?
-    /// The cached NIP-65 relay list for a pubkey, without a network fetch.
-    func cachedRelayList(for pubkey: PublicKey) async -> RelayListMetadata?
+    func fetchRelayList(for publicKey: PublicKey, timeout: Duration?) async throws -> RelayListMetadata?
+    /// The cached NIP-65 relay list for a public key, without a network fetch.
+    func cachedRelayList(for publicKey: PublicKey) async -> RelayListMetadata?
     /// Publishes the current user's NIP-65 relay list.
     @discardableResult
     func publishRelayList(
@@ -215,10 +215,10 @@ public protocol NostrRelayRouting: Sendable {
 
     /// Fetches and caches a user's NIP-17 DM relay list.
     func fetchDirectMessageRelayList(
-        for pubkey: PublicKey, timeout: Duration?
+        for publicKey: PublicKey, timeout: Duration?
     ) async throws -> DirectMessageRelayList?
-    /// The cached NIP-17 DM relay list for a pubkey, without a network fetch.
-    func cachedDirectMessageRelayList(for pubkey: PublicKey) async -> DirectMessageRelayList?
+    /// The cached NIP-17 DM relay list for a public key, without a network fetch.
+    func cachedDirectMessageRelayList(for publicKey: PublicKey) async -> DirectMessageRelayList?
     /// Publishes the current user's NIP-17 DM relay list.
     @discardableResult
     func publishDirectMessageRelayList(
@@ -242,7 +242,7 @@ public protocol NostrMessaging: Sendable {
     @discardableResult
     func send(
         _ content: String,
-        to recipientPubkey: PublicKey,
+        to recipientPublicKey: PublicKey,
         subject: String?,
         replyTo: EventID?,
         expiration: Timestamp?,
@@ -262,14 +262,14 @@ public protocol NostrMessaging: Sendable {
         size: Int?,
         dimensions: String?,
         blurhash: String?,
-        to recipientPubkey: PublicKey,
+        to recipientPublicKey: PublicKey,
         expiration: Timestamp?,
         strategy: PublishStrategy?
     ) async throws -> SendDirectMessageResult
     /// Sends a rumor of any kind gift-wrapped, routed like a direct message.
     @discardableResult
     func sendGiftWrapped(
-        _ rumor: UnsignedEvent, to recipientPubkey: PublicKey, expiration: Timestamp?, strategy: PublishStrategy?
+        _ rumor: UnsignedEvent, to recipientPublicKey: PublicKey, expiration: Timestamp?, strategy: PublishStrategy?
     ) async throws -> SendDirectMessageResult
 
     /// Unwraps a received gift wrap as a message.
@@ -326,11 +326,11 @@ public protocol NostrGroupManaging: Sendable {
 
     /// Fetches a group's kind-39000 metadata.
     func fetchMetadata(
-        for group: GroupReference, authorPubkey: PublicKey?, timeout: Duration?
+        for group: GroupReference, authorPublicKey: PublicKey?, timeout: Duration?
     ) async throws -> Groups.Metadata?
     /// Fetches a group's full relay-generated state snapshot.
     func fetchState(
-        for group: GroupReference, authorPubkey: PublicKey?, timeout: Duration?
+        for group: GroupReference, authorPublicKey: PublicKey?, timeout: Duration?
     ) async throws -> GroupState
     /// Subscribes to a group's live timeline.
     func timeline(
@@ -338,7 +338,7 @@ public protocol NostrGroupManaging: Sendable {
     ) async throws -> SubscriptionSequence
 
     /// Fetches the kind-10009 list of groups a user is in.
-    func fetchSimpleGroupList(for pubkey: PublicKey?, timeout: Duration?) async throws -> SimpleGroupList?
+    func fetchSimpleGroupList(for publicKey: PublicKey?, timeout: Duration?) async throws -> SimpleGroupList?
     /// Publishes the current user's kind-10009 group list.
     @discardableResult
     func publishSimpleGroupList(
@@ -354,17 +354,17 @@ public protocol NostrListManaging: Sendable {
     @discardableResult
     func publish(_ list: NostrList, strategy: PublishStrategy?) async throws -> PublishedEvent
     /// Fetches the newest list of a kind.
-    func fetch(kind: Event.Kind, for pubkey: PublicKey?, timeout: Duration?) async throws -> NostrList?
+    func fetch(kind: Event.Kind, for publicKey: PublicKey?, timeout: Duration?) async throws -> NostrList?
 
     /// Publishes a NIP-51 set, replacing any prior set with the same kind and `d` identifier.
     @discardableResult
     func publishSet(_ set: NostrListSet, strategy: PublishStrategy?) async throws -> PublishedEvent
     /// Fetches one set by kind and `d` identifier.
     func fetchSet(
-        kind: Event.Kind, identifier: String, for pubkey: PublicKey?, timeout: Duration?
+        kind: Event.Kind, identifier: String, for publicKey: PublicKey?, timeout: Duration?
     ) async throws -> NostrListSet?
     /// Fetches every set of a kind for an author, newest per `d` identifier.
-    func fetchSets(kind: Event.Kind, for pubkey: PublicKey?, timeout: Duration?) async throws -> [NostrListSet]
+    func fetchSets(kind: Event.Kind, for publicKey: PublicKey?, timeout: Duration?) async throws -> [NostrListSet]
     /// Fetches the set addressed by a NIP-19 `naddr`.
     func fetchSet(naddr: NAddr, timeout: Duration?) async throws -> NostrListSet?
 }

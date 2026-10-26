@@ -16,7 +16,7 @@ struct GiftWrapImpersonationTests {
     /// message only in the fields under test.
     private func rumorJSON(
         id: String,
-        pubkey: String,
+        publicKey: String,
         createdAt: Int64,
         kind: Event.Kind,
         tags: [[String]],
@@ -24,7 +24,7 @@ struct GiftWrapImpersonationTests {
     ) throws -> String {
         let object: [String: Any] = [
             "id": id,
-            "pubkey": pubkey,
+            "pubkey": publicKey,
             "created_at": createdAt,
             "kind": kind.rawValue,
             "tags": tags,
@@ -39,7 +39,7 @@ struct GiftWrapImpersonationTests {
     private func wrap(
         rumorJSON: String,
         sender: KeyPair,
-        recipientPubkey: PublicKey
+        recipientPublicKey: PublicKey
     ) throws -> Event {
         let senderSigner = EventSigner(keyPair: sender)
         let seal = try senderSigner.sign(
@@ -48,7 +48,7 @@ struct GiftWrapImpersonationTests {
                 createdAt: Timestamp(rawValue: Timestamp.now.rawValue - 60),
                 kind: .seal,
                 tags: [],
-                content: try senderSigner.nip44Encrypt(rumorJSON, to: recipientPubkey)
+                content: try senderSigner.nip44Encrypt(rumorJSON, to: recipientPublicKey)
             )
         )
 
@@ -59,15 +59,15 @@ struct GiftWrapImpersonationTests {
                 publicKey: ephemeral.publicKey,
                 createdAt: Timestamp(rawValue: Timestamp.now.rawValue - 60),
                 kind: .giftWrap,
-                tags: [Tag.publicKey(recipientPubkey)],
-                content: try ephemeral.nip44Encrypt(sealJSON, to: recipientPubkey)
+                tags: [Tag.publicKey(recipientPublicKey)],
+                content: try ephemeral.nip44Encrypt(sealJSON, to: recipientPublicKey)
             )
         )
     }
 
     /// Mallory seals a rumor that names Alice as its author. The seal's own signature is Mallory's
     /// and verifies, so signature checking alone does not catch this — only comparing the two
-    /// pubkeys does. The rumor even carries the correct hash of its own contents, so an id check
+    /// public keys does. The rumor even carries the correct hash of its own contents, so an id check
     /// does not catch it either.
     @Test("a rumor attributed to someone other than the sealer is rejected")
     func rumorFromAnotherAuthorIsRejected() async throws {
@@ -84,14 +84,14 @@ struct GiftWrapImpersonationTests {
         )
         let rumor = try rumorJSON(
             id: try forged.computedID.hex,
-            pubkey: alice.publicKey.hex,
+            publicKey: alice.publicKey.hex,
             createdAt: forged.createdAt.rawValue,
             kind: forged.kind,
             tags: forged.tags,
             content: forged.content
         )
 
-        let giftWrap = try wrap(rumorJSON: rumor, sender: mallory, recipientPubkey: bob.publicKey)
+        let giftWrap = try wrap(rumorJSON: rumor, sender: mallory, recipientPublicKey: bob.publicKey)
 
         await #expect(throws: NostrError.verificationFailed) {
             try await GiftWrap.unwrap(giftWrap: giftWrap, recipient: EventSigner(keyPair: bob))
@@ -108,21 +108,21 @@ struct GiftWrapImpersonationTests {
 
         let rumor = try rumorJSON(
             id: try EventID(hex: String(repeating: "11", count: 32)).hex,
-            pubkey: alice.publicKey.hex,
+            publicKey: alice.publicKey.hex,
             createdAt: 1_700_000_000,
             kind: .privateDirectMessage,
             tags: [["p", bob.publicKey.hex]],
             content: "hello"
         )
 
-        let giftWrap = try wrap(rumorJSON: rumor, sender: alice, recipientPubkey: bob.publicKey)
+        let giftWrap = try wrap(rumorJSON: rumor, sender: alice, recipientPublicKey: bob.publicKey)
 
         await #expect(throws: NostrError.invalidEventID) {
             try await GiftWrap.unwrap(giftWrap: giftWrap, recipient: EventSigner(keyPair: bob))
         }
     }
 
-    /// The check is on the pubkeys, not on the rumor being a DM: a mismatch has to fail whatever
+    /// The check is on the public keys, not on the rumor being a DM: a mismatch has to fail whatever
     /// kind it claims to be, since gift wrapping carries reactions and file messages too.
     @Test("the author check applies to any wrapped kind")
     func mismatchIsRejectedForOtherKinds() async throws {
@@ -139,14 +139,14 @@ struct GiftWrapImpersonationTests {
         )
         let rumor = try rumorJSON(
             id: try forged.computedID.hex,
-            pubkey: alice.publicKey.hex,
+            publicKey: alice.publicKey.hex,
             createdAt: forged.createdAt.rawValue,
             kind: forged.kind,
             tags: forged.tags,
             content: forged.content
         )
 
-        let giftWrap = try wrap(rumorJSON: rumor, sender: mallory, recipientPubkey: bob.publicKey)
+        let giftWrap = try wrap(rumorJSON: rumor, sender: mallory, recipientPublicKey: bob.publicKey)
 
         await #expect(throws: NostrError.verificationFailed) {
             try await GiftWrap.unwrap(giftWrap: giftWrap, recipient: EventSigner(keyPair: bob))
@@ -154,7 +154,7 @@ struct GiftWrapImpersonationTests {
     }
 
     /// The genuine path built by the same helper, confirming the forgeries above differ from a real
-    /// message only in the pubkey and id — and that the new checks do not reject honest traffic.
+    /// message only in the public key and id — and that the new checks do not reject honest traffic.
     @Test("a rumor sealed by its own author still unwraps")
     func genuineMessageStillUnwraps() async throws {
         let alice = try KeyPair()
@@ -169,18 +169,18 @@ struct GiftWrapImpersonationTests {
         )
         let rumor = try rumorJSON(
             id: try event.computedID.hex,
-            pubkey: alice.publicKey.hex,
+            publicKey: alice.publicKey.hex,
             createdAt: event.createdAt.rawValue,
             kind: event.kind,
             tags: event.tags,
             content: event.content
         )
 
-        let giftWrap = try wrap(rumorJSON: rumor, sender: alice, recipientPubkey: bob.publicKey)
+        let giftWrap = try wrap(rumorJSON: rumor, sender: alice, recipientPublicKey: bob.publicKey)
         let unwrapped = try await GiftWrap.unwrap(
             giftWrap: giftWrap, recipient: EventSigner(keyPair: bob))
 
-        #expect(unwrapped.senderPubkey == alice.publicKey)
+        #expect(unwrapped.senderPublicKey == alice.publicKey)
         #expect(unwrapped.event.publicKey == alice.publicKey)
         #expect(unwrapped.event.content == "hello")
     }
@@ -194,11 +194,11 @@ struct GiftWrapImpersonationTests {
 
         let original = try signer.signTextNote(content: "Secret message")
         let giftWrap = try await GiftWrap.wrap(
-            event: original, signer: signer, recipientPubkey: bob.publicKey)
+            event: original, signer: signer, recipientPublicKey: bob.publicKey)
         let unwrapped = try await GiftWrap.unwrap(
             giftWrap: giftWrap, recipient: EventSigner(keyPair: bob))
 
-        #expect(unwrapped.senderPubkey == alice.publicKey)
+        #expect(unwrapped.senderPublicKey == alice.publicKey)
         #expect(unwrapped.event.publicKey == alice.publicKey)
         #expect(unwrapped.event.id == original.id)
         #expect(unwrapped.event.content == "Secret message")

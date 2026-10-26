@@ -11,9 +11,9 @@ struct GiftWrappedRumorDeliveryTests {
     private let customKind = Event.Kind(rawValue: 30_999)
     private let senderKey = String(repeating: "1", count: 64)
 
-    private func makeRumor(pubkey: PublicKey, recipient: PublicKey) -> UnsignedEvent {
+    private func makeRumor(publicKey: PublicKey, recipient: PublicKey) -> UnsignedEvent {
         UnsignedEvent(
-            publicKey: pubkey, kind: customKind,
+            publicKey: publicKey, kind: customKind,
             tags: [.publicKey(recipient), .hashtag("friend-request")],
             content: "{\"bundle\":\"abc\"}"
         )
@@ -27,7 +27,7 @@ struct GiftWrappedRumorDeliveryTests {
         let recipient = try KeyPair()
         await client.dmRelayListStore.markNoList(for: recipient.publicKey)
         await client.dmRelayListStore.markNoList(for: sender.publicKey)
-        let rumor = makeRumor(pubkey: sender.publicKey, recipient: recipient.publicKey)
+        let rumor = makeRumor(publicKey: sender.publicKey, recipient: recipient.publicKey)
 
         let result = try await PublishAckSupport.acknowledgingPublishes(2, on: socket) {
             try await client.messages.sendGiftWrapped(rumor, to: recipient.publicKey)
@@ -39,7 +39,7 @@ struct GiftWrappedRumorDeliveryTests {
 
         let received = try await GiftWrap.unwrap(
             giftWrap: result.recipientGiftWrap, recipient: EventSigner(keyPair: recipient))
-        #expect(received.senderPubkey == sender.publicKey)
+        #expect(received.senderPublicKey == sender.publicKey)
         #expect(received.event.id == result.rumor.id)
         #expect(received.event.kind == customKind)
         #expect(received.event.content == rumor.content)
@@ -76,7 +76,7 @@ struct GiftWrappedRumorDeliveryTests {
             DirectMessageRelayList(relays: [inboxURL]), createdAt: Timestamp(rawValue: 1), for: recipient.publicKey)
         // The sender advertised no list, so the self-copy falls back to the whole pool.
         await client.dmRelayListStore.markNoList(for: sender.publicKey)
-        let rumor = makeRumor(pubkey: sender.publicKey, recipient: recipient.publicKey)
+        let rumor = makeRumor(publicKey: sender.publicKey, recipient: recipient.publicKey)
 
         let task = Task { try await client.messages.sendGiftWrapped(rumor, to: recipient.publicKey) }
         // The inbox relay receives both wraps; the other pool relay only the self-copy.
@@ -102,7 +102,7 @@ struct GiftWrappedRumorDeliveryTests {
         await client.dmRelayListStore.markNoList(for: recipient.publicKey)
         await client.dmRelayListStore.markNoList(for: sender.publicKey)
         let expiry = Timestamp(rawValue: 2_000_000_000)
-        let rumor = makeRumor(pubkey: sender.publicKey, recipient: recipient.publicKey)
+        let rumor = makeRumor(publicKey: sender.publicKey, recipient: recipient.publicKey)
 
         let result = try await PublishAckSupport.acknowledgingPublishes(2, on: socket) {
             try await client.messages.sendGiftWrapped(rumor, to: recipient.publicKey, expiration: expiry)
@@ -115,11 +115,11 @@ struct GiftWrappedRumorDeliveryTests {
     }
 
     @Test("a rumor authored under another key throws invalidPublicKey and publishes nothing")
-    func mismatchedPubkeyThrows() async throws {
+    func mismatchedPublicKeyThrows() async throws {
         let (client, socket) = try await ConnectedClientFixture.make()
         try await client.identity.setPrivateKey(senderKey)
         let recipient = try KeyPair()
-        let rumor = makeRumor(pubkey: try KeyPair().publicKey, recipient: recipient.publicKey)
+        let rumor = makeRumor(publicKey: try KeyPair().publicKey, recipient: recipient.publicKey)
 
         await #expect(throws: NostrError.invalidPublicKey) {
             try await client.messages.sendGiftWrapped(rumor, to: recipient.publicKey)
@@ -134,7 +134,7 @@ struct GiftWrappedRumorDeliveryTests {
         try await client.identity.setPrivateKey(senderKey)
         let sender = try KeyPair(privateKeyHex: senderKey)
         let recipient = try KeyPair()
-        let rumor = makeRumor(pubkey: sender.publicKey, recipient: recipient.publicKey)
+        let rumor = makeRumor(publicKey: sender.publicKey, recipient: recipient.publicKey)
 
         await #expect(throws: NostrError.noRelaysInPool) {
             try await client.messages.sendGiftWrapped(rumor, to: recipient.publicKey)
@@ -144,7 +144,7 @@ struct GiftWrappedRumorDeliveryTests {
     @Test("without a signer it throws signerNotSet")
     func noSignerThrows() async throws {
         let client = NostrClient()
-        let rumor = makeRumor(pubkey: try KeyPair().publicKey, recipient: try KeyPair().publicKey)
+        let rumor = makeRumor(publicKey: try KeyPair().publicKey, recipient: try KeyPair().publicKey)
 
         await #expect(throws: NostrError.signerNotSet) {
             try await client.messages.sendGiftWrapped(rumor, to: try KeyPair().publicKey)

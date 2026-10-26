@@ -46,10 +46,10 @@ public actor NostrClient {
     /// Named for the state it holds rather than the ``subscriptions`` namespace accessor.
     var openSubscriptions: [String: SubscriptionState] = [:]
 
-    /// Per-pubkey NIP-65 relay list cache and outbox/gossip resolver
+    /// Per-public-key NIP-65 relay list cache and outbox/gossip resolver
     let relayListStore: RelayListStore
 
-    /// Per-pubkey NIP-17 DM relay list (kind 10050) cache and inbox resolver
+    /// Per-public-key NIP-17 DM relay list (kind 10050) cache and inbox resolver
     let dmRelayListStore: DirectMessageRelayListStore
 
     public init(

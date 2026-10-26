@@ -11,10 +11,10 @@ public struct DirectMessage: Sendable, Identifiable, Hashable {
     public let rumorID: EventID
 
     /// The sender's public key.
-    public let senderPubkey: PublicKey
+    public let senderPublicKey: PublicKey
 
     /// The recipient's public key.
-    public let recipientPubkey: PublicKey
+    public let recipientPublicKey: PublicKey
 
     /// The message content
     public let content: String
@@ -36,8 +36,8 @@ public struct DirectMessage: Sendable, Identifiable, Hashable {
     /// Creates a direct message from its parsed parts.
     public init(
         rumorID: EventID,
-        senderPubkey: PublicKey,
-        recipientPubkey: PublicKey,
+        senderPublicKey: PublicKey,
+        recipientPublicKey: PublicKey,
         content: String,
         createdAt: Timestamp,
         subject: String? = nil,
@@ -45,8 +45,8 @@ public struct DirectMessage: Sendable, Identifiable, Hashable {
         expiresAt: Timestamp? = nil
     ) {
         self.rumorID = rumorID
-        self.senderPubkey = senderPubkey
-        self.recipientPubkey = recipientPubkey
+        self.senderPublicKey = senderPublicKey
+        self.recipientPublicKey = recipientPublicKey
         self.content = content
         self.createdAt = createdAt
         self.subject = subject

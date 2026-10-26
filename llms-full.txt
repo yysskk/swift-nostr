@@ -127,12 +127,12 @@ list items, and NIP-42 authentication all work unchanged:
 ```swift
 try await client.identity.setSigner(remoteSigner)   // a RemoteSigner or any NostrSigning
 try await client.events.publishTextNote(content: "Signed remotely")
-try await client.messages.send("gift-wrapped by the bunker", to: recipientPubkey)
+try await client.messages.send("gift-wrapped by the bunker", to: recipientPublicKey)
 
-// Or author an event with no helper: build it under the signer's pubkey and sign it.
-let pubkey = await client.identity.publicKey!
+// Or author an event with no helper: build it under the signer's public key and sign it.
+let publicKey = await client.identity.publicKey!
 let signed = try await client.identity.sign(
-    UnsignedEvent(publicKey: pubkey, kind: .textNote, content: "Signed remotely"))
+    UnsignedEvent(publicKey: publicKey, kind: .textNote, content: "Signed remotely"))
 try await client.events.publish(signed)           // generic publish of a pre-signed event
 ```
 
@@ -141,8 +141,8 @@ signer, for app payloads to a peer outside the DM path (a relay round-trip per c
 signer); both throw `signerNotSet` without a signer:
 
 ```swift
-let payload = try await client.identity.nip44Encrypt("app payload", to: peerPubkey)
-let plaintext = try await client.identity.nip44Decrypt(payload, from: peerPubkey)
+let payload = try await client.identity.nip44Encrypt("app payload", to: peerPublicKey)
+let plaintext = try await client.identity.nip44Decrypt(payload, from: peerPublicKey)
 ```
 
 ### Authentication (NIP-42)
@@ -197,7 +197,7 @@ try await client.events.publishMetadata(UserMetadata(name: "Alice", about: "Nost
 try await client.events.publishReaction(to: note.event, content: "🤙")
 try await client.events.publishRepost(of: note.event, relayURL: relay)  // RelayURL? hint
 try await client.events.publishDeletion(eventIDs: [note.event.id], reason: "posted by mistake")
-try await client.events.publishReport(pubkey: author, type: .impersonation)  // report a pubkey (NIP-56)
+try await client.events.publishReport(publicKey: author, type: .impersonation)  // report a public key (NIP-56)
 try await client.events.publishReport(event: note.event, type: .spam, reason: "unsolicited")  // report an event and its author
 try await client.events.publishTextNote(content: "Important!", strategy: .quorum(2))
 try await client.events.publish(signedEvent)  // publish any pre-signed event
@@ -213,12 +213,12 @@ or calling `close()` sends CLOSE to the relays automatically.
 
 ```swift
 // Convenience subscriptions
-let timeline = try await client.subscriptions.userTimeline(pubkey: alice)  // SubscriptionSequence
+let timeline = try await client.subscriptions.userTimeline(publicKey: alice)  // SubscriptionSequence
 for await event in timeline.events { print(event.content) }
 
 let feed = try await client.subscriptions.globalFeed(limit: 50)
-let mentions = try await client.subscriptions.mentions(pubkey: alice)
-let metadata = try await client.subscriptions.metadata(pubkeys: [alice, bob])  // [PublicKey]
+let mentions = try await client.subscriptions.mentions(publicKey: alice)
+let metadata = try await client.subscriptions.metadata(publicKeys: [alice, bob])  // [PublicKey]
 
 // Custom filter subscription, events only
 let filter = Filter(authors: [alice, bob], kinds: [1], limit: 100)  // [PublicKey]
@@ -249,7 +249,7 @@ results. With zero resolved relays they throw (`NostrError.noRelaysInPool` /
 ```swift
 let events = try await client.events.fetch(filters: [filter])
 let event = try await client.events.fetchEvent(id: eventID)      // EventID
-let metadata = try await client.events.fetchMetadata(pubkey: alice)
+let metadata = try await client.events.fetchMetadata(publicKey: alice)
 // Scope a fetch to a subset of relays (e.g. naddr relay hints): `from:` is a Set<RelayURL>?;
 // nil (default) uses the whole pool, [] throws, and relays not in the pool are skipped.
 let scoped = try await client.events.fetch(filters: [filter], from: [relay])
@@ -277,21 +277,21 @@ let byRelay = try await client.relays.pool.countEvents(matching: [filter])  // [
 try await client.messages.send("Hello!", to: recipient)   // PublicKey
 
 // Send a rumor of any kind, gift-wrapped and routed like a DM (rumor.publicKey must be the signer's)
-let rumor = UnsignedEvent(publicKey: myPubkey, kind: Event.Kind(rawValue: 30_999), content: payload)
+let rumor = UnsignedEvent(publicKey: myPublicKey, kind: Event.Kind(rawValue: 30_999), content: payload)
 try await client.messages.sendGiftWrapped(rumor, to: recipient)
 
 // Subscribe to incoming DMs, parsed automatically. Wraps sealed to someone else and malformed
 // ones are skipped; a signer that cannot be reached (a remote NIP-46 timeout/disconnect) throws,
 // so a transient failure never passes for an empty inbox. Resubscribe to resume.
 for try await message in try await client.messages.subscribe() {
-    print("From: \(message.senderPubkey), Content: \(message.content)")
+    print("From: \(message.senderPublicKey), Content: \(message.content)")
 }
 
 // Or receive raw gift wraps and parse manually
 let giftWraps = try await client.messages.giftWraps()
 for await giftWrap in giftWraps.events {
     let dm = try await client.messages.parse(giftWrap)
-    print("From: \(dm.senderPubkey): \(dm.content)")
+    print("From: \(dm.senderPublicKey): \(dm.content)")
 }
 
 // Parse a received gift wrap event
@@ -324,9 +324,9 @@ try await client.groups.publishMessage(
 
 // Moderation (kinds 9000-9002, 9005, 9007-9010): the relay checks the author's role and answers with OK.
 try await client.groups.publishModeration(
-    .putUser(publicKey: memberPubkey, roles: ["moderator"]), in: group, reason: "welcome")
+    .putUser(publicKey: memberPublicKey, roles: ["moderator"]), in: group, reason: "welcome")
 
-// Relay-signed state, newest event per kind. With a known relay pubkey (group.relayPubkey,
+// Relay-signed state, newest event per kind. With a known relay public key (group.relayPublicKey,
 // the naddr coordinate's author), wrong-author and invalid-signature events are dropped.
 let metadata = try await client.groups.fetchMetadata(for: group)   // Groups.Metadata?
 let state = try await client.groups.fetchState(for: group)         // GroupState snapshot
@@ -752,14 +752,14 @@ let meta = try signer.signMetadata(UserMetadata(name: "Alice"))
 let reaction = try signer.signReaction(to: event, content: "🤙")
 let repost = try signer.signRepost(of: event, relayURL: relay)  // RelayURL? hint
 let deletion = try signer.signDeletion(eventIDs: [event.id], reason: "mistake")
-let contacts = try signer.signContactList([Contact(pubkey: alice)])
+let contacts = try signer.signContactList([Contact(publicKey: alice)])
 let relayList = try signer.signRelayListMetadata(
     read: [try RelayURL(string: "wss://in.example")], write: [try RelayURL(string: "wss://out.example")])
 let auth = try signer.signClientAuthentication(relayURL: relay, challenge: "challenge")  // kind 22242, NIP-42
 let pow = try await signer.sign(unsignedEvent, proofOfWork: 20)  // mine to 20 leading zero bits, then sign (NIP-13)
 let listEvent = try signer.signList(list)   // NIP-51: private items NIP-44-self-encrypted into content
 let opened = try signer.openList(listEvent) // decrypts private items (throws if not decryptable with this key)
-let report = try signer.signReport(pubkey: author, type: .impersonation)  // kind 1984, NIP-56
+let report = try signer.signReport(publicKey: author, type: .impersonation)  // kind 1984, NIP-56
 let eventReport = try signer.signReport(event: note, type: .illegal, reason: "reason")  // reports the event and its author
 ```
 
@@ -856,7 +856,7 @@ let sealed = try SealedMessage.seal("message", for: recipientPublicKey, using: s
 print(sealed.payload)  // base64-encoded
 
 // Open
-let plaintext = try sealed.open(from: senderPubkey, using: recipientKeyPair)
+let plaintext = try sealed.open(from: senderPublicKey, using: recipientKeyPair)
 ```
 
 With a caller-supplied 32-byte conversation key (e.g. one shared by a group) instead of a key pair. A fresh nonce is generated per call; anyone holding the key can read and forge messages.
@@ -879,7 +879,7 @@ Both sides take any `NostrSigning`, so a remote NIP-46 signer wraps and unwraps 
 let wrapped = try await GiftWrap.wrap(
     event: rumorEvent,
     signer: EventSigner(keyPair: senderKeyPair),
-    recipientPubkey: recipientPubkey
+    recipientPublicKey: recipientPublicKey
 )
 
 // Unwrap
@@ -887,7 +887,7 @@ let unwrapped = try await GiftWrap.unwrap(
     giftWrap: wrappedEvent,
     recipient: EventSigner(keyPair: recipientKeyPair)
 )
-print(unwrapped.senderPubkey)  // original sender
+print(unwrapped.senderPublicKey)  // original sender
 print(unwrapped.event)         // original event
 ```
 
@@ -898,17 +898,17 @@ NIP-17 Private Direct Message (struct: Sendable, Identifiable, Hashable).
 ### Properties
 
 - `rumorID: EventID` -- message ID (also Identifiable.id)
-- `senderPubkey: PublicKey` -- sender's public key
-- `recipientPubkey: PublicKey` -- recipient's public key (a rumor whose `p` tag is not a canonical hex key fails to parse)
+- `senderPublicKey: PublicKey` -- sender's public key
+- `recipientPublicKey: PublicKey` -- recipient's public key (a rumor whose `p` tag is not a canonical hex key fails to parse)
 - `content: String` -- message content
 - `createdAt: Timestamp` -- the rumor's `created_at` (the gift wrap's own is randomized)
 - `subject: String?` -- optional conversation subject
 - `replyTo: EventID?` -- optional id of the event replied to (nil when the reply marker's id is malformed)
 - `expiresAt: Timestamp?` -- the NIP-40 expiration on the gift wrap, if any
 
-`DirectMessageReaction` has `rumorID`, `senderPubkey`, `messageID: EventID`, and
-`messageAuthorPubkey: PublicKey`; `DirectMessageFile` has `rumorID`, `senderPubkey`, and
-`recipientPubkey`; both also have `createdAt: Timestamp` and `expiresAt: Timestamp?`. A reaction whose `e` or `p` tag is missing or malformed fails to parse.
+`DirectMessageReaction` has `rumorID`, `senderPublicKey`, `messageID: EventID`, and
+`messageAuthorPublicKey: PublicKey`; `DirectMessageFile` has `rumorID`, `senderPublicKey`, and
+`recipientPublicKey`; both also have `createdAt: Timestamp` and `expiresAt: Timestamp?`. A reaction whose `e` or `p` tag is missing or malformed fails to parse.
 
 ## DirectMessageBuilder
 
@@ -922,7 +922,7 @@ let builder = DirectMessageBuilder(signer: EventSigner(keyPair: keyPair))
 // Single recipient (the recipient gift wrap plus the sender's self-copy)
 let result = try await builder.createMessageWithSelfCopy(
     content: "Hello!",
-    to: recipientPubkey,
+    to: recipientPublicKey,
     subject: "Greetings",
     replyTo: nil,
     expiration: Timestamp.now.advanced(by: .seconds(3600))  // optional NIP-40 expiration on both wraps
@@ -931,7 +931,7 @@ let result = try await builder.createMessageWithSelfCopy(
 // Group message (one gift wrap per recipient + sender copy)
 let allWraps = try await builder.createGroupMessage(
     content: "Group hello!",
-    to: [pubkey1, pubkey2]   // [PublicKey]
+    to: [publicKey1, publicKey2]   // [PublicKey]
 )
 ```
 
@@ -953,15 +953,15 @@ Contact information for NIP-02 (struct: Codable, Hashable, Sendable).
 
 ### Properties
 
-- `pubkey: PublicKey` -- public key
+- `publicKey: PublicKey` -- public key
 - `relayURL: RelayURL?` -- recommended relay URL (`init(tag:)` reads a malformed hint as nil)
 - `petname: String?` -- local nickname
 
 ### Usage
 
 ```swift
-let contact = Contact(pubkey: try PublicKey(npub: "npub1..."), relayURL: relay, petname: "alice")
-let tag = contact.tag               // ["p", pubkey hex, relayURL, petname]
+let contact = Contact(publicKey: try PublicKey(npub: "npub1..."), relayURL: relay, petname: "alice")
+let tag = contact.tag               // ["p", public key hex, relayURL, petname]
 let parsed = Contact(tag: tag)      // nil unless a "p" tag with a canonical hex key
 
 // Extract contacts from kind-3 event; "p" tags with a malformed key are skipped
@@ -994,14 +994,14 @@ var list = NostrList(
 try await client.lists.publish(list)
 
 // Read-modify-write: start from the fetched list so nothing is dropped.
-// No pubkey -> the current user's list, with private items decrypted (throws if undecryptable).
+// No public key -> the current user's list, with private items decrypted (throws if undecryptable).
 if var mine = try await client.lists.fetch(kind: .bookmarkList) {
     mine.publicItems.append(.reference("https://another.example"))
     try await client.lists.publish(mine)
 }
 
 // Another user's list returns public items only.
-let theirs = try await client.lists.fetch(kind: .muteList, for: pubkey)
+let theirs = try await client.lists.fetch(kind: .muteList, for: publicKey)
 
 // Public-only view of any list event (private items stay empty).
 let publicView = NostrList(event: event)
@@ -1040,7 +1040,7 @@ let set = try NostrListSet(
 try await client.lists.publishSet(set)
 
 // Read-modify-write: start from the fetched set so nothing is dropped.
-// No pubkey -> the current user's set, with private items decrypted (throws if undecryptable).
+// No public key -> the current user's set, with private items decrypted (throws if undecryptable).
 if var mine = try await client.lists.fetchSet(kind: .bookmarkSet, identifier: "reading") {
     mine.publicItems.append(.reference("https://another.example"))
     try await client.lists.publishSet(mine)
@@ -1050,8 +1050,8 @@ if var mine = try await client.lists.fetchSet(kind: .bookmarkSet, identifier: "r
 let all = try await client.lists.fetchSets(kind: .bookmarkSet)
 
 // Another user's set, or a set addressed by naddr: public items only.
-let theirs = try await client.lists.fetchSet(kind: .bookmarkSet, identifier: "reading", for: pubkey)
-let addr = try set.naddr(author: authorPubkey)     // NIP-19 naddr coordinate
+let theirs = try await client.lists.fetchSet(kind: .bookmarkSet, identifier: "reading", for: publicKey)
+let addr = try set.naddr(author: authorPublicKey)     // NIP-19 naddr coordinate
 let byAddr = try await client.lists.fetchSet(naddr: addr)
 
 // Public-only view of any set event (private items stay empty).
@@ -1094,10 +1094,10 @@ let article = LongFormContent(
 try await client.events.publishLongFormContent(article)
 
 // Fetch by author + identifier (newest version wins across relays)
-let fetched = try await client.events.fetchLongFormContent(author: pubkey, identifier: "my-first-article")
+let fetched = try await client.events.fetchLongFormContent(author: publicKey, identifier: "my-first-article")
 
 // Fetch by naddr coordinate (relay hints are used when already in the pool)
-let naddr = try article.naddr(author: pubkey, relays: [try RelayURL(string: "wss://relay.example")])
+let naddr = try article.naddr(author: publicKey, relays: [try RelayURL(string: "wss://relay.example")])
 let byCoord = try await client.events.fetchLongFormContent(naddr: naddr)
 
 // Sign without publishing
@@ -1134,7 +1134,7 @@ let message = try await Groups.contentEvent(
 // .removeUser(publicKey:), .editMetadata(Metadata), .deleteEvent(id:), .createGroup,
 // .deleteGroup, .createInvite(code:), .updatePinList([PinnedItem]).
 let promote = try await Groups.moderationEvent(
-    .putUser(publicKey: memberPubkey, roles: ["moderator"]),
+    .putUser(publicKey: memberPublicKey, roles: ["moderator"]),
     groupID: "abcdef", reason: "welcome", signer: signer)
 ```
 
@@ -1142,7 +1142,7 @@ let promote = try await Groups.moderationEvent(
 
 ```swift
 Groups.previousReference(forEventID: id)  // first 8 hex chars of an EventID
-Groups.previousReferences(from: recentEvents, excludingAuthor: myPubkey, maxCount: 3)  // PublicKey?
+Groups.previousReferences(from: recentEvents, excludingAuthor: myPublicKey, maxCount: 3)  // PublicKey?
     // random sample over the newest 50 events, for a trailing "previous" tag (spec: carry >= 3)
 Groups.previousReferences(of: event)      // the references an event carries ([] when absent)
 Groups.unknownPreviousReferences(of: event, knownEventIDs: seenIDs)  // some Sequence<EventID>
@@ -1187,7 +1187,7 @@ print(request.action, request.groupID, request.reason ?? "", request.previousRef
 
 // A PublicKey's standing from kind-9000/9001 history — the latest event targeting it wins
 // (ties broken by lowest id, the NIP-01 convention). nil means no record: assume non-member.
-switch Groups.membership(of: pubkey, in: moderationEvents) {
+switch Groups.membership(of: publicKey, in: moderationEvents) {
 case .member(let roles): print("member", roles)
 case .removed: print("removed")
 case nil: print("no record")
@@ -1197,23 +1197,23 @@ case nil: print("no record")
 ## GroupReference
 
 Where a NIP-29 group lives (struct: Sendable, Hashable; NostrClient library): the (relay,
-group id) pair, optionally with the relay's pubkey (the author of its kind-39000 metadata) and
+group id) pair, optionally with the relay's public key (the author of its kind-39000 metadata) and
 an invite code — everything an `naddr` share link carries. Groups are shared as the naddr of
 their kind-39000 metadata event, sometimes suffixed with `?invite=<code>`.
 
 ```swift
 let group = try GroupReference(naddrString: "naddr1...?invite=A7fjq2")
-// group.relayURL, group.id, group.relayPubkey (PublicKey?), group.inviteCode (String?)
+// group.relayURL, group.id, group.relayPublicKey (PublicKey?), group.inviteCode (String?)
 let direct = GroupReference(relayURL: try RelayURL(string: "wss://groups.example"), id: "abcdef")
 let fromNaddr = try GroupReference(naddr: naddr, inviteCode: "A7fjq2")  // kind must be 39000
 let link = try group.shareableString()  // naddr + "?invite=<code>", round-trips the code
-let coord = try group.naddr()           // throws without relayPubkey
+let coord = try group.naddr()           // throws without relayPublicKey
 ```
 
 ## GroupState
 
 One fetch's snapshot of a NIP-29 group's relay-generated state (struct: Sendable, Hashable;
-NostrClient library). Returned by `groups.fetchState(for:authorPubkey:timeout:)`; each field is
+NostrClient library). Returned by `groups.fetchState(for:authorPublicKey:timeout:)`; each field is
 nil when the relay published nothing for that kind (e.g. the member list of a private group):
 
 - `metadata: Groups.Metadata?` -- kind 39000
@@ -1236,7 +1236,7 @@ private entries ride the NIP-44 list machinery, readable only by the author.
 
 `GroupListEntry` is one `["group", groupID, relayURL, name?]` entry: `groupID`, `relayURL: RelayURL`,
 optional `name` (a "group" tag whose relay is not a relay URL does not parse as an entry); build one from a reference with `GroupListEntry(_ reference:name:)` and
-convert back via `.reference` (relay pubkey and invite code are not part of the list format).
+convert back via `.reference` (relay public key and invite code are not part of the list format).
 
 ```swift
 // Keep the list fresh as the user joins and leaves. Unlike the group flows this broadcasts to
@@ -1247,7 +1247,7 @@ list.publicEntries.append(GroupListEntry(group, name: "Cool Group"))
 if !list.relayURLs.contains(group.relayURL) { list.relayURLs.append(group.relayURL) }
 try await client.groups.publishSimpleGroupList(list)
 
-let theirs = try await client.groups.fetchSimpleGroupList(for: pubkey)  // public entries only
+let theirs = try await client.groups.fetchSimpleGroupList(for: publicKey)  // public entries only
 ```
 
 ## ReportType
@@ -1261,9 +1261,9 @@ The reason category of a NIP-56 report, kind 1984 (enum: String, Sendable, Hasha
 ### Usage
 
 ```swift
-// Report a pubkey: the type rides on the "p" tag.
-let report = try signer.signReport(pubkey: author, type: .impersonation, reason: "")   // PublicKey
-try await client.events.publishReport(pubkey: author, type: .impersonation)
+// Report a public key: the type rides on the "p" tag.
+let report = try signer.signReport(publicKey: author, type: .impersonation, reason: "")   // PublicKey
+try await client.events.publishReport(publicKey: author, type: .impersonation)
 
 // Report an event: the type rides on the "e" tag, plus a bare "p" tag naming the author.
 let eventReport = try signer.signReport(event: note, type: .illegal, reason: "against the law")
@@ -1277,14 +1277,14 @@ NIP-05 DNS-based internet identifier verification (struct: Sendable).
 ```swift
 // Verify identifier
 let result = try await InternetIdentifier.verify("alice@example.com")
-print(result.pubkey)   // PublicKey
+print(result.publicKey)   // PublicKey
 print(result.relays)   // [RelayURL]; entries that are not relay URLs are skipped
 
-// Verify against expected pubkey
-try await InternetIdentifier.verify("alice@example.com", expectedPubkey: alice)
+// Verify against expected public key
+try await InternetIdentifier.verify("alice@example.com", expectedPublicKey: alice)
 
-// Look up pubkey or relays; a nostr.json value that is not canonical hex throws pubkeyNotFound
-let pubkey = try await InternetIdentifier.lookupPubkey("alice@example.com")   // PublicKey
+// Look up public key or relays; a nostr.json value that is not canonical hex throws publicKeyNotFound
+let publicKey = try await InternetIdentifier.lookupPublicKey("alice@example.com")   // PublicKey
 let relays = try await InternetIdentifier.lookupRelays("alice@example.com")   // [RelayURL]
 
 // String extensions
@@ -1475,7 +1475,7 @@ let injected = RelayConnectionTransport(relayURLs: relays, webSocketFactory: OkH
 Bech32 encoding/decoding for NIP-19 (enum).
 
 ```swift
-let encoded = try Bech32.encode(hrp: "npub", data: pubkeyData)
+let encoded = try Bech32.encode(hrp: "npub", data: publicKeyData)
 let (hrp, data) = try Bech32.decode("npub1...")
 ```
 
@@ -1510,7 +1510,7 @@ A `nostr:` reference found inside event content (NIP-27; struct: Sendable, Hasha
 - `var tag: Tag` -- the tag this reference contributes: `p` for npub/nprofile, `q` for note/nevent, `a` for `naddr`, each carrying the entity's first relay hint when present
 - `static func tags(for content: String) -> [Tag]` -- the deduplicated tags for every reference, in first-seen order
 
-The matching `q` tag is built with `Tag.quote(_ id:relayURL:publicKey:)` -- a NIP-18 `["q", id, relay, pubkey]` tag with empty-string placeholders for skipped middle elements.
+The matching `q` tag is built with `Tag.quote(_ id:relayURL:publicKey:)` -- a NIP-18 `["q", id, relay, public key]` tag with empty-string placeholders for skipped middle elements.
 
 ```swift
 let content = "gm nostr:npub1... quoting nostr:note1..."
@@ -1527,7 +1527,7 @@ import NostrConnect
 // Start a session from a signer-issued bunker:// token. clientKeyPair defaults to a fresh random
 // keypair (pass a persisted one to resume an authorized session); transport defaults to a
 // RelayConnectionTransport over the token's relays.
-let bunker = try BunkerURI(string: "bunker://<remote-signer-pubkey>?relay=wss://...&secret=...")
+let bunker = try BunkerURI(string: "bunker://<remote-signer-public-key>?relay=wss://...&secret=...")
 let signer = try RemoteSigner(bunker: bunker)
 
 // Session behavior.
@@ -1547,28 +1547,28 @@ let authorized = try RemoteSigner(
 // when present). Commands call this automatically; call it to surface errors up front.
 try await signer.connect()
 signer.clientPublicKey                       // PublicKey — the local client identity (nonisolated)
-let remotePubkey = await signer.remoteSignerPubkey   // PublicKey? — the signer's key (not necessarily the user's)
+let remotePublicKey = await signer.remoteSignerPublicKey   // PublicKey? — the signer's key (not necessarily the user's)
 ```
 
 ### Client-initiated nostrconnect:// flow
 
 ```swift
 // The client starts the handshake: generate an invitation, show it as a QR code or deep link, and
-// wait for the signer to accept. The signer's pubkey is unknown until then, so remoteSignerPubkey is
+// wait for the signer to accept. The signer's public key is unknown until then, so remoteSignerPublicKey is
 // nil until awaitConnection() resolves.
 let invitation = try NostrConnectURI.invitation(clientKeyPair: clientKeyPair, relays: [relayURL])
 displayQRCode(invitation.stringValue)
 
-// clientKeyPair.publicKey MUST equal invitation.clientPubkey, a PublicKey (else
+// clientKeyPair.publicKey MUST equal invitation.clientPublicKey, a PublicKey (else
 // RemoteSignerError.invalidURI). Transport
 // defaults to a RelayConnectionTransport over the invitation's relays.
 let signer = try RemoteSigner(invitation: invitation, clientKeyPair: clientKeyPair)
 
 // Waits for the first kind-24133 response whose result echoes the invitation secret (validated per
-// spec), pins subsequent traffic to that pubkey, marks the session connected, and returns it. A
+// spec), pins subsequent traffic to that public key, marks the session connected, and returns it. A
 // response with a mismatched secret is ignored (keeps waiting); throws RemoteSignerError.timedOut
 // after Config.requestTimeout. Commands then work exactly as in the bunker flow.
-let remoteSignerPubkey: PublicKey = try await signer.awaitConnection()
+let remoteSignerPublicKey: PublicKey = try await signer.awaitConnection()
 ```
 
 ### Commands
@@ -1576,11 +1576,11 @@ let remoteSignerPubkey: PublicKey = try await signer.awaitConnection()
 ```swift
 // PublicKey via get_public_key; cached; may differ from the signer's. A reply that is not canonical
 // hex throws RemoteSignerError.responseValidationFailed.
-let userPubkey = try await signer.userPublicKey()  // the same value as `try await signer.publicKey`
+let userPublicKey = try await signer.userPublicKey()  // the same value as `try await signer.publicKey`
 
 // sign_event: signs remotely, then verifies the returned event and checks its kind/content/tags/
 // created_at match the request (throws RemoteSignerError.responseValidationFailed otherwise).
-let signed = try await signer.sign(UnsignedEvent(publicKey: userPubkey, kind: .textNote, content: "hi"))
+let signed = try await signer.sign(UnsignedEvent(publicKey: userPublicKey, kind: .textNote, content: "hi"))
 
 try await signer.ping()                                       // expects "pong"
 let ct = try await signer.nip44Encrypt("hi", to: thirdParty)   // PublicKey
@@ -1603,7 +1603,7 @@ for await challenge in await signer.authChallenges() {
 }
 ```
 
-- `BunkerURI(string:)` / `NostrConnectURI(string:)` — parse `bunker://` tokens and `nostrconnect://` invitations; the host is the signer's `remoteSignerPubkey` / the client's `clientPubkey` as a `PublicKey`, and a host that is not canonical lowercase hex (uppercase included) throws `invalidURI(reason:)`. `BunkerURI(remoteSignerPubkey:relays:secret:)` and `NostrConnectURI(clientPubkey:relays:secret:…)` take a `PublicKey` and `relays: [RelayURL]`; a `relay` parameter that is not a valid relay URL throws `invalidURI(reason:)` rather than being dropped
+- `BunkerURI(string:)` / `NostrConnectURI(string:)` — parse `bunker://` tokens and `nostrconnect://` invitations; the host is the signer's `remoteSignerPublicKey` / the client's `clientPublicKey` as a `PublicKey`, and a host that is not canonical lowercase hex (uppercase included) throws `invalidURI(reason:)`. `BunkerURI(remoteSignerPublicKey:relays:secret:)` and `NostrConnectURI(clientPublicKey:relays:secret:…)` take a `PublicKey` and `relays: [RelayURL]`; a `relay` parameter that is not a valid relay URL throws `invalidURI(reason:)` rather than being dropped
 - `RemoteSignerMethod` — the method set (`connect`, `sign_event`, `ping`, `get_public_key`, `nip04_*`, `nip44_*`, `switch_relays`, `logout`)
 - `RemoteSignerPermission` — `perms` tokens (e.g. `.signEvent(kind:)`, `.nip44Encrypt`)
 - `RemoteSignerAuthChallenge` — `url`, `method`, `requestID`

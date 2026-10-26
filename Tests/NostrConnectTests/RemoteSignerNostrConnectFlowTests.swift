@@ -31,22 +31,23 @@ struct RemoteSignerNostrConnectFlowTests {
 
     // MARK: - init validation
 
-    @Test("init throws invalidURI when the keypair does not match the invitation pubkey")
+    @Test("init throws invalidURI when the keypair does not match the invitation public key")
     func initRejectsMismatchedKeyPair() async throws {
         let invitation = try makeInvitation()
         let otherKeyPair = try KeyPair()
 
-        #expect(throws: RemoteSignerError.invalidURI(reason: "client keypair does not match the invitation pubkey")) {
+        #expect(throws: RemoteSignerError.invalidURI(reason: "client keypair does not match the invitation public key"))
+        {
             _ = try RemoteSigner(
                 invitation: invitation, clientKeyPair: otherKeyPair, transport: FakeRemoteSignerTransport())
         }
     }
 
-    @Test("remoteSignerPubkey is nil before the signer is discovered")
-    func remoteSignerPubkeyStartsNil() async throws {
+    @Test("remoteSignerPublicKey is nil before the signer is discovered")
+    func remoteSignerPublicKeyStartsNil() async throws {
         let invitation = try makeInvitation()
         let remote = try makeSigner(invitation: invitation, transport: FakeRemoteSignerTransport())
-        #expect(await remote.remoteSignerPubkey == nil)
+        #expect(await remote.remoteSignerPublicKey == nil)
     }
 
     // MARK: - happy path
@@ -72,7 +73,7 @@ struct RemoteSignerNostrConnectFlowTests {
 
         let discovered = try await connection.value
         #expect(discovered == signer.publicKey)
-        #expect(await remote.remoteSignerPubkey == signer.publicKey)
+        #expect(await remote.remoteSignerPublicKey == signer.publicKey)
         #expect(await remote.isConnectedForTesting == true)
     }
 
@@ -89,7 +90,7 @@ struct RemoteSignerNostrConnectFlowTests {
                 requestID: "connect-ack", result: invitation.secret, client: client, signer: signer))
         _ = try await connection.value
 
-        // After discovery the subscription is narrowed to the signer's pubkey for defense in depth.
+        // After discovery the subscription is narrowed to the signer's public key for defense in depth.
         let repinned = await transport.subscriptions.values.first?.first
         #expect(repinned?.authors == [signer.publicKey])
     }
@@ -112,7 +113,7 @@ struct RemoteSignerNostrConnectFlowTests {
                 requestID: "spoof", result: "not-the-secret", client: client, signer: spoofer))
 
         // The waiter is still pending, so the connection task has not completed.
-        #expect(await remote.remoteSignerPubkey == nil)
+        #expect(await remote.remoteSignerPublicKey == nil)
 
         // Now the genuine signer echoes the correct secret and the connection resolves to it.
         try await transport.deliver(
@@ -139,7 +140,7 @@ struct RemoteSignerNostrConnectFlowTests {
         _ = try await connection.value
 
         // A follow-up command is sent to and answered by the discovered signer.
-        let pubkey = Task { try await remote.userPublicKey() }
+        let publicKey = Task { try await remote.userPublicKey() }
         let sent = try await RemoteSignerFixtures.waitForSentEvents(transport, count: 1)
         let request = try RemoteSignerFixtures.decryptRequest(sent[0], client: client, signer: signer)
         #expect(request.method == RemoteSignerMethod.getPublicKey.rawValue)
@@ -147,7 +148,7 @@ struct RemoteSignerNostrConnectFlowTests {
             RemoteSignerFixtures.response(
                 requestID: request.id, result: PublicKey.fixture("user").hex, client: client, signer: signer))
 
-        #expect(try await pubkey.value == PublicKey.fixture("user"))
+        #expect(try await publicKey.value == PublicKey.fixture("user"))
     }
 
     // MARK: - timeout

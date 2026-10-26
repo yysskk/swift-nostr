@@ -156,7 +156,7 @@ struct RemoteSignerPermissionRequestTests {
                 requestID: connectRequest.id, result: "ack", client: client, signer: signer))
         try await connectTask.value
 
-        let pubkey = Task { try await remote.userPublicKey() }
+        let publicKey = Task { try await remote.userPublicKey() }
         let sent = try await RemoteSignerFixtures.waitForSentEvents(transport, count: 2)
         let request = try RemoteSignerFixtures.decryptRequest(sent[1], client: client, signer: signer)
 
@@ -173,7 +173,7 @@ struct RemoteSignerPermissionRequestTests {
             }
         }
 
-        await #expect(throws: RemoteSignerError.timedOut) { _ = try await pubkey.value }
+        await #expect(throws: RemoteSignerError.timedOut) { _ = try await publicKey.value }
         let elapsed = clock.now - start
         challenger.cancel()
 

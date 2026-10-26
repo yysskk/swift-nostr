@@ -210,7 +210,7 @@ struct ClientMessageTests {
     func serializeEventMessage() throws {
         let event = Event(
             id: EventID.fixture("id123"),
-            publicKey: PublicKey.fixture("pubkey123"),
+            publicKey: PublicKey.fixture("publicKey123"),
             createdAt: Timestamp(rawValue: 1_234_567_890),
             kind: 1,
             tags: [],

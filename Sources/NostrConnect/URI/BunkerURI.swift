@@ -4,7 +4,7 @@ public import NostrCore
 /// A parsed NIP-46 `bunker://` connection token issued by a remote signer:
 ///
 /// ```text
-/// bunker://<remote-signer-pubkey>?relay=<wss url>&relay=...&secret=<optional>
+/// bunker://<remote-signer-public-key>?relay=<wss url>&relay=...&secret=<optional>
 /// ```
 ///
 /// - The host is the remote signer's public key in canonical lowercase hex, which is not
@@ -16,7 +16,7 @@ public import NostrCore
 /// https://github.com/nostr-protocol/nips/blob/master/46.md
 public struct BunkerURI: Sendable, Hashable {
     /// The remote signer's public key — not necessarily the user's key.
-    public let remoteSignerPubkey: PublicKey
+    public let remoteSignerPublicKey: PublicKey
 
     /// The relays the remote signer listens on. Always at least one.
     public let relays: [RelayURL]
@@ -30,16 +30,16 @@ public struct BunkerURI: Sendable, Hashable {
     /// Creates a token from its components.
     ///
     /// - Parameters:
-    ///   - remoteSignerPubkey: The remote signer's public key.
+    ///   - remoteSignerPublicKey: The remote signer's public key.
     ///   - relays: The relays the remote signer listens on (must contain at least one).
     ///   - secret: An optional one-time connection secret.
     /// - Throws: ``RemoteSignerError/invalidURI(reason:)`` if the relay list is empty.
-    public init(remoteSignerPubkey: PublicKey, relays: [RelayURL], secret: String? = nil) throws {
+    public init(remoteSignerPublicKey: PublicKey, relays: [RelayURL], secret: String? = nil) throws {
         guard !relays.isEmpty else {
             throw RemoteSignerError.invalidURI(reason: "at least one relay is required")
         }
 
-        self.remoteSignerPubkey = remoteSignerPubkey
+        self.remoteSignerPublicKey = remoteSignerPublicKey
         self.relays = relays
         self.secret = secret
     }
@@ -58,10 +58,10 @@ public struct BunkerURI: Sendable, Hashable {
         }
 
         guard let host = components.host, !host.isEmpty else {
-            throw RemoteSignerError.invalidURI(reason: "missing remote signer pubkey")
+            throw RemoteSignerError.invalidURI(reason: "missing remote signer public key")
         }
-        guard let remoteSignerPubkey = PublicKey(host) else {
-            throw RemoteSignerError.invalidURI(reason: "remote signer pubkey must be lowercase 32-byte hex")
+        guard let remoteSignerPublicKey = PublicKey(host) else {
+            throw RemoteSignerError.invalidURI(reason: "remote signer public key must be lowercase 32-byte hex")
         }
 
         let queryItems = components.queryItems ?? []
@@ -76,7 +76,7 @@ public struct BunkerURI: Sendable, Hashable {
 
         let secret = queryItems.first(where: { $0.name == "secret" })?.value
 
-        try self.init(remoteSignerPubkey: remoteSignerPubkey, relays: relays, secret: secret)
+        try self.init(remoteSignerPublicKey: remoteSignerPublicKey, relays: relays, secret: secret)
     }
 
     /// The canonical connection string, with each relay and the secret percent-encoded.
@@ -85,6 +85,6 @@ public struct BunkerURI: Sendable, Hashable {
         if let secret {
             items.append(URLQueryItem(name: "secret", value: secret))
         }
-        return "\(Self.scheme)://\(remoteSignerPubkey)?\(URIQuery.encode(items))"
+        return "\(Self.scheme)://\(remoteSignerPublicKey)?\(URIQuery.encode(items))"
     }
 }

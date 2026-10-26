@@ -77,7 +77,7 @@ struct WalletConnectRequestTests {
             WalletConnectRequest(
                 method: .payKeysend,
                 params: PayKeysendParams(
-                    amount: 1000, pubkey: "02abc", tlvRecords: [TLVRecord(type: 696_969, value: "deadbeef")])))
+                    amount: 1000, nodePublicKey: "02abc", tlvRecords: [TLVRecord(type: 696_969, value: "deadbeef")])))
         let params = try params(root)
         guard case .array(let records)? = params["tlv_records"], case .object(let first)? = records.first else {
             Issue.record("expected a tlv_records array")
@@ -85,6 +85,31 @@ struct WalletConnectRequestTests {
         }
         #expect(first["type"] == .int(696_969))
         #expect(first["value"] == .string("deadbeef"))
+    }
+
+    @Test("pay_keysend encodes nodePublicKey under the wire key public key")
+    func payKeysendNodePublicKeyWireKey() throws {
+        let params = try params(
+            wire(
+                WalletConnectRequest(
+                    method: .payKeysend, params: PayKeysendParams(amount: 1000, nodePublicKey: "02abc"))))
+        #expect(params["pubkey"] == .string("02abc"))
+        #expect(params["nodePublicKey"] == nil)
+    }
+
+    @Test("multi_pay_keysend encodes each keysend's nodePublicKey under the wire key public key")
+    func multiPayKeysendNodePublicKeyWireKey() throws {
+        let params = try params(
+            wire(
+                WalletConnectRequest(
+                    method: .multiPayKeysend,
+                    params: MultiPayKeysendParams(keysends: [.init(nodePublicKey: "02abc", amount: 1000)]))))
+        guard case .array(let keysends)? = params["keysends"], case .object(let first)? = keysends.first else {
+            Issue.record("expected a keysends array")
+            return
+        }
+        #expect(first["pubkey"] == .string("02abc"))
+        #expect(first["nodePublicKey"] == nil)
     }
 
     @Test("multi_pay_invoice encodes each invoice and omits a nil id")

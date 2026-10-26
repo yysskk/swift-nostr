@@ -6,7 +6,7 @@ import NostrCore
 /// invoice has been paid, attesting to the payment.
 ///
 /// Wrap a kind-9735 event to read its fields, then call
-/// ``validate(lnurlProviderPubkey:expectedAmountMillisats:requiringDescriptionHash:)`` to confirm the
+/// ``validate(lnurlProviderPublicKey:expectedAmountMillisats:requiringDescriptionHash:)`` to confirm the
 /// receipt is authentic and matches the zap you requested.
 /// https://github.com/nostr-protocol/nips/blob/master/57.md
 public struct ZapReceipt: Sendable, Hashable {
@@ -37,13 +37,13 @@ public struct ZapReceipt: Sendable, Hashable {
     /// The zap request the provider echoed back (the `description` tag), as its raw JSON string.
     public var descriptionJSON: String? { event.firstTagValue(named: "description") }
 
-    /// The pubkey that was zapped (the `p` tag), or nil if the tag is absent or not a canonical hex
+    /// The public key that was zapped (the `p` tag), or nil if the tag is absent or not a canonical hex
     /// public key.
-    public var recipientPubkey: PublicKey? { event.firstTagValue(named: "p").flatMap(PublicKey.init) }
+    public var recipientPublicKey: PublicKey? { event.firstTagValue(named: "p").flatMap(PublicKey.init) }
 
-    /// The pubkey that sent the zap (the uppercase `P` tag), or nil if the tag is absent or not a
+    /// The public key that sent the zap (the uppercase `P` tag), or nil if the tag is absent or not a
     /// canonical hex public key.
-    public var senderPubkey: PublicKey? { event.firstTagValue(named: "P").flatMap(PublicKey.init) }
+    public var senderPublicKey: PublicKey? { event.firstTagValue(named: "P").flatMap(PublicKey.init) }
 
     /// The id of the event that was zapped (the `e` tag), or nil if the zap targeted no event or
     /// the tag is not a canonical hex event id.
@@ -55,7 +55,7 @@ public struct ZapReceipt: Sendable, Hashable {
     /// The zapped amount in millisatoshis, taken from the embedded zap request's `amount` tag.
     ///
     /// Nil when the request carries no `amount` tag *or* when its value is not a number; use
-    /// ``validate(lnurlProviderPubkey:expectedAmountMillisats:requiringDescriptionHash:)`` to tell
+    /// ``validate(lnurlProviderPublicKey:expectedAmountMillisats:requiringDescriptionHash:)`` to tell
     /// those apart, since it rejects a malformed amount rather than treating it as absent.
     public var amountMillisats: Int64? {
         guard let value = zapRequest?.firstTagValue(named: "amount") else { return nil }
@@ -67,10 +67,10 @@ public struct ZapReceipt: Sendable, Hashable {
 
 extension ZapReceipt {
     /// The reason a zap receipt failed
-    /// ``ZapReceipt/validate(lnurlProviderPubkey:expectedAmountMillisats:requiringDescriptionHash:)``.
+    /// ``ZapReceipt/validate(lnurlProviderPublicKey:expectedAmountMillisats:requiringDescriptionHash:)``.
     public enum ValidationError: Error, LocalizedError, Sendable, Equatable {
         /// The receipt was not signed by the recipient's LNURL provider.
-        case payeePubkeyMismatch
+        case payeePublicKeyMismatch
         /// The receipt's signature is invalid.
         case invalidSignature
         /// The receipt has no `bolt11` tag.
@@ -101,7 +101,7 @@ extension ZapReceipt {
 
         public var errorDescription: String? {
             switch self {
-            case .payeePubkeyMismatch:
+            case .payeePublicKeyMismatch:
                 return "The zap receipt was not signed by the recipient's LNURL provider"
             case .invalidSignature:
                 return "The zap receipt signature is invalid"
@@ -148,7 +148,7 @@ extension ZapReceipt {
     /// the caller asked for cannot be established.
     /// https://github.com/nostr-protocol/nips/blob/master/57.md
     /// - Parameters:
-    ///   - lnurlProviderPubkey: The `nostrPubkey` from the recipient's ``LNURLPayResponse`` — the key
+    ///   - lnurlProviderPublicKey: The `nostrPubkey` from the recipient's ``LNURLPayResponse`` — the key
     ///     the provider signs receipts with.
     ///   - expectedAmountMillisats: The amount you requested. When given, the invoice must name an
     ///     amount and it must match.
@@ -159,13 +159,13 @@ extension ZapReceipt {
     ///     provider is known to omit it and you accept losing that binding.
     /// - Throws: ``ValidationError`` if any check fails.
     public func validate(
-        lnurlProviderPubkey: PublicKey,
+        lnurlProviderPublicKey: PublicKey,
         expectedAmountMillisats: Int64? = nil,
         requiringDescriptionHash: Bool = true
     ) throws {
         // 1. The receipt must claim to come from the provider's key.
-        guard event.publicKey == lnurlProviderPubkey else {
-            throw ValidationError.payeePubkeyMismatch
+        guard event.publicKey == lnurlProviderPublicKey else {
+            throw ValidationError.payeePublicKeyMismatch
         }
 
         // 2. Required tags must be present.
@@ -215,7 +215,7 @@ extension ZapReceipt {
         //    `p`/`e` than the sender asked for. A `p` that is not a canonical hex key names no one,
         //    so it counts as missing; the `e` values are compared verbatim, so a malformed one can
         //    only ever match an identical value in the request.
-        guard let receiptRecipient = recipientPubkey else {
+        guard let receiptRecipient = recipientPublicKey else {
             throw ValidationError.missingRecipient
         }
         if let zapRequest {

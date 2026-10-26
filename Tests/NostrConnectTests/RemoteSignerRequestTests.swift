@@ -17,13 +17,13 @@ struct RemoteSignerRequestTests {
 
     @Test("the encoded body carries id, method, and params keys")
     func encodesExpectedKeys() throws {
-        let request = RemoteSignerRequest(id: "abc", method: .connect, params: ["pubkey", "secret"])
+        let request = RemoteSignerRequest(id: "abc", method: .connect, params: ["remote-signer-public-key", "secret"])
         let data = try JSONEncoder().encode(request)
         let object = try JSONSerialization.jsonObject(with: data) as? [String: Any]
         let root = try #require(object)
         #expect(root["id"] as? String == "abc")
         #expect(root["method"] as? String == "connect")
-        #expect(root["params"] as? [String] == ["pubkey", "secret"])
+        #expect(root["params"] as? [String] == ["remote-signer-public-key", "secret"])
     }
 
     @Test("makeID yields unique 32-hex-character ids")

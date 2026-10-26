@@ -62,8 +62,8 @@ struct DirectMessageRoutingTests {
         #expect(targets == [inboxURL])
     }
 
-    @Test("Resolving an unknown pubkey on an empty pool returns no relays")
-    func unknownPubkeyEmptyPoolReturnsEmpty() async {
+    @Test("Resolving an unknown public key on an empty pool returns no relays")
+    func unknownPublicKeyEmptyPoolReturnsEmpty() async {
         // No connected relay to query, so discovery is skipped and nothing resolves —
         // the caller then falls back to the full pool.
         let client = NostrClient()

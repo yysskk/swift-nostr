@@ -63,7 +63,7 @@ struct FilterSerializationTests {
         let id = EventID.fixture("id")
         let author = PublicKey.fixture("author")
         let referencedEvent = EventID.fixture("referenced event")
-        let referencedPublicKey = PublicKey.fixture("referenced pubkey")
+        let referencedPublicKey = PublicKey.fixture("referenced public key")
         let filter = Filter(
             ids: [id],
             authors: [author],

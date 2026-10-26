@@ -85,7 +85,7 @@ the subscription automatically.
 ```swift
 // User timeline
 let alice = try PublicKey(npub: "npub1...")
-let timeline = try await client.subscriptions.userTimeline(pubkey: alice)
+let timeline = try await client.subscriptions.userTimeline(publicKey: alice)
 for await event in timeline.events {
     print("Note: \(event.content)")
 }
@@ -110,7 +110,7 @@ await subscription.close()
 let event = try await client.events.fetchEvent(id: try EventID(note: "note1..."))
 
 // Fetch user metadata
-let metadata = try await client.events.fetchMetadata(pubkey: alice)
+let metadata = try await client.events.fetchMetadata(publicKey: alice)
 print("Name: \(metadata?.name ?? "Unknown")")
 
 // Fetch with custom filters

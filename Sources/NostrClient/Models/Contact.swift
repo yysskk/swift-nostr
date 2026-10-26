@@ -5,7 +5,7 @@ import NostrCore
 /// https://github.com/nostr-protocol/nips/blob/master/02.md
 public struct Contact: Codable, Hashable, Sendable {
     /// The public key of the contact
-    public let pubkey: PublicKey
+    public let publicKey: PublicKey
 
     /// The main relay URL where the client reads events from this contact
     public let relayURL: RelayURL?
@@ -13,21 +13,27 @@ public struct Contact: Codable, Hashable, Sendable {
     /// A local name (petname) for this contact
     public let petname: String?
 
+    enum CodingKeys: String, CodingKey {
+        case publicKey = "pubkey"
+        case relayURL
+        case petname
+    }
+
     /// Creates a contact.
     /// - Parameters:
-    ///   - pubkey: The contact's public key.
+    ///   - publicKey: The contact's public key.
     ///   - relayURL: The main relay URL where the client reads events from this contact.
     ///   - petname: A local name for this contact.
-    public init(pubkey: PublicKey, relayURL: RelayURL? = nil, petname: String? = nil) {
-        self.pubkey = pubkey
+    public init(publicKey: PublicKey, relayURL: RelayURL? = nil, petname: String? = nil) {
+        self.publicKey = publicKey
         self.relayURL = relayURL
         self.petname = petname
     }
 
-    /// The `p` tag for a NIP-02 contact list: `["p", pubkey, relayURL, petname]`, with an empty
+    /// The `p` tag for a NIP-02 contact list: `["p", public key, relayURL, petname]`, with an empty
     /// relay placeholder when only a petname is set.
     public var tag: Tag {
-        .publicKey(pubkey, relayURL: relayURL, petname: petname)
+        .publicKey(publicKey, relayURL: relayURL, petname: petname)
     }
 
     /// Creates a contact from a "p" tag.
@@ -36,14 +42,14 @@ public struct Contact: Codable, Hashable, Sendable {
     /// relay hint is the list author's own content, so one that is not a valid relay URL is read
     /// as absent rather than failing the contact.
     public init?(tag: Tag) {
-        guard tag.name == "p", let pubkey = tag.primaryValue.flatMap(PublicKey.init) else {
+        guard tag.name == "p", let publicKey = tag.primaryValue.flatMap(PublicKey.init) else {
             return nil
         }
 
         let relayURL = tag.values.count > 1 ? RelayURL(tag.values[1]) : nil
         let petname = tag.values.count > 2 && !tag.values[2].isEmpty ? tag.values[2] : nil
 
-        self.init(pubkey: pubkey, relayURL: relayURL, petname: petname)
+        self.init(publicKey: publicKey, relayURL: relayURL, petname: petname)
     }
 }
 

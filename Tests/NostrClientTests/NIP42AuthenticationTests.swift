@@ -272,8 +272,8 @@ struct NIP42RelayConnectionTests {
         await connection.disconnect()
     }
 
-    @Test("multiple pubkeys can authenticate on one connection")
-    func multiplePubkeysAuthenticate() async throws {
+    @Test("multiple public keys can authenticate on one connection")
+    func multiplePublicKeysAuthenticate() async throws {
         let (connection, mock) = makeConnection()
         try await connection.connect()
 
@@ -312,7 +312,7 @@ struct NIP42RelayConnectionTests {
         await connection.disconnect()
     }
 
-    @Test("disconnect clears the challenge and authenticated pubkeys")
+    @Test("disconnect clears the challenge and authenticated public keys")
     func disconnectClearsAuthenticationState() async throws {
         let (connection, mock) = makeConnection()
         try await connection.connect()

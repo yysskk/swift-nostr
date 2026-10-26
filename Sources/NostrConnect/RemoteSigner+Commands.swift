@@ -5,7 +5,7 @@ public import NostrCore
 extension RemoteSigner {
     /// Fetches (and caches) the user's public key (`get_public_key`).
     ///
-    /// This may differ from ``remoteSignerPubkey`` — a signer can hold a key distinct from its own
+    /// This may differ from ``remoteSignerPublicKey`` — a signer can hold a key distinct from its own
     /// session identity. The result is cached, so subsequent calls return without another
     /// round-trip.
     /// - Returns: The user's public key, parsed from the signer's hex reply.
@@ -13,19 +13,19 @@ extension RemoteSigner {
     ///   but a canonical hex public key.
     public func userPublicKey() async throws -> PublicKey {
         if let cached = userPublicKeyIfCached { return cached }
-        guard let pubkey = PublicKey(try await performSingle(method: .getPublicKey, params: [])) else {
+        guard let publicKey = PublicKey(try await performSingle(method: .getPublicKey, params: [])) else {
             throw RemoteSignerError.responseValidationFailed
         }
-        cacheUserPublicKey(pubkey)
-        return pubkey
+        cacheUserPublicKey(publicKey)
+        return publicKey
     }
 
     /// Signs `event` remotely (`sign_event`).
     ///
     /// The signer returns a complete signed event; this validates the returned event's id and
-    /// signature and confirms its `pubkey`, `kind`, `content`, `tags`, and `created_at` match the
+    /// signature and confirms its `publicKey`, `kind`, `content`, `tags`, and `createdAt` match the
     /// request, so a signer cannot substitute a different event or sign under a different key.
-    /// - Parameter event: The unsigned event to sign. Its `pubkey` must be the user's public key
+    /// - Parameter event: The unsigned event to sign. Its `publicKey` must be the user's public key
     ///   (from ``userPublicKey()``); the returned event is rejected unless the signer authored it
     ///   under that key.
     /// - Returns: The signed ``Event``.
@@ -39,8 +39,8 @@ extension RemoteSigner {
             throw RemoteSignerError.responseDecodingFailed
         }
         // verify() only proves the returned event is self-consistent (its id/sig match its own
-        // pubkey), not that it was signed by the expected key. Require the signer to have authored
-        // it under the pubkey the caller asked for, so a validly-signed event from a different key
+        // public key), not that it was signed by the expected key. Require the signer to have authored
+        // it under the public key the caller asked for, so a validly-signed event from a different key
         // cannot be substituted.
         guard (try? signed.verify()) == true,
             signed.publicKey == event.publicKey,
@@ -87,20 +87,20 @@ extension RemoteSigner {
     /// performs it with the user's key.
     /// - Parameters:
     ///   - plaintext: The message to encrypt.
-    ///   - thirdPartyPubkey: The recipient's public key.
+    ///   - thirdPartyPublicKey: The recipient's public key.
     /// - Returns: The NIP-04 ciphertext.
-    public func nip04Encrypt(_ plaintext: String, to thirdPartyPubkey: PublicKey) async throws -> String {
-        try await performSingle(method: .nip04Encrypt, params: [thirdPartyPubkey.hex, plaintext])
+    public func nip04Encrypt(_ plaintext: String, to thirdPartyPublicKey: PublicKey) async throws -> String {
+        try await performSingle(method: .nip04Encrypt, params: [thirdPartyPublicKey.hex, plaintext])
     }
 
     /// Decrypts a legacy NIP-04 message from a third party (`nip04_decrypt`); the signer performs it
     /// with the user's key.
     /// - Parameters:
     ///   - ciphertext: The NIP-04 ciphertext to decrypt.
-    ///   - thirdPartyPubkey: The sender's public key.
+    ///   - thirdPartyPublicKey: The sender's public key.
     /// - Returns: The decrypted plaintext.
-    public func nip04Decrypt(_ ciphertext: String, from thirdPartyPubkey: PublicKey) async throws -> String {
-        try await performSingle(method: .nip04Decrypt, params: [thirdPartyPubkey.hex, ciphertext])
+    public func nip04Decrypt(_ ciphertext: String, from thirdPartyPublicKey: PublicKey) async throws -> String {
+        try await performSingle(method: .nip04Decrypt, params: [thirdPartyPublicKey.hex, ciphertext])
     }
 
     /// Asks the signer for its preferred relays (`switch_relays`).

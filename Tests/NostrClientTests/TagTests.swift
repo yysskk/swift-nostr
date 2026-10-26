@@ -64,8 +64,8 @@ struct TagTests {
             ])
     }
 
-    @Test("pubkey tag pads skipped relay before petname")
-    func pubkeyTagPadsRelay() {
+    @Test("public key tag pads skipped relay before petname")
+    func publicKeyTagPadsRelay() {
         #expect(Event.Tag.publicKey(pk1).rawArray == ["p", pk1.hex])
         #expect(Event.Tag.publicKey(pk1, relayURL: relay).rawArray == ["p", pk1.hex, "wss://r.example"])
         #expect(Event.Tag.publicKey(pk1, petname: "alice").rawArray == ["p", pk1.hex, "", "alice"])
@@ -88,16 +88,16 @@ struct TagTests {
         #expect(Event.Tag.relay(spelled).rawArray == ["relay", "wss://r.example"])
     }
 
-    @Test("pubkey tag matches Contact.tag")
-    func pubkeyTagMatchesContactTag() throws {
+    @Test("public key tag matches Contact.tag")
+    func publicKeyTagMatchesContactTag() throws {
         let contacts = [
-            Contact(pubkey: pk1),
-            Contact(pubkey: pk1, relayURL: relay),
-            Contact(pubkey: pk1, petname: "alice"),
-            Contact(pubkey: pk1, relayURL: relay, petname: "alice"),
+            Contact(publicKey: pk1),
+            Contact(publicKey: pk1, relayURL: relay),
+            Contact(publicKey: pk1, petname: "alice"),
+            Contact(publicKey: pk1, relayURL: relay, petname: "alice"),
         ]
         for contact in contacts {
-            let tag = Event.Tag.publicKey(contact.pubkey, relayURL: contact.relayURL, petname: contact.petname)
+            let tag = Event.Tag.publicKey(contact.publicKey, relayURL: contact.relayURL, petname: contact.petname)
             #expect(tag == contact.tag)
         }
     }
@@ -210,8 +210,8 @@ struct TagTests {
         #expect(event.firstTagValue(named: "missing") == nil)
     }
 
-    @Test("referenced ids and pubkeys")
-    func referencedIDsAndPubkeys() {
+    @Test("referenced ids and public keys")
+    func referencedIDsAndPublicKeys() {
         let event = makeEvent(tags: [
             ["e", id1.hex], ["e", id2.hex, "wss://r.example"], ["p", pk1.hex], ["e"], ["p", pk2.hex],
         ])
@@ -221,7 +221,7 @@ struct TagTests {
 
     /// Tags are written by whoever authored the event, so a value that is not a canonical id or
     /// key is not something to hand back typed — it is skipped, keeping the well-formed ones.
-    @Test("referenced ids and pubkeys skip malformed values")
+    @Test("referenced ids and public keys skip malformed values")
     func referencedValuesSkipMalformed() {
         let event = makeEvent(tags: [
             ["e", "id1"], ["e", id1.hex.uppercased()], ["e", id2.hex],

@@ -10,8 +10,8 @@ import NostrCore
 /// ```swift
 /// for try await payload in try await client.messages.payloads() {
 ///     switch payload {
-///     case .message(let message): print("\(message.senderPubkey): \(message.content)")
-///     case .reaction(let reaction): print("\(reaction.senderPubkey) reacted \(reaction.content)")
+///     case .message(let message): print("\(message.senderPublicKey): \(message.content)")
+///     case .reaction(let reaction): print("\(reaction.senderPublicKey) reacted \(reaction.content)")
 ///     }
 /// }
 /// ```

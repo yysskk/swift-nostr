@@ -88,8 +88,8 @@ struct DirectMessageSequenceTests {
 
         #expect(received.count == 1)
         #expect(received.first?.content == "hi bob")
-        #expect(received.first?.senderPubkey == alice.publicKey)
-        #expect(received.first?.recipientPubkey == bob.publicKey)
+        #expect(received.first?.senderPublicKey == alice.publicKey)
+        #expect(received.first?.recipientPublicKey == bob.publicKey)
         #expect(received.first?.subject == "greetings")
         #expect(received.first?.rumorID == toBob.rumor.id)
     }

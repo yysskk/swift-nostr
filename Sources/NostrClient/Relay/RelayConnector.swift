@@ -3,7 +3,7 @@ import Foundation
 /// Brings relay URLs into the pool — and, for `.addAndConnect`, connects them —
 /// according to a ``GossipRelayPolicy``.
 ///
-/// Shared by the per-pubkey relay-list stores (NIP-65 ``RelayListStore`` and
+/// Shared by the per-public-key relay-list stores (NIP-65 ``RelayListStore`` and
 /// NIP-17 ``DirectMessageRelayListStore``) so they resolve and connect relays
 /// the same way.
 struct RelayConnector: Sendable {

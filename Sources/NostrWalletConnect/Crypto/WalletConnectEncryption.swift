@@ -26,33 +26,35 @@ struct WalletConnectCipher: Sendable {
         self.scheme = scheme
     }
 
-    /// Encrypts `plaintext` from `sender` to the holder of `recipientPubkey`.
+    /// Encrypts `plaintext` from `sender` to the holder of `recipientPublicKey`.
     /// - Parameters:
     ///   - plaintext: The message to encrypt.
-    ///   - recipientPubkey: The recipient's public key.
+    ///   - recipientPublicKey: The recipient's public key.
     ///   - sender: The sender's key pair.
     /// - Returns: The encrypted payload, in the chosen scheme's wire format.
-    func encrypt(_ plaintext: String, recipientPubkey: PublicKey, sender: KeyPair) throws -> String {
+    func encrypt(_ plaintext: String, recipientPublicKey: PublicKey, sender: KeyPair) throws -> String {
         switch scheme {
         case .nip44:
-            return try SealedMessage.seal(plaintext, for: recipientPubkey, using: sender).payload
+            return try SealedMessage.seal(plaintext, for: recipientPublicKey, using: sender).payload
         case .nip04:
-            return try NIP04.encrypt(plaintext, privateKey: sender.privateKey, peerPubkeyXOnly: recipientPubkey.data)
+            return try NIP04.encrypt(
+                plaintext, privateKey: sender.privateKey, peerPublicKeyXOnly: recipientPublicKey.data)
         }
     }
 
-    /// Decrypts `payload` sent by the holder of `senderPubkey` to `recipient`.
+    /// Decrypts `payload` sent by the holder of `senderPublicKey` to `recipient`.
     /// - Parameters:
     ///   - payload: The encrypted payload, in the chosen scheme's wire format.
-    ///   - senderPubkey: The sender's public key.
+    ///   - senderPublicKey: The sender's public key.
     ///   - recipient: The recipient's key pair.
     /// - Returns: The decrypted plaintext.
-    func decrypt(_ payload: String, senderPubkey: PublicKey, recipient: KeyPair) throws -> String {
+    func decrypt(_ payload: String, senderPublicKey: PublicKey, recipient: KeyPair) throws -> String {
         switch scheme {
         case .nip44:
-            return try SealedMessage(payload: payload).open(from: senderPubkey, using: recipient)
+            return try SealedMessage(payload: payload).open(from: senderPublicKey, using: recipient)
         case .nip04:
-            return try NIP04.decrypt(payload, privateKey: recipient.privateKey, peerPubkeyXOnly: senderPubkey.data)
+            return try NIP04.decrypt(
+                payload, privateKey: recipient.privateKey, peerPublicKeyXOnly: senderPublicKey.data)
         }
     }
 }

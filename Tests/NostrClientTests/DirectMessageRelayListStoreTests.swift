@@ -15,54 +15,54 @@ struct DirectMessageRelayListStoreTests {
     @Test("Newer DM relay list wins (replaceable event)")
     func newerWins() async {
         let store = makeStore()
-        let pubkey = PublicKey.fixture("pubkey1")
+        let publicKey = PublicKey.fixture("publicKey1")
 
         await store.store(
             DirectMessageRelayList(relays: [RelayURL("wss://a.example.com")!]), createdAt: Timestamp(rawValue: 100),
-            for: pubkey)
+            for: publicKey)
         // older → ignored
         await store.store(
             DirectMessageRelayList(relays: [RelayURL("wss://b.example.com")!]), createdAt: Timestamp(rawValue: 50),
-            for: pubkey)
-        var cached = await store.cachedList(for: pubkey)
+            for: publicKey)
+        var cached = await store.cachedList(for: publicKey)
         #expect(cached?.relays == [RelayURL("wss://a.example.com")!])
 
         // newer → wins
         await store.store(
             DirectMessageRelayList(relays: [RelayURL("wss://c.example.com")!]), createdAt: Timestamp(rawValue: 200),
-            for: pubkey)
-        cached = await store.cachedList(for: pubkey)
+            for: publicKey)
+        cached = await store.cachedList(for: publicKey)
         #expect(cached?.relays == [RelayURL("wss://c.example.com")!])
     }
 
     @Test("Equal createdAt keeps existing entry")
     func equalCreatedAtKeepsExisting() async {
         let store = makeStore()
-        let pubkey = PublicKey.fixture("pubkey1")
+        let publicKey = PublicKey.fixture("publicKey1")
 
         await store.store(
             DirectMessageRelayList(relays: [RelayURL("wss://a.example.com")!]), createdAt: Timestamp(rawValue: 100),
-            for: pubkey)
+            for: publicKey)
         await store.store(
             DirectMessageRelayList(relays: [RelayURL("wss://b.example.com")!]), createdAt: Timestamp(rawValue: 100),
-            for: pubkey)
+            for: publicKey)
 
-        let cached = await store.cachedList(for: pubkey)
+        let cached = await store.cachedList(for: publicKey)
         #expect(cached?.relays == [RelayURL("wss://a.example.com")!])
     }
 
     @Test("Resolves inbox relay URLs")
     func inboxURLResolution() async {
         let store = makeStore()
-        let pubkey = PublicKey.fixture("pubkey1")
+        let publicKey = PublicKey.fixture("publicKey1")
 
         await store.store(
             DirectMessageRelayList(relays: [RelayURL("wss://inbox.example.com")!, RelayURL("wss://dm.example.com")!]),
             createdAt: Timestamp(rawValue: 1),
-            for: pubkey
+            for: publicKey
         )
 
-        let inbox = await store.inboxRelayURLs(for: pubkey)
+        let inbox = await store.inboxRelayURLs(for: publicKey)
         let expected: Set<RelayURL> = [
             RelayURL("wss://inbox.example.com")!,
             RelayURL("wss://dm.example.com")!,
@@ -70,8 +70,8 @@ struct DirectMessageRelayListStoreTests {
         #expect(inbox == expected)
     }
 
-    @Test("Unknown pubkey resolves to an empty inbox set")
-    func unknownPubkeyResolvesEmpty() async {
+    @Test("Unknown public key resolves to an empty inbox set")
+    func unknownPublicKeyResolvesEmpty() async {
         let store = makeStore()
         let inbox = await store.inboxRelayURLs(for: PublicKey.fixture("nobody"))
         #expect(inbox.isEmpty)
@@ -80,60 +80,60 @@ struct DirectMessageRelayListStoreTests {
     @Test("An empty DM relay list resolves to an empty inbox set")
     func emptyListResolvesEmptyInbox() async {
         let store = makeStore()
-        let pubkey = PublicKey.fixture("pubkey1")
+        let publicKey = PublicKey.fixture("publicKey1")
 
-        await store.store(DirectMessageRelayList(relays: []), createdAt: Timestamp(rawValue: 1), for: pubkey)
+        await store.store(DirectMessageRelayList(relays: []), createdAt: Timestamp(rawValue: 1), for: publicKey)
 
         // A peer advertising an empty list is "resolved" but routes nowhere, so the
         // caller falls back to the full pool rather than refetching.
-        #expect(await store.isResolved(for: pubkey) == true)
-        #expect(await store.inboxRelayURLs(for: pubkey).isEmpty)
+        #expect(await store.isResolved(for: publicKey) == true)
+        #expect(await store.inboxRelayURLs(for: publicKey).isEmpty)
     }
 
     // MARK: - Negative cache
 
-    @Test("A fresh pubkey is unresolved until looked up")
-    func freshPubkeyIsUnresolved() async {
+    @Test("A fresh public key is unresolved until looked up")
+    func freshPublicKeyIsUnresolved() async {
         let store = makeStore()
         #expect(await store.isResolved(for: PublicKey.fixture("nobody")) == false)
     }
 
-    @Test("markNoList resolves a pubkey without caching a list")
+    @Test("markNoList resolves a public key without caching a list")
     func markNoListResolvesWithoutCaching() async {
         let store = makeStore()
-        let pubkey = PublicKey.fixture("pubkey1")
+        let publicKey = PublicKey.fixture("publicKey1")
 
-        await store.markNoList(for: pubkey)
+        await store.markNoList(for: publicKey)
 
-        #expect(await store.isResolved(for: pubkey) == true)
+        #expect(await store.isResolved(for: publicKey) == true)
         // The negative cache must not leak a phantom list through the read APIs.
-        #expect(await store.cachedList(for: pubkey) == nil)
-        #expect(await store.inboxRelayURLs(for: pubkey).isEmpty)
+        #expect(await store.cachedList(for: publicKey) == nil)
+        #expect(await store.inboxRelayURLs(for: publicKey).isEmpty)
     }
 
     @Test("A cached list counts as resolved")
     func cachedListIsResolved() async {
         let store = makeStore()
-        let pubkey = PublicKey.fixture("pubkey1")
+        let publicKey = PublicKey.fixture("publicKey1")
 
         await store.store(
             DirectMessageRelayList(relays: [RelayURL("wss://a.example.com")!]), createdAt: Timestamp(rawValue: 1),
-            for: pubkey)
-        #expect(await store.isResolved(for: pubkey) == true)
+            for: publicKey)
+        #expect(await store.isResolved(for: publicKey) == true)
     }
 
     @Test("Storing a real list clears a prior no-list mark")
     func storingClearsNoListMark() async {
         let store = makeStore()
-        let pubkey = PublicKey.fixture("pubkey1")
+        let publicKey = PublicKey.fixture("publicKey1")
 
-        await store.markNoList(for: pubkey)
+        await store.markNoList(for: publicKey)
         await store.store(
             DirectMessageRelayList(relays: [RelayURL("wss://a.example.com")!]), createdAt: Timestamp(rawValue: 1),
-            for: pubkey)
+            for: publicKey)
 
-        #expect(await store.cachedList(for: pubkey)?.relays == [RelayURL("wss://a.example.com")!])
-        #expect(await store.isResolved(for: pubkey) == true)
+        #expect(await store.cachedList(for: publicKey)?.relays == [RelayURL("wss://a.example.com")!])
+        #expect(await store.isResolved(for: publicKey) == true)
     }
 
     @Test("Ingest a kind 10050 event")

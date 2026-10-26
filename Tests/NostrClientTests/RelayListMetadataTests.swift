@@ -145,7 +145,7 @@ struct RelayListMetadataTests {
     func parsingIgnoresOtherTags() {
         let list = RelayListMetadata(tags: [
             ["r", "wss://a.example.com"],
-            ["p", "somepubkey"],
+            ["p", "somepublickey"],
             ["r", "wss://b.example.com", "read"],
         ])
         #expect(list.entries.count == 2)
@@ -314,16 +314,16 @@ struct RelayListMetadataEventTests {
 @Suite("Relay List Metadata Filter Tests (NIP-65)")
 struct RelayListMetadataFilterTests {
 
-    @Test("Relay list filter for single pubkey")
-    func filterSinglePubkey() {
+    @Test("Relay list filter for single public key")
+    func filterSinglePublicKey() {
         let filter = Filter.relayListMetadata(publicKey: .fixture("abc123"))
         #expect(filter.authors == [.fixture("abc123")])
         #expect(filter.kinds == [10002])
         #expect(filter.limit == 1)
     }
 
-    @Test("Relay list filter for multiple pubkeys")
-    func filterMultiplePubkeys() {
+    @Test("Relay list filter for multiple public keys")
+    func filterMultiplePublicKeys() {
         let filter = Filter.relayListMetadata(publicKeys: [.fixture("abc123"), .fixture("def456")])
         #expect(filter.authors == [.fixture("abc123"), .fixture("def456")])
         #expect(filter.kinds == [10002])

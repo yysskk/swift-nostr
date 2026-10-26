@@ -38,7 +38,7 @@ let signer = try RemoteSigner(bunker: bunker)
 ```
 
 The token's host is the signer's public key, held as a `PublicKey` in
-``BunkerURI/remoteSignerPubkey``. It must be canonical lowercase hex: anything else, uppercase hex
+``BunkerURI/remoteSignerPublicKey``. It must be canonical lowercase hex: anything else, uppercase hex
 included, throws ``RemoteSignerError/invalidURI(reason:)``.
 
 The session signs and encrypts with a *client* identity — a fresh random keypair by default — so the
@@ -69,7 +69,7 @@ A `nostrconnect://` invitation carries its permissions in the URI instead (see b
 Alternatively the *client* can begin the handshake with a `nostrconnect://` invitation. Generate one
 with ``NostrConnectURI/invitation(clientKeyPair:relays:permissions:name:url:image:)``, show its
 ``NostrConnectURI/stringValue`` as a QR code or deep link, and create a ``RemoteSigner`` from it. The
-signer's pubkey is unknown until it scans the invitation and replies, so wait for it with
+signer's public key is unknown until it scans the invitation and replies, so wait for it with
 ``RemoteSigner/awaitConnection()``:
 
 ```swift
@@ -83,7 +83,7 @@ let signer = try RemoteSigner(invitation: invitation, clientKeyPair: clientKeyPa
 // Resolves once the signer accepts. The response's secret is validated against the invitation, per
 // NIP-46, so a spoofed reply is ignored; a reply that never arrives throws
 // ``RemoteSignerError/timedOut``.
-let remoteSignerPubkey: PublicKey = try await signer.awaitConnection()
+let remoteSignerPublicKey: PublicKey = try await signer.awaitConnection()
 ```
 
 Once ``RemoteSigner/awaitConnection()`` returns, the session is connected and the commands below work
@@ -92,13 +92,13 @@ exactly as for a `bunker://` session.
 ## Prove the User's Public Key
 
 ``RemoteSigner/userPublicKey()`` asks the signer which key it signs with. This may differ from
-``RemoteSigner/remoteSignerPubkey`` — the signer's session identity — and it is cached after the
+``RemoteSigner/remoteSignerPublicKey`` — the signer's session identity — and it is cached after the
 first call. A reply that is not a canonical hex key throws
 ``RemoteSignerError/responseValidationFailed``:
 
 ```swift
-let userPubkey: PublicKey = try await signer.userPublicKey()
-print("Signing as \(userPubkey.npub)")
+let userPublicKey: PublicKey = try await signer.userPublicKey()
+print("Signing as \(userPublicKey.npub)")
 ```
 
 ## Sign an Event
@@ -107,7 +107,7 @@ Build an ``UnsignedEvent`` and hand it to ``RemoteSigner/sign(_:)``. The signer 
 signed event, which is verified locally and checked against the request before it is returned:
 
 ```swift
-let unsigned = UnsignedEvent(publicKey: userPubkey, kind: .textNote, content: "Signed by my bunker")
+let unsigned = UnsignedEvent(publicKey: userPublicKey, kind: .textNote, content: "Signed by my bunker")
 let signed = try await signer.sign(unsigned)
 print(signed.id, try signed.verify())
 ```
@@ -137,12 +137,12 @@ The signer can encrypt and decrypt with the user's key on the client's behalf, f
 legacy NIP-04:
 
 ```swift
-// recipientPubkey and senderPubkey are PublicKey values.
-let ciphertext = try await signer.nip44Encrypt("hello", to: recipientPubkey)
-let plaintext = try await signer.nip44Decrypt(ciphertext, from: senderPubkey)
+// recipientPublicKey and senderPublicKey are PublicKey values.
+let ciphertext = try await signer.nip44Encrypt("hello", to: recipientPublicKey)
+let plaintext = try await signer.nip44Decrypt(ciphertext, from: senderPublicKey)
 
-let legacyCiphertext = try await signer.nip04Encrypt("hello", to: recipientPubkey)
-let legacyPlaintext = try await signer.nip04Decrypt(legacyCiphertext, from: senderPubkey)
+let legacyCiphertext = try await signer.nip04Encrypt("hello", to: recipientPublicKey)
+let legacyPlaintext = try await signer.nip04Decrypt(legacyCiphertext, from: senderPublicKey)
 ```
 
 ## Check Liveness and End the Session
