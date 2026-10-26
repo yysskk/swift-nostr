@@ -17,23 +17,6 @@ struct PublishedEventTests {
         return (client, socket)
     }
 
-    @Test("dynamic member lookup forwards Event properties")
-    func dynamicMemberLookupForwardsEventProperties() throws {
-        let keyPair = try KeyPair()
-        let signer = EventSigner(keyPair: keyPair)
-        let event = try signer.sign(.textNote("hello"))
-        let published = PublishedEvent(
-            event: event,
-            result: PublishResult(statuses: [relayURL: .accepted])
-        )
-
-        #expect(published.id == event.id)
-        #expect(published.kind == event.kind)
-        #expect(published.content == "hello")
-        #expect(published.event == event)
-        #expect(published.result.acceptedRelays == [relayURL])
-    }
-
     @Test("publishTextNote returns the signed event with a publish result")
     func publishTextNoteReturnsPublishedEvent() async throws {
         let (client, socket) = try await makeClient()
@@ -42,7 +25,7 @@ struct PublishedEventTests {
         }
 
         #expect(published.event.kind == .textNote)
-        #expect(published.content == "hello nostr")
+        #expect(published.event.content == "hello nostr")
         #expect(try published.event.verify())
         #expect(published.result.acceptedRelays == [relayURL])
         await client.relays.disconnect()
@@ -95,7 +78,7 @@ struct PublishedEventTests {
             try await client.events.publishReaction(to: note)
         }
         #expect(reaction.event.kind == .reaction)
-        #expect(reaction.content == "+")
+        #expect(reaction.event.content == "+")
 
         let repost = try await PublishAckSupport.acknowledgingPublishes(on: socket) {
             try await client.events.publishRepost(of: note)
@@ -131,10 +114,10 @@ struct PublishedEventTests {
         #expect(metadata.event.kind == .setMetadata)
 
         let deletion = try await PublishAckSupport.acknowledgingPublishes(on: socket) {
-            try await client.events.publishDeletion(eventIDs: [metadata.id], reason: "cleanup")
+            try await client.events.publishDeletion(eventIDs: [metadata.event.id], reason: "cleanup")
         }
         #expect(deletion.event.kind == .eventDeletion)
-        #expect(deletion.event.tags.contains(["e", metadata.id.hex]))
+        #expect(deletion.event.tags.contains(["e", metadata.event.id.hex]))
         await client.relays.disconnect()
     }
 
