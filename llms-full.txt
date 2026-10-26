@@ -1294,8 +1294,7 @@ A deterministic overload `previousReferences(from:excludingAuthor:maxCount:using
 Parsers check the kind, read the group id from the "d" tag, and — when `relayPublicKey` (a
 `PublicKey`) is given — reject any other author; they never verify signatures (call
 `event.verify()` yourself). A "p" or "e" entry whose value is not a canonical hex key or id is
-skipped. All
-throw `Groups.ValidationError` (`invalidEventKind`, `missingGroupID`, `unexpectedAuthor`,
+skipped. All are `throws(Groups.ValidationError)` (`invalidEventKind`, `missingGroupID`, `unexpectedAuthor`,
 `missingTag`, `unsupportedModerationKind`).
 
 ```swift
@@ -1409,7 +1408,9 @@ try await client.events.publishReport(event: note, type: .spam, reason: "unsolic
 
 ## InternetIdentifier
 
-NIP-05 DNS-based internet identifier verification (struct: Sendable).
+NIP-05 DNS-based internet identifier verification (struct: Sendable). `verify`, `lookupPublicKey`,
+`lookupRelays`, and the `String` extensions are `async throws(InternetIdentifier.VerificationError)`
+(`invalidIdentifier`, `networkError`, `invalidResponse`, `publicKeyNotFound`, `publicKeyMismatch`).
 
 ```swift
 // Verify identifier
@@ -1417,8 +1418,14 @@ let result = try await InternetIdentifier.verify("alice@example.com")
 print(result.publicKey)   // PublicKey
 print(result.relays)   // [RelayURL]; entries that are not relay URLs are skipped
 
-// Verify against expected public key
-try await InternetIdentifier.verify("alice@example.com", expectedPublicKey: alice)
+// Verify against expected public key; the catch needs no cast
+do {
+    try await InternetIdentifier.verify("alice@example.com", expectedPublicKey: alice)
+} catch .publicKeyMismatch {
+    // the identifier names a different key
+} catch {
+    // any other InternetIdentifier.VerificationError
+}
 
 // Look up public key or relays; a nostr.json value that is not canonical hex throws publicKeyNotFound
 let publicKey = try await InternetIdentifier.lookupPublicKey("alice@example.com")   // PublicKey

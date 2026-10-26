@@ -328,6 +328,20 @@ struct NIP29GroupStateTests {
         }
     }
 
+    @Test("parse failures are thrown as the concrete ValidationError")
+    func typedValidationError() throws {
+        let relay = EventSigner(keyPair: try KeyPair())
+        let impostor = EventSigner(keyPair: try KeyPair())
+        let forged = try stateEvent(kind: .groupMetadata, tags: [.identifier("abcdef")], signer: impostor)
+
+        do {
+            _ = try Groups.Metadata(event: forged, relayPublicKey: relay.publicKey)
+            Issue.record("Expected an unexpected author")
+        } catch {
+            #expect(error == .unexpectedAuthor(expected: relay.publicKey, actual: impostor.publicKey))
+        }
+    }
+
     @Test("every parser pins the author when a relay public key is given")
     func relayPublicKeyCheck() throws {
         let relay = EventSigner(keyPair: try KeyPair())

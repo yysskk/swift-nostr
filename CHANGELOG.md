@@ -85,6 +85,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **APIs that throw a single error type use typed throws** (breaking): callers now get the
+  concrete error type without casting, so `catch .invalidBase64` or `error == .publicKeyMismatch`
+  works directly. `HTTPAuth.validate(authorization:url:method:payload:tolerance:now:)` and
+  `HTTPAuth.event(fromAuthorizationHeader:)` are `throws(HTTPAuth.ValidationError)`; the
+  `init(event:relayPublicKey:)` of `Groups.Metadata`, `AdminList`, `MemberList`, `RoleList`, and
+  `PinList`, and `Groups.ModerationRequest.init(event:)` are `throws(Groups.ValidationError)`; and
+  `InternetIdentifier.verify(_:)`, `verify(_:expectedPublicKey:)`, `lookupPublicKey(_:)`,
+  `lookupRelays(_:)`, and `String.verifyAsInternetIdentifier()` /
+  `verifyAsInternetIdentifier(expectedPublicKey:)` are `async throws(InternetIdentifier.VerificationError)`.
 - **`Event.id`, `Event.pubkey`, and the event signature are typed** (breaking): `id` is an
   `EventID`, `pubkey` a `PublicKey`, and `sig: String` is now `signature: Signature?` — still the
   `sig` field on the wire. `Event.init` takes `signature:` instead of `sig:`. A `nil` signature is an

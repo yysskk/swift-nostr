@@ -39,10 +39,15 @@ public struct InternetIdentifier: Sendable {
 
     /// Errors that can occur during verification
     public enum VerificationError: Error, LocalizedError, Sendable, Equatable {
+        /// The identifier is not a well-formed `name@domain`.
         case invalidIdentifier
+        /// The `nostr.json` request failed; carries the underlying error's description.
         case networkError(String)
+        /// The server answered with a non-2xx status or a body that is not a `nostr.json` document.
         case invalidResponse
+        /// The document has no canonical hex public key for the name.
         case publicKeyNotFound
+        /// The identifier resolves to a public key other than the expected one.
         case publicKeyMismatch
 
         public var errorDescription: String? {
@@ -132,7 +137,9 @@ public struct InternetIdentifier: Sendable {
     /// ``VerificationError/publicKeyNotFound``.
     /// - Parameter identifier: The identifier (e.g., "alice@example.com")
     /// - Returns: The verification result containing public key and optional relays
-    public static func verify(_ identifier: String) async throws -> VerificationResult {
+    /// - Throws: ``VerificationError/invalidIdentifier``, ``VerificationError/networkError(_:)``,
+    ///   ``VerificationError/invalidResponse``, or ``VerificationError/publicKeyNotFound``.
+    public static func verify(_ identifier: String) async throws(VerificationError) -> VerificationResult {
         guard let (name, domain) = parse(identifier) else {
             throw VerificationError.invalidIdentifier
         }
@@ -166,7 +173,9 @@ public struct InternetIdentifier: Sendable {
     /// is treated as absent.
     /// - Throws: ``VerificationError/invalidResponse`` if `data` is not a `nostr.json` document, or
     ///   ``VerificationError/publicKeyNotFound`` if it has no usable key for `name`.
-    static func result(for identifier: String, name: String, in data: Data) throws -> VerificationResult {
+    static func result(
+        for identifier: String, name: String, in data: Data
+    ) throws(VerificationError) -> VerificationResult {
         let response: InternetIdentifierResponse
         do {
             response = try JSONDecoder().decode(InternetIdentifierResponse.self, from: data)
@@ -192,7 +201,11 @@ public struct InternetIdentifier: Sendable {
     ///   - identifier: The identifier
     ///   - expectedPublicKey: The expected public key
     /// - Returns: The verification result if successful
-    public static func verify(_ identifier: String, expectedPublicKey: PublicKey) async throws -> VerificationResult {
+    /// - Throws: Anything ``verify(_:)`` throws, or ``VerificationError/publicKeyMismatch`` when the
+    ///   identifier resolves to a different key.
+    public static func verify(
+        _ identifier: String, expectedPublicKey: PublicKey
+    ) async throws(VerificationError) -> VerificationResult {
         let result = try await verify(identifier)
 
         guard result.publicKey == expectedPublicKey else {
@@ -205,7 +218,8 @@ public struct InternetIdentifier: Sendable {
     /// Looks up a public key from an internet identifier
     /// - Parameter identifier: The identifier
     /// - Returns: The public key the identifier resolves to
-    public static func lookupPublicKey(_ identifier: String) async throws -> PublicKey {
+    /// - Throws: Anything ``verify(_:)`` throws.
+    public static func lookupPublicKey(_ identifier: String) async throws(VerificationError) -> PublicKey {
         let result = try await verify(identifier)
         return result.publicKey
     }
@@ -213,7 +227,8 @@ public struct InternetIdentifier: Sendable {
     /// Looks up recommended relays for an internet identifier
     /// - Parameter identifier: The identifier
     /// - Returns: The valid relay URLs the server recommends, in the order listed
-    public static func lookupRelays(_ identifier: String) async throws -> [RelayURL] {
+    /// - Throws: Anything ``verify(_:)`` throws.
+    public static func lookupRelays(_ identifier: String) async throws(VerificationError) -> [RelayURL] {
         let result = try await verify(identifier)
         return result.relays
     }
@@ -236,14 +251,18 @@ extension String {
     }
 
     /// Verifies this string as an internet identifier
-    public func verifyAsInternetIdentifier() async throws -> InternetIdentifier.VerificationResult {
+    /// - Throws: Anything ``InternetIdentifier/verify(_:)`` throws.
+    public func verifyAsInternetIdentifier() async throws(InternetIdentifier.VerificationError)
+        -> InternetIdentifier.VerificationResult
+    {
         try await InternetIdentifier.verify(self)
     }
 
     /// Verifies this string as an internet identifier against an expected public key
+    /// - Throws: Anything ``InternetIdentifier/verify(_:expectedPublicKey:)`` throws.
     public func verifyAsInternetIdentifier(
         expectedPublicKey: PublicKey
-    ) async throws -> InternetIdentifier.VerificationResult {
+    ) async throws(InternetIdentifier.VerificationError) -> InternetIdentifier.VerificationResult {
         try await InternetIdentifier.verify(self, expectedPublicKey: expectedPublicKey)
     }
 }

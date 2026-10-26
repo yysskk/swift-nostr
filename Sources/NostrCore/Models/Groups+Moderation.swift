@@ -117,7 +117,7 @@ extension Groups {
         ///   or ``ValidationError/missingTag(name:kind:)`` when a tag the kind requires is
         ///   absent. A "p" or "e" target whose value is not a canonical hex public key or event
         ///   id counts as absent, and a pinned "e" item with such a value is skipped.
-        public init(event: Event) throws {
+        public init(event: Event) throws(ValidationError) {
             guard Self.moderationKinds.contains(event.kind) else {
                 throw ValidationError.unsupportedModerationKind(event.kind)
             }

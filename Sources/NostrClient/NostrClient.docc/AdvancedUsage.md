@@ -237,11 +237,15 @@ let result = try await InternetIdentifier.verify("alice@example.com")
 print("Public key: \(result.publicKey)")
 print("Relays: \(result.relays)")
 
-// Verify against expected public key
-try await InternetIdentifier.verify(
-    "alice@example.com",
-    expectedPublicKey: try PublicKey(npub: "npub1...")
-)
+// Verify against expected public key; errors are typed as `InternetIdentifier.VerificationError`
+let expectedPublicKey = try PublicKey(npub: "npub1...")
+do {
+    try await InternetIdentifier.verify("alice@example.com", expectedPublicKey: expectedPublicKey)
+} catch .publicKeyMismatch {
+    print("alice@example.com names a different key")
+} catch {
+    print("Verification failed: \(error.localizedDescription)")
+}
 
 // Look up public key only
 let publicKey = try await InternetIdentifier.lookupPublicKey("alice@example.com")
