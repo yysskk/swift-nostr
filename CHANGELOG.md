@@ -97,6 +97,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`PublishedEvent` no longer forwards `Event` properties** (breaking): the dynamic member lookup
+  is removed, so read them through `event` (`published.event.id`, `published.event.content`).
 - **Tag names are a typed `Tag.Name`** (breaking): `Tag.name` and `Tag(name:values:)` use
   `Event.Tag.Name`, an open `RawRepresentable` string type that encodes as a bare string and is
   `ExpressibleByStringLiteral`, so `Tag(name: "x")` and `tags(named: "x")` still compile. Constants

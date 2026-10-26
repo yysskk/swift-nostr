@@ -527,15 +527,13 @@ let isValid = try event.verify()  // verifies Schnorr signature
 ## PublishedEvent
 
 Returned by the convenience publish methods: the signed `event` plus the per-relay
-`result` (`PublishResult`). `Event` properties are forwarded via dynamic member
-lookup (`published.id`, `published.content`); use `.event` where an `Event` value
-itself is required.
+`result` (`PublishResult`). Read `Event` properties through `event` (`published.event.id`).
 
 ```swift
 let published = try await client.events.publishTextNote(content: "hi")
 published.event          // Event
 published.result         // PublishResult (statuses: [RelayURL: PublishRelayStatus])
-published.id             // forwarded from Event
+published.event.id       // EventID
 published.result.acceptedRelays / .failedRelays / .pendingRelays  // Set<RelayURL>
 published.result.status(for: try RelayURL(string: "wss://Relay.Example.com/"))  // any spelling; nil if not targeted
 ```

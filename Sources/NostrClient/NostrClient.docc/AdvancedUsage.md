@@ -800,7 +800,7 @@ parameter and return a ``PublishedEvent`` carrying both the signed event and its
 
 ```swift
 let note = try await client.events.publishTextNote(content: "Hello!", strategy: .quorum(2))
-print("id:", note.id)  // Event properties are forwarded
+print("id:", note.event.id)
 print("accepted:", note.result.acceptedRelays)
 ```
 
