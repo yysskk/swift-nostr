@@ -111,14 +111,14 @@ public actor NostrClient {
     }
 
     /// The signer's public key, for the helpers that cannot proceed without one.
-    /// - Throws: ``NostrError/signerNotSet`` when no signer is set.
-    func requiredPublicKey() throws -> PublicKey {
-        guard let cachedPublicKey else { throw NostrError.signerNotSet }
+    /// - Throws: ``NostrClient/Error/signerNotSet`` when no signer is set.
+    func requiredPublicKey() throws(Error) -> PublicKey {
+        guard let cachedPublicKey else { throw .signerNotSet }
         return cachedPublicKey
     }
 
     /// Signs `template` as the active signer's public key (local synchronously, remote via relay
-    /// round-trip), throwing ``NostrError/signerNotSet`` if none is set.
+    /// round-trip), throwing ``NostrClient/Error/signerNotSet`` if none is set.
     ///
     /// The cached public key is used, so a remote signer is not asked for it again.
     func sign(_ template: EventTemplate) async throws -> Event {
@@ -135,13 +135,30 @@ public actor NostrClient {
     /// against it works with a local key and a remote NIP-46 signer alike; callers do the network
     /// publish after the closure returns.
     ///
-    /// - Throws: ``NostrError/signerNotSet`` when no signer is set.
+    /// - Throws: ``NostrClient/Error/signerNotSet`` when no signer is set, plus anything `body`
+    ///   throws.
     func withSigner<T: Sendable>(
         _ body: @Sendable (_ signer: any NostrSigning, _ publicKey: PublicKey) async throws -> T
     ) async throws -> T {
         guard let activeSigner, let cachedPublicKey else {
-            throw NostrError.signerNotSet
+            throw Error.signerNotSet
         }
         return try await body(activeSigner, cachedPublicKey)
+    }
+}
+
+// MARK: - Error
+extension NostrClient {
+    /// Why a ``NostrClient`` operation failed before reaching a relay or the signer.
+    public enum Error: Swift.Error, LocalizedError, Sendable, Equatable {
+        /// The operation needs a signer and none is set.
+        case signerNotSet
+
+        public var errorDescription: String? {
+            switch self {
+            case .signerNotSet:
+                return "No signer is set — call setSigner(_:), setPrivateKey(_:), or setNsec(_:) first"
+            }
+        }
     }
 }

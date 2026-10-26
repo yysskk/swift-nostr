@@ -80,7 +80,7 @@ struct PublishStrategyTests {
     @Test("publishing on an empty pool throws")
     func publishOnEmptyPoolThrows() async {
         let pool = RelayPool()
-        await #expect(throws: NostrError.noRelaysInPool) {
+        await #expect(throws: RelayPool.Error.emptyPool) {
             try await pool.publish(self.dummyEvent)
         }
     }
@@ -88,9 +88,25 @@ struct PublishStrategyTests {
     @Test("publishing to an empty target set throws")
     func publishToEmptyTargetSetThrows() async throws {
         let pool = try await makePool()
-        await #expect(throws: NostrError.noMatchingRelays([])) {
+        await #expect(throws: RelayPool.Error.noMatchingRelays([])) {
             try await pool.publish(self.dummyEvent, to: [])
         }
+    }
+
+    @Test("a quorum publish that too few relays accept throws quorumNotMet with the counts")
+    func quorumPublishBelowQuorumThrows() async throws {
+        // One connected relay that acknowledges, plus one that was never connected and fails
+        // fast: one acknowledgment against a quorum of two.
+        let (client, socket) = try await ConnectedClientFixture.make(relayURL: urlA)
+        let pool = await client.pool
+        await pool.addRelay(urlB)
+
+        await #expect(throws: RelayPool.Error.quorumNotMet(acknowledged: 1, required: 2)) {
+            try await PublishAckSupport.acknowledgingPublishes(on: socket) {
+                try await pool.publish(self.dummyEvent, strategy: .quorum(2))
+            }
+        }
+        await pool.disconnectAll()
     }
 
     @Test("publish on a disconnected connection fails fast with notConnected")
@@ -124,7 +140,7 @@ struct PublishStrategyTests {
     func publishFailureWhenQuorumNotMet() {
         let error = RelayPool.publishFailure(
             successCount: 1, requiredAcks: 2, lastError: RelayConnection.Error.timedOut)
-        #expect(error as? NostrError == .relayError("Publish quorum not met: 1/2 relays acknowledged"))
+        #expect(error as? RelayPool.Error == .quorumNotMet(acknowledged: 1, required: 2))
     }
 
     @Test("meeting the quorum succeeds despite other failures")

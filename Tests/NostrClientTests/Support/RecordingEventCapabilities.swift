@@ -7,7 +7,7 @@ import NostrCore
 /// protocol extensions can be exercised without a relay pool.
 ///
 /// Targeting mimics a pool holding `pooledRelays`: a targeted call none of whose relays is pooled
-/// (an empty set included) throws ``NostrError/noMatchingRelays(_:)`` after it is recorded.
+/// (an empty set included) throws ``RelayPool/Error/noMatchingRelays(_:)`` after it is recorded.
 actor RecordingEventCapabilities: NostrEventPublishing, NostrEventFetching {
     struct TemplatePublish: Sendable {
         let template: EventTemplate
@@ -103,7 +103,7 @@ actor RecordingEventCapabilities: NostrEventPublishing, NostrEventFetching {
         guard let relayURLs else { return }
         let reachable = pooledRelays.map { relayURLs.intersection($0) } ?? relayURLs
         guard !reachable.isEmpty else {
-            throw NostrError.noMatchingRelays(relayURLs.sorted { $0.description < $1.description })
+            throw RelayPool.Error.noMatchingRelays(relayURLs.sorted { $0.description < $1.description })
         }
     }
 }

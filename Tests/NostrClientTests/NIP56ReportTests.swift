@@ -78,7 +78,7 @@ struct NIP56ReportTests {
     func publishReportWithoutSignerThrowsSignerNotSet() async throws {
         let client = NostrClient()
 
-        await #expect(throws: NostrError.signerNotSet) {
+        await #expect(throws: NostrClient.Error.signerNotSet) {
             _ = try await client.events.publishReport(publicKey: .fixture("target"), type: .spam)
         }
     }

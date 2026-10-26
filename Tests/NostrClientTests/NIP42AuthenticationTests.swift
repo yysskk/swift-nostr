@@ -77,7 +77,7 @@ struct NIP42AuthenticationEventTests {
             .clientAuthentication(
                 relayURL: RelayURL("wss://relay.example.com")!, challenge: "abc"))
 
-        await #expect(throws: NostrError.cannotPublishAuthenticationEvent) {
+        await #expect(throws: RelayPool.Error.cannotPublishAuthenticationEvent) {
             _ = try await pool.publish(authEvent)
         }
     }

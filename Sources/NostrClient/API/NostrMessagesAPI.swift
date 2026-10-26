@@ -66,7 +66,7 @@ public struct NostrMessagesAPI: NostrMessaging {
     ///
     /// A nil target means the addressee advertised no DM relay list (or none could be connected), so
     /// the copy falls back to the full pool rather than being dropped; the recipient copy's fallback
-    /// throws ``NostrError/noRelaysInPool`` when the pool is also empty. The recipient and sender
+    /// throws ``RelayPool/Error/emptyPool`` when the pool is also empty. The recipient and sender
     /// addressees are resolved in parallel — each may trigger an independent relay-list fetch — and
     /// the best-effort self-copy never blocks or fails the primary send.
     private func deliver(

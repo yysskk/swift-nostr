@@ -202,19 +202,19 @@ struct PublishedEventTests {
     func publishingWithoutSignerThrowsSignerNotSet() async throws {
         let client = NostrClient()
 
-        await #expect(throws: NostrError.signerNotSet) {
+        await #expect(throws: NostrClient.Error.signerNotSet) {
             _ = try await client.events.publishTextNote(content: "no signer")
         }
-        await #expect(throws: NostrError.signerNotSet) {
+        await #expect(throws: NostrClient.Error.signerNotSet) {
             _ = try await client.events.publishMetadata(UserMetadata(name: "x"))
         }
-        await #expect(throws: NostrError.signerNotSet) {
+        await #expect(throws: NostrClient.Error.signerNotSet) {
             _ = try await client.messages.send("hi", to: .fixture("pk"))
         }
-        await #expect(throws: NostrError.signerNotSet) {
+        await #expect(throws: NostrClient.Error.signerNotSet) {
             _ = try await client.messages.subscribe()
         }
-        await #expect(throws: NostrError.signerNotSet) {
+        await #expect(throws: NostrClient.Error.signerNotSet) {
             _ = try await client.routing.publishRelayList(write: [RelayURL("wss://w.example.com")!])
         }
     }
@@ -228,7 +228,7 @@ struct PublishedEventTests {
             .createMessageWithSelfCopy(content: "hi", to: bob.publicKey)
             .recipientGiftWrap
 
-        await #expect(throws: NostrError.signerNotSet) {
+        await #expect(throws: NostrClient.Error.signerNotSet) {
             _ = try await client.messages.parse(giftWrap)
         }
     }

@@ -167,7 +167,7 @@ public struct ZapsAPI: Sendable {
 
     /// Fetches the zap receipts naming the signer as recipient.
     public func received(limit: Int = 50, timeout: Duration? = nil) async throws -> [ZapReceipt] {
-        guard let publicKey = await identity.publicKey else { throw NostrError.signerNotSet }
+        guard let publicKey = await identity.publicKey else { throw NostrClient.Error.signerNotSet }
         let filter = Filter(kinds: [.zap], publicKeyReferences: [publicKey], limit: limit)
         return try await events.fetch(filters: [filter], timeout: timeout).compactMap(ZapReceipt.init(event:))
     }
@@ -214,7 +214,7 @@ try await client.events.publish(signed)           // generic publish of a pre-si
 
 `identity.nip44Encrypt(_:to:)` and `identity.nip44Decrypt(_:from:)` run NIP-44 v2 through the same
 signer, for app payloads to a peer outside the DM path (a relay round-trip per call with a remote
-signer); both throw `signerNotSet` without a signer:
+signer); both throw `NostrClient.Error.signerNotSet` without a signer:
 
 ```swift
 let payload = try await client.identity.nip44Encrypt("app payload", to: peerPublicKey)
@@ -263,7 +263,7 @@ Convenience publish methods return a `PublishedEvent` — the signed `event` plu
 per-relay `result` (`PublishResult`). All accept an optional `strategy:` parameter
 (`.firstAck` / `.quorum(n)` / `.allSettled`) controlling how many acknowledgments to
 wait for before returning. Publishing with zero resolved relays throws —
-`NostrError.noRelaysInPool` for an empty pool, `.noMatchingRelays` when no targeted
+`RelayPool.Error.emptyPool` for an empty pool, `.noMatchingRelays` when no targeted
 URL is in the pool.
 
 ```swift
@@ -321,7 +321,7 @@ await client.subscriptions.unsubscribeAll()
 ### One-Shot Fetches
 
 Fetch methods open a temporary subscription, wait for all relays to signal EOSE, then return
-results. With zero resolved relays they throw (`NostrError.noRelaysInPool` /
+results. With zero resolved relays they throw (`RelayPool.Error.emptyPool` /
 `.noMatchingRelays`) instead of idling until the timeout:
 
 ```swift
@@ -1582,7 +1582,15 @@ await pool.clearDeduplicationCache()
 Membership and targeting take `RelayURL`s, keyed by their canonical form. Targets (`to:`) are a
 `Set<RelayURL>?`: nil broadcasts to the whole pool, relays not in the pool are skipped, and when
 none is in the pool — an empty set included — the call throws
-`noMatchingRelays([RelayURL])`, carrying the targets sorted by their canonical string.
+`RelayPool.Error.noMatchingRelays([RelayURL])`, carrying the targets sorted by their canonical string.
+
+Pool-level failures throw `RelayPool.Error`: `emptyPool`, `noMatchingRelays([RelayURL])`,
+`cannotPublishAuthenticationEvent` (publishing a kind-22242 event), `quorumNotMet(acknowledged:required:)`
+(a `.quorum` publish that too few relays accepted), `subscriptionSuperseded` (another subscribe under the
+same id replaced this one before it was established), `subscriptionFailed` (no relay accepted the
+subscription), and `allConnectionsFailed` (`connectAll()` with every relay failing). `connectAll()` and
+`subscribe` are `throws(RelayPool.Error)`; when every targeted relay fails a publish or count, the last
+relay's own error (`RelayRejection` or `RelayConnection.Error`) is thrown instead.
 
 Event deduplication is per subscription: copies of one event arriving from several relays
 collapse into a single delivery, an event matching two subscriptions is delivered to both,
@@ -1828,11 +1836,12 @@ for await challenge in await signer.authChallenges() {
   tests, or the default transport with a `webSocketFactory:` for a platform-native socket
 - `RemoteSignerError` — `invalidURI(reason:)`, `notConnected`, `connectionInProgress`, `requestEncodingFailed`, `responseDecodingFailed`, `timedOut`, `connectionRejected(message:)`, `secretMismatch`, `signerError(message:)`, `responseValidationFailed`
 
-## NostrError
+## Errors
 
-Error types (enum: Error, LocalizedError, Sendable, Equatable).
-
-Cases: `signerNotSet`, `connectionFailed(String)`, `notConnected`, `relayError(String)`, `noRelaysInPool`, `noMatchingRelays([RelayURL])`, `cannotPublishAuthenticationEvent`.
+Every domain throws its own error type (each an enum conforming to `Error`, `LocalizedError`,
+`Sendable`, and `Equatable`, nested in the type it belongs to), documented with that type above.
+`NostrClient.Error.signerNotSet` is thrown by every client operation that needs a signer when none is
+set; extensions built on the capability protocols throw it too.
 
 ## Supported NIPs
 

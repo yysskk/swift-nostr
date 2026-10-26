@@ -433,7 +433,7 @@ struct NIP42AutomaticAuthenticationTests {
         let (client, _) = makeClient()
         await client.identity.setSigner(EventSigner(keyPair: try KeyPair()))
 
-        await #expect(throws: NostrError.noMatchingRelays([RelayURL("wss://unknown.example.com")!])) {
+        await #expect(throws: RelayPool.Error.noMatchingRelays([RelayURL("wss://unknown.example.com")!])) {
             try await client.identity.authenticate(relayURL: RelayURL("wss://Unknown.Example.com/")!)
         }
     }
@@ -459,7 +459,7 @@ struct NIP42AutomaticAuthenticationTests {
         let connection = try #require(await client.relays.pool.relay(for: relayURL))
         try await pollUntil { await connection.authenticationChallenge != nil }
 
-        await #expect(throws: NostrError.signerNotSet) {
+        await #expect(throws: NostrClient.Error.signerNotSet) {
             try await client.identity.authenticate(relayURL: relayURL)
         }
         await client.relays.disconnect()

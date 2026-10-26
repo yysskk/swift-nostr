@@ -20,14 +20,14 @@ actor RecordingRelayCapabilities: NostrRelayManaging {
     }
 
     /// What every connect throws, or nil to succeed.
-    let connectError: NostrError?
+    let connectError: RelayPool.Error?
 
     private(set) var calls: [Call] = []
     /// The configuration passed with each add, keyed by relay, for the adds that passed one.
     private(set) var configs: [RelayURL: RelayConnectionConfig] = [:]
     private var pool: [RelayURL: RelayConnection] = [:]
 
-    init(connectError: NostrError? = nil) {
+    init(connectError: RelayPool.Error? = nil) {
         self.connectError = connectError
     }
 

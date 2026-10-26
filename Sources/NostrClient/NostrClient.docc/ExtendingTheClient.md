@@ -91,7 +91,7 @@ public struct ZapsAPI: Sendable {
 
     /// Fetches the zap receipts naming the signer as recipient.
     public func received(limit: Int = 50, timeout: Duration? = nil) async throws -> [ZapReceipt] {
-        guard let publicKey = await identity.publicKey else { throw NostrError.signerNotSet }
+        guard let publicKey = await identity.publicKey else { throw NostrClient.Error.signerNotSet }
         let filter = Filter(kinds: [.zap], publicKeyReferences: [publicKey], limit: limit)
         return try await events.fetch(filters: [filter], timeout: timeout).compactMap(ZapReceipt.init(event:))
     }

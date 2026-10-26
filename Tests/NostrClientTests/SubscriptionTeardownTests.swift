@@ -238,6 +238,41 @@ struct SubscriptionGenerationTests {
         await client.relays.disconnect()
     }
 
+    /// The subscribe that loses the overlap is told so with a dedicated error rather than a
+    /// generic failure, and the winner is unaffected. Whether two subscribes actually interleave
+    /// is up to the scheduler, so the race is repeated until one does.
+    @Test("the subscribe that loses an overlap throws subscriptionSuperseded")
+    func overlappedSubscribeThrowsSuperseded() async throws {
+        let (client, _) = try await makeClient()
+        let pool = await client.pool
+
+        var supersededCount = 0
+        for attempt in 0..<50 {
+            let id = "sub-\(attempt)"
+            async let first = subscribeFailure(on: pool, subscriptionID: id)
+            async let second = subscribeFailure(on: pool, subscriptionID: id)
+            let failures = await [first, second].compactMap { $0 }
+            #expect(failures.allSatisfy { $0 == .subscriptionSuperseded })
+            #expect(failures.count < 2)
+            supersededCount += failures.count
+            await pool.unsubscribe(subscriptionID: id)
+            if supersededCount > 0 { break }
+        }
+        #expect(supersededCount > 0)
+
+        await client.relays.disconnect()
+    }
+
+    /// Subscribes on `pool` and returns the pool error it threw, or nil when it succeeded.
+    private func subscribeFailure(on pool: RelayPool, subscriptionID: String) async -> RelayPool.Error? {
+        do {
+            try await pool.subscribe(subscriptionID: subscriptionID, filters: [Filter(kinds: [1])]) { _ in }
+            return nil
+        } catch {
+            return error
+        }
+    }
+
     private func pollUntil(_ condition: @Sendable () async -> Bool) async throws {
         for _ in 0..<200 {
             if await condition() { return }

@@ -82,7 +82,7 @@ struct SubscriptionCapabilityTests {
         _ = try await subscriptions.subscribe(filters: [filter], to: [relayB], bufferingPolicy: .bufferingOldest(2))
         // An empty set stays a set — it reaches the primitive, which rejects it, rather than
         // collapsing to nil and subscribing on the whole pool.
-        await #expect(throws: NostrError.noMatchingRelays([])) {
+        await #expect(throws: RelayPool.Error.noMatchingRelays([])) {
             try await subscriptions.subscribe(filters: [filter], to: [])
         }
 

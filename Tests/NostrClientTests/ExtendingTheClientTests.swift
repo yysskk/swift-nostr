@@ -49,7 +49,7 @@ private struct ZapsAPI: Sendable {
 
     /// Fetches the zap receipts naming the signer as recipient.
     func received(limit: Int = 50, timeout: Duration? = nil) async throws -> [ZapReceipt] {
-        guard let publicKey = await identity.publicKey else { throw NostrError.signerNotSet }
+        guard let publicKey = await identity.publicKey else { throw NostrClient.Error.signerNotSet }
         let filter = Filter(kinds: [.zap], publicKeyReferences: [publicKey], limit: limit)
         return try await events.fetch(filters: [filter], timeout: timeout).compactMap(ZapReceipt.init(event:))
     }
@@ -245,7 +245,7 @@ struct ExtendingTheClientTests {
         let events = CannedEvents([])
         let zaps = ZapsAPI(events: events, identity: RecordingIdentityCapabilities())
 
-        await #expect(throws: NostrError.signerNotSet) {
+        await #expect(throws: NostrClient.Error.signerNotSet) {
             _ = try await zaps.received()
         }
         #expect(await events.requests.isEmpty)

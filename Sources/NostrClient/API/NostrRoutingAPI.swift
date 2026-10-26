@@ -132,8 +132,9 @@ public struct NostrRoutingAPI: NostrRelayRouting {
 
     /// Ensures the current user's own NIP-17 DM inbox relays (kind 10050) are in the pool and
     /// connected, fetching the list first when it is not cached.
+    /// - Throws: ``NostrClient/Error/signerNotSet`` if no signer is configured.
     @discardableResult
-    public func connectDirectMessageInboxRelays() async throws -> Set<RelayURL> {
+    public func connectDirectMessageInboxRelays() async throws(NostrClient.Error) -> Set<RelayURL> {
         await connectedInboxRelays(for: try await client.requiredPublicKey())
     }
 

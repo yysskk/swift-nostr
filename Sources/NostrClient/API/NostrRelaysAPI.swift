@@ -49,9 +49,9 @@ public struct NostrRelaysAPI: NostrRelayManaging {
     // MARK: - Connection lifecycle
 
     /// Connects to all relays in the pool.
-    /// - Throws: ``NostrError/connectionFailed(_:)`` if every relay in the pool fails to
+    /// - Throws: ``RelayPool/Error/allConnectionsFailed`` if every relay in the pool fails to
     ///   connect; partial connection failures are tolerated.
-    public func connect() async throws {
+    public func connect() async throws(RelayPool.Error) {
         _ = try await client.pool.connectAll()
     }
 

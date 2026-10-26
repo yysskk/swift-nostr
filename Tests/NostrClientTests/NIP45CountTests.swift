@@ -225,10 +225,10 @@ struct NIP45CountTests {
 
     // MARK: - RelayPool
 
-    @Test("the pool count on an empty pool throws noRelaysInPool")
+    @Test("the pool count on an empty pool throws emptyPool")
     func poolCountOnEmptyPoolThrows() async {
         let pool = RelayPool()
-        await #expect(throws: NostrError.noRelaysInPool) {
+        await #expect(throws: RelayPool.Error.emptyPool) {
             _ = try await pool.countEvents(matching: [Filter(kinds: [.textNote])])
         }
     }

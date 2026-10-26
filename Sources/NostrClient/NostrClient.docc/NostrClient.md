@@ -185,6 +185,8 @@ add NIP helpers and namespaces of your own; see <doc:ExtendingTheClient>.
 
 ### Errors
 
+- ``NostrClient/Error``
+- ``RelayPool/Error``
 - ``NIP19Entity/Error``
 - ``GiftWrap/Error``
 - ``DirectMessagePayload/Error``

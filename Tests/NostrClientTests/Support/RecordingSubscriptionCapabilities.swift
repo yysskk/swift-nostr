@@ -7,7 +7,7 @@ import NostrCore
 /// items, so the protocol extension can be exercised without a relay pool.
 ///
 /// Targeting mimics a pool holding `pooledRelays`: a targeted subscribe none of whose relays is
-/// pooled (an empty set included) throws ``NostrError/noMatchingRelays(_:)`` after it is recorded.
+/// pooled (an empty set included) throws ``RelayPool/Error/noMatchingRelays(_:)`` after it is recorded.
 actor RecordingSubscriptionCapabilities: NostrSubscribing {
     struct Subscribe: Sendable {
         let filters: [Filter]
@@ -66,7 +66,7 @@ actor RecordingSubscriptionCapabilities: NostrSubscribing {
         guard let relayURLs else { return }
         let reachable = pooledRelays.map { relayURLs.intersection($0) } ?? relayURLs
         guard !reachable.isEmpty else {
-            throw NostrError.noMatchingRelays(relayURLs.sorted { $0.description < $1.description })
+            throw RelayPool.Error.noMatchingRelays(relayURLs.sorted { $0.description < $1.description })
         }
     }
 }

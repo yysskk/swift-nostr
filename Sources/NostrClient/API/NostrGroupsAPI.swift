@@ -24,7 +24,7 @@ public struct NostrGroupsAPI: NostrGroupManaging {
     /// Signs `template` with the configured signer and publishes it to the group's relay only,
     /// adding and connecting the relay on demand.
     ///
-    /// Signing comes first, so without a signer ``NostrError/signerNotSet`` is thrown before the
+    /// Signing comes first, so without a signer ``NostrClient/Error/signerNotSet`` is thrown before the
     /// group's relay is touched.
     @discardableResult
     public func publish(
@@ -147,13 +147,13 @@ public struct NostrGroupsAPI: NostrGroupManaging {
     ///
     /// A NIP-29 group lives on a single relay, so every group flow targets exactly that
     /// relay; targeting a URL the pool does not know throws
-    /// ``NostrError/noMatchingRelays(_:)``, so this helper guarantees the relay is
+    /// ``RelayPool/Error/noMatchingRelays(_:)``, so this helper guarantees the relay is
     /// present and connected first. The relay is added when absent, and connecting is
     /// idempotent when it already is connected.
     ///
     /// - Returns: The group's relay URL, to pass to the pool's targeting parameters.
-    /// - Throws: ``NostrError/connectionFailed(_:)`` when the relay cannot be connected.
-    private func ensureRelay(_ group: GroupReference) async throws -> RelayURL {
+    /// - Throws: ``RelayConnection/Error`` when the relay cannot be connected.
+    private func ensureRelay(_ group: GroupReference) async throws(RelayConnection.Error) -> RelayURL {
         let connection = await client.pool.addRelay(group.relayURL)
         try await connection.connect()
         return group.relayURL

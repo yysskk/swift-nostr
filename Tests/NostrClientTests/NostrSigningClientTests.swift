@@ -80,7 +80,7 @@ struct NostrSigningClientTests {
     func signWithoutSignerThrows() async throws {
         let (client, _) = makeClient()
 
-        await #expect(throws: NostrError.signerNotSet) {
+        await #expect(throws: NostrClient.Error.signerNotSet) {
             try await client.identity.sign(.textNote("x"))
         }
     }
@@ -121,10 +121,10 @@ struct NostrSigningClientTests {
         let peer = try KeyPair()
         let payload = try EventSigner(keyPair: peer).nip44Encrypt("x", to: try KeyPair().publicKey)
 
-        await #expect(throws: NostrError.signerNotSet) {
+        await #expect(throws: NostrClient.Error.signerNotSet) {
             try await client.identity.nip44Encrypt("x", to: peer.publicKey)
         }
-        await #expect(throws: NostrError.signerNotSet) {
+        await #expect(throws: NostrClient.Error.signerNotSet) {
             try await client.identity.nip44Decrypt(payload, from: peer.publicKey)
         }
     }

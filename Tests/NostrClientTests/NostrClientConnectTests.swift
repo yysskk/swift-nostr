@@ -52,7 +52,7 @@ struct NostrClientConnectTests {
         )
         let client = NostrClient(relayPoolConfig: poolConfig)
 
-        await #expect(throws: NostrError.self) {
+        await #expect(throws: RelayPool.Error.allConnectionsFailed) {
             try await client.relays.connect(to: [RelayURL("ws://127.0.0.1:9")!])
         }
         // The relay was added even though connecting failed.

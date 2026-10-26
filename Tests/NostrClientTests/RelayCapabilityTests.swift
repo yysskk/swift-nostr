@@ -63,10 +63,10 @@ struct RelayCapabilityTests {
 
     @Test("connect(to:) keeps the relays it added when connecting fails, and rethrows the error")
     func connectToRethrowsAfterAdding() async throws {
-        let stub = RecordingRelayCapabilities(connectError: .connectionFailed("every relay failed"))
+        let stub = RecordingRelayCapabilities(connectError: .allConnectionsFailed)
         let relays: any NostrRelayManaging = stub
 
-        await #expect(throws: NostrError.connectionFailed("every relay failed")) {
+        await #expect(throws: RelayPool.Error.allConnectionsFailed) {
             try await relays.connect(to: [relayA])
         }
 

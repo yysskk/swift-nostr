@@ -54,7 +54,7 @@ extension NostrClient {
     /// Builds and signs a kind-22242 client-authentication event (NIP-42) via the active signer, so
     /// both the automatic responder and the manual ``NostrIdentityAPI/authenticate(relayURL:)``
     /// support a local or a remote signer.
-    /// - Throws: ``NostrError/signerNotSet`` when no signer is configured.
+    /// - Throws: ``NostrClient/Error/signerNotSet`` when no signer is configured.
     func clientAuthenticationEvent(relayURL: RelayURL, challenge: String) async throws -> Event {
         try await sign(.clientAuthentication(relayURL: relayURL, challenge: challenge))
     }

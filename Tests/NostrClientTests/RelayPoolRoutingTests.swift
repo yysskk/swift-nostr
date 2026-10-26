@@ -42,10 +42,10 @@ struct RelayPoolRoutingTests {
         #expect(count == 3)
     }
 
-    @Test("targetConnections(nil) on an empty pool throws noRelaysInPool")
+    @Test("targetConnections(nil) on an empty pool throws emptyPool")
     func targetNilOnEmptyPoolThrows() async {
         let pool = RelayPool()
-        await #expect(throws: NostrError.noRelaysInPool) {
+        await #expect(throws: RelayPool.Error.emptyPool) {
             _ = try await pool.targetConnections(nil)
         }
     }
@@ -68,7 +68,7 @@ struct RelayPoolRoutingTests {
     @Test("targetConnections with only unknown URLs throws noMatchingRelays")
     func targetUnknownThrows() async throws {
         let pool = try await makePool()
-        await #expect(throws: NostrError.noMatchingRelays([self.unknown])) {
+        await #expect(throws: RelayPool.Error.noMatchingRelays([self.unknown])) {
             _ = try await pool.targetConnections([unknown])
         }
     }
@@ -76,7 +76,7 @@ struct RelayPoolRoutingTests {
     @Test("targetConnections with an empty set throws noMatchingRelays")
     func targetEmptyThrows() async throws {
         let pool = try await makePool()
-        await #expect(throws: NostrError.noMatchingRelays([])) {
+        await #expect(throws: RelayPool.Error.noMatchingRelays([])) {
             _ = try await pool.targetConnections([])
         }
     }
@@ -91,7 +91,7 @@ struct RelayPoolRoutingTests {
             RelayURL("wss://also-unknown.example.com")!,
         ]
         await #expect(
-            throws: NostrError.noMatchingRelays([
+            throws: RelayPool.Error.noMatchingRelays([
                 RelayURL("wss://also-unknown.example.com")!,
                 RelayURL("wss://unknown.example.com")!,
             ])
@@ -111,7 +111,7 @@ struct RelayPoolRoutingTests {
     @Test("publishing to only-unknown targets throws noMatchingRelays")
     func publishToUnknownTargetsThrows() async throws {
         let pool = try await makePool()
-        await #expect(throws: NostrError.noMatchingRelays([self.unknown])) {
+        await #expect(throws: RelayPool.Error.noMatchingRelays([self.unknown])) {
             try await pool.publish(self.dummyEvent, to: [self.unknown])
         }
     }
@@ -196,7 +196,7 @@ struct RelayPoolRoutingTests {
         await pool.addRelay(urlA)
         await pool.addRelay(urlB)
 
-        await #expect(throws: NostrError.relayError("Failed to subscribe on any relay")) {
+        await #expect(throws: RelayPool.Error.subscriptionFailed) {
             try await pool.subscribe(subscriptionID: "sub", filters: [Filter()]) { _ in }
         }
         #expect(await pool.subscriptionHandlerCount == 0)

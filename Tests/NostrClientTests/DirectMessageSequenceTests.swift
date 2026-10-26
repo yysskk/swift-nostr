@@ -183,7 +183,7 @@ struct DirectMessageSequenceTests {
     @Test("messages.subscribe(limit:) requires a signer")
     func directMessagesRequiresSigner() async throws {
         let client = NostrClient()
-        await #expect(throws: NostrError.self) {
+        await #expect(throws: NostrClient.Error.signerNotSet) {
             _ = try await client.messages.subscribe()
         }
     }
