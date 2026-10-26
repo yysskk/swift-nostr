@@ -9,28 +9,6 @@ import Testing
     import FoundationNetworking
 #endif
 
-/// A ``NostrSigning`` that signs with a held key but is not an ``EventSigner`` — it stands in
-/// for a remote NIP-46 signer so the group flows' signing seam can be exercised end to end.
-private struct FakeRemoteSigner: NostrSigning {
-    let keyPair: KeyPair
-
-    var publicKey: PublicKey {
-        get async throws { keyPair.publicKey }
-    }
-
-    func sign(_ event: UnsignedEvent) async throws -> Event {
-        try EventSigner(keyPair: keyPair).sign(event)
-    }
-
-    func nip44Encrypt(_ plaintext: String, to recipientPublicKey: PublicKey) async throws -> String {
-        try EventSigner(keyPair: keyPair).nip44Encrypt(plaintext, to: recipientPublicKey)
-    }
-
-    func nip44Decrypt(_ ciphertext: String, from senderPublicKey: PublicKey) async throws -> String {
-        try EventSigner(keyPair: keyPair).nip44Decrypt(ciphertext, from: senderPublicKey)
-    }
-}
-
 @Suite("NIP-29 Group Client Tests")
 struct NIP29GroupClientTests {
 
@@ -263,7 +241,7 @@ struct NIP29GroupClientTests {
     func joinGroupWithRemoteSigner() async throws {
         let (client, socket) = makeClient()
         let keyPair = try KeyPair()
-        try await client.identity.setSigner(FakeRemoteSigner(keyPair: keyPair) as any NostrSigning)
+        try await client.identity.setSigner(StubRemoteSigner(keyPair: keyPair) as any NostrSigning)
 
         let group = GroupReference(relayURL: groupRelayURL, id: groupID, inviteCode: "welcome")
         let joinTask = Task { try await client.groups.join(group) }

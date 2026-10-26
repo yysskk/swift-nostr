@@ -115,7 +115,7 @@ struct NIP42AutomaticAuthenticationTests {
         let (connection, mock) = makeConnection()
         let signer = EventSigner(keyPair: try KeyPair())
         await connection.setAuthenticationResponder { relayURL, challenge in
-            try? signer.signClientAuthentication(relayURL: relayURL, challenge: challenge)
+            try? signer.sign(.clientAuthentication(relayURL: relayURL, challenge: challenge))
         }
         try await connection.connect()
 
@@ -154,7 +154,7 @@ struct NIP42AutomaticAuthenticationTests {
 
         let signer = EventSigner(keyPair: try KeyPair())
         await connection.setAuthenticationResponder { relayURL, challenge in
-            try? signer.signClientAuthentication(relayURL: relayURL, challenge: challenge)
+            try? signer.sign(.clientAuthentication(relayURL: relayURL, challenge: challenge))
         }
 
         let sent = try await acknowledgeAuth(on: connection, mock: mock)
@@ -167,7 +167,7 @@ struct NIP42AutomaticAuthenticationTests {
         let (connection, mock) = makeConnection()
         let signer = EventSigner(keyPair: try KeyPair())
         await connection.setAuthenticationResponder { relayURL, challenge in
-            try? signer.signClientAuthentication(relayURL: relayURL, challenge: challenge)
+            try? signer.sign(.clientAuthentication(relayURL: relayURL, challenge: challenge))
         }
         await connection.setAuthenticationResponder(nil)
         try await connection.connect()
@@ -185,7 +185,7 @@ struct NIP42AutomaticAuthenticationTests {
         let (connection, mock) = makeConnection()
         let signer = EventSigner(keyPair: try KeyPair())
         await connection.setAuthenticationResponder { relayURL, challenge in
-            try? signer.signClientAuthentication(relayURL: relayURL, challenge: challenge)
+            try? signer.sign(.clientAuthentication(relayURL: relayURL, challenge: challenge))
         }
         try await connection.connect()
 
@@ -203,7 +203,7 @@ struct NIP42AutomaticAuthenticationTests {
         let (connection, mock) = makeConnection()
         let signer = EventSigner(keyPair: try KeyPair())
         await connection.setAuthenticationResponder { relayURL, challenge in
-            try? signer.signClientAuthentication(relayURL: relayURL, challenge: challenge)
+            try? signer.sign(.clientAuthentication(relayURL: relayURL, challenge: challenge))
         }
         try await connection.connect()
 
@@ -226,7 +226,7 @@ struct NIP42AutomaticAuthenticationTests {
         let (connection, mock) = makeConnection()
         let signer = EventSigner(keyPair: try KeyPair())
         await connection.setAuthenticationResponder { relayURL, challenge in
-            try? signer.signClientAuthentication(relayURL: relayURL, challenge: challenge)
+            try? signer.sign(.clientAuthentication(relayURL: relayURL, challenge: challenge))
         }
         try await connection.connect()
 
@@ -243,7 +243,7 @@ struct NIP42AutomaticAuthenticationTests {
         let (connection, mock) = makeConnection()
         let signer = EventSigner(keyPair: try KeyPair())
         await connection.setAuthenticationResponder { relayURL, challenge in
-            try? signer.signClientAuthentication(relayURL: relayURL, challenge: challenge)
+            try? signer.sign(.clientAuthentication(relayURL: relayURL, challenge: challenge))
         }
         try await connection.connect()
 
@@ -295,7 +295,7 @@ struct NIP42AutomaticAuthenticationTests {
 
         let connectionA = await pool.addRelay(urlA)
         await pool.setAuthenticationResponder { relayURL, challenge in
-            try? signer.signClientAuthentication(relayURL: relayURL, challenge: challenge)
+            try? signer.sign(.clientAuthentication(relayURL: relayURL, challenge: challenge))
         }
         let connectionB = await pool.addRelay(urlB)
         // Connect sequentially so the factory pairs mockA with relay A and

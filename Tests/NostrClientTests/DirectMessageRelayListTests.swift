@@ -165,7 +165,7 @@ struct DirectMessageRelayListTests {
         let keyPair = try KeyPair()
         let signer = EventSigner(keyPair: keyPair)
 
-        let textNote = try signer.signTextNote(content: "Hello")
+        let textNote = try signer.sign(.textNote("Hello"))
         #expect(textNote.directMessageRelayList == nil)
         #expect(textNote.isDirectMessageRelayList == false)
     }
@@ -176,7 +176,7 @@ struct DirectMessageRelayListTests {
         let signer = EventSigner(keyPair: keyPair)
 
         let dmRelayEvent = try signer.signDirectMessageRelayList(relays: [RelayURL("wss://a.example.com")!])
-        let textNote = try signer.signTextNote(content: "Hello")
+        let textNote = try signer.sign(.textNote("Hello"))
 
         #expect(dmRelayEvent.isDirectMessageRelayList == true)
         #expect(textNote.isDirectMessageRelayList == false)

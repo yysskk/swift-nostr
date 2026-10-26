@@ -43,7 +43,7 @@ struct RelayConnectionTeardownTests {
         try await connection.connect()
 
         let signer = EventSigner(keyPair: try KeyPair())
-        let event = try signer.signTextNote(content: "hello")
+        let event = try await signer.sign(.textNote("hello"))
 
         let publish = Task { try await connection.publish(event) }
         // Wait for the EVENT to reach the socket, so the waiter is registered before the drop.

@@ -106,7 +106,7 @@ struct FilterSerializationTests {
         let signer = try EventSigner(
             privateKeyHex: "5566778899aabbccddeeff00112233445566778899aabbccddeeff0011223344"
         )
-        let event = try signer.signTextNote(content: "gm")
+        let event = try signer.sign(.textNote("gm"))
 
         let json = try ClientMessage.event(event).serialize()
         let array = try #require(JSONSerialization.jsonObject(with: Data(json.utf8)) as? [Any])

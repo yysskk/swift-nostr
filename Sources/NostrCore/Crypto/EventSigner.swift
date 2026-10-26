@@ -54,6 +54,20 @@ public struct EventSigner: Sendable {
         )
     }
 
+    /// Signs `template` as this signer's ``publicKey``, returning the complete signed event.
+    ///
+    /// The synchronous counterpart of ``NostrSigning/sign(_:)-(EventTemplate)``:
+    ///
+    /// ```swift
+    /// let note = try signer.sign(.textNote("gm"))
+    /// ```
+    /// - Parameter template: The event to sign.
+    /// - Returns: The signed ``Event``.
+    /// - Throws: An error if the event cannot be serialized for hashing or signed.
+    public func sign(_ template: EventTemplate) throws -> Event {
+        try sign(UnsignedEvent(template, publicKey: publicKey))
+    }
+
     /// Encrypts `plaintext` to `recipientPublicKey` with NIP-44 v2, as this signer's identity.
     /// - Parameters:
     ///   - plaintext: The message to encrypt.
@@ -70,112 +84,6 @@ public struct EventSigner: Sendable {
     /// - Returns: The decrypted plaintext.
     public func nip44Decrypt(_ ciphertext: String, from senderPublicKey: PublicKey) throws -> String {
         try SealedMessage(payload: ciphertext).open(from: senderPublicKey, using: keyPair)
-    }
-
-    /// Creates and signs a text note (kind 1)
-    public func signTextNote(content: String, tags: [Tag] = []) throws -> Event {
-        try sign(.textNote(publicKey: keyPair.publicKey, content: content, tags: tags))
-    }
-
-    /// Creates and signs a reaction event (kind 7)
-    public func signReaction(to event: Event, content: String = "+") throws -> Event {
-        try sign(.reaction(publicKey: keyPair.publicKey, to: event, content: content))
-    }
-
-    /// Creates and signs a repost event (kind 6)
-    /// - Parameters:
-    ///   - event: The event being reposted; it is embedded in the content and referenced by an `e` tag.
-    ///   - relayURL: The relay where the reposted event can be found, recorded in the `e` tag.
-    public func signRepost(of event: Event, relayURL: RelayURL? = nil) throws -> Event {
-        try sign(.repost(publicKey: keyPair.publicKey, of: event, relayURL: relayURL))
-    }
-
-    /// Creates and signs a delete event (kind 5) requesting deletion of `eventIDs`, one `e` tag each.
-    public func signDeletion(eventIDs: [EventID], reason: String = "") throws -> Event {
-        try sign(.deletion(publicKey: keyPair.publicKey, eventIDs: eventIDs, reason: reason))
-    }
-
-    /// Creates and signs a client authentication event (kind 22242, NIP-42)
-    /// answering a relay's AUTH challenge.
-    ///
-    /// The event carries the relay URL and the challenge as tags and an empty
-    /// content. It is ephemeral: relays validate it during the AUTH handshake
-    /// and neither store nor broadcast it.
-    /// https://github.com/nostr-protocol/nips/blob/master/42.md
-    ///
-    /// - Parameters:
-    ///   - relayURL: The URL of the relay being authenticated to.
-    ///   - challenge: The challenge string received in the relay's AUTH message.
-    public func signClientAuthentication(relayURL: RelayURL, challenge: String) throws -> Event {
-        try sign(.clientAuthentication(publicKey: keyPair.publicKey, relayURL: relayURL, challenge: challenge))
-    }
-
-    /// Creates and signs a zap request event (kind 9734, NIP-57).
-    ///
-    /// A zap request is **not** published to relays — it is sent to the recipient's LNURL-pay
-    /// callback (see ``LNURLPayResponse/invoiceRequestURL(amountMillisats:zapRequest:lnurl:)``),
-    /// which returns a Lightning invoice and later publishes the matching kind-9735 zap receipt.
-    /// https://github.com/nostr-protocol/nips/blob/master/57.md
-    /// - Parameters:
-    ///   - recipientPublicKey: The public key being zapped (the `p` tag, required).
-    ///   - relays: Relays the recipient's wallet should publish the zap receipt to (the `relays`
-    ///     tag, in canonical form; required — must contain at least one relay).
-    ///   - amountMillisats: The amount in millisatoshis (the `amount` tag). Recommended.
-    ///   - lnurl: The recipient's lnurl-pay URL, bech32-encoded with the `lnurl` prefix. Recommended.
-    ///   - eventID: The id of the event being zapped, when zapping an event rather than a person
-    ///     (the `e` tag).
-    ///   - eventCoordinate: An event coordinate when zapping an addressable event (the `a` tag).
-    ///   - comment: An optional message sent with the payment (the event content).
-    public func signZapRequest(
-        recipientPublicKey: PublicKey,
-        relays: [RelayURL],
-        amountMillisats: Int64? = nil,
-        lnurl: String? = nil,
-        eventID: EventID? = nil,
-        eventCoordinate: String? = nil,
-        comment: String = ""
-    ) throws -> Event {
-        // NIP-57 requires at least one relay so the recipient's wallet knows where to publish the
-        // kind-9735 zap receipt; an empty list would otherwise yield a useless ["relays"] tag.
-        guard !relays.isEmpty else {
-            throw NostrError.invalidData
-        }
-
-        var tags: [Tag] = [
-            Tag(name: "relays", values: relays.map(\.description)),
-            .publicKey(recipientPublicKey),
-        ]
-        if let amountMillisats {
-            tags.append(Tag(name: "amount", values: [String(amountMillisats)]))
-        }
-        if let lnurl {
-            tags.append(Tag(name: "lnurl", values: [lnurl]))
-        }
-        if let eventID {
-            tags.append(.event(eventID))
-        }
-        if let eventCoordinate {
-            tags.append(Tag(name: "a", values: [eventCoordinate]))
-        }
-
-        return try sign(UnsignedEvent(publicKey: keyPair.publicKey, kind: .zapRequest, tags: tags, content: comment))
-    }
-}
-
-// MARK: - Proof of Work
-extension EventSigner {
-    /// Mines `unsignedEvent` to the given NIP-13 difficulty (leading zero bits), then signs it.
-    ///
-    /// Mining is cooperative and cancellable — see ``ProofOfWork/mine(event:difficulty:)``.
-    /// https://github.com/nostr-protocol/nips/blob/master/13.md
-    /// - Parameters:
-    ///   - unsignedEvent: The event to mine and sign. Any existing `nonce` tags are replaced.
-    ///   - difficulty: The target number of leading zero bits, in `0...256`.
-    /// - Throws: `CancellationError` if cancelled; ``NostrError/invalidData`` if `difficulty` is
-    ///   outside `0...256`.
-    public func sign(_ unsignedEvent: UnsignedEvent, proofOfWork difficulty: Int) async throws -> Event {
-        let mined = try await ProofOfWork.mine(event: unsignedEvent, difficulty: difficulty)
-        return try sign(mined)
     }
 }
 

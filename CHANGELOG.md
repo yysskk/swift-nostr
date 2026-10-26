@@ -38,6 +38,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   waits for relays (EOSE, or COUNT) when the call passes no timeout, and
   `RelayConnectionConfig.queryTimeout` does the same for `RelayConnection.count(filters:timeout:)`.
   Both default to 10 seconds.
+- **`EventTemplate` describes an event before it is signed**: its `kind`, `tags`, `content`, and
+  `createdAt` — everything but the public key, id, and signature — as mutable properties, so a
+  template can be adjusted before signing. Static factories build the NostrCore events:
+  `textNote(_:tags:)`, `reaction(to:content:)`, `repost(of:relayURL:)`, `deletion(of:reason:)`,
+  `clientAuthentication(relayURL:challenge:)`, and
+  `zapRequest(to:relays:amountMillisats:lnurl:eventID:eventCoordinate:comment:)`.
+  `NostrSigning.sign(_:)` signs a template as the signer's public key, so it works with a local
+  `EventSigner` and a remote `RemoteSigner` alike, and `EventSigner.sign(_:)` does the same
+  synchronously. `UnsignedEvent(_:publicKey:)` builds the unsigned event from a template.
 
 ### Changed
 
@@ -349,6 +358,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `GetInfoResult.pubkey` (and their initializer labels) are `nodePublicKey`: each is a Lightning
   node's hex public key, not a Nostr `PublicKey`, so it stays a `String` and takes a name of its
   own. The NIP-47 JSON key is still `pubkey`.
+- **Events are signed from `EventTemplate`s** (breaking): `EventSigner.signTextNote(content:tags:)`,
+  `signReaction(to:content:)`, `signRepost(of:relayURL:)`, `signDeletion(eventIDs:reason:)`,
+  `signClientAuthentication(relayURL:challenge:)`, and `signZapRequest(recipientPublicKey:...)` are
+  removed. Sign the matching template instead — `signer.sign(.textNote("gm"))`,
+  `.deletion(of:reason:)`, `.zapRequest(to:relays:...)`, and so on — which also works with a remote
+  signer, so a `RemoteSigner` can now sign zap requests.
+- **Proof of work mines a template with any signer** (breaking): `EventSigner.sign(_:proofOfWork:)`
+  taking an `UnsignedEvent` is replaced by `NostrSigning.sign(_:proofOfWork:)` taking an
+  `EventTemplate`. To mine an `UnsignedEvent` keyed in advance, use
+  `ProofOfWork.mine(event:difficulty:)` and sign the result.
+- **`identity.sign(_:)` signs an `EventTemplate`** (breaking): `NostrIdentityAPI.sign(_:)` and the
+  `NostrIdentityProviding` requirement take a template and sign it as the configured signer's public
+  key, instead of an `UnsignedEvent` the caller had to key with `identity.publicKey`.
+- **`RelayConnection.authenticate(using:)` takes any `NostrSigning`**, so a remote signer can answer
+  a relay's AUTH challenge on a direct connection too.
 
 ## [0.8.0] - 2026-10-25
 

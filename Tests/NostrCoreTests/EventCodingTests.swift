@@ -5,7 +5,7 @@ import Testing
 @Suite("Event Coding Tests")
 struct EventCodingTests {
     private func signedNote() throws -> Event {
-        try EventSigner(keyPair: try KeyPair()).signTextNote(content: "gm")
+        try EventSigner(keyPair: try KeyPair()).sign(.textNote("gm"))
     }
 
     private func jsonObject(_ event: Event) throws -> [String: Any] {

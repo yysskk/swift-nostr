@@ -21,7 +21,7 @@ struct PublishedEventTests {
     func dynamicMemberLookupForwardsEventProperties() throws {
         let keyPair = try KeyPair()
         let signer = EventSigner(keyPair: keyPair)
-        let event = try signer.signTextNote(content: "hello")
+        let event = try signer.sign(.textNote("hello"))
         let published = PublishedEvent(
             event: event,
             result: PublishResult(statuses: [relayURL: .accepted])

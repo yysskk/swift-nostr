@@ -49,23 +49,39 @@ print(Timestamp.now.rawValue, dayAgo.date)
 
 ## Sign and Verify
 
-``EventSigner`` turns an ``UnsignedEvent`` into a signed ``Event``, and ``Event/verify()`` checks an event's id and signature.
+An ``EventTemplate`` holds what you decide about an event — its kind, tags, content, and creation time. ``EventSigner`` signs it under its key into a complete ``Event``, and ``Event/verify()`` checks an event's id and signature.
 
 ```swift
 let signer = EventSigner(keyPair: keyPair)
 
-let note = try signer.signTextNote(content: "Hello, Nostr!")
-let reaction = try signer.signReaction(to: note, content: "🤙")
+let note = try signer.sign(.textNote("Hello, Nostr!"))
+let reaction = try signer.sign(.reaction(to: note, content: "🤙"))
 
 // Or build any event yourself. Tags that reference an event or a key take the typed value.
 let custom = try signer.sign(
-    UnsignedEvent(
-        publicKey: keyPair.publicKey, kind: .textNote,
-        tags: [.event(note.id, marker: .reply), .publicKey(note.publicKey)], content: "gm")
+    EventTemplate(
+        kind: .textNote,
+        tags: [.event(note.id, marker: .reply), .publicKey(note.publicKey)],
+        content: "gm")
 )
 
 let isValid = try note.verify()
 assert(isValid)
+```
+
+A template's properties are mutable, so a factory's result can be adjusted before signing:
+
+```swift
+var expiring = EventTemplate.textNote("gone in an hour")
+expiring.tags.append(.expiration(.now.advanced(by: .seconds(3600))))
+let event = try signer.sign(expiring)
+```
+
+Templates work with any ``NostrSigning``, including a remote NIP-46 signer, through ``NostrSigning/sign(_:)-(EventTemplate)``; ``NostrSigning/sign(_:proofOfWork:)`` mines one to a NIP-13 difficulty before signing it:
+
+```swift
+let zapRequest = try await remoteSigner.sign(.zapRequest(to: recipient, relays: [relay]))
+let mined = try await signer.sign(.textNote("worked for"), proofOfWork: 20)
 ```
 
 ## Authorize an HTTP Request

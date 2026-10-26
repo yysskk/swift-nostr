@@ -44,8 +44,8 @@ extension NostrClient {
     /// Signs the kind-22242 answer to a challenge, or returns `nil` when the
     /// signer is gone or the mode changed since the responder was installed.
     ///
-    /// Signing goes through ``activeSign(_:)`` so a remote NIP-46 signer can answer challenges
-    /// too, resolving its signature via a relay round-trip.
+    /// Signing goes through ``sign(_:)`` so a remote NIP-46 signer can answer challenges too,
+    /// resolving its signature via a relay round-trip.
     private func signAuthenticationResponse(relayURL: RelayURL, challenge: String) async -> Event? {
         guard currentAuthenticationMode == .automatic else { return nil }
         return try? await clientAuthenticationEvent(relayURL: relayURL, challenge: challenge)
@@ -56,12 +56,6 @@ extension NostrClient {
     /// support a local or a remote signer.
     /// - Throws: ``NostrError/signerNotSet`` when no signer is configured.
     func clientAuthenticationEvent(relayURL: RelayURL, challenge: String) async throws -> Event {
-        let unsigned = UnsignedEvent(
-            publicKey: try requiredPublicKey(),
-            kind: .clientAuthentication,
-            tags: [.relay(relayURL), .challenge(challenge)],
-            content: ""
-        )
-        return try await activeSign(unsigned)
+        try await sign(.clientAuthentication(relayURL: relayURL, challenge: challenge))
     }
 }

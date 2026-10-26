@@ -31,7 +31,7 @@ struct NIP42AuthRetryTests {
 
     private func makeResponder(signer: EventSigner) -> RelayConnection.AuthenticationResponder {
         { relayURL, challenge in
-            try? signer.signClientAuthentication(relayURL: relayURL, challenge: challenge)
+            try? signer.sign(.clientAuthentication(relayURL: relayURL, challenge: challenge))
         }
     }
 
@@ -52,7 +52,7 @@ struct NIP42AuthRetryTests {
         await connection.setAuthenticationResponder(makeResponder(signer: signer))
         try await connection.connect()
 
-        let note = try signer.signTextNote(content: "gm")
+        let note = try await signer.sign(.textNote("gm"))
         let publishTask = Task { try await connection.publish(note) }
 
         // First attempt is rejected; the relay sends the challenge alongside.
@@ -78,7 +78,7 @@ struct NIP42AuthRetryTests {
         try await connection.connect()
 
         let signer = EventSigner(keyPair: try KeyPair())
-        let note = try signer.signTextNote(content: "gm")
+        let note = try await signer.sign(.textNote("gm"))
         let publishTask = Task { try await connection.publish(note) }
 
         try await NIP42TestSupport.pollUntil { self.eventFrames(in: mock).count == 1 }
@@ -101,7 +101,7 @@ struct NIP42AuthRetryTests {
         await connection.setAuthenticationResponder(makeResponder(signer: signer))
         try await connection.connect()
 
-        let note = try signer.signTextNote(content: "gm")
+        let note = try await signer.sign(.textNote("gm"))
         let publishTask = Task { try await connection.publish(note) }
 
         try await NIP42TestSupport.pollUntil { self.eventFrames(in: mock).count == 1 }
@@ -132,7 +132,7 @@ struct NIP42AuthRetryTests {
         await connection.setAuthenticationResponder(makeResponder(signer: signer))
         try await connection.connect()
 
-        let note = try signer.signTextNote(content: "gm")
+        let note = try await signer.sign(.textNote("gm"))
         let publishTask = Task { try await connection.publish(note) }
 
         // The relay rejects but never sends a challenge, so the responder
@@ -157,7 +157,7 @@ struct NIP42AuthRetryTests {
         await connection.setAuthenticationResponder(makeResponder(signer: signer))
         try await connection.connect()
 
-        let note = try signer.signTextNote(content: "gm")
+        let note = try await signer.sign(.textNote("gm"))
         let publishTask = Task { try await connection.publish(note) }
 
         try await NIP42TestSupport.pollUntil { self.eventFrames(in: mock).count == 1 }
@@ -183,7 +183,7 @@ struct NIP42AuthRetryTests {
             // is still being produced — before authenticate(with:) registers
             // its pending entry.
             try? await Task.sleep(for: .milliseconds(100))
-            return try? signer.signClientAuthentication(relayURL: relayURL, challenge: challenge)
+            return try? await signer.sign(.clientAuthentication(relayURL: relayURL, challenge: challenge))
         }
         await connection.setAuthenticationResponder(slowResponder)
         try await connection.connect()

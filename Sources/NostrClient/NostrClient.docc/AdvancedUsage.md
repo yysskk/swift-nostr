@@ -397,10 +397,10 @@ try await connection.authenticate(using: signer)
 print(await connection.isAuthenticated)
 ```
 
-A pre-signed event (e.g. from a remote signer) can be sent with
-``RelayConnection/authenticate(with:)``. Detect why a relay denied an operation with
-``RelayResponsePrefix`` — `auth-required:` means authenticate and retry, `restricted:`
-means the public key is not allowed even when authenticated.
+``RelayConnection/authenticate(using:)`` takes any `NostrSigning`, local or remote. A pre-signed
+event can be sent with ``RelayConnection/authenticate(with:)``. Detect why a relay denied an
+operation with ``RelayResponsePrefix`` — `auth-required:` means authenticate and retry,
+`restricted:` means the public key is not allowed even when authenticated.
 
 ## Remote Signing (NIP-46)
 
@@ -425,13 +425,11 @@ try await client.events.publishTextNote(content: "Signed by my bunker")
 try await client.messages.send("and gift-wrapped by it too", to: recipientPublicKey)
 ```
 
-To author an event this library has no helper for, build an ``UnsignedEvent`` under
-``NostrIdentityAPI/publicKey``, sign it, and publish it:
+To author an event this library has no helper for, describe it with an ``EventTemplate``, sign it
+as ``NostrIdentityAPI/publicKey``, and publish it:
 
 ```swift
-guard let publicKey = await client.identity.publicKey else { return }
-let signed = try await client.identity.sign(
-    UnsignedEvent(publicKey: publicKey, kind: .textNote, content: "Signed by my bunker"))
+let signed = try await client.identity.sign(EventTemplate(kind: .textNote, content: "Signed by my bunker"))
 try await client.events.publish(signed)
 ```
 
@@ -616,7 +614,7 @@ every public key it mentions in `p` tags, with ``NostrRoutingAPI/publishGossip(_
 ```swift
 let signer = EventSigner(keyPair: keyPair)
 let alice = try PublicKey(npub: "npub1...")
-let note = try signer.signTextNote(content: "gm!", tags: [.publicKey(alice)])
+let note = try signer.sign(.textNote("gm!", tags: [.publicKey(alice)]))
 try await client.routing.publishGossip(note)
 ```
 
@@ -638,15 +636,16 @@ let (data, _) = try await URLSession.shared.data(from: serviceURL)
 let pay = try JSONDecoder().decode(LNURLPayResponse.self, from: data)
 guard pay.supportsZaps, let providerPublicKey = pay.nostrPublicKey else { return }
 
-// 2. Sign a zap request (kind 9734) — note it is NOT published to relays.
+// 2. Sign a zap request (kind 9734) with any signer, local or remote — note it is NOT published
+//    to relays.
 let signer = EventSigner(keyPair: keyPair)
-let zapRequest = try signer.signZapRequest(
-    recipientPublicKey: try PublicKey(npub: "npub1..."),
+let zapRequest = try signer.sign(.zapRequest(
+    to: try PublicKey(npub: "npub1..."),
     relays: [try RelayURL(string: "wss://relay.example.com")],     // where the recipient's wallet should publish the receipt
     amountMillisats: 21_000,
     lnurl: LNURL.encode(serviceURL),
     comment: "great post!"
-)
+))
 
 // 3. Fetch the bolt11 invoice from the callback, then pay it with a Lightning wallet.
 let bolt11 = try await pay.fetchInvoice(
@@ -669,7 +668,7 @@ and `expectedAmountMillisats` fails against an invoice that names no amount. The
 commit to the zap request through its description hash; pass `requiringDescriptionHash: false` only
 for a provider known to omit it, accepting the loss of that binding.
 
-The ``EventSigner/signZapRequest(recipientPublicKey:relays:amountMillisats:lnurl:eventID:eventCoordinate:comment:)``,
+The ``EventTemplate/zapRequest(to:relays:amountMillisats:lnurl:eventID:eventCoordinate:comment:)``,
 ``LNURLPayResponse/fetchInvoice(amountMillisats:zapRequest:lnurl:urlSession:)``, ``Bolt11Invoice``,
 and ``ZapReceipt/validate(lnurlProviderPublicKey:expectedAmountMillisats:requiringDescriptionHash:)`` APIs each work standalone,
 so you can adopt only the parts of the flow you need.
@@ -803,14 +802,13 @@ for await message in await connection.messages() {
 let keyPair = try KeyPair()
 let signer = EventSigner(keyPair: keyPair)
 
-let unsigned = UnsignedEvent(
-    publicKey: keyPair.publicKey,
+let template = EventTemplate(
     kind: .textNote,
     tags: [.hashtag("test")],
     content: "Manually signed"
 )
 
-let signed = try signer.sign(unsigned)
+let signed = try signer.sign(template)
 let isValid = try signed.verify()
 ```
 

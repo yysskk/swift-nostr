@@ -25,9 +25,9 @@ extension WalletConnection {
     /// Completes a NIP-57 zap end to end: fetches the Lightning invoice from the recipient's LNURL
     /// endpoint and pays it through this wallet connection.
     ///
-    /// This closes the gap the `NostrClient` zap flow leaves open. Build and sign the zap request
-    /// (kind 9734) with `EventSigner.signZapRequest(...)` and resolve the recipient's
-    /// `LNURLPayResponse` first, then call this to fetch and pay the invoice in one step.
+    /// This closes the gap the `NostrClient` zap flow leaves open. Sign the zap request (kind 9734)
+    /// built by `EventTemplate.zapRequest(to:relays:...)` with any `NostrSigning` and resolve the
+    /// recipient's `LNURLPayResponse` first, then call this to fetch and pay the invoice in one step.
     ///
     /// To confirm the recipient's LNURL provider published a matching kind-9735 zap receipt,
     /// subscribe to the zap request's relays with `NostrClient` and validate it with

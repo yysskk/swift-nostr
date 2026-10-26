@@ -90,7 +90,7 @@ struct NIP17Tests {
 
         // Create a simple event
         let signer = EventSigner(keyPair: alice)
-        let originalEvent = try signer.signTextNote(content: "Secret message")
+        let originalEvent = try await signer.sign(.textNote("Secret message"))
 
         // Alice wraps the event for Bob
         let wrapped = try await GiftWrap.wrap(
@@ -119,7 +119,7 @@ struct NIP17Tests {
         let bob = try KeyPair()
 
         let signer = EventSigner(keyPair: alice)
-        let event = try signer.signTextNote(content: "Test")
+        let event = try await signer.sign(.textNote("Test"))
 
         let wrapped = try await GiftWrap.wrap(
             event: event,
@@ -379,7 +379,7 @@ struct NIP17Tests {
 
         // Create a regular text note (not a gift wrap)
         let signer = EventSigner(keyPair: alice)
-        let textNote = try signer.signTextNote(content: "Not a gift wrap")
+        let textNote = try await signer.sign(.textNote("Not a gift wrap"))
 
         let parser = DirectMessageParser(signer: EventSigner(keyPair: bob))
 

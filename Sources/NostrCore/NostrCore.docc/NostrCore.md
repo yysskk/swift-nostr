@@ -12,7 +12,7 @@ Depend on NostrCore directly when you only need these primitives — for example
 import NostrCore
 
 let signer = try EventSigner(nsec: "nsec1...")
-let event = try signer.signTextNote(content: "Hello, Nostr!")
+let event = try signer.sign(.textNote("Hello, Nostr!"))
 let isValid = try event.verify()
 ```
 
@@ -25,6 +25,7 @@ let isValid = try event.verify()
 ### Events and Tags
 
 - ``Event``
+- ``EventTemplate``
 - ``UnsignedEvent``
 - ``EventID``
 - ``Signature``

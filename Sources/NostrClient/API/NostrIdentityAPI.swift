@@ -48,16 +48,15 @@ public struct NostrIdentityAPI: NostrIdentityProviding {
         get async { await client.cachedPublicKey }
     }
 
-    /// Signs an event with the configured signer, local or remote.
+    /// Signs `template` as ``publicKey`` with the configured signer, local or remote.
     ///
-    /// Build an ``UnsignedEvent`` with ``publicKey`` as its public key; combine with
-    /// ``NostrEventsAPI/publish(_:to:strategy:)`` to author and publish an event this library has
-    /// no helper for.
-    /// - Parameter unsignedEvent: The event to sign; its `publicKey` should be ``publicKey``.
+    /// Combine with ``NostrEventsAPI/publish(_:to:strategy:)`` to author and publish an event this
+    /// library has no helper for.
+    /// - Parameter template: The event to sign.
     /// - Returns: The signed ``Event``.
     /// - Throws: ``NostrError/signerNotSet`` if no signer is set, plus anything the signer throws.
-    public func sign(_ unsignedEvent: UnsignedEvent) async throws -> Event {
-        try await client.activeSign(unsignedEvent)
+    public func sign(_ template: EventTemplate) async throws -> Event {
+        try await client.sign(template)
     }
 
     // MARK: - Encryption (NIP-44)

@@ -1,5 +1,6 @@
 import Foundation
 import NostrCore
+import NostrTestSupport
 import Testing
 
 @Suite("NostrSigning Tests")
@@ -24,6 +25,50 @@ struct NostrSigningTests {
         #expect(event.kind == .textNote)
         #expect(event.content == "hello")
         #expect(try event.verify())
+    }
+
+    @Test("sign(_:) signs a template under the signer's public key through any NostrSigning")
+    func signTemplateThroughProtocol() async throws {
+        let keyPair = try KeyPair()
+        let signer: any NostrSigning = EventSigner(keyPair: keyPair)
+        var template = EventTemplate.textNote("hello", tags: [.hashtag("nostr")])
+        template.createdAt = Timestamp(rawValue: 1_700_000_000)
+
+        let event = try await signer.sign(template)
+
+        #expect(event.publicKey == keyPair.publicKey)
+        #expect(event.kind == .textNote)
+        #expect(event.tags == [["t", "nostr"]])
+        #expect(event.content == "hello")
+        #expect(event.createdAt == template.createdAt)
+        #expect(try event.verify())
+    }
+
+    @Test("sign(_:) resolves the public key of a signer that is not an EventSigner")
+    func signTemplateThroughRemoteSigner() async throws {
+        let keyPair = try KeyPair()
+        let signer = StubRemoteSigner(keyPair: keyPair)
+
+        let event = try await signer.sign(.textNote("hello"))
+
+        #expect(event.publicKey == keyPair.publicKey)
+        #expect(event.content == "hello")
+        #expect(try event.verify())
+    }
+
+    @Test("a zap request is signed by a signer that is not an EventSigner (NIP-57)")
+    func zapRequestThroughRemoteSigner() async throws {
+        let keyPair = try KeyPair()
+        let signer = StubRemoteSigner(keyPair: keyPair)
+        let relay = RelayURL("wss://relay.example.com")!
+
+        let zap = try await signer.sign(.zapRequest(to: .fixture("recipient"), relays: [relay], amountMillisats: 21000))
+
+        #expect(zap.kind == .zapRequest)
+        #expect(zap.publicKey == keyPair.publicKey)
+        #expect(zap.firstTagValue(named: "p") == PublicKey.fixture("recipient").hex)
+        #expect(zap.firstTagValue(named: "amount") == "21000")
+        #expect(try zap.verify())
     }
 
     @Test("NIP-44 encrypt then decrypt round-trips through any NostrSigning")

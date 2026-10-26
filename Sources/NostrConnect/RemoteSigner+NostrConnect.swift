@@ -7,7 +7,7 @@ public import NostrCore
 /// ``NostrConnectURI`` invitation (shown to the user as a QR code or deep link), the signer scans it
 /// and replies, and the client discovers the signer's public key from that reply *after* validating the
 /// invitation secret the signer echoes back. Once ``awaitConnection()`` resolves, the typed commands
-/// (``sign(_:)``, ``userPublicKey()``, …) work exactly as they do for a `bunker://` session.
+/// (``sign(_:)-(UnsignedEvent)``, ``userPublicKey()``, …) work exactly as they do for a `bunker://` session.
 ///
 /// https://github.com/nostr-protocol/nips/blob/master/46.md
 extension RemoteSigner {

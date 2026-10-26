@@ -14,7 +14,7 @@ dependencies: [
 ```
 
 Then add the `NostrConnect` product to your target. It re-exports the `NostrCore` primitives
-its API surfaces (`Event`, `KeyPair`, `UnsignedEvent`, …):
+its API surfaces (`Event`, `EventTemplate`, `KeyPair`, …):
 
 ```swift
 .target(
@@ -103,12 +103,12 @@ print("Signing as \(userPublicKey.npub)")
 
 ## Sign an Event
 
-Build an ``UnsignedEvent`` and hand it to ``RemoteSigner/sign(_:)``. The signer returns a complete
-signed event, which is verified locally and checked against the request before it is returned:
+``RemoteSigner`` is a `NostrSigning`, so it signs an ``EventTemplate`` as the user's public key. The
+signer returns a complete signed event, which is verified locally and checked against the request
+before it is returned:
 
 ```swift
-let unsigned = UnsignedEvent(publicKey: userPublicKey, kind: .textNote, content: "Signed by my bunker")
-let signed = try await signer.sign(unsigned)
+let signed = try await signer.sign(.textNote("Signed by my bunker"))
 print(signed.id, try signed.verify())
 ```
 
@@ -128,7 +128,7 @@ Task {
 }
 
 // This may block on an auth challenge the first time; the browser flow resolves it.
-let signed = try await signer.sign(unsigned)
+let signed = try await signer.sign(.textNote("Signed by my bunker"))
 ```
 
 ## Encrypt and Decrypt
@@ -165,7 +165,7 @@ the request is ``RemoteSignerError/responseValidationFailed``:
 
 ```swift
 do {
-    let signed = try await signer.sign(unsigned)
+    let signed = try await signer.sign(.textNote("Signed by my bunker"))
     print(signed.id)
 } catch let RemoteSignerError.signerError(message) {
     print("The signer refused: \(message)")

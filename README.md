@@ -190,7 +190,7 @@ print(payment.preimage)
 let zap = try await connection.payZap(
     lnurlPay: lnurlPay,            // resolved LNURLPayResponse
     amountMillisats: 21_000,
-    zapRequest: zapRequest)        // signed with EventSigner.signZapRequest(...)
+    zapRequest: zapRequest)        // try await signer.sign(.zapRequest(to: recipient, relays: relays))
 print(zap.preimage)
 ```
 
@@ -208,9 +208,8 @@ let signer = try RemoteSigner(bunker: try BunkerURI(string: "bunker://..."))
 
 // Prove the user's key and sign an event remotely — the signed event is verified locally.
 let userPublicKey = try await signer.userPublicKey()
-let signed = try await signer.sign(
-    UnsignedEvent(publicKey: userPublicKey, kind: .textNote, content: "Signed by my bunker"))
-print(signed.id, try signed.verify())
+let signed = try await signer.sign(.textNote("Signed by my bunker"))
+print(signed.publicKey == userPublicKey, try signed.verify())
 ```
 
 Or start the handshake from the client: generate a `nostrconnect://` invitation, show it as a QR code or link, and wait for the signer to accept — its public key is discovered from the response, which is validated against the invitation secret.
@@ -229,9 +228,7 @@ A `RemoteSigner` can also drive a `NostrClient`: `client.identity.setSigner(_:)`
 
 ```swift
 try await client.identity.setSigner(signer)   // any NostrSigning — a RemoteSigner or a local EventSigner
-let userPublicKey = try await signer.publicKey
-let signed = try await client.identity.sign(
-    UnsignedEvent(publicKey: userPublicKey, kind: .textNote, content: "Signed by my bunker"))
+let signed = try await client.identity.sign(.textNote("Signed by my bunker"))
 try await client.events.publish(signed)
 ```
 
@@ -297,7 +294,7 @@ Each of these is covered in depth, with worked examples, in the [documentation](
 - **Relay-based groups (NIP-29)** — parse `naddr` share links with `GroupReference`, join and leave, chat with timeline references, moderate with `Groups.ModerationAction`, fetch validated relay-signed state with `groups.fetchState`, and keep the kind-10009 simple group list fresh.
 - **Relay information (NIP-11)** — fetch a relay's capabilities with `RelayInformation.fetch(from:)`.
 - **NIP-19 entities** — encode/decode `npub`/`nsec`/`note`/`nprofile`/`nevent`/`naddr` via `NIP19Entity`, `NProfile`, `NEvent`, and `NAddr`.
-- **Low-level APIs** — drive a single `RelayConnection` directly, or sign events by hand with `EventSigner`.
+- **Low-level APIs** — drive a single `RelayConnection` directly, or build an `EventTemplate` (`.textNote`, `.reaction`, `.zapRequest`, …) and sign it with any signer: `try signer.sign(.textNote("gm"))`.
 
 ## Supported NIPs
 

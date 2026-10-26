@@ -45,7 +45,7 @@ struct NIP56ReportTests {
     @Test("signReport(event:) tags the event with a type and names the author with a bare p tag")
     func signEventReport() throws {
         let author = EventSigner(keyPair: try KeyPair())
-        let note = try author.signTextNote(content: "offending note")
+        let note = try author.sign(.textNote("offending note"))
 
         let reporter = EventSigner(keyPair: try KeyPair())
         let event = try reporter.signReport(event: note, type: .illegal, reason: "against the law")
@@ -62,7 +62,7 @@ struct NIP56ReportTests {
     @Test("signReport(event:) keeps the author p tag even when the reason is empty")
     func signEventReportWithoutReason() throws {
         let author = EventSigner(keyPair: try KeyPair())
-        let note = try author.signTextNote(content: "offending note")
+        let note = try author.sign(.textNote("offending note"))
 
         let reporter = EventSigner(keyPair: try KeyPair())
         let event = try reporter.signReport(event: note, type: .spam)

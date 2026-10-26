@@ -61,7 +61,7 @@ struct OpenTimestampsTests {
         let keyPair = try KeyPair()
         let signer = EventSigner(keyPair: keyPair)
 
-        let event = try signer.signTextNote(content: "No OTS here")
+        let event = try signer.sign(.textNote("No OTS here"))
 
         #expect(!event.hasOpenTimestampsAttestation)
         #expect(event.openTimestamps == nil)

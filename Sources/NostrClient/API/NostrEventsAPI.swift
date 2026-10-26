@@ -26,7 +26,7 @@ public struct NostrEventsAPI: NostrEventPublishing, NostrEventFetching {
         tags: [Tag] = [],
         strategy: PublishStrategy? = nil
     ) async throws -> PublishedEvent {
-        try await signAndPublish(strategy: strategy) { .textNote(publicKey: $0, content: content, tags: tags) }
+        try await signAndPublish(.textNote(content, tags: tags), strategy: strategy)
     }
 
     /// Publishes a reply to an event
@@ -47,46 +47,44 @@ public struct NostrEventsAPI: NostrEventPublishing, NostrEventFetching {
         relayURL: RelayURL? = nil,
         strategy: PublishStrategy? = nil
     ) async throws -> PublishedEvent {
-        try await signAndPublish(strategy: strategy) { publicKey in
-            var tags: [Tag] = []
+        var tags: [Tag] = []
 
-            // Carry over the thread root (NIP-10). The marker lives at a fixed position —
-            // ["e", id, relay, marker] — so it is read there rather than searched for anywhere in
-            // the tag: a relay hint or public key that happens to read "root" is not a marker.
-            let parentEventTags = event.tags(named: "e")
-            let markedRoot = parentEventTags.first {
-                $0.values.count >= 3 && $0.values[2] == Tag.EventMarker.root.rawValue
-            }
-
-            // NIP-10's deprecated positional form carries no markers, and there the first "e" tag
-            // is the root. Without this the parent looked rootless and the reply started a second
-            // thread alongside the one it was answering.
-            let positionalRoot =
-                parentEventTags.allSatisfy { $0.values.count < 3 } ? parentEventTags.first : nil
-
-            if let markedRoot {
-                tags.append(markedRoot)
-                tags.append(.event(event.id, relayURL: relayURL, marker: .reply))
-            } else if let positionalRoot, let rootID = positionalRoot.primaryValue.flatMap(EventID.init) {
-                // Re-emitted with an explicit "root" marker rather than copied through. Appending
-                // the unmarked tag verbatim would leave a mixed set — one marked "reply", one with
-                // no marker — which marked-scheme readers take to mean a mention, losing the very
-                // thread this recovery exists to preserve.
-                // The hint is the parent author's third-party content: kept only when it is a
-                // valid relay URL.
-                let hint = positionalRoot.values.count >= 2 ? RelayURL(positionalRoot.values[1]) : nil
-                tags.append(.event(rootID, relayURL: hint, marker: .root))
-                tags.append(.event(event.id, relayURL: relayURL, marker: .reply))
-            } else {
-                // This is a reply to a root event
-                tags.append(.event(event.id, relayURL: relayURL, marker: .root))
-            }
-
-            // Add p tag for the author we're replying to
-            tags.append(.publicKey(event.publicKey))
-
-            return .textNote(publicKey: publicKey, content: content, tags: tags)
+        // Carry over the thread root (NIP-10). The marker lives at a fixed position —
+        // ["e", id, relay, marker] — so it is read there rather than searched for anywhere in
+        // the tag: a relay hint or public key that happens to read "root" is not a marker.
+        let parentEventTags = event.tags(named: "e")
+        let markedRoot = parentEventTags.first {
+            $0.values.count >= 3 && $0.values[2] == Tag.EventMarker.root.rawValue
         }
+
+        // NIP-10's deprecated positional form carries no markers, and there the first "e" tag
+        // is the root. Without this the parent looked rootless and the reply started a second
+        // thread alongside the one it was answering.
+        let positionalRoot =
+            parentEventTags.allSatisfy { $0.values.count < 3 } ? parentEventTags.first : nil
+
+        if let markedRoot {
+            tags.append(markedRoot)
+            tags.append(.event(event.id, relayURL: relayURL, marker: .reply))
+        } else if let positionalRoot, let rootID = positionalRoot.primaryValue.flatMap(EventID.init) {
+            // Re-emitted with an explicit "root" marker rather than copied through. Appending
+            // the unmarked tag verbatim would leave a mixed set — one marked "reply", one with
+            // no marker — which marked-scheme readers take to mean a mention, losing the very
+            // thread this recovery exists to preserve.
+            // The hint is the parent author's third-party content: kept only when it is a
+            // valid relay URL.
+            let hint = positionalRoot.values.count >= 2 ? RelayURL(positionalRoot.values[1]) : nil
+            tags.append(.event(rootID, relayURL: hint, marker: .root))
+            tags.append(.event(event.id, relayURL: relayURL, marker: .reply))
+        } else {
+            // This is a reply to a root event
+            tags.append(.event(event.id, relayURL: relayURL, marker: .root))
+        }
+
+        // Add p tag for the author we're replying to
+        tags.append(.publicKey(event.publicKey))
+
+        return try await signAndPublish(.textNote(content, tags: tags), strategy: strategy)
     }
 
     /// Publishes user metadata
@@ -107,7 +105,7 @@ public struct NostrEventsAPI: NostrEventPublishing, NostrEventFetching {
         content: String = "+",
         strategy: PublishStrategy? = nil
     ) async throws -> PublishedEvent {
-        try await signAndPublish(strategy: strategy) { .reaction(publicKey: $0, to: event, content: content) }
+        try await signAndPublish(.reaction(to: event, content: content), strategy: strategy)
     }
 
     /// Publishes a repost
@@ -123,7 +121,7 @@ public struct NostrEventsAPI: NostrEventPublishing, NostrEventFetching {
         relayURL: RelayURL? = nil,
         strategy: PublishStrategy? = nil
     ) async throws -> PublishedEvent {
-        try await signAndPublish(strategy: strategy) { try .repost(publicKey: $0, of: event, relayURL: relayURL) }
+        try await signAndPublish(.repost(of: event, relayURL: relayURL), strategy: strategy)
     }
 
     /// Publishes a deletion request (kind 5, NIP-09) for events the signer authored.
@@ -134,9 +132,7 @@ public struct NostrEventsAPI: NostrEventPublishing, NostrEventFetching {
         reason: String = "",
         strategy: PublishStrategy? = nil
     ) async throws -> PublishedEvent {
-        try await signAndPublish(strategy: strategy) {
-            .deletion(publicKey: $0, eventIDs: eventIDs, reason: reason)
-        }
+        try await signAndPublish(.deletion(of: eventIDs, reason: reason), strategy: strategy)
     }
 
     /// Publishes a report of a public key (kind 1984, NIP-56).
@@ -345,13 +341,20 @@ public struct NostrEventsAPI: NostrEventPublishing, NostrEventFetching {
 
     // MARK: - Private
 
-    /// Builds an event under the signer's public key, signs it, and broadcasts it to the whole pool —
-    /// the shape every convenience `publish*` helper above shares.
+    /// Signs `template` with the configured signer and broadcasts it to the whole pool — the shape
+    /// every convenience `publish*` helper above shares.
+    private func signAndPublish(_ template: EventTemplate, strategy: PublishStrategy?) async throws -> PublishedEvent {
+        let event = try await client.sign(template)
+        let result = try await client.pool.publish(event, strategy: strategy)
+        return PublishedEvent(event: event, result: result)
+    }
+
+    /// Builds an event under the signer's public key, signs it, and broadcasts it to the whole pool.
     private func signAndPublish(
         strategy: PublishStrategy?,
         _ build: @Sendable (_ publicKey: PublicKey) throws -> UnsignedEvent
     ) async throws -> PublishedEvent {
-        let event = try await client.signEvent(build)
+        let event = try await client.withSigner { signer, publicKey in try await signer.sign(build(publicKey)) }
         let result = try await client.pool.publish(event, strategy: strategy)
         return PublishedEvent(event: event, result: result)
     }
