@@ -8,7 +8,7 @@ enum NWCFixtures {
     static func uri(wallet: KeyPair, client: KeyPair) throws -> WalletConnectURI {
         try WalletConnectURI(
             walletPubkey: wallet.publicKey,
-            relays: [URL(string: "wss://relay.example")!],
+            relays: [RelayURL("wss://relay.example")!],
             secret: client.privateKey)
     }
 

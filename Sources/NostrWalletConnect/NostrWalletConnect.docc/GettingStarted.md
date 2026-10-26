@@ -78,7 +78,7 @@ let keyPair = try KeyPair(nsec: "nsec1...")   // the zapping user's key
 let signer = EventSigner(keyPair: keyPair)
 let zapRequest = try signer.signZapRequest(
     recipientPubkey: try PublicKey(npub: "npub1..."),
-    relays: ["wss://relay.example.com"],
+    relays: [try RelayURL(string: "wss://relay.example.com")],
     amountMillisats: 21_000,
     lnurl: LNURL.encode(serviceURL),
     comment: "great post!")

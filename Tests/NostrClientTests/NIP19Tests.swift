@@ -39,13 +39,41 @@ struct NIP19Tests {
             return
         }
         #expect(profile.publicKey == pubkey)
-        #expect(profile.relays == ["wss://r.x.com", "wss://djbas.sadkb.com"])
+        #expect(profile.relays == [RelayURL("wss://r.x.com")!, RelayURL("wss://djbas.sadkb.com")!])
     }
 
     @Test("encode nprofile matches canonical vector")
     func encodeNprofileVector() throws {
-        let profile = try NProfile(publicKey: pubkey, relays: ["wss://r.x.com", "wss://djbas.sadkb.com"])
+        let profile = try NProfile(
+            publicKey: pubkey, relays: [RelayURL("wss://r.x.com")!, RelayURL("wss://djbas.sadkb.com")!])
         #expect(try profile.encoded == nprofileVector)
+    }
+
+    @Test("decoding skips relay hints that are not relay URLs and keeps the rest in order")
+    func decodingSkipsMalformedRelayHints() throws {
+        let hints = ["", "https://web.example.com", "WSS://R.Example.com/", "not a relay", "wss://s.example.com"]
+        let expected = [RelayURL("wss://r.example.com")!, RelayURL("wss://s.example.com")!]
+
+        let profile = try NProfile(
+            bech32String: RawTLV.bech32(prefix: "nprofile", special: pubkey.data, relays: hints))
+        #expect(profile.relays == expected)
+
+        let eventID = EventID.fixture("note")
+        let event = try NEvent(bech32String: RawTLV.bech32(prefix: "nevent", special: eventID.data, relays: hints))
+        #expect(event.relays == expected)
+
+        let addr = try NAddr(
+            bech32String: RawTLV.bech32(
+                prefix: "naddr", special: Data("d".utf8), relays: hints, author: pubkey, kind: 30023))
+        #expect(addr.relays == expected)
+    }
+
+    @Test("encoding writes relay hints in canonical form")
+    func encodingWritesCanonicalRelayHints() throws {
+        let profile = try NProfile(publicKey: pubkey, relays: [RelayURL("WSS://R.X.com:443/")!])
+        let canonical = try NProfile(publicKey: pubkey, relays: [RelayURL("wss://r.x.com")!])
+        #expect(try profile.encoded == canonical.encoded)
+        #expect(try NProfile(bech32String: profile.encoded).relays == [RelayURL("wss://r.x.com")!])
     }
 
     @Test("nprofile round-trips without relays")
@@ -62,7 +90,7 @@ struct NIP19Tests {
     func neventRoundTripFull() throws {
         let event = try NEvent(
             eventID: eventID,
-            relays: ["wss://relay.example.com"],
+            relays: [RelayURL("wss://relay.example.com")!],
             author: pubkey,
             kind: 1
         )
@@ -73,7 +101,7 @@ struct NIP19Tests {
         #expect(decoded == event)
         #expect(decoded.author == pubkey)
         #expect(decoded.kind == 1)
-        #expect(decoded.relays == ["wss://relay.example.com"])
+        #expect(decoded.relays == [RelayURL("wss://relay.example.com")!])
     }
 
     @Test("nevent round-trips with only the event id")
@@ -94,7 +122,7 @@ struct NIP19Tests {
             identifier: "1700847963",
             author: pubkey,
             kind: 30023,
-            relays: ["wss://relay3.example.com"]
+            relays: [RelayURL("wss://relay3.example.com")!]
         )
         let encoded = try addr.encoded
         #expect(encoded.hasPrefix("naddr1"))
@@ -118,11 +146,11 @@ struct NIP19Tests {
     @Test("NEvent(event:) captures id, author, and kind")
     func neventFromEvent() throws {
         let event = makeEvent(kind: 1, tags: [])
-        let nevent = try NEvent(event: event, relays: ["wss://relay.example.com"])
+        let nevent = try NEvent(event: event, relays: [RelayURL("wss://relay.example.com")!])
         #expect(nevent.eventID == eventID)
         #expect(nevent.author == pubkey)
         #expect(nevent.kind == 1)
-        #expect(nevent.relays == ["wss://relay.example.com"])
+        #expect(nevent.relays == [RelayURL("wss://relay.example.com")!])
     }
 
     @Test("NAddr(event:) extracts the d tag")

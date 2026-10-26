@@ -375,7 +375,7 @@ Tag.previous(["12345678"])       // ["previous", ref...] (NIP-29 timeline refere
 Tag.inviteCode("A7fjq2")         // ["code", "A7fjq2"] (NIP-29 kinds 9009/9021)
 Tag.role("mod", description: "kicks")  // ["role", name, description?] (NIP-29 kind 39003)
 Tag.pubkey(pk, roles: ["admin"]) // ["p", pk, role...] (NIP-29; index 1 is a role, not a relay hint)
-Tag.simpleGroup(id: "abcdef", relayURL: "wss://g", name: "Cool")  // ["group", ...] (NIP-51 kind 10009)
+Tag.simpleGroup(id: "abcdef", relayURL: try RelayURL(string: "wss://g"), name: "Cool")  // ["group", ...] (NIP-51 kind 10009)
 Tag(rawArray: ["custom", "x"])   // failable, nil for []
 tag.rawArray                     // [String] wire form
 // Raw escape hatch when you hold [[String]]:
@@ -724,7 +724,8 @@ let reaction = try signer.signReaction(to: event, content: "🤙")
 let repost = try signer.signRepost(of: event, relayURL: relay)  // RelayURL? hint
 let deletion = try signer.signDeletion(eventIDs: [event.id], reason: "mistake")
 let contacts = try signer.signContactList([Contact(pubkey: alice)])
-let relayList = try signer.signRelayListMetadata(read: ["wss://in.example"], write: ["wss://out.example"])
+let relayList = try signer.signRelayListMetadata(
+    read: [try RelayURL(string: "wss://in.example")], write: [try RelayURL(string: "wss://out.example")])
 let auth = try signer.signClientAuthentication(relayURL: relay, challenge: "challenge")  // kind 22242, NIP-42
 let pow = try await signer.sign(unsignedEvent, proofOfWork: 20)  // mine to 20 leading zero bits, then sign (NIP-13)
 let listEvent = try signer.signList(list)   // NIP-51: private items NIP-44-self-encrypted into content
@@ -1064,7 +1065,7 @@ try await client.events.publishLongFormContent(article)
 let fetched = try await client.events.fetchLongFormContent(author: pubkey, identifier: "my-first-article")
 
 // Fetch by naddr coordinate (relay hints are used when already in the pool)
-let naddr = try article.naddr(author: pubkey, relays: ["wss://relay.example"])
+let naddr = try article.naddr(author: pubkey, relays: [try RelayURL(string: "wss://relay.example")])
 let byCoord = try await client.events.fetchLongFormContent(naddr: naddr)
 
 // Sign without publishing
@@ -1171,7 +1172,7 @@ their kind-39000 metadata event, sometimes suffixed with `?invite=<code>`.
 ```swift
 let group = try GroupReference(naddrString: "naddr1...?invite=A7fjq2")
 // group.relayURL, group.id, group.relayPubkey (PublicKey?), group.inviteCode (String?)
-let direct = GroupReference(relayURL: "wss://groups.example", id: "abcdef")
+let direct = GroupReference(relayURL: try RelayURL(string: "wss://groups.example"), id: "abcdef")
 let fromNaddr = try GroupReference(naddr: naddr, inviteCode: "A7fjq2")  // kind must be 39000
 let link = try group.shareableString()  // naddr + "?invite=<code>", round-trips the code
 let coord = try group.naddr()           // throws without relayPubkey
@@ -1197,11 +1198,12 @@ detect group migrations and forks. A typed view over `NostrList` (`init(list:)` 
 private entries ride the NIP-44 list machinery, readable only by the author.
 
 - `publicEntries: [GroupListEntry]` / `privateEntries: [GroupListEntry]` -- the "group" tags
-- `relayURLs: [String]` -- the public single-value "r" tags, one per group relay
+- `relayURLs: [RelayURL]` -- the public single-value "r" tags, one per group relay (an "r" tag
+  whose URL is not a relay URL stays in `additionalPublicTags`)
 - `additionalPublicTags` / `additionalPrivateTags: [Tag]` -- out-of-shape tags, preserved losslessly
 
-`GroupListEntry` is one `["group", groupID, relayURL, name?]` entry: `groupID`, `relayURL`,
-optional `name`; build one from a reference with `GroupListEntry(_ reference:name:)` and
+`GroupListEntry` is one `["group", groupID, relayURL, name?]` entry: `groupID`, `relayURL: RelayURL`,
+optional `name` (a "group" tag whose relay is not a relay URL does not parse as an entry); build one from a reference with `GroupListEntry(_ reference:name:)` and
 convert back via `.reference` (relay pubkey and invite code are not part of the list format).
 
 ```swift
@@ -1244,14 +1246,14 @@ NIP-05 DNS-based internet identifier verification (struct: Sendable).
 // Verify identifier
 let result = try await InternetIdentifier.verify("alice@example.com")
 print(result.pubkey)   // PublicKey
-print(result.relays)   // [String]
+print(result.relays)   // [RelayURL]; entries that are not relay URLs are skipped
 
 // Verify against expected pubkey
 try await InternetIdentifier.verify("alice@example.com", expectedPubkey: alice)
 
 // Look up pubkey or relays; a nostr.json value that is not canonical hex throws pubkeyNotFound
 let pubkey = try await InternetIdentifier.lookupPubkey("alice@example.com")   // PublicKey
-let relays = try await InternetIdentifier.lookupRelays("alice@example.com")
+let relays = try await InternetIdentifier.lookupRelays("alice@example.com")   // [RelayURL]
 
 // String extensions
 "alice@example.com".isValidInternetIdentifier  // Bool
@@ -1448,7 +1450,8 @@ A NIP-19 bech32-encoded entity (enum: Sendable, Hashable). Cases: `npub(PublicKe
 The TLV entities hold typed values: `NProfile(publicKey: PublicKey, relays:)`,
 `NEvent(eventID: EventID, relays:, author: PublicKey?, kind: Int?)` (or `NEvent(event:relays:)`), and
 `NAddr(identifier:author: PublicKey, kind:relays:)` (or `NAddr(event:relays:)`); each also has
-`init(bech32String:)` and `encoded`. Relay hints stay `[String]`.
+`init(bech32String:)` and `encoded`. Relay hints are `[RelayURL]`: decoding skips a TLV relay
+record that is not a valid relay URL, and encoding writes each hint in canonical form.
 - `init(nostrURI: String) throws` -- decode a NIP-21 `nostr:` URI (case-insensitive scheme, tolerates `nostr://`, rejects `nsec`)
 - `var nostrURI: String { get throws }` -- canonical `nostr:` URI (no `//`, throws for `nsec`)
 
@@ -1545,7 +1548,7 @@ let ct = try await signer.nip44Encrypt("hi", to: thirdParty)   // PublicKey
 let pt = try await signer.nip44Decrypt(ct, from: thirdParty)
 let ct04 = try await signer.nip04Encrypt("hi", to: thirdParty)  // legacy NIP-04, PublicKey
 let pt04 = try await signer.nip04Decrypt(ct04, from: thirdParty)
-let relays = try await signer.switchRelays()                  // [URL]? — nil when the signer keeps its set
+let relays = try await signer.switchRelays()                  // [RelayURL]? — nil when the signer keeps its set
 await signer.logout()                                          // best-effort logout, then disconnect
 await signer.disconnect()                                      // tear down; fails in-flight with notConnected
 ```
@@ -1561,7 +1564,7 @@ for await challenge in await signer.authChallenges() {
 }
 ```
 
-- `BunkerURI(string:)` / `NostrConnectURI(string:)` — parse `bunker://` tokens and `nostrconnect://` invitations; the host is the signer's `remoteSignerPubkey` / the client's `clientPubkey` as a `PublicKey`, and a host that is not canonical lowercase hex (uppercase included) throws `invalidURI(reason:)`. `BunkerURI(remoteSignerPubkey:relays:secret:)` and `NostrConnectURI(clientPubkey:relays:secret:…)` take a `PublicKey`
+- `BunkerURI(string:)` / `NostrConnectURI(string:)` — parse `bunker://` tokens and `nostrconnect://` invitations; the host is the signer's `remoteSignerPubkey` / the client's `clientPubkey` as a `PublicKey`, and a host that is not canonical lowercase hex (uppercase included) throws `invalidURI(reason:)`. `BunkerURI(remoteSignerPubkey:relays:secret:)` and `NostrConnectURI(clientPubkey:relays:secret:…)` take a `PublicKey` and `relays: [RelayURL]`; a `relay` parameter that is not a valid relay URL throws `invalidURI(reason:)` rather than being dropped
 - `RemoteSignerMethod` — the method set (`connect`, `sign_event`, `ping`, `get_public_key`, `nip04_*`, `nip44_*`, `switch_relays`, `logout`)
 - `RemoteSignerPermission` — `perms` tokens (e.g. `.signEvent(kind:)`, `.nip44Encrypt`)
 - `RemoteSignerAuthChallenge` — `url`, `method`, `requestID`

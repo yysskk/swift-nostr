@@ -102,9 +102,9 @@ enum TLV {
         return id
     }
 
-    /// Ensures each relay URL fits within a single TLV record (255 bytes).
-    static func validatedRelays(_ relays: [String]) throws -> [String] {
-        for relay in relays where relay.utf8.count > 255 {
+    /// Ensures each relay URL's canonical form fits within a single TLV record (255 bytes).
+    static func validatedRelays(_ relays: [RelayURL]) throws -> [RelayURL] {
+        for relay in relays where relay.description.utf8.count > 255 {
             throw NostrError.invalidTLV
         }
         return relays
@@ -159,9 +159,16 @@ enum TLV {
         specialRecord(eventID.data)
     }
 
-    /// ``Kind/relay`` records, one per relay-hint URL.
-    static func relayRecords(_ urls: [String]) -> [Record] {
-        urls.map { Record(type: Kind.relay.rawValue, value: Data($0.utf8)) }
+    /// ``Kind/relay`` records, one per relay-hint URL, in canonical form.
+    static func relayRecords(_ urls: [RelayURL]) -> [Record] {
+        urls.map { Record(type: Kind.relay.rawValue, value: Data($0.description.utf8)) }
+    }
+
+    /// The relay hint a ``Kind/relay`` record carries, or nil when it is not a valid relay URL.
+    /// Relay hints come from whoever encoded the entity, so a malformed one is skipped rather
+    /// than failing the whole entity.
+    static func relay(_ record: Record) -> RelayURL? {
+        RelayURL(String(decoding: record.value, as: UTF8.self))
     }
 
     /// A ``Kind/author`` record carrying the author's public key.

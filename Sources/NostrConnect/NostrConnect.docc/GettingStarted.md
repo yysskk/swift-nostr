@@ -75,7 +75,7 @@ signer's pubkey is unknown until it scans the invitation and replies, so wait fo
 ```swift
 let clientKeyPair = try KeyPair()
 let invitation = try NostrConnectURI.invitation(
-    clientKeyPair: clientKeyPair, relays: [URL(string: "wss://relay.example")!])
+    clientKeyPair: clientKeyPair, relays: [try RelayURL(string: "wss://relay.example")])
 displayQRCode(invitation.stringValue)
 
 let signer = try RemoteSigner(invitation: invitation, clientKeyPair: clientKeyPair)

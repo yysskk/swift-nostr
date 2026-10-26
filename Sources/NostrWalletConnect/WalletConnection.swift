@@ -68,7 +68,7 @@ public actor WalletConnection {
         self.clientPubkey = keyPair.publicKey
         self.session = Session(
             transport: transport
-                ?? RelayConnectionTransport(relayURLs: uri.relays.compactMap { try? RelayURL(url: $0) }),
+                ?? RelayConnectionTransport(relayURLs: uri.relays),
             timedOut: WalletConnectError.timedOut,
             notConnected: WalletConnectError.notConnected)
     }

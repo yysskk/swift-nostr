@@ -17,18 +17,18 @@ struct RelayListStoreTests {
         let store = makeStore()
         let pubkey = PublicKey.fixture("pubkey1")
 
-        let listA = RelayListMetadata(entries: [RelayListEntry(url: "wss://a.example.com")])
-        let listB = RelayListMetadata(entries: [RelayListEntry(url: "wss://b.example.com")])
-        let listC = RelayListMetadata(entries: [RelayListEntry(url: "wss://c.example.com")])
+        let listA = RelayListMetadata(entries: [RelayListEntry(url: RelayURL("wss://a.example.com")!)])
+        let listB = RelayListMetadata(entries: [RelayListEntry(url: RelayURL("wss://b.example.com")!)])
+        let listC = RelayListMetadata(entries: [RelayListEntry(url: RelayURL("wss://c.example.com")!)])
 
         await store.store(listA, createdAt: 100, for: pubkey)
         await store.store(listB, createdAt: 50, for: pubkey)  // older → ignored
         var cached = await store.cachedList(for: pubkey)
-        #expect(cached?.entries.first?.url == "wss://a.example.com")
+        #expect(cached?.entries.first?.url == RelayURL("wss://a.example.com"))
 
         await store.store(listC, createdAt: 200, for: pubkey)  // newer → wins
         cached = await store.cachedList(for: pubkey)
-        #expect(cached?.entries.first?.url == "wss://c.example.com")
+        #expect(cached?.entries.first?.url == RelayURL("wss://c.example.com"))
     }
 
     @Test("Equal createdAt keeps existing entry")
@@ -37,18 +37,18 @@ struct RelayListStoreTests {
         let pubkey = PublicKey.fixture("pubkey1")
 
         await store.store(
-            RelayListMetadata(entries: [RelayListEntry(url: "wss://a.example.com")]),
+            RelayListMetadata(entries: [RelayListEntry(url: RelayURL("wss://a.example.com")!)]),
             createdAt: 100,
             for: pubkey
         )
         await store.store(
-            RelayListMetadata(entries: [RelayListEntry(url: "wss://b.example.com")]),
+            RelayListMetadata(entries: [RelayListEntry(url: RelayURL("wss://b.example.com")!)]),
             createdAt: 100,
             for: pubkey
         )
 
         let cached = await store.cachedList(for: pubkey)
-        #expect(cached?.entries.first?.url == "wss://a.example.com")
+        #expect(cached?.entries.first?.url == RelayURL("wss://a.example.com"))
     }
 
     @Test("Resolves write and read relay URLs")
@@ -57,9 +57,9 @@ struct RelayListStoreTests {
         let pubkey = PublicKey.fixture("pubkey1")
 
         let list = RelayListMetadata(entries: [
-            RelayListEntry(url: "wss://both.example.com", usage: .readWrite),
-            RelayListEntry(url: "wss://read.example.com", usage: .read),
-            RelayListEntry(url: "wss://write.example.com", usage: .write),
+            RelayListEntry(url: RelayURL("wss://both.example.com")!, usage: .readWrite),
+            RelayListEntry(url: RelayURL("wss://read.example.com")!, usage: .read),
+            RelayListEntry(url: RelayURL("wss://write.example.com")!, usage: .write),
         ])
         await store.store(list, createdAt: 1, for: pubkey)
 
@@ -94,13 +94,13 @@ struct RelayListStoreTests {
         let signer = EventSigner(keyPair: keyPair)
 
         let event = try signer.signRelayListMetadata(
-            RelayListMetadata(entries: [RelayListEntry(url: "wss://a.example.com", usage: .write)])
+            RelayListMetadata(entries: [RelayListEntry(url: RelayURL("wss://a.example.com")!, usage: .write)])
         )
         let ingested = await store.ingest(event)
         #expect(ingested != nil)
 
         let cached = await store.cachedList(for: keyPair.publicKey)
-        #expect(cached?.writeRelays == ["wss://a.example.com"])
+        #expect(cached?.writeRelays == [RelayURL("wss://a.example.com")!])
     }
 
     @Test("Ingest ignores non-10002 event")

@@ -73,7 +73,7 @@ struct GiftWrappedRumorDeliveryTests {
         let sender = try KeyPair(privateKeyHex: senderKey)
         let recipient = try KeyPair()
         await client.dmRelayListStore.store(
-            DirectMessageRelayList(relays: [inboxURL.description]), createdAt: 1, for: recipient.publicKey)
+            DirectMessageRelayList(relays: [inboxURL]), createdAt: 1, for: recipient.publicKey)
         // The sender advertised no list, so the self-copy falls back to the whole pool.
         await client.dmRelayListStore.markNoList(for: sender.publicKey)
         let rumor = makeRumor(pubkey: sender.publicKey, recipient: recipient.publicKey)

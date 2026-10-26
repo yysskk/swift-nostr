@@ -335,13 +335,11 @@ public struct NostrGroupsAPI: NostrGroupManaging {
     /// idempotent when it already is connected.
     ///
     /// - Returns: The group's relay URL, to pass to the pool's targeting parameters.
-    /// - Throws: ``NostrError/invalidRelayURL(_:)`` when the URL is not a valid WebSocket
-    ///   relay URL, or ``NostrError/connectionFailed(_:)`` when the relay cannot be connected.
+    /// - Throws: ``NostrError/connectionFailed(_:)`` when the relay cannot be connected.
     private func ensureRelay(_ group: GroupReference) async throws -> RelayURL {
-        let url = try RelayURL(string: group.relayURL)
-        let connection = await client.pool.addRelay(url)
+        let connection = await client.pool.addRelay(group.relayURL)
         try await connection.connect()
-        return url
+        return group.relayURL
     }
 
     /// Picks the winning event of one relay-generated state kind: the newest `createdAt`,

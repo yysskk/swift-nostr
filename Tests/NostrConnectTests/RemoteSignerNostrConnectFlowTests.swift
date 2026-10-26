@@ -16,7 +16,7 @@ struct RemoteSignerNostrConnectFlowTests {
     }
 
     private func makeInvitation() throws -> NostrConnectURI {
-        try NostrConnectURI.invitation(clientKeyPair: client, relays: [URL(string: "wss://relay.example")!])
+        try NostrConnectURI.invitation(clientKeyPair: client, relays: [RelayURL("wss://relay.example")!])
     }
 
     private func makeSigner(

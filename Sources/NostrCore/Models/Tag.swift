@@ -263,10 +263,10 @@ extension Tag {
     }
 
     /// A "group" tag of the NIP-51 kind-10009 simple group list:
-    /// `["group", groupID, relayURL, name?]`.
+    /// `["group", groupID, relayURL, name?]`, with the relay URL in its canonical form.
     /// https://github.com/nostr-protocol/nips/blob/master/51.md
-    public static func simpleGroup(id: String, relayURL: String, name: String? = nil) -> Tag {
-        var values = [id, relayURL]
+    public static func simpleGroup(id: String, relayURL: RelayURL, name: String? = nil) -> Tag {
+        var values = [id, relayURL.description]
         if let name {
             values.append(name)
         }

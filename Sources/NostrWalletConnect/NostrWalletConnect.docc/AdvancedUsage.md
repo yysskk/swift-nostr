@@ -172,7 +172,7 @@ let lnurlPay = try JSONDecoder().decode(LNURLPayResponse.self, from: data)
 let signer = EventSigner(keyPair: try KeyPair(nsec: "nsec1..."))
 let zapRequest = try signer.signZapRequest(
     recipientPubkey: try PublicKey(npub: "npub1..."),
-    relays: ["wss://relay.example.com"],
+    relays: [try RelayURL(string: "wss://relay.example.com")],
     amountMillisats: 21_000,
     lnurl: LNURL.encode(serviceURL))
 
@@ -217,7 +217,7 @@ platform whose Foundation has none, or an in-memory fake in tests — hand it a
 let connection = WalletConnection(
     uri: uri,
     transport: RelayConnectionTransport(
-        relayURLs: try uri.relays.map(RelayURL.init(url:)), webSocketFactory: OkHttpWebSocketFactory()))
+        relayURLs: uri.relays, webSocketFactory: OkHttpWebSocketFactory()))
 ```
 
 NIP-47 request events are ephemeral, so `RelayTransport`'s `send(_:)` is fire-and-forget: the

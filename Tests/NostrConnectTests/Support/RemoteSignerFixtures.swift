@@ -16,7 +16,7 @@ enum RemoteSignerFixtures {
     static func bunker(signer: KeyPair, secret: String? = nil) throws -> BunkerURI {
         try BunkerURI(
             remoteSignerPubkey: signer.publicKey,
-            relays: [URL(string: "wss://relay.example")!],
+            relays: [RelayURL("wss://relay.example")!],
             secret: secret)
     }
 

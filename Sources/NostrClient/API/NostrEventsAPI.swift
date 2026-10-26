@@ -238,11 +238,8 @@ public struct NostrEventsAPI: NostrEventPublishing, NostrEventFetching {
 
         // Use the coordinate's relay hints only where they are already connected in the pool.
         var hinted: Set<RelayURL> = []
-        for relay in naddr.relays {
-            guard let url = RelayURL(relay) else { continue }
-            if await client.pool.relay(for: url) != nil {
-                hinted.insert(url)
-            }
+        for relay in naddr.relays where await client.pool.relay(for: relay) != nil {
+            hinted.insert(relay)
         }
 
         let events = try await client.fetch(

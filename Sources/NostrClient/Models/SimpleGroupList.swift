@@ -12,7 +12,7 @@ public struct GroupListEntry: Sendable, Hashable {
     public var groupID: String
 
     /// The URL of the relay hosting the group.
-    public var relayURL: String
+    public var relayURL: RelayURL
 
     /// An optional human-readable group name. An empty string is normalized to nil on
     /// every construction and mutation path, so an entry always round-trips through its
@@ -23,7 +23,8 @@ public struct GroupListEntry: Sendable, Hashable {
         }
     }
 
-    public init(groupID: String, relayURL: String, name: String? = nil) {
+    /// Creates an entry for the group `groupID` on the relay at `relayURL`.
+    public init(groupID: String, relayURL: RelayURL, name: String? = nil) {
         self.groupID = groupID
         self.relayURL = relayURL
         self.name = name?.isEmpty == true ? nil : name
@@ -39,15 +40,14 @@ public struct GroupListEntry: Sendable, Hashable {
 
     /// Parses a `["group", id, relay, name?]` tag.
     ///
-    /// Returns nil unless the tag is named "group" with a non-empty id, a non-empty relay
-    /// URL, and no values beyond the optional name — an out-of-shape "group" tag is left
+    /// Returns nil unless the tag is named "group" with a non-empty id, a valid relay URL,
+    /// and no values beyond the optional name — an out-of-shape "group" tag is left
     /// to ``SimpleGroupList``'s additional-tag buckets so its content survives a round
     /// trip. A present-but-empty name is treated as nil.
     public init?(tag: Tag) {
         guard tag.name == "group", (2...3).contains(tag.values.count) else { return nil }
         let groupID = tag.values[0]
-        let relayURL = tag.values[1]
-        guard !groupID.isEmpty, !relayURL.isEmpty else { return nil }
+        guard !groupID.isEmpty, let relayURL = RelayURL(tag.values[1]) else { return nil }
         let name = tag.values.count == 3 && !tag.values[2].isEmpty ? tag.values[2] : nil
         self.init(groupID: groupID, relayURL: relayURL, name: name)
     }
@@ -89,10 +89,10 @@ public struct SimpleGroupList: Sendable, Hashable {
     /// The `"r"` relay URLs of the public tags, in order — the relays the author uses for
     /// groups, one tag per relay. (Private `"r"` tags, if any, stay in
     /// ``additionalPrivateTags``.)
-    public var relayURLs: [String]
+    public var relayURLs: [RelayURL]
 
     /// Public tags that are neither well-formed `["group", id, relay, name?]` tags nor
-    /// single-value `["r", url]` tags, preserved in order.
+    /// single-value `["r", url]` tags carrying a valid relay URL, preserved in order.
     public var additionalPublicTags: [Tag]
 
     /// Private tags that are not well-formed `["group", id, relay, name?]` tags, preserved
@@ -102,7 +102,7 @@ public struct SimpleGroupList: Sendable, Hashable {
     public init(
         publicEntries: [GroupListEntry] = [],
         privateEntries: [GroupListEntry] = [],
-        relayURLs: [String] = [],
+        relayURLs: [RelayURL] = [],
         additionalPublicTags: [Tag] = [],
         additionalPrivateTags: [Tag] = []
     ) {
@@ -116,9 +116,10 @@ public struct SimpleGroupList: Sendable, Hashable {
     /// Builds the typed view of a kind-10009 list.
     ///
     /// Well-formed `["group", ...]` tags become ``publicEntries`` and ``privateEntries``,
-    /// and public single-value `["r", url]` tags become ``relayURLs``; every other tag
-    /// lands in ``additionalPublicTags`` or ``additionalPrivateTags`` — including
-    /// out-of-shape "group" and "r" tags, so nothing is dropped.
+    /// and public single-value `["r", url]` tags carrying a valid relay URL become
+    /// ``relayURLs``; every other tag lands in ``additionalPublicTags`` or
+    /// ``additionalPrivateTags`` — including out-of-shape "group" and "r" tags and ones whose
+    /// relay URL is malformed, so nothing is dropped.
     ///
     /// - Throws: ``NostrError/invalidData`` when `list.kind` is not
     ///   ``Event/Kind/simpleGroupList``.
@@ -127,13 +128,13 @@ public struct SimpleGroupList: Sendable, Hashable {
             throw NostrError.invalidData
         }
         var publicEntries: [GroupListEntry] = []
-        var relayURLs: [String] = []
+        var relayURLs: [RelayURL] = []
         var additionalPublicTags: [Tag] = []
         for tag in list.publicItems {
             if let entry = GroupListEntry(tag: tag) {
                 publicEntries.append(entry)
-            } else if tag.name == "r", tag.values.count == 1, !tag.values[0].isEmpty {
-                relayURLs.append(tag.values[0])
+            } else if tag.name == "r", tag.values.count == 1, let relayURL = RelayURL(tag.values[0]) {
+                relayURLs.append(relayURL)
             } else {
                 additionalPublicTags.append(tag)
             }
@@ -161,12 +162,12 @@ public struct SimpleGroupList: Sendable, Hashable {
     /// Public items are the ``publicEntries``' tags first, then an `["r", url]` tag per
     /// ``relayURLs`` element, then ``additionalPublicTags``; private items are the
     /// ``privateEntries``' tags followed by ``additionalPrivateTags``. Converting a list
-    /// through ``init(list:)`` and back normalizes that grouping — and drops the
-    /// present-but-empty name element of a "group" tag — but preserves every tag's
-    /// content.
+    /// through ``init(list:)`` and back normalizes that grouping — drops the
+    /// present-but-empty name element of a "group" tag and writes relay URLs in canonical
+    /// form — but otherwise preserves every tag's content.
     public var list: NostrList {
         var publicItems = publicEntries.map(\.tag)
-        publicItems.append(contentsOf: relayURLs.map { Tag.reference($0) })
+        publicItems.append(contentsOf: relayURLs.map { Tag.reference($0.description) })
         publicItems.append(contentsOf: additionalPublicTags)
         return NostrList(
             kind: .simpleGroupList,

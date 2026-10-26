@@ -13,7 +13,7 @@ struct GroupReferenceTests {
     private func groupNAddr(
         identifier: String = "abcdef",
         kind: Int = 39000,
-        relays: [String] = ["wss://groups.example.com"]
+        relays: [RelayURL] = [RelayURL("wss://groups.example.com")!]
     ) throws -> NAddr {
         try NAddr(identifier: identifier, author: relayPubkey, kind: kind, relays: relays)
     }
@@ -22,10 +22,12 @@ struct GroupReferenceTests {
 
     @Test("a kind-39000 naddr maps to relay, id, and relay pubkey")
     func naddrRoundTrip() throws {
-        let naddr = try groupNAddr(relays: ["wss://groups.example.com", "wss://mirror.example.com"])
+        let naddr = try groupNAddr(relays: [
+            RelayURL("wss://groups.example.com")!, RelayURL("wss://mirror.example.com")!,
+        ])
         let reference = try GroupReference(naddr: naddr)
 
-        #expect(reference.relayURL == "wss://groups.example.com")
+        #expect(reference.relayURL == RelayURL("wss://groups.example.com"))
         #expect(reference.id == "abcdef")
         #expect(reference.relayPubkey == relayPubkey)
         #expect(reference.inviteCode == nil)
@@ -42,20 +44,27 @@ struct GroupReferenceTests {
         }
     }
 
-    @Test("an naddr without a usable relay hint is rejected")
+    /// An `naddr` string for the group whose relay hints are written as `relays`, verbatim.
+    private func rawGroupNAddr(relays: [String]) throws -> String {
+        try RawTLV.bech32(
+            prefix: "naddr", special: Data("abcdef".utf8), relays: relays, author: relayPubkey, kind: 39000)
+    }
+
+    @Test("an naddr without a valid relay hint is rejected")
     func rejectsMissingRelayHints() throws {
         #expect(throws: NostrError.invalidNIP19Entity) {
             _ = try GroupReference(naddr: self.groupNAddr(relays: []))
         }
+        let malformedOnly = try rawGroupNAddr(relays: ["", "https://groups.example.com"])
         #expect(throws: NostrError.invalidNIP19Entity) {
-            _ = try GroupReference(naddr: self.groupNAddr(relays: [""]))
+            _ = try GroupReference(naddrString: malformedOnly)
         }
     }
 
-    @Test("the first non-empty relay hint wins")
-    func skipsEmptyRelayHints() throws {
-        let naddr = try groupNAddr(relays: ["", "wss://groups.example.com"])
-        #expect(try GroupReference(naddr: naddr).relayURL == "wss://groups.example.com")
+    @Test("the first valid relay hint wins")
+    func skipsMalformedRelayHints() throws {
+        let naddr = try rawGroupNAddr(relays: ["", "not a relay", "WSS://Groups.Example.com/"])
+        #expect(try GroupReference(naddrString: naddr).relayURL == RelayURL("wss://groups.example.com"))
     }
 
     // MARK: - Share-link strings
@@ -64,7 +73,7 @@ struct GroupReferenceTests {
     func parsesNaddrString() throws {
         let reference = try GroupReference(naddrString: try groupNAddr().encoded)
 
-        #expect(reference.relayURL == "wss://groups.example.com")
+        #expect(reference.relayURL == RelayURL("wss://groups.example.com"))
         #expect(reference.id == "abcdef")
         #expect(reference.relayPubkey == relayPubkey)
         #expect(reference.inviteCode == nil)
@@ -101,7 +110,7 @@ struct GroupReferenceTests {
 
     @Test("naddr() requires the relay pubkey")
     func naddrRequiresRelayPubkey() throws {
-        let reference = GroupReference(relayURL: "wss://groups.example.com", id: "abcdef")
+        let reference = GroupReference(relayURL: RelayURL("wss://groups.example.com")!, id: "abcdef")
         #expect(throws: NostrError.invalidNIP19Entity) {
             _ = try reference.naddr()
         }
@@ -113,19 +122,19 @@ struct GroupReferenceTests {
     @Test("naddr() rebuilds the group coordinate")
     func naddrRebuildsCoordinate() throws {
         let reference = GroupReference(
-            relayURL: "wss://groups.example.com", id: "abcdef", relayPubkey: relayPubkey)
+            relayURL: RelayURL("wss://groups.example.com")!, id: "abcdef", relayPubkey: relayPubkey)
         let naddr = try reference.naddr()
 
         #expect(naddr.identifier == "abcdef")
         #expect(naddr.author == relayPubkey)
         #expect(naddr.kind == 39000)
-        #expect(naddr.relays == ["wss://groups.example.com"])
+        #expect(naddr.relays == [RelayURL("wss://groups.example.com")!])
     }
 
     @Test("shareableString() round-trips through init(naddrString:), invite code included")
     func shareableStringRoundTrips() throws {
         let reference = GroupReference(
-            relayURL: "wss://groups.example.com",
+            relayURL: RelayURL("wss://groups.example.com")!,
             id: "abcdef",
             relayPubkey: relayPubkey,
             inviteCode: "top/secret code+1"
@@ -136,7 +145,8 @@ struct GroupReferenceTests {
         #expect(shared.contains("?invite="))
         #expect(try GroupReference(naddrString: shared) == reference)
 
-        let bare = GroupReference(relayURL: "wss://groups.example.com", id: "abcdef", relayPubkey: relayPubkey)
+        let bare = GroupReference(
+            relayURL: RelayURL("wss://groups.example.com")!, id: "abcdef", relayPubkey: relayPubkey)
         #expect(try GroupReference(naddrString: bare.shareableString()) == bare)
     }
 
@@ -145,18 +155,18 @@ struct GroupReferenceTests {
     @Test("the memberwise initializer stores every field")
     func memberwiseInitPassthrough() {
         let reference = GroupReference(
-            relayURL: "wss://groups.example.com",
+            relayURL: RelayURL("wss://groups.example.com")!,
             id: "abcdef",
             relayPubkey: relayPubkey,
             inviteCode: "A7fjq2"
         )
 
-        #expect(reference.relayURL == "wss://groups.example.com")
+        #expect(reference.relayURL == RelayURL("wss://groups.example.com"))
         #expect(reference.id == "abcdef")
         #expect(reference.relayPubkey == relayPubkey)
         #expect(reference.inviteCode == "A7fjq2")
 
-        let minimal = GroupReference(relayURL: "wss://groups.example.com", id: "abcdef")
+        let minimal = GroupReference(relayURL: RelayURL("wss://groups.example.com")!, id: "abcdef")
         #expect(minimal.relayPubkey == nil)
         #expect(minimal.inviteCode == nil)
     }

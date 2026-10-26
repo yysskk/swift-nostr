@@ -125,7 +125,7 @@ struct InternetIdentifierTests {
         let result = InternetIdentifier.VerificationResult(
             identifier: "alice@example.com",
             pubkey: .fixture("alice"),
-            relays: ["wss://relay1.com", "wss://relay2.com"]
+            relays: [RelayURL("wss://relay1.com")!, RelayURL("wss://relay2.com")!]
         )
 
         #expect(result.identifier == "alice@example.com")
@@ -138,19 +138,19 @@ struct InternetIdentifierTests {
         let result1 = InternetIdentifier.VerificationResult(
             identifier: "alice@example.com",
             pubkey: .fixture("alice"),
-            relays: ["wss://relay.com"]
+            relays: [RelayURL("wss://relay.com")!]
         )
 
         let result2 = InternetIdentifier.VerificationResult(
             identifier: "alice@example.com",
             pubkey: .fixture("alice"),
-            relays: ["wss://relay.com"]
+            relays: [RelayURL("wss://relay.com")!]
         )
 
         let result3 = InternetIdentifier.VerificationResult(
             identifier: "bob@example.com",
             pubkey: .fixture("alice"),
-            relays: ["wss://relay.com"]
+            relays: [RelayURL("wss://relay.com")!]
         )
 
         #expect(result1 == result2)
@@ -222,7 +222,20 @@ struct InternetIdentifierTests {
 
         #expect(result.identifier == "Alice@example.com")
         #expect(result.pubkey == alice)
-        #expect(result.relays == ["wss://relay.example.com"])
+        #expect(result.relays == [RelayURL("wss://relay.example.com")!])
+    }
+
+    @Test("relays listed under the key that are not relay URLs are skipped, the rest kept in order")
+    func malformedRelaysAreSkipped() throws {
+        let data = try nostrJSON(
+            names: ["alice": alice.hex],
+            relays: [
+                alice.hex: ["https://web.example.com", "WSS://B.Example.com/", "not a relay", "wss://a.example.com"]
+            ])
+
+        let result = try InternetIdentifier.result(for: "alice@example.com", name: "alice", in: data)
+
+        #expect(result.relays == [RelayURL("wss://b.example.com")!, RelayURL("wss://a.example.com")!])
     }
 
     @Test(

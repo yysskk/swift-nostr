@@ -17,16 +17,19 @@ struct DirectMessageRelayListStoreTests {
         let store = makeStore()
         let pubkey = PublicKey.fixture("pubkey1")
 
-        await store.store(DirectMessageRelayList(relays: ["wss://a.example.com"]), createdAt: 100, for: pubkey)
+        await store.store(
+            DirectMessageRelayList(relays: [RelayURL("wss://a.example.com")!]), createdAt: 100, for: pubkey)
         // older → ignored
-        await store.store(DirectMessageRelayList(relays: ["wss://b.example.com"]), createdAt: 50, for: pubkey)
+        await store.store(
+            DirectMessageRelayList(relays: [RelayURL("wss://b.example.com")!]), createdAt: 50, for: pubkey)
         var cached = await store.cachedList(for: pubkey)
-        #expect(cached?.relays == ["wss://a.example.com"])
+        #expect(cached?.relays == [RelayURL("wss://a.example.com")!])
 
         // newer → wins
-        await store.store(DirectMessageRelayList(relays: ["wss://c.example.com"]), createdAt: 200, for: pubkey)
+        await store.store(
+            DirectMessageRelayList(relays: [RelayURL("wss://c.example.com")!]), createdAt: 200, for: pubkey)
         cached = await store.cachedList(for: pubkey)
-        #expect(cached?.relays == ["wss://c.example.com"])
+        #expect(cached?.relays == [RelayURL("wss://c.example.com")!])
     }
 
     @Test("Equal createdAt keeps existing entry")
@@ -34,11 +37,13 @@ struct DirectMessageRelayListStoreTests {
         let store = makeStore()
         let pubkey = PublicKey.fixture("pubkey1")
 
-        await store.store(DirectMessageRelayList(relays: ["wss://a.example.com"]), createdAt: 100, for: pubkey)
-        await store.store(DirectMessageRelayList(relays: ["wss://b.example.com"]), createdAt: 100, for: pubkey)
+        await store.store(
+            DirectMessageRelayList(relays: [RelayURL("wss://a.example.com")!]), createdAt: 100, for: pubkey)
+        await store.store(
+            DirectMessageRelayList(relays: [RelayURL("wss://b.example.com")!]), createdAt: 100, for: pubkey)
 
         let cached = await store.cachedList(for: pubkey)
-        #expect(cached?.relays == ["wss://a.example.com"])
+        #expect(cached?.relays == [RelayURL("wss://a.example.com")!])
     }
 
     @Test("Resolves inbox relay URLs")
@@ -47,7 +52,7 @@ struct DirectMessageRelayListStoreTests {
         let pubkey = PublicKey.fixture("pubkey1")
 
         await store.store(
-            DirectMessageRelayList(relays: ["wss://inbox.example.com", "wss://dm.example.com"]),
+            DirectMessageRelayList(relays: [RelayURL("wss://inbox.example.com")!, RelayURL("wss://dm.example.com")!]),
             createdAt: 1,
             for: pubkey
         )
@@ -106,7 +111,7 @@ struct DirectMessageRelayListStoreTests {
         let store = makeStore()
         let pubkey = PublicKey.fixture("pubkey1")
 
-        await store.store(DirectMessageRelayList(relays: ["wss://a.example.com"]), createdAt: 1, for: pubkey)
+        await store.store(DirectMessageRelayList(relays: [RelayURL("wss://a.example.com")!]), createdAt: 1, for: pubkey)
         #expect(await store.isResolved(for: pubkey) == true)
     }
 
@@ -116,9 +121,9 @@ struct DirectMessageRelayListStoreTests {
         let pubkey = PublicKey.fixture("pubkey1")
 
         await store.markNoList(for: pubkey)
-        await store.store(DirectMessageRelayList(relays: ["wss://a.example.com"]), createdAt: 1, for: pubkey)
+        await store.store(DirectMessageRelayList(relays: [RelayURL("wss://a.example.com")!]), createdAt: 1, for: pubkey)
 
-        #expect(await store.cachedList(for: pubkey)?.relays == ["wss://a.example.com"])
+        #expect(await store.cachedList(for: pubkey)?.relays == [RelayURL("wss://a.example.com")!])
         #expect(await store.isResolved(for: pubkey) == true)
     }
 
@@ -128,12 +133,12 @@ struct DirectMessageRelayListStoreTests {
         let keyPair = try KeyPair()
         let signer = EventSigner(keyPair: keyPair)
 
-        let event = try signer.signDirectMessageRelayList(relays: ["wss://inbox.example.com"])
+        let event = try signer.signDirectMessageRelayList(relays: [RelayURL("wss://inbox.example.com")!])
         let ingested = await store.ingest(event)
         #expect(ingested != nil)
 
         let cached = await store.cachedList(for: keyPair.publicKey)
-        #expect(cached?.relays == ["wss://inbox.example.com"])
+        #expect(cached?.relays == [RelayURL("wss://inbox.example.com")!])
     }
 
     @Test("Ingest ignores a non-10050 event")

@@ -286,7 +286,7 @@ struct NIP23LongFormTests {
         try await connection.connect()
 
         // A relay hint matching the pooled relay: the fetch targets it (the new `to:` param).
-        let naddr = try article.naddr(author: signer.publicKey, relays: [relayURL.description])
+        let naddr = try article.naddr(author: signer.publicKey, relays: [relayURL])
 
         let task = Task { try await client.events.fetchLongFormContent(naddr: naddr, timeout: 2) }
 

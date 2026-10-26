@@ -285,7 +285,23 @@ struct RemoteSignerCommandsTests {
                 client: client, signer: signer))
 
         let urls = try await relays.value
-        #expect(urls == [URL(string: "wss://a.example")!, URL(string: "wss://b.example")!])
+        #expect(urls == [RelayURL("wss://a.example")!, RelayURL("wss://b.example")!])
+    }
+
+    @Test(
+        "switchRelays rejects an entry that is not a relay URL instead of dropping it",
+        arguments: [#"["wss://a.example","https://b.example"]"#, #"["wss://a.example","not a relay"]"#])
+    func switchRelaysRejectsMalformedEntry(result: String) async throws {
+        let (remote, transport) = try await connected()
+
+        let relays = Task { try await remote.switchRelays() }
+        let request = try await nextRequest(transport)
+        try await transport.deliver(
+            RemoteSignerFixtures.response(requestID: request.id, result: result, client: client, signer: signer))
+
+        await #expect(throws: RemoteSignerError.responseDecodingFailed) {
+            _ = try await relays.value
+        }
     }
 
     @Test("switchRelays returns nil when the signer keeps its relays")

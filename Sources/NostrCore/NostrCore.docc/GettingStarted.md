@@ -139,7 +139,7 @@ struct OkHttpWebSocketFactory: WebSocketSessionFactory {
 }
 
 let relay = RelayConnection(
-    url: URL(string: "wss://relay.example.com")!,
+    url: try RelayURL(string: "wss://relay.example.com"),
     webSocketFactory: OkHttpWebSocketFactory()
 )
 try await relay.connect()

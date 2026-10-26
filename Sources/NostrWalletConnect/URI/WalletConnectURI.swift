@@ -24,7 +24,7 @@ public struct WalletConnectURI: Sendable, Hashable {
     public let walletPubkey: PublicKey
 
     /// The relays the wallet service listens on. Always at least one.
-    public let relays: [URL]
+    public let relays: [RelayURL]
 
     /// The 32-byte client secret key. The client signs and encrypts with this key.
     public let secret: Data
@@ -48,7 +48,7 @@ public struct WalletConnectURI: Sendable, Hashable {
     ///   - secret: The 32-byte client secret key (must be a valid secp256k1 private key).
     ///   - lud16: An optional lightning address.
     /// - Throws: ``WalletConnectError/invalidURI(reason:)`` if any field fails validation.
-    public init(walletPubkey: PublicKey, relays: [URL], secret: Data, lud16: String? = nil) throws {
+    public init(walletPubkey: PublicKey, relays: [RelayURL], secret: Data, lud16: String? = nil) throws {
         guard !relays.isEmpty else {
             throw WalletConnectError.invalidURI(reason: "at least one relay is required")
         }
@@ -72,7 +72,8 @@ public struct WalletConnectURI: Sendable, Hashable {
     ///
     /// - Parameter string: The connection string issued by the wallet service.
     /// - Throws: ``WalletConnectError/invalidURI(reason:)`` if the string is malformed or missing
-    ///   required fields, including a host that is not a canonical lowercase hex public key.
+    ///   required fields, including a host that is not a canonical lowercase hex public key or a
+    ///   `relay` value that is not a valid relay URL.
     public init(string: String) throws {
         guard let components = URLComponents(string: string),
             components.scheme?.lowercased() == Self.scheme
@@ -90,13 +91,10 @@ public struct WalletConnectURI: Sendable, Hashable {
         let queryItems = components.queryItems ?? []
 
         let relayValues = queryItems.filter { $0.name == "relay" }.compactMap { $0.value }
-        let relays = relayValues.compactMap { URL(string: $0) }
-        // The scheme is checked here rather than left to the transport: `RelayConnection`'s
-        // URL-taking initializer does not validate, unlike its string form, so an `https://` relay
-        // in a pasted URI would be connected to as written.
-        guard !relayValues.isEmpty, relays.count == relayValues.count,
-            relays.allSatisfy({ ["ws", "wss"].contains($0.scheme?.lowercased() ?? "") })
-        else {
+        // Every relay must parse: dropping a malformed one would make the URI look like it lists
+        // fewer relays than it does.
+        let relays = relayValues.compactMap(RelayURL.init)
+        guard !relayValues.isEmpty, relays.count == relayValues.count else {
             throw WalletConnectError.invalidURI(reason: "missing or malformed relay")
         }
 
@@ -117,7 +115,7 @@ public struct WalletConnectURI: Sendable, Hashable {
         components.scheme = Self.scheme
         components.host = walletPubkey.hex
 
-        var items = relays.map { URLQueryItem(name: "relay", value: $0.absoluteString) }
+        var items = relays.map { URLQueryItem(name: "relay", value: $0.description) }
         items.append(URLQueryItem(name: "secret", value: secret.hexEncodedString()))
         if let lud16 {
             items.append(URLQueryItem(name: "lud16", value: lud16))

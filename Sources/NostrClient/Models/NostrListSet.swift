@@ -86,7 +86,7 @@ public struct NostrListSet: Sendable, Hashable {
     }
 
     /// A NIP-19 `naddr` addressing this set for `author`.
-    public func naddr(author: PublicKey, relays: [String] = []) throws -> NAddr {
+    public func naddr(author: PublicKey, relays: [RelayURL] = []) throws -> NAddr {
         try NAddr(identifier: identifier, author: author, kind: kind.rawValue, relays: relays)
     }
 }

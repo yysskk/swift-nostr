@@ -139,31 +139,3 @@ struct RelayURLValueSemanticsTests {
         }
     }
 }
-
-@Suite("Relay URL Package Helper Tests")
-struct RelayURLPackageHelperTests {
-
-    @Test("normalize applies the canonical rules to valid and invalid strings alike")
-    func normalize() {
-        #expect(RelayURL.normalize("wss://Relay.Example.COM/") == "wss://relay.example.com")
-        #expect(RelayURL.normalize("wss://host:443") == "wss://host")
-        #expect(RelayURL.normalize("wss://host/a/") == "wss://host/a/")
-        // Strings that are not relay URLs still de-duplicate; unparseable ones fall back to the
-        // whole-string rule.
-        #expect(RelayURL.normalize("HTTPS://Host.Example/") == "https://host.example")
-        #expect(RelayURL.normalize("Not A URL/") == "not a url")
-    }
-
-    @Test("Set(parsingValid:) keeps valid relay URLs and skips malformed entries")
-    func parsingValidSkipsInvalidEntries() {
-        let urls = Set<RelayURL>(parsingValid: [
-            "wss://relay.example.com",
-            "wss://Relay.Example.com/",  // duplicate after normalization
-            "https://not-a-relay.example.com",  // wrong scheme
-            "wss:garbage",  // no host
-            "wss://r.example.com/path#frag",  // fragment
-            "ws://second.example.com",
-        ])
-        #expect(urls == [RelayURL("wss://relay.example.com")!, RelayURL("ws://second.example.com")!])
-    }
-}

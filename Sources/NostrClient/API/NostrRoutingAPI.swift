@@ -54,8 +54,8 @@ public struct NostrRoutingAPI: NostrRelayRouting {
     /// - Returns: The signed event together with the per-relay publish outcome.
     @discardableResult
     public func publishRelayList(
-        read: [String] = [],
-        write: [String] = [],
+        read: [RelayURL] = [],
+        write: [RelayURL] = [],
         strategy: PublishStrategy? = nil
     ) async throws -> PublishedEvent {
         try await publishRelayList(RelayListMetadata(read: read, write: write), strategy: strategy)
@@ -162,7 +162,7 @@ public struct NostrRoutingAPI: NostrRelayRouting {
     /// - Returns: The signed event together with the per-relay publish outcome.
     @discardableResult
     public func publishDirectMessageRelayList(
-        relays: [String],
+        relays: [RelayURL],
         strategy: PublishStrategy? = nil
     ) async throws -> PublishedEvent {
         try await publishDirectMessageRelayList(DirectMessageRelayList(relays: relays), strategy: strategy)
