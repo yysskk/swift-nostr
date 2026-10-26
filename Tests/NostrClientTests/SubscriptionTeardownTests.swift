@@ -239,26 +239,29 @@ struct SubscriptionGenerationTests {
     }
 
     /// The subscribe that loses the overlap is told so with a dedicated error rather than a
-    /// generic failure, and the winner is unaffected. Whether two subscribes actually interleave
-    /// is up to the scheduler, so the race is repeated until one does.
+    /// generic failure, and the winner is unaffected. A hook runs the second subscribe to
+    /// completion inside the first one's registration suspension, so the overlap always happens.
     @Test("the subscribe that loses an overlap throws subscriptionSuperseded")
     func overlappedSubscribeThrowsSuperseded() async throws {
         let (client, _) = try await makeClient()
         let pool = await client.pool
 
-        var supersededCount = 0
-        for attempt in 0..<50 {
-            let id = "sub-\(attempt)"
-            async let first = subscribeFailure(on: pool, subscriptionID: id)
-            async let second = subscribeFailure(on: pool, subscriptionID: id)
-            let failures = await [first, second].compactMap { $0 }
-            #expect(failures.allSatisfy { $0 == .subscriptionSuperseded })
-            #expect(failures.count < 2)
-            supersededCount += failures.count
-            await pool.unsubscribe(subscriptionID: id)
-            if supersededCount > 0 { break }
+        let hookCalls = MessageCounts()
+        await pool.setListenersRegisteredHook { subscriptionID in
+            hookCalls.bump()
+            guard hookCalls.value == 1 else { return }
+            let overlapping = await subscribeFailure(on: pool, subscriptionID: subscriptionID)
+            #expect(overlapping == nil)
         }
-        #expect(supersededCount > 0)
+
+        let failure = await subscribeFailure(on: pool, subscriptionID: "sub")
+        await pool.setListenersRegisteredHook(nil)
+
+        #expect(hookCalls.value == 2)
+        #expect(failure == .subscriptionSuperseded)
+        // Only the winner's listeners remain, under the generation it registered.
+        #expect(await pool.subscriptionGeneration(for: "sub") != nil)
+        #expect(await pool.listenerTaskCount(for: "sub") == 1)
 
         await client.relays.disconnect()
     }

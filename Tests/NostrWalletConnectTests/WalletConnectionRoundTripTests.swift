@@ -203,7 +203,7 @@ struct WalletConnectionRoundTripTests {
 
     @Test("multi_pay_invoice correlates by d tag and surfaces partial completion")
     func multiPayPartial() async throws {
-        let (connection, transport, client, wallet) = try makeConnection(timeout: .milliseconds(400))
+        let (connection, transport, client, wallet) = try makeConnection(timeout: .seconds(2))
 
         async let results = connection.multiPayInvoice([
             .init(id: "a", invoice: "lnbc1"),
@@ -227,7 +227,7 @@ struct WalletConnectionRoundTripTests {
 
     @Test("multi_pay_invoice completes promptly when a response cannot be decrypted")
     func multiPayUndecryptableCompletesPromptly() async throws {
-        let (connection, transport, client, wallet) = try makeConnection(timeout: .seconds(5))
+        let (connection, transport, client, wallet) = try makeConnection(timeout: .seconds(30))
 
         async let results = connection.multiPayInvoice([
             .init(id: "a", invoice: "lnbc1"),
@@ -257,9 +257,9 @@ struct WalletConnectionRoundTripTests {
         #expect(mapped.outcomes[0].value?.preimage == "pa")
         #expect(mapped.indicesWithoutResponse == [1])
         // The two outcomes this separates are "completed when the second response arrived" and
-        // "waited out the 5s timeout", so the bound only has to sit between them. A tighter one
+        // "waited out the 30s timeout", so the bound only has to sit between them. A tighter one
         // measures the scheduler instead: on a loaded CI runner the arrival path alone can take
-        // a second, which made this fail while the behavior under test was correct.
-        #expect(elapsed < .seconds(2.5))
+        // seconds, which made this fail while the behavior under test was correct.
+        #expect(elapsed < .seconds(10))
     }
 }

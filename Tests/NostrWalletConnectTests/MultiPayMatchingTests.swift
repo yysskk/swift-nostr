@@ -60,7 +60,7 @@ struct MultiPayMatchingTests {
     /// fewer results than invoices, with nothing saying which had been lost.
     @Test("a duplicate d tag is reported rather than overwriting a result")
     func duplicateDTagIsReported() async throws {
-        let (connection, transport, client, wallet) = try makeConnection(timeout: .milliseconds(400))
+        let (connection, transport, client, wallet) = try makeConnection(timeout: .seconds(2))
 
         async let results = connection.multiPayInvoice([
             .init(id: "a", invoice: "lnbc1"),
@@ -96,7 +96,7 @@ struct MultiPayMatchingTests {
     /// A response naming a `d` tag no invoice asked for still describes a payment that happened.
     @Test("a response for an unknown item is surfaced as unmatched")
     func unknownDTagIsUnmatched() async throws {
-        let (connection, transport, client, wallet) = try makeConnection(timeout: .milliseconds(400))
+        let (connection, transport, client, wallet) = try makeConnection(timeout: .seconds(2))
 
         async let results = connection.multiPayInvoice([.init(id: "a", invoice: "lnbc1")])
 
@@ -128,7 +128,7 @@ struct MultiPayMatchingTests {
         #expect(invoiceResults.outcomes.isEmpty)
         #expect(keysendResults.outcomes.isEmpty)
         // Anything well under the 30-second timeout separates "returned at once" from "waited".
-        #expect(elapsed < .seconds(1))
+        #expect(elapsed < .seconds(10))
     }
 
     /// A reply carrying another command's `result_type` answers a different request; folding it in

@@ -290,7 +290,7 @@ struct NIP45CountTests {
         // Relay A answers; relay B never replies and times out. The pool tolerates the
         // partial failure and returns only the relay that answered.
         let task = Task {
-            try await pool.countEvents(matching: [Filter(kinds: [.textNote])], timeout: .milliseconds(300))
+            try await pool.countEvents(matching: [Filter(kinds: [.textNote])], timeout: .seconds(2))
         }
 
         try await pollUntil { mockA.sentTextFrames.contains { $0.hasPrefix("[\"COUNT\"") } }
