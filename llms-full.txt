@@ -1852,7 +1852,7 @@ for await challenge in await signer.authChallenges() {
 - `RemoteSignerAuthChallenge` — `url`, `method`, `requestID`
 - `RelayTransport` / `RelayConnectionTransport` (`NostrCore`) — the relay seam; inject a fake for
   tests, or the default transport with a `webSocketFactory:` for a platform-native socket
-- `RemoteSignerError` — `invalidURI(reason:)`, `notConnected`, `connectionInProgress`, `requestEncodingFailed`, `responseDecodingFailed`, `timedOut`, `connectionRejected(message:)`, `secretMismatch`, `signerError(message:)`, `responseValidationFailed`
+- `RemoteSignerError` — `invalidURI(reason:)`, `notConnected`, `connectionInProgress`, `requestEncodingFailed`, `responseDecodingFailed`, `timedOut`, `connectionRejected(message:)`, `signerError(message:)`, `responseValidationFailed`
 
 ## Errors
 

@@ -21,11 +21,10 @@ public enum RemoteSignerError: Error, LocalizedError, Sendable, Equatable {
     /// The remote signer did not respond before the configured timeout elapsed.
     case timedOut
 
-    /// The remote signer declined the connection.
+    /// The remote signer declined the connection, or answered `connect` with neither `"ack"` nor
+    /// the secret that was sent. `message` is the result the signer returned, empty when there was
+    /// none.
     case connectionRejected(message: String)
-
-    /// The secret returned by the remote signer did not match the one that was sent.
-    case secretMismatch
 
     /// The remote signer returned an explicit error for the request.
     case signerError(message: String)
@@ -49,8 +48,6 @@ public enum RemoteSignerError: Error, LocalizedError, Sendable, Equatable {
             return "The remote signer did not respond in time"
         case .connectionRejected(let message):
             return "The remote signer rejected the connection: \(message)"
-        case .secretMismatch:
-            return "The remote signer returned a secret that did not match"
         case .signerError(let message):
             return "Remote signer error: \(message)"
         case .responseValidationFailed:
