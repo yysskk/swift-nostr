@@ -24,35 +24,26 @@ public struct Contact: Codable, Hashable, Sendable {
         self.petname = petname
     }
 
-    /// Converts to a tag array for NIP-02 event
-    public func toTag() -> [String] {
-        var tag = ["p", pubkey.hex]
-        if let relayURL = relayURL {
-            tag.append(relayURL.description)
-            if let petname = petname {
-                tag.append(petname)
-            }
-        } else if let petname = petname {
-            tag.append("")
-            tag.append(petname)
-        }
-        return tag
+    /// The `p` tag for a NIP-02 contact list: `["p", pubkey, relayURL, petname]`, with an empty
+    /// relay placeholder when only a petname is set.
+    public var tag: Tag {
+        .pubkey(pubkey, relayURL: relayURL, petname: petname)
     }
 
-    /// Creates a Contact from a "p" tag array
+    /// Creates a contact from a "p" tag.
     ///
     /// Returns nil unless the tag is a `p` tag whose value is a canonical hex public key. The
     /// relay hint is the list author's own content, so one that is not a valid relay URL is read
     /// as absent rather than failing the contact.
-    public static func fromTag(_ tag: [String]) -> Contact? {
-        guard tag.count >= 2, tag[0] == "p", let pubkey = PublicKey(tag[1]) else {
+    public init?(tag: Tag) {
+        guard tag.name == "p", let pubkey = tag.primaryValue.flatMap(PublicKey.init) else {
             return nil
         }
 
-        let relayURL = tag.count > 2 ? RelayURL(tag[2]) : nil
-        let petname = tag.count > 3 && !tag[3].isEmpty ? tag[3] : nil
+        let relayURL = tag.values.count > 1 ? RelayURL(tag.values[1]) : nil
+        let petname = tag.values.count > 2 && !tag.values[2].isEmpty ? tag.values[2] : nil
 
-        return Contact(pubkey: pubkey, relayURL: relayURL, petname: petname)
+        self.init(pubkey: pubkey, relayURL: relayURL, petname: petname)
     }
 }
 
@@ -66,7 +57,7 @@ extension Event {
             return nil
         }
 
-        return tags.compactMap { Contact.fromTag($0) }
+        return structuredTags.compactMap(Contact.init(tag:))
     }
 
     /// Checks if this is a contact list event

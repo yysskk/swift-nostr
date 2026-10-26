@@ -48,9 +48,9 @@ public struct RelayListMetadata: Codable, Hashable, Sendable {
         entries.filter { $0.usage.canWrite }.map { $0.url }
     }
 
-    /// Converts to the full tag array for a kind 10002 event.
-    public func toTags() -> [[String]] {
-        entries.map { $0.toTag() }
+    /// The full tag list for a kind 10002 event, one "r" tag per entry.
+    public var tags: [Tag] {
+        entries.map(\.tag)
     }
 
     /// Parses a relay list from a kind 10002 event. Returns nil if the event is not kind 10002.
@@ -58,16 +58,16 @@ public struct RelayListMetadata: Codable, Hashable, Sendable {
         guard event.kind == .relayListMetadata else {
             return nil
         }
-        self.init(tags: event.tags)
+        self.init(tags: event.structuredTags)
     }
 
-    /// Parses a relay list from raw tags (kind-agnostic). A tag whose URL is not a valid relay
+    /// Parses a relay list from tags (kind-agnostic). A tag whose URL is not a valid relay
     /// URL is skipped, and duplicate relays are removed (first wins).
-    public init(tags: [[String]]) {
+    public init(tags: [Tag]) {
         var seen = Set<RelayURL>()
         var result: [RelayListEntry] = []
         for tag in tags {
-            guard let entry = RelayListEntry.fromTag(tag) else {
+            guard let entry = RelayListEntry(tag: tag) else {
                 continue
             }
             if seen.insert(entry.url).inserted {

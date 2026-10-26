@@ -20,8 +20,8 @@ struct NIP23LongFormTests {
 
     // MARK: - Tag mapping
 
-    @Test("toTags emits d/title/summary/image/published_at/t in order")
-    func toTagsEmitsAllFields() {
+    @Test("tags emits d/title/summary/image/published_at/t in order")
+    func tagsEmitsAllFields() {
         let article = LongFormContent(
             identifier: "my-article",
             title: "Hello",
@@ -32,7 +32,7 @@ struct NIP23LongFormTests {
             content: "# Body"
         )
 
-        let tags = article.toTags()
+        let tags = article.tags
         #expect(tags[0] == ["d", "my-article"])
         #expect(tags.contains(["title", "Hello"]))
         #expect(tags.contains(["summary", "A summary"]))
@@ -42,10 +42,10 @@ struct NIP23LongFormTests {
         #expect(tags.contains(["t", "swift"]))
     }
 
-    @Test("toTags omits optional fields when nil")
-    func toTagsOmitsOptionalFields() {
+    @Test("tags omits optional fields when nil")
+    func tagsOmitsOptionalFields() {
         let article = LongFormContent(identifier: "minimal")
-        #expect(article.toTags() == [["d", "minimal"]])
+        #expect(article.tags == [["d", "minimal"]])
     }
 
     @Test("init(event:) round-trips the modeled fields")
@@ -79,8 +79,8 @@ struct NIP23LongFormTests {
             additionalTags: [["client", "x"]]
         )
 
-        // The unmodeled tag is emitted by toTags().
-        #expect(article.toTags().contains(["client", "x"]))
+        // The unmodeled tag is emitted by tags.
+        #expect(article.tags.contains(["client", "x"]))
 
         // Parsing the emitted tags back preserves it in additionalTags, not elsewhere.
         let event = Event(
@@ -88,7 +88,7 @@ struct NIP23LongFormTests {
             pubkey: PublicKey(String(repeating: "a", count: 64))!,
             createdAt: Timestamp(rawValue: 1),
             kind: .longFormContent,
-            tags: article.toTags(),
+            tags: article.tags.map(\.rawArray),
             content: "",
             signature: nil
         )
@@ -153,7 +153,7 @@ struct NIP23LongFormTests {
 
         let article = try #require(LongFormContent(event: event))
         #expect(article.publishedAt == Timestamp(rawValue: .max))
-        #expect(article.toTags().contains(["published_at", "9223372036854775807"]))
+        #expect(article.tags.contains(["published_at", "9223372036854775807"]))
     }
 
     @Test("a published_at that is not an integer is ignored")
@@ -261,7 +261,7 @@ struct NIP23LongFormTests {
             pubkey: signer.publicKey,
             createdAt: Timestamp(rawValue: older.createdAt.rawValue + 1000),
             kind: .longFormContent,
-            rawTags: newerBase.toTags(),
+            tags: newerBase.tags,
             content: ""
         )
         let newer = try signer.sign(newerUnsigned)

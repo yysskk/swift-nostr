@@ -22,9 +22,9 @@ public struct OpenTimestamps: Sendable, Hashable {
         Data(base64Encoded: otsData)
     }
 
-    /// Creates a tag for embedding in an event
-    public func toTag() -> [String] {
-        ["ots", otsData]
+    /// The `ots` tag for embedding in an event: `["ots", base64 data]`.
+    public var tag: Tag {
+        Tag(name: "ots", values: [otsData])
     }
 }
 
@@ -53,7 +53,7 @@ extension UnsignedEvent {
         var newTags = tags
         // Remove existing ots tag if present
         newTags.removeAll { $0.first == "ots" }
-        newTags.append(ots.toTag())
+        newTags.append(ots.tag.rawArray)
 
         return UnsignedEvent(
             pubkey: pubkey,

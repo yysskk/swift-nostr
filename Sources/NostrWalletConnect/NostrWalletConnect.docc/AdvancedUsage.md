@@ -70,7 +70,7 @@ let byBolt11 = try await connection.lookupInvoice(.invoice("lnbc..."))
 print(byHash.state ?? "", byBolt11.amount)
 
 // Balance, in millisatoshis.
-let balance = try await connection.getBalance()
+let balance = try await connection.fetchBalance()
 print("\(balance.balance) msat")
 ```
 

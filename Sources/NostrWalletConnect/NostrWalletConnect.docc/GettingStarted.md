@@ -95,10 +95,10 @@ print("Zap preimage: \(zap.preimage)")
 ## Query the Wallet
 
 ```swift
-let balance = try await connection.getBalance()
+let balance = try await connection.fetchBalance()
 print("Balance: \(balance.balance) msat")
 
-let info = try await connection.getInfo()
+let info = try await connection.fetchNodeInfo()
 print("Node alias: \(info.alias ?? "unknown")")
 print("Supported methods: \(info.methods)")
 ```

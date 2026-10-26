@@ -224,6 +224,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `closed`, and `count`, and the parameters of `RelayConnection.subscribe(subscriptionID:filters:)`,
   `unsubscribe(subscriptionID:)`, `RelayPool.unsubscribe(subscriptionID:)`, and
   `NostrSubscriptionsAPI.unsubscribe(subscriptionID:)`. The wire format is unchanged.
+- **Conversions are initializers and properties** (breaking): following the Swift API Design
+  Guidelines, which discourage `to`/`from` prefixes. `Mnemonic.fromEntropy(_:)` is
+  `Mnemonic(entropy:)` and `Mnemonic.toSeed(passphrase:)` is `seed(passphrase:)`.
+  `RelayListEntry.toTag()` and `Contact.toTag()` are a `tag: Tag` property, and their `fromTag(_:)`
+  is `init?(tag: Tag)`; `OpenTimestamps.toTag()` is `tag: Tag`. `toTags() -> [[String]]` on
+  `RelayListMetadata`, `DirectMessageRelayList`, and `LongFormContent` is `tags: [Tag]`, and
+  `RelayListMetadata(tags:)` and `DirectMessageRelayList(tags:)` take `[Tag]`, so a list round-trips
+  without passing through raw arrays; `LongFormContent.additionalTags` is `[Tag]` too. The NIP-29
+  state models' `toTags` (`Groups.Metadata`, `AdminList`, `MemberList`, `RoleList`, `PinList`) is
+  `tags`.
+- **Wallet queries read as `fetch`** (breaking): `WalletConnection.getBalance()` is
+  `fetchBalance()` and `getInfo()` is `fetchNodeInfo()`, matching `fetchInfo()` and the client's
+  `fetchEvent`. `get_info` returns the wallet's Lightning node info, so it is named apart from
+  `fetchInfo()`, which reads the kind-13194 info event. The `WalletConnectMethod` cases and the
+  `GetBalanceResult`/`GetInfoResult` types keep their NIP-47 method names.
+- **`Filter.getTagQuery(_:)` is removed** (breaking): use `tagQuery(_:)`, which it forwarded to.
 - **Direct message times are `Timestamp`** (breaking): `createdAt` and `expiresAt` on
   `DirectMessage`, `DirectMessageReaction`, and `DirectMessageFile`, and their initializers, were
   `Date`. They carry the rumor's `created_at` and the gift wrap's `expiration` exactly as received.

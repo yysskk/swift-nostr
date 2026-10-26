@@ -61,11 +61,11 @@ public struct Mnemonic: Sendable {
 
         let entropy = try SecureRandom.generateBytes(count: entropyBytes)
 
-        return try fromEntropy(entropy)
+        return try Mnemonic(entropy: entropy)
     }
 
-    /// Creates a mnemonic from entropy data
-    public static func fromEntropy(_ entropy: Data) throws -> Mnemonic {
+    /// Creates a mnemonic from BIP-39 entropy: 16, 20, 24, 28 or 32 bytes for 12 to 24 words.
+    public init(entropy: Data) throws {
         guard [16, 20, 24, 28, 32].contains(entropy.count) else {
             throw NostrError.invalidMnemonic
         }
@@ -99,7 +99,7 @@ public struct Mnemonic: Sendable {
             words.append(BIP39WordList.english[index])
         }
 
-        return try Mnemonic(words: words)
+        try self.init(words: words)
     }
 
     // MARK: - Seed Derivation
@@ -107,7 +107,7 @@ public struct Mnemonic: Sendable {
     /// Derives the BIP-39 seed from the mnemonic using PBKDF2
     /// - Parameter passphrase: Optional passphrase for additional security
     /// - Returns: 64-byte seed
-    public func toSeed(passphrase: String = "") -> Data {
+    public func seed(passphrase: String = "") -> Data {
         let password = phrase.decomposedStringWithCompatibilityMapping
         let salt = ("mnemonic" + passphrase).decomposedStringWithCompatibilityMapping
 

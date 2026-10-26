@@ -20,24 +20,24 @@ struct RelayListMetadataTests {
         #expect(RelayUsage.readWrite.canWrite == true)
     }
 
-    // MARK: - Entry to tag
+    // MARK: - Entry tag
 
-    @Test("Entry to tag - read+write (no marker)")
-    func entryToTagReadWrite() {
+    @Test("Entry tag - read+write (no marker)")
+    func entryTagReadWrite() {
         let entry = RelayListEntry(url: RelayURL("wss://relay.example.com")!, usage: .readWrite)
-        #expect(entry.toTag() == ["r", "wss://relay.example.com"])
+        #expect(entry.tag == ["r", "wss://relay.example.com"])
     }
 
-    @Test("Entry to tag - read only")
-    func entryToTagRead() {
+    @Test("Entry tag - read only")
+    func entryTagRead() {
         let entry = RelayListEntry(url: RelayURL("wss://relay.example.com")!, usage: .read)
-        #expect(entry.toTag() == ["r", "wss://relay.example.com", "read"])
+        #expect(entry.tag == ["r", "wss://relay.example.com", "read"])
     }
 
-    @Test("Entry to tag - write only")
-    func entryToTagWrite() {
+    @Test("Entry tag - write only")
+    func entryTagWrite() {
         let entry = RelayListEntry(url: RelayURL("wss://relay.example.com")!, usage: .write)
-        #expect(entry.toTag() == ["r", "wss://relay.example.com", "write"])
+        #expect(entry.tag == ["r", "wss://relay.example.com", "write"])
     }
 
     @Test("Entry default usage is read+write")
@@ -46,48 +46,54 @@ struct RelayListMetadataTests {
         #expect(entry.usage == .readWrite)
     }
 
-    // MARK: - Entry from tag
+    // MARK: - Entry init(tag:)
 
-    @Test("Entry from tag - no marker means read+write")
-    func entryFromTagNoMarker() {
-        let entry = RelayListEntry.fromTag(["r", "wss://relay.example.com"])
+    @Test("Entry init(tag:) - no marker means read+write")
+    func entryInitTagNoMarker() {
+        let entry = RelayListEntry(tag: ["r", "wss://relay.example.com"])
         #expect(entry?.url == RelayURL("wss://relay.example.com"))
         #expect(entry?.usage == .readWrite)
     }
 
-    @Test("Entry from tag - read marker")
-    func entryFromTagRead() {
-        let entry = RelayListEntry.fromTag(["r", "wss://relay.example.com", "read"])
+    @Test("Entry init(tag:) - read marker")
+    func entryInitTagRead() {
+        let entry = RelayListEntry(tag: ["r", "wss://relay.example.com", "read"])
         #expect(entry?.usage == .read)
     }
 
-    @Test("Entry from tag - write marker")
-    func entryFromTagWrite() {
-        let entry = RelayListEntry.fromTag(["r", "wss://relay.example.com", "write"])
+    @Test("Entry init(tag:) - write marker")
+    func entryInitTagWrite() {
+        let entry = RelayListEntry(tag: ["r", "wss://relay.example.com", "write"])
         #expect(entry?.usage == .write)
     }
 
-    @Test("Entry from tag - empty marker means read+write")
-    func entryFromTagEmptyMarker() {
-        let entry = RelayListEntry.fromTag(["r", "wss://relay.example.com", ""])
+    @Test("Entry init(tag:) - empty marker means read+write")
+    func entryInitTagEmptyMarker() {
+        let entry = RelayListEntry(tag: ["r", "wss://relay.example.com", ""])
         #expect(entry?.usage == .readWrite)
     }
 
-    @Test("Entry from tag - unknown marker is lenient read+write")
-    func entryFromTagUnknownMarker() {
-        let entry = RelayListEntry.fromTag(["r", "wss://relay.example.com", "garbage"])
+    @Test("Entry init(tag:) - unknown marker is lenient read+write")
+    func entryInitTagUnknownMarker() {
+        let entry = RelayListEntry(tag: ["r", "wss://relay.example.com", "garbage"])
         #expect(entry?.usage == .readWrite)
     }
 
-    @Test("Entry from tag - missing url returns nil")
-    func entryFromTagMissingURL() {
-        #expect(RelayListEntry.fromTag(["r"]) == nil)
-        #expect(RelayListEntry.fromTag(["r", ""]) == nil)
+    @Test("Entry init(tag:) - missing url returns nil")
+    func entryInitTagMissingURL() {
+        #expect(RelayListEntry(tag: ["r"]) == nil)
+        #expect(RelayListEntry(tag: ["r", ""]) == nil)
     }
 
-    @Test("Entry from tag - wrong tag type returns nil")
-    func entryFromTagWrongType() {
-        #expect(RelayListEntry.fromTag(["p", "wss://relay.example.com"]) == nil)
+    @Test("Entry init(tag:) - wrong tag type returns nil")
+    func entryInitTagWrongType() {
+        #expect(RelayListEntry(tag: ["p", "wss://relay.example.com"]) == nil)
+    }
+
+    @Test("Entry round-trips through tag and init(tag:)", arguments: [RelayUsage.readWrite, .read, .write])
+    func entryTagRoundTrip(usage: RelayUsage) throws {
+        let entry = RelayListEntry(url: try #require(RelayURL("wss://relay.example.com")), usage: usage)
+        #expect(RelayListEntry(tag: entry.tag) == entry)
     }
 
     // MARK: - Metadata read/write filtering
@@ -104,10 +110,10 @@ struct RelayListMetadataTests {
         #expect(list.writeRelays == [RelayURL("wss://both.example.com")!, RelayURL("wss://write.example.com")!])
     }
 
-    // MARK: - toTags / parse round-trip
+    // MARK: - tags / parse round-trip
 
-    @Test("toTags produces NIP-65 r tags")
-    func toTagsFormat() {
+    @Test("tags produces NIP-65 r tags")
+    func tagsFormat() {
         let list = RelayListMetadata(entries: [
             RelayListEntry(url: RelayURL("wss://a.example.com")!, usage: .readWrite),
             RelayListEntry(url: RelayURL("wss://b.example.com")!, usage: .read),
@@ -115,7 +121,7 @@ struct RelayListMetadataTests {
         ])
 
         #expect(
-            list.toTags() == [
+            list.tags == [
                 ["r", "wss://a.example.com"],
                 ["r", "wss://b.example.com", "read"],
                 ["r", "wss://c.example.com", "write"],
@@ -123,7 +129,7 @@ struct RelayListMetadataTests {
         )
     }
 
-    @Test("Round-trip toTags then init(tags:)")
+    @Test("Round-trip tags then init(tags:)")
     func roundTrip() {
         let original = RelayListMetadata(entries: [
             RelayListEntry(url: RelayURL("wss://a.example.com")!, usage: .readWrite),
@@ -131,7 +137,7 @@ struct RelayListMetadataTests {
             RelayListEntry(url: RelayURL("wss://c.example.com")!, usage: .write),
         ])
 
-        let parsed = RelayListMetadata(tags: original.toTags())
+        let parsed = RelayListMetadata(tags: original.tags)
         #expect(parsed.entries == original.entries)
     }
 
@@ -171,14 +177,14 @@ struct RelayListMetadataTests {
         let list = RelayListMetadata(tags: [["r", "wss://Relay.Example.com/"]])
         #expect(list.entries.count == 1)
         #expect(list.entries[0].url == RelayURL("wss://relay.example.com"))
-        #expect(list.toTags() == [["r", "wss://relay.example.com"]])
+        #expect(list.tags == [["r", "wss://relay.example.com"]])
     }
 
     @Test(
         "An r tag whose URL is not a relay URL is skipped",
         arguments: ["https://relay.example.com", "not a relay", "wss://relay.example.com/#frag"])
     func malformedURLIsSkipped(url: String) {
-        #expect(RelayListEntry.fromTag(["r", url]) == nil)
+        #expect(RelayListEntry(tag: ["r", url]) == nil)
         let list = RelayListMetadata(tags: [["r", url], ["r", "wss://good.example.com", "write"]])
         #expect(list.entries == [RelayListEntry(url: RelayURL("wss://good.example.com")!, usage: .write)])
     }
@@ -202,7 +208,7 @@ struct RelayListMetadataEventTests {
 
         #expect(event.kind == 10002)
         #expect(event.content == "")
-        #expect(event.tags == list.toTags())
+        #expect(event.structuredTags == list.tags)
         #expect(try event.verify())
     }
 

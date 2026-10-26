@@ -134,12 +134,6 @@ public struct Filter: Codable, Sendable, Hashable {
         let key = tag.hasPrefix("#") ? tag : "#\(tag)"
         return tagQueries[key]
     }
-
-    /// Returns the values of a generic tag query.
-    @available(*, deprecated, renamed: "tagQuery(_:)")
-    public func getTagQuery(_ tag: String) -> [String]? {
-        tagQuery(tag)
-    }
 }
 
 // MARK: - Dynamic Coding Keys

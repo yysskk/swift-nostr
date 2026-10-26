@@ -56,7 +56,7 @@ public struct KeyPair: Sendable {
     ///   - passphrase: Optional passphrase for additional security
     ///   - account: The account index (default 0)
     public init(mnemonic: Mnemonic, passphrase: String = "", account: UInt32 = 0) throws {
-        let seed = mnemonic.toSeed(passphrase: passphrase)
+        let seed = mnemonic.seed(passphrase: passphrase)
         let privateKey = try KeyDerivation.deriveNostrKey(seed: seed, account: account)
         try self.init(privateKey: privateKey)
     }

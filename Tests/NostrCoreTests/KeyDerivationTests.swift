@@ -11,7 +11,7 @@ struct KeyDerivationTests {
 
     @Test("deriveNostrKey on a NIP-06 seed produces the vector private key")
     func derivesNIP06VectorKey() throws {
-        let seed = try Mnemonic(phrase: mnemonicPhrase).toSeed()
+        let seed = try Mnemonic(phrase: mnemonicPhrase).seed()
 
         let privateKey = try KeyDerivation.deriveNostrKey(seed: seed)
 
@@ -21,7 +21,7 @@ struct KeyDerivationTests {
 
     @Test("A non-zero account derives a different key than account 0")
     func accountChangesKey() throws {
-        let seed = try Mnemonic(phrase: mnemonicPhrase).toSeed()
+        let seed = try Mnemonic(phrase: mnemonicPhrase).seed()
 
         let account0 = try KeyDerivation.deriveNostrKey(seed: seed, account: 0)
         let account1 = try KeyDerivation.deriveNostrKey(seed: seed, account: 1)

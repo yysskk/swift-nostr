@@ -17,7 +17,7 @@ extension UnsignedEvent {
 
     /// A relay list metadata event (kind 10002, NIP-65).
     package static func relayListMetadata(pubkey: PublicKey, _ relayList: RelayListMetadata) -> UnsignedEvent {
-        UnsignedEvent(pubkey: pubkey, kind: .relayListMetadata, rawTags: relayList.toTags(), content: "")
+        UnsignedEvent(pubkey: pubkey, kind: .relayListMetadata, tags: relayList.tags, content: "")
     }
 
     /// A DM relay list event (kind 10050, NIP-17), advertising where the author receives
@@ -25,7 +25,7 @@ extension UnsignedEvent {
     package static func directMessageRelayList(
         pubkey: PublicKey, _ relayList: DirectMessageRelayList
     ) -> UnsignedEvent {
-        UnsignedEvent(pubkey: pubkey, kind: .directMessageRelayList, rawTags: relayList.toTags(), content: "")
+        UnsignedEvent(pubkey: pubkey, kind: .directMessageRelayList, tags: relayList.tags, content: "")
     }
 
     /// A report of `target` (kind 1984, NIP-56). The report type rides on the "p" tag;
@@ -71,7 +71,7 @@ extension UnsignedEvent {
         return UnsignedEvent(
             pubkey: pubkey,
             kind: draft ? .longFormDraft : .longFormContent,
-            rawTags: article.toTags(),
+            tags: article.tags,
             content: article.content
         )
     }
@@ -81,7 +81,7 @@ extension UnsignedEvent {
         UnsignedEvent(
             pubkey: pubkey,
             kind: list.kind,
-            rawTags: list.publicItems.map(\.rawArray),
+            tags: list.publicItems,
             content: encryptedContent
         )
     }
@@ -106,7 +106,7 @@ extension UnsignedEvent {
         return UnsignedEvent(
             pubkey: pubkey,
             kind: set.kind,
-            rawTags: tags.map(\.rawArray),
+            tags: tags,
             content: encryptedContent
         )
     }

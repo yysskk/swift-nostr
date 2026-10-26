@@ -24,11 +24,11 @@ struct OpenTimestampsTests {
         #expect(ots.rawData == rawData)
     }
 
-    @Test("OpenTimestamps to tag conversion")
-    func toTag() {
+    @Test("OpenTimestamps tag")
+    func tag() {
         let base64Data = "SGVsbG8gT1RT"
         let ots = OpenTimestamps(base64EncodedOTS: base64Data)
-        let tag = ots.toTag()
+        let tag = ots.tag
 
         #expect(tag == ["ots", base64Data])
     }

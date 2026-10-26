@@ -82,14 +82,16 @@ extension WalletConnection {
         return try decodeResult(content, as: ListTransactionsResult.self).transactions
     }
 
-    /// Returns the wallet balance in millisatoshis (`get_balance`).
-    public func getBalance() async throws -> GetBalanceResult {
+    /// Fetches the wallet balance in millisatoshis (`get_balance`).
+    public func fetchBalance() async throws -> GetBalanceResult {
         let content = try await performSingle(method: .getBalance, params: EmptyParams())
         return try decodeResult(content, as: GetBalanceResult.self)
     }
 
-    /// Returns the wallet node info (`get_info`).
-    public func getInfo() async throws -> GetInfoResult {
+    /// Fetches the wallet's Lightning node info (`get_info`).
+    ///
+    /// Distinct from ``fetchInfo()``, which reads the wallet's kind-13194 info event.
+    public func fetchNodeInfo() async throws -> GetInfoResult {
         let content = try await performSingle(method: .getInfo, params: EmptyParams())
         return try decodeResult(content, as: GetInfoResult.self)
     }

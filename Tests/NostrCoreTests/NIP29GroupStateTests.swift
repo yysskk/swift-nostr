@@ -50,7 +50,7 @@ struct NIP29GroupStateTests {
             additionalTags: [Event.Tag(name: "alt", values: ["pizza group"])]
         )
 
-        let event = try stateEvent(kind: .groupMetadata, tags: metadata.toTags, signer: relay)
+        let event = try stateEvent(kind: .groupMetadata, tags: metadata.tags, signer: relay)
 
         #expect(try Groups.Metadata(event: event) == metadata)
     }
@@ -111,7 +111,7 @@ struct NIP29GroupStateTests {
             flagged.fieldTags.map(\.rawArray)
                 == [["private"], ["closed"], ["restricted"], ["hidden"], ["livekit"]])
         #expect(flagged.fieldTags.allSatisfy { $0.name != "d" })
-        #expect(flagged.toTags.first == .identifier("abcdef"))
+        #expect(flagged.tags.first == .identifier("abcdef"))
     }
 
     @Test("supported_kinds distinguishes absent from empty and drops junk values")
@@ -153,7 +153,7 @@ struct NIP29GroupStateTests {
         let parsed = try Groups.Metadata(event: event)
         #expect(parsed.additionalTags.map(\.rawArray) == [["alt", "pizza group"], ["custom", "a", "b"]])
 
-        let reemitted = try stateEvent(kind: .groupMetadata, tags: parsed.toTags, signer: relay)
+        let reemitted = try stateEvent(kind: .groupMetadata, tags: parsed.tags, signer: relay)
         #expect(try Groups.Metadata(event: reemitted) == parsed)
     }
 
@@ -215,10 +215,10 @@ struct NIP29GroupStateTests {
         )
 
         #expect(
-            list.toTags.map(\.rawArray)
+            list.tags.map(\.rawArray)
                 == [["d", "abcdef"], ["p", ceo.hex, "ceo", "admin"], ["p", greeter.hex]])
 
-        let event = try stateEvent(kind: .groupAdmins, tags: list.toTags, signer: relay)
+        let event = try stateEvent(kind: .groupAdmins, tags: list.tags, signer: relay)
         #expect(try Groups.AdminList(event: event) == list)
     }
 
@@ -228,9 +228,9 @@ struct NIP29GroupStateTests {
         let members = [PublicKey.fixture("first"), PublicKey.fixture("second")]
         let list = Groups.MemberList(groupID: "abcdef", members: members)
 
-        #expect(list.toTags.map(\.rawArray) == [["d", "abcdef"], ["p", members[0].hex], ["p", members[1].hex]])
+        #expect(list.tags.map(\.rawArray) == [["d", "abcdef"], ["p", members[0].hex], ["p", members[1].hex]])
 
-        let event = try stateEvent(kind: .groupMembers, tags: list.toTags, signer: relay)
+        let event = try stateEvent(kind: .groupMembers, tags: list.tags, signer: relay)
         #expect(try Groups.MemberList(event: event) == list)
     }
 
@@ -246,10 +246,10 @@ struct NIP29GroupStateTests {
         )
 
         #expect(
-            list.toTags.map(\.rawArray)
+            list.tags.map(\.rawArray)
                 == [["d", "abcdef"], ["role", "ceo", "Can do everything"], ["role", "member"]])
 
-        let event = try stateEvent(kind: .groupRoles, tags: list.toTags, signer: relay)
+        let event = try stateEvent(kind: .groupRoles, tags: list.tags, signer: relay)
         #expect(try Groups.RoleList(event: event) == list)
     }
 
@@ -265,10 +265,10 @@ struct NIP29GroupStateTests {
         )
 
         #expect(
-            list.toTags.map(\.rawArray)
+            list.tags.map(\.rawArray)
                 == [["d", "abcdef"], ["e", first.hex], ["a", address], ["e", second.hex]])
 
-        let event = try stateEvent(kind: .groupPinList, tags: list.toTags, signer: relay)
+        let event = try stateEvent(kind: .groupPinList, tags: list.tags, signer: relay)
         let parsed = try Groups.PinList(event: event)
         #expect(parsed == list)
         #expect(parsed.items == [.event(id: first), .address(address), .event(id: second)])

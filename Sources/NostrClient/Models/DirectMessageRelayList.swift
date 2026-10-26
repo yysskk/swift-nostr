@@ -19,14 +19,14 @@ public struct DirectMessageRelayList: Codable, Hashable, Sendable {
 
     /// Creates a list from relay URLs. Duplicate URLs are removed (first wins),
     /// matching how a list parsed from an event is normalized — so a list always
-    /// round-trips identically through ``toTags()`` and back.
+    /// round-trips identically through ``tags`` and back.
     public init(relays: [RelayURL]) {
         self.relays = Self.deduplicated(relays)
     }
 
-    /// Converts to the full tag array for a kind 10050 event, with each URL in canonical form.
-    public func toTags() -> [[String]] {
-        relays.map { ["relay", $0.description] }
+    /// The full tag list for a kind 10050 event: one `relay` tag per URL, in canonical form.
+    public var tags: [Tag] {
+        relays.map { .relay($0) }
     }
 
     /// Parses a DM relay list from a kind 10050 event. Returns nil if the event is not kind 10050.
@@ -34,17 +34,17 @@ public struct DirectMessageRelayList: Codable, Hashable, Sendable {
         guard event.kind == .directMessageRelayList else {
             return nil
         }
-        self.init(tags: event.tags)
+        self.init(tags: event.structuredTags)
     }
 
-    /// Parses a DM relay list from raw tags (kind-agnostic). A `relay` tag whose URL is not a
+    /// Parses a DM relay list from tags (kind-agnostic). A `relay` tag whose URL is not a
     /// valid relay URL is skipped, and duplicate relays are removed (first wins).
-    public init(tags: [[String]]) {
+    public init(tags: [Tag]) {
         let urls = tags.compactMap { tag -> RelayURL? in
-            guard tag.count >= 2, tag[0] == "relay" else {
+            guard tag.name == "relay" else {
                 return nil
             }
-            return RelayURL(tag[1])
+            return tag.primaryValue.flatMap(RelayURL.init)
         }
         self.relays = Self.deduplicated(urls)
     }

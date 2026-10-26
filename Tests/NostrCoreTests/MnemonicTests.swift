@@ -34,6 +34,48 @@ struct MnemonicTests {
         #expect(keyPair.publicKey.hex == expectedPublicKey)
     }
 
+    // MARK: - BIP-39 Test Vectors
+
+    @Test(
+        "init(entropy:) matches the BIP-39 reference vectors",
+        arguments: [
+            (
+                "00000000000000000000000000000000",
+                "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
+            ),
+            (
+                "7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f7f",
+                "legal winner thank year wave sausage worth useful legal winner thank yellow"
+            ),
+            (
+                "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+                "zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo zoo vote"
+            ),
+        ]
+    )
+    func entropyVectors(entropyHex: String, phrase: String) throws {
+        let entropy = try #require(Data(hexString: entropyHex))
+
+        #expect(try Mnemonic(entropy: entropy).phrase == phrase)
+    }
+
+    @Test("seed(passphrase:) matches the BIP-39 reference vector")
+    func seedVector() throws {
+        let mnemonic = try Mnemonic(entropy: Data(count: 16))
+
+        #expect(
+            mnemonic.seed(passphrase: "TREZOR").hexEncodedString()
+                == "c55257c360c07c72029aebc1b53c05ed0362ada38ead3e3e9efa3708e53495531f09a6987599d18264c1e1c92f2cf141630c7a3c4ab7c81b2f001698e7463b04"
+        )
+    }
+
+    @Test("init(entropy:) rejects an unsupported entropy length")
+    func entropyRejectsInvalidLength() {
+        #expect(throws: NostrError.invalidMnemonic) {
+            _ = try Mnemonic(entropy: Data(count: 15))
+        }
+    }
+
     // MARK: - Mnemonic Generation
 
     @Test("Generate 12 word mnemonic")

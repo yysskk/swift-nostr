@@ -484,7 +484,7 @@ NIP-01 Subscription Filter (struct: Codable, Sendable, Hashable).
 ```swift
 var filter = Filter()
 filter.addTagQuery("t", values: ["nostr", "bitcoin"])  // #t tag
-let values = filter.getTagQuery("t")
+let values = filter.tagQuery("t")
 ```
 
 ### Convenience Builders
@@ -818,7 +818,8 @@ BIP-39 mnemonic seed phrase for NIP-06 key derivation (struct: Sendable).
 ```swift
 let mnemonic = try Mnemonic.generate(wordCount: 12)  // 12, 15, 18, 21, or 24
 let mnemonic = try Mnemonic(phrase: "word1 word2 ...")
-let seed = try mnemonic.toSeed(passphrase: "optional")  // 64-byte seed
+let mnemonic = try Mnemonic(entropy: entropy)       // 16-32 bytes of BIP-39 entropy
+let seed = mnemonic.seed(passphrase: "optional")  // 64-byte seed
 ```
 
 ## KeyDerivation
@@ -948,15 +949,15 @@ Contact information for NIP-02 (struct: Codable, Hashable, Sendable).
 ### Properties
 
 - `pubkey: PublicKey` -- public key
-- `relayURL: RelayURL?` -- recommended relay URL (`fromTag` reads a malformed hint as nil)
+- `relayURL: RelayURL?` -- recommended relay URL (`init(tag:)` reads a malformed hint as nil)
 - `petname: String?` -- local nickname
 
 ### Usage
 
 ```swift
 let contact = Contact(pubkey: try PublicKey(npub: "npub1..."), relayURL: relay, petname: "alice")
-let tag = contact.toTag()           // ["p", pubkey hex, relayURL, petname]
-let parsed = Contact.fromTag(tag)   // nil unless a "p" tag with a canonical hex key
+let tag = contact.tag               // ["p", pubkey hex, relayURL, petname]
+let parsed = Contact(tag: tag)      // nil unless a "p" tag with a canonical hex key
 
 // Extract contacts from kind-3 event; "p" tags with a malformed key are skipped
 let contacts = event.contacts       // [Contact]?
@@ -1064,13 +1065,13 @@ version. Metadata rides on tags; the Markdown body is the event content.
 - `title: String?` / `summary: String?` / `imageURL: String?` -- `title` / `summary` / `image` tags
 - `publishedAt: Timestamp?` -- `published_at` tag; auto-filled with now on first publish, preserved on edits
 - `hashtags: [String]` -- `t` tags
-- `additionalTags: [[String]]` -- tags the model does not interpret, preserved losslessly across edits
+- `additionalTags: [Tag]` -- tags the model does not interpret, preserved losslessly across edits
 - `content: String` -- the Markdown body
 
 ### Methods
 
 - `init(event:)` -- parse a kind 30023/30024 event; nil for any other kind
-- `toTags() -> [[String]]` -- the full tag array (d, title, summary, image, published_at, t…, then additionalTags)
+- `tags: [Tag]` -- the full tag list (d, title, summary, image, published_at, t…, then additionalTags)
 - `naddr(author:relays:) throws -> NAddr` -- the `naddr` coordinate for a `PublicKey` author (always kind 30023; drafts are not addressed by naddr)
 - `Event.longFormContent: LongFormContent?` -- the article carried by an event, if any
 
@@ -1159,7 +1160,7 @@ throw `Groups.ValidationError` (`invalidEventKind`, `missingGroupID`, `unexpecte
 let meta = try Groups.Metadata(event: e39000, relayPubkey: relayPubkey)
 // meta.groupID, .name, .picture, .banner, .about, .isPrivate, .isRestricted, .isHidden,
 // .isClosed, .isLiveKitEnabled, .supportedKinds, .parentGroupID, .childGroupIDs,
-// .additionalTags (uninterpreted tags, lossless), .toTags / .fieldTags for re-emission
+// .additionalTags (uninterpreted tags, lossless), .tags / .fieldTags for re-emission
 // (fieldTags is exactly the kind-9002 edit-metadata tag layout)
 
 let admins = try Groups.AdminList(event: e39001)   // .admins: [Groups.Admin] (PublicKey + roles)
@@ -1316,7 +1317,7 @@ OpenTimestamps attestation support for NIP-03 (struct: Sendable, Hashable).
 ```swift
 let ots = OpenTimestamps(base64EncodedOTS: "...")
 let ots = OpenTimestamps(otsFileData: data)
-let tag = ots.toTag()               // ["ots", base64data]
+let tag = ots.tag                   // ["ots", base64data]
 let raw = ots.rawData               // Data?
 
 // Event extensions

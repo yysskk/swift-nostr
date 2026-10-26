@@ -66,7 +66,7 @@ public struct SealedMessage: Sendable {
         using senderKeyPair: KeyPair,
         nonce: Data
     ) throws -> SealedMessage {
-        let conversationKey = try getConversationKey(
+        let conversationKey = try Self.conversationKey(
             senderPrivateKey: senderKeyPair.privateKey,
             recipientPubkey: recipientPubkey.data
         )
@@ -166,7 +166,7 @@ public struct SealedMessage: Sendable {
     ///   - recipientKeyPair: The recipient's key pair
     /// - Returns: The decrypted plaintext message
     public func open(from senderPubkey: PublicKey, using recipientKeyPair: KeyPair) throws -> String {
-        let conversationKey = try Self.getConversationKey(
+        let conversationKey = try Self.conversationKey(
             senderPrivateKey: recipientKeyPair.privateKey,
             recipientPubkey: senderPubkey.data
         )
@@ -277,12 +277,12 @@ public struct SealedMessage: Sendable {
         guard let publicKey = Data(hexString: publicKeyHex) else {
             throw NostrError.invalidPublicKey
         }
-        let conversationKey = try getConversationKey(senderPrivateKey: privateKey, recipientPubkey: publicKey)
+        let conversationKey = try Self.conversationKey(senderPrivateKey: privateKey, recipientPubkey: publicKey)
         return conversationKey.hexEncodedString()
     }
 
     /// Computes the conversation key using ECDH + HKDF
-    private static func getConversationKey(senderPrivateKey: Data, recipientPubkey: Data) throws -> Data {
+    private static func conversationKey(senderPrivateKey: Data, recipientPubkey: Data) throws -> Data {
         // Get the private key for ECDH (use KeyAgreement, not Signing)
         let privateKey = try P256K.KeyAgreement.PrivateKey(dataRepresentation: senderPrivateKey)
 

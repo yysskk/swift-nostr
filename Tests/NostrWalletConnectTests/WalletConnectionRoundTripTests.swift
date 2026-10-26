@@ -82,7 +82,7 @@ struct WalletConnectionRoundTripTests {
     func concurrentCorrelation() async throws {
         let (connection, transport, client, wallet) = try makeConnection()
 
-        async let balance = connection.getBalance()
+        async let balance = connection.fetchBalance()
         async let payment = connection.payInvoice("lnbc1")
 
         let requests = try await NWCFixtures.waitForSentEvents(transport, count: 2)
@@ -109,7 +109,7 @@ struct WalletConnectionRoundTripTests {
     func startsOnce() async throws {
         let (connection, transport, client, wallet) = try makeConnection()
 
-        async let balance = connection.getBalance()
+        async let balance = connection.fetchBalance()
         async let payment = connection.payInvoice("lnbc1")
 
         let requests = try await NWCFixtures.waitForSentEvents(transport, count: 2)
@@ -139,7 +139,7 @@ struct WalletConnectionRoundTripTests {
         // Hold connect() open so both commands are in flight while the connection is still starting.
         await transport.closeGate()
 
-        async let balance = connection.getBalance()
+        async let balance = connection.fetchBalance()
         async let payment = connection.payInvoice("lnbc1")
 
         try await NWCFixtures.waitForConnectAttempts(transport, count: 1)
