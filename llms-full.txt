@@ -668,7 +668,12 @@ CustomStringConvertible). `rawValue: Int64` is the number exactly as on the wire
 re-encoding never changes an event or its id; the JSON encoding is a bare integer and decoding a
 non-integer fails. `description` is the decimal seconds. Used by `Event.createdAt`,
 `UnsignedEvent.createdAt`, `Filter.since`/`until`, `Tag.expiration`, `Event.expiration`,
-`isExpired(asOf:)`, and the `createdAt:` parameters of `Groups` and `HTTPAuth` (default `.now`).
+`isExpired(asOf:)`, the `createdAt:` parameters of `Groups` and `HTTPAuth` (default `.now`),
+`DirectMessage`/`DirectMessageReaction`/`DirectMessageFile` `createdAt` and `expiresAt`, the
+`expiration:` parameters of `client.messages`, `DirectMessageBuilder`, and `GiftWrap.wrap`,
+`LongFormContent.publishedAt`, `client.groups.timeline(_:kinds:since:limit:)`,
+`Bolt11Invoice.timestamp`, and the NIP-47 `WalletConnectTransaction` times and
+`ListTransactionsParams` `from`/`until`.
 
 ```swift
 let ts = Timestamp(rawValue: 1_700_000_000)  // kept as is, any Int64
@@ -890,13 +895,14 @@ NIP-17 Private Direct Message (struct: Sendable, Identifiable, Hashable).
 - `senderPubkey: PublicKey` -- sender's public key
 - `recipientPubkey: PublicKey` -- recipient's public key (a rumor whose `p` tag is not a canonical hex key fails to parse)
 - `content: String` -- message content
-- `createdAt: Date` -- creation timestamp
+- `createdAt: Timestamp` -- the rumor's `created_at` (the gift wrap's own is randomized)
 - `subject: String?` -- optional conversation subject
 - `replyTo: EventID?` -- optional id of the event replied to (nil when the reply marker's id is malformed)
+- `expiresAt: Timestamp?` -- the NIP-40 expiration on the gift wrap, if any
 
 `DirectMessageReaction` has `rumorID`, `senderPubkey`, `messageID: EventID`, and
 `messageAuthorPubkey: PublicKey`; `DirectMessageFile` has `rumorID`, `senderPubkey`, and
-`recipientPubkey`. A reaction whose `e` or `p` tag is missing or malformed fails to parse.
+`recipientPubkey`; both also have `createdAt: Timestamp` and `expiresAt: Timestamp?`. A reaction whose `e` or `p` tag is missing or malformed fails to parse.
 
 ## DirectMessageBuilder
 
@@ -912,7 +918,8 @@ let result = try await builder.createMessageWithSelfCopy(
     content: "Hello!",
     to: recipientPubkey,
     subject: "Greetings",
-    replyTo: nil
+    replyTo: nil,
+    expiration: Timestamp(Date().addingTimeInterval(3600))  // optional NIP-40 expiration on both wraps
 )
 
 // Group message (one gift wrap per recipient + sender copy)
@@ -1055,7 +1062,7 @@ version. Metadata rides on tags; the Markdown body is the event content.
 
 - `identifier: String` -- the `d` tag value identifying the article
 - `title: String?` / `summary: String?` / `imageURL: String?` -- `title` / `summary` / `image` tags
-- `publishedAt: Date?` -- `published_at` tag (Unix seconds); auto-filled with now on first publish, preserved on edits
+- `publishedAt: Timestamp?` -- `published_at` tag; auto-filled with now on first publish, preserved on edits
 - `hashtags: [String]` -- `t` tags
 - `additionalTags: [[String]]` -- tags the model does not interpret, preserved losslessly across edits
 - `content: String` -- the Markdown body

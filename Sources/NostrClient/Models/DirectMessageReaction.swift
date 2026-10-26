@@ -26,11 +26,12 @@ public struct DirectMessageReaction: Sendable, Identifiable, Hashable {
     /// The reaction content — typically "+" (like), "-" (dislike), or an emoji.
     public let content: String
 
-    /// When the reaction was created.
-    public let createdAt: Date
+    /// When the reaction was created: the rumor's `created_at`.
+    public let createdAt: Timestamp
 
-    /// Optional NIP-40 expiration carried on the gift wrap.
-    public let expiresAt: Date?
+    /// The NIP-40 expiration carried on the gift wrap, if any. After this time relays stop serving
+    /// the event.
+    public let expiresAt: Timestamp?
 
     /// Creates a reaction from its parsed parts.
     public init(
@@ -39,8 +40,8 @@ public struct DirectMessageReaction: Sendable, Identifiable, Hashable {
         messageID: EventID,
         messageAuthorPubkey: PublicKey,
         content: String,
-        createdAt: Date,
-        expiresAt: Date? = nil
+        createdAt: Timestamp,
+        expiresAt: Timestamp? = nil
     ) {
         self.rumorID = rumorID
         self.senderPubkey = senderPubkey

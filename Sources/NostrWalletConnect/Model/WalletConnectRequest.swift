@@ -1,4 +1,5 @@
 import Foundation
+import NostrCore
 
 /// The JSON body of a NIP-47 request event (kind 23194): `{"method": ..., "params": {...}}`.
 ///
@@ -212,10 +213,10 @@ public enum TransactionType: String, Codable, Sendable, Hashable {
 
 /// Parameters for `list_transactions`.
 public struct ListTransactionsParams: Codable, Sendable, Hashable {
-    /// Only include transactions at or after this Unix timestamp (seconds).
-    public let from: Int64?
-    /// Only include transactions at or before this Unix timestamp (seconds).
-    public let until: Int64?
+    /// Only include transactions created at or after this time.
+    public let from: Timestamp?
+    /// Only include transactions created at or before this time.
+    public let until: Timestamp?
     /// The maximum number of transactions to return.
     public let limit: Int?
     /// The number of transactions to skip.
@@ -225,8 +226,11 @@ public struct ListTransactionsParams: Codable, Sendable, Hashable {
     /// Filter by transaction direction.
     public let type: TransactionType?
 
+    /// Creates `list_transactions` parameters; nil leaves a criterion to the wallet's default.
+    ///
+    /// `from` and `until` encode as integer Unix seconds.
     public init(
-        from: Int64? = nil, until: Int64? = nil, limit: Int? = nil, offset: Int? = nil,
+        from: Timestamp? = nil, until: Timestamp? = nil, limit: Int? = nil, offset: Int? = nil,
         unpaid: Bool? = nil, type: TransactionType? = nil
     ) {
         self.from = from

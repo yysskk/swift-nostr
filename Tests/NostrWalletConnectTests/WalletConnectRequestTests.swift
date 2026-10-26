@@ -104,6 +104,26 @@ struct WalletConnectRequestTests {
         #expect(params["type"] == .string("incoming"))
     }
 
+    @Test("list_transactions encodes from and until as integer Unix seconds")
+    func listTransactionsTimeRange() throws {
+        let root = try wire(
+            WalletConnectRequest(
+                method: .listTransactions,
+                params: ListTransactionsParams(
+                    from: Timestamp(rawValue: 1_700_000_000), until: Timestamp(rawValue: 1_700_086_400))))
+        let params = try params(root)
+        #expect(params["from"] == .int(1_700_000_000))
+        #expect(params["until"] == .int(1_700_086_400))
+    }
+
+    @Test("list_transactions omits an unset time range")
+    func listTransactionsOmitsTimeRange() throws {
+        let params = try params(
+            wire(WalletConnectRequest(method: .listTransactions, params: ListTransactionsParams())))
+        #expect(params["from"] == nil)
+        #expect(params["until"] == nil)
+    }
+
     @Test("metadata keys are preserved verbatim (no snake_case mangling)")
     func metadataKeysPreserved() throws {
         let metadata: [String: JSONValue] = [

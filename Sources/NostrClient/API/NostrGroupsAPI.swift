@@ -240,21 +240,21 @@ public struct NostrGroupsAPI: NostrGroupManaging {
     /// - Parameters:
     ///   - group: The group to follow; its relay is added to the pool and connected on demand.
     ///   - kinds: The content kinds to receive; nil (the default) receives all kinds.
-    ///   - since: Only events created at or after this moment, if given.
+    ///   - since: Only events whose `created_at` is at or after this time, if given.
     ///   - limit: The maximum number of stored events the relay should send, if given.
     /// - Returns: The subscription as an async sequence of relay-aware events.
     /// - Throws: Anything the connection or subscribe throws.
     public func timeline(
         _ group: GroupReference,
         kinds: [Event.Kind]? = nil,
-        since: Date? = nil,
+        since: Timestamp? = nil,
         limit: Int? = nil
     ) async throws -> SubscriptionSequence {
         let relayURL = try await ensureRelay(group)
         let filter = Filter.groupTimeline(
             groupID: group.id,
             kinds: kinds,
-            since: since.map(Timestamp.init),
+            since: since,
             limit: limit
         )
         return try await client.subscribe(filters: [filter], toURLs: [relayURL])

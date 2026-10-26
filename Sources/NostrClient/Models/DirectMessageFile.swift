@@ -48,11 +48,12 @@ public struct DirectMessageFile: Sendable, Identifiable, Hashable {
     /// Blurhash placeholder for progressive display (`blurhash`).
     public let blurhash: String?
 
-    /// When the message was created.
-    public let createdAt: Date
+    /// When the message was created: the rumor's `created_at`.
+    public let createdAt: Timestamp
 
-    /// Optional NIP-40 expiration carried on the gift wrap.
-    public let expiresAt: Date?
+    /// The NIP-40 expiration carried on the gift wrap, if any. After this time relays stop serving
+    /// the event.
+    public let expiresAt: Timestamp?
 
     /// Creates a file message from its parsed parts.
     public init(
@@ -68,8 +69,8 @@ public struct DirectMessageFile: Sendable, Identifiable, Hashable {
         size: Int? = nil,
         dimensions: String? = nil,
         blurhash: String? = nil,
-        createdAt: Date,
-        expiresAt: Date? = nil
+        createdAt: Timestamp,
+        expiresAt: Timestamp? = nil
     ) {
         self.rumorID = rumorID
         self.senderPubkey = senderPubkey

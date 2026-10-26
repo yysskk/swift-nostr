@@ -162,13 +162,13 @@ struct NIP25DirectMessageReactionTests {
         let sender = try KeyPair()
         let recipient = try KeyPair()
         let builder = DirectMessageBuilder(signer: EventSigner(keyPair: sender))
-        let expiry = Date(timeIntervalSince1970: 1_700_000_000)
+        let expiry = Timestamp(rawValue: 1_700_000_000)
 
         let result = try await builder.createReactionWithSelfCopy(
             reaction: "+", to: messageID, author: sender.publicKey,
             recipientPubkey: recipient.publicKey, expiration: expiry)
 
-        #expect(result.recipientGiftWrap.expiration == Timestamp(expiry))
+        #expect(result.recipientGiftWrap.expiration == expiry)
         let parsed = try await DirectMessageParser(signer: EventSigner(keyPair: recipient)).parseReaction(
             result.recipientGiftWrap)
         #expect(parsed.expiresAt == expiry)
@@ -183,7 +183,7 @@ struct NIP25DirectMessageReactionTests {
         let myPubkey = try #require(await client.identity.publicKey)
         let message = DirectMessage(
             rumorID: messageID, senderPubkey: author.publicKey,
-            recipientPubkey: myPubkey, content: "hi", createdAt: Date())
+            recipientPubkey: myPubkey, content: "hi", createdAt: .now)
 
         // Confirmed-absent DM relay lists: both copies fall back to the pool's relay
         // without a discovery fetch.

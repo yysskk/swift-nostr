@@ -21,12 +21,12 @@ struct RelayListStoreTests {
         let listB = RelayListMetadata(entries: [RelayListEntry(url: RelayURL("wss://b.example.com")!)])
         let listC = RelayListMetadata(entries: [RelayListEntry(url: RelayURL("wss://c.example.com")!)])
 
-        await store.store(listA, createdAt: 100, for: pubkey)
-        await store.store(listB, createdAt: 50, for: pubkey)  // older → ignored
+        await store.store(listA, createdAt: Timestamp(rawValue: 100), for: pubkey)
+        await store.store(listB, createdAt: Timestamp(rawValue: 50), for: pubkey)  // older → ignored
         var cached = await store.cachedList(for: pubkey)
         #expect(cached?.entries.first?.url == RelayURL("wss://a.example.com"))
 
-        await store.store(listC, createdAt: 200, for: pubkey)  // newer → wins
+        await store.store(listC, createdAt: Timestamp(rawValue: 200), for: pubkey)  // newer → wins
         cached = await store.cachedList(for: pubkey)
         #expect(cached?.entries.first?.url == RelayURL("wss://c.example.com"))
     }
@@ -38,12 +38,12 @@ struct RelayListStoreTests {
 
         await store.store(
             RelayListMetadata(entries: [RelayListEntry(url: RelayURL("wss://a.example.com")!)]),
-            createdAt: 100,
+            createdAt: Timestamp(rawValue: 100),
             for: pubkey
         )
         await store.store(
             RelayListMetadata(entries: [RelayListEntry(url: RelayURL("wss://b.example.com")!)]),
-            createdAt: 100,
+            createdAt: Timestamp(rawValue: 100),
             for: pubkey
         )
 
@@ -61,7 +61,7 @@ struct RelayListStoreTests {
             RelayListEntry(url: RelayURL("wss://read.example.com")!, usage: .read),
             RelayListEntry(url: RelayURL("wss://write.example.com")!, usage: .write),
         ])
-        await store.store(list, createdAt: 1, for: pubkey)
+        await store.store(list, createdAt: Timestamp(rawValue: 1), for: pubkey)
 
         let writeURLs = await store.writeRelayURLs(for: pubkey)
         let readURLs = await store.readRelayURLs(for: pubkey)

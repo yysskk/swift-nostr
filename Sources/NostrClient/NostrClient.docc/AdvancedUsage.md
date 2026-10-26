@@ -116,7 +116,7 @@ and 7.
 
 ### Disappearing Messages (NIP-40)
 
-Pass an `expiration` to attach a NIP-40 expiration timestamp to a message's gift wraps. Relays stop
+Pass an `expiration` ``Timestamp`` to attach a NIP-40 expiration to a message's gift wraps. Relays stop
 serving the event after that time, and the received ``DirectMessage`` exposes ``DirectMessage/expiresAt``
 so clients can hide it once it lapses.
 
@@ -124,7 +124,7 @@ so clients can hide it once it lapses.
 try await client.messages.send(
     "This self-destructs in an hour",
     to: recipient,
-    expiration: Date().addingTimeInterval(3600)
+    expiration: Timestamp(Date().addingTimeInterval(3600))
 )
 ```
 
@@ -653,7 +653,7 @@ let bolt11 = try await pay.fetchInvoice(
     amountMillisats: 21_000, zapRequest: zapRequest, lnurl: LNURL.encode(serviceURL))
 // …pay `bolt11` with your wallet. You can also decode it on its own (the initializer is failable):
 if let invoice = Bolt11Invoice(bolt11) {
-    // invoice.amountMillisats, .paymentHash, .descriptionHash, .expirySeconds
+    // invoice.amountMillisats, .timestamp (a Timestamp), .paymentHash, .descriptionHash, .expirySeconds
 }
 
 // 4. When the kind-9735 zap receipt arrives over relays, verify it is authentic.

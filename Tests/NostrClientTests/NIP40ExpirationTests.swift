@@ -67,7 +67,7 @@ struct NIP40ExpirationTests {
     func dmGiftWrapCarriesExpiration() async throws {
         let sender = try KeyPair()
         let recipient = try KeyPair()
-        let expiry = Date(timeIntervalSince1970: 1_700_000_000)
+        let expiry = Timestamp(rawValue: 1_700_000_000)
 
         let builder = DirectMessageBuilder(signer: EventSigner(keyPair: sender))
         let result = try await builder.createMessageWithSelfCopy(
@@ -75,8 +75,8 @@ struct NIP40ExpirationTests {
 
         // The public gift wraps carry the expiration; the encrypted rumor stays untouched
         // so the plaintext leaks nothing.
-        #expect(result.recipientGiftWrap.expiration == Timestamp(expiry))
-        #expect(result.selfGiftWrap.expiration == Timestamp(expiry))
+        #expect(result.recipientGiftWrap.expiration == expiry)
+        #expect(result.selfGiftWrap.expiration == expiry)
         #expect(result.rumor.expiration == nil)
     }
 
@@ -84,7 +84,7 @@ struct NIP40ExpirationTests {
     func parsedDMExposesExpiration() async throws {
         let sender = try KeyPair()
         let recipient = try KeyPair()
-        let expiry = Date(timeIntervalSince1970: 1_700_000_000)
+        let expiry = Timestamp(rawValue: 1_700_000_000)
 
         let builder = DirectMessageBuilder(signer: EventSigner(keyPair: sender))
         let result = try await builder.createMessageWithSelfCopy(
@@ -94,6 +94,24 @@ struct NIP40ExpirationTests {
         let message = try await parser.parse(result.recipientGiftWrap)
         #expect(message.expiresAt == expiry)
         #expect(message.content == "self-destructs")
+    }
+
+    @Test("a received DM keeps the rumor's created_at and an expiration beyond Date's range exactly")
+    func parsedDMKeepsTimestampsExactly() async throws {
+        let sender = try KeyPair()
+        let recipient = try KeyPair()
+        let expiry = Timestamp(rawValue: .max)
+
+        let builder = DirectMessageBuilder(signer: EventSigner(keyPair: sender))
+        let result = try await builder.createMessageWithSelfCopy(
+            content: "far future", to: recipient.publicKey, expiration: expiry)
+        #expect(result.recipientGiftWrap.firstTagValue(named: "expiration") == "9223372036854775807")
+
+        let parser = DirectMessageParser(signer: EventSigner(keyPair: recipient))
+        let message = try await parser.parse(result.recipientGiftWrap)
+        #expect(message.expiresAt == expiry)
+        // The gift wrap's own created_at is randomized; the message reports the rumor's.
+        #expect(message.createdAt == result.rumor.createdAt)
     }
 
     @Test("a normal DM has no expiration")

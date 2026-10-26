@@ -21,7 +21,7 @@ actor DirectMessageRelayListStore {
     /// An equal `createdAt` keeps the existing entry.
     /// - Returns: The effective (possibly pre-existing) list.
     @discardableResult
-    func store(_ list: DirectMessageRelayList, createdAt: Int64, for pubkey: PublicKey) -> DirectMessageRelayList {
+    func store(_ list: DirectMessageRelayList, createdAt: Timestamp, for pubkey: PublicKey) -> DirectMessageRelayList {
         // A real list supersedes any earlier "no list" result for this pubkey.
         resolvedWithoutList.remove(pubkey)
         return cache.store(list, createdAt: createdAt, for: pubkey)
@@ -47,7 +47,7 @@ actor DirectMessageRelayListStore {
         guard let list = event.directMessageRelayList else {
             return nil
         }
-        return store(list, createdAt: event.createdAt.rawValue, for: event.pubkey)
+        return store(list, createdAt: event.createdAt, for: event.pubkey)
     }
 
     /// Returns the cached DM relay list for a pubkey, if any.

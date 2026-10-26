@@ -33,7 +33,7 @@ public struct DirectMessageBuilder: Sendable {
         to recipientPubkey: PublicKey,
         subject: String? = nil,
         replyTo: EventID? = nil,
-        expiration: Date? = nil
+        expiration: Timestamp? = nil
     ) async throws -> SendDirectMessageResult {
         let senderPubkey = try await signer.publicKey
         let rumor = try makeRumor(
@@ -63,7 +63,7 @@ public struct DirectMessageBuilder: Sendable {
         to messageID: EventID,
         author: PublicKey,
         recipientPubkey: PublicKey,
-        expiration: Date? = nil
+        expiration: Timestamp? = nil
     ) async throws -> SendDirectMessageResult {
         let senderPubkey = try await signer.publicKey
         let rumor = try makeReactionRumor(
@@ -95,7 +95,7 @@ public struct DirectMessageBuilder: Sendable {
         dimensions: String? = nil,
         blurhash: String? = nil,
         to recipientPubkey: PublicKey,
-        expiration: Date? = nil
+        expiration: Timestamp? = nil
     ) async throws -> SendDirectMessageResult {
         let senderPubkey = try await signer.publicKey
         let rumor = try makeFileRumor(
@@ -162,7 +162,7 @@ public struct DirectMessageBuilder: Sendable {
         rumor: Event,
         senderPubkey: PublicKey,
         to recipientPubkey: PublicKey,
-        expiration: Date?
+        expiration: Timestamp?
     ) async throws -> SendDirectMessageResult {
         async let recipientGiftWrap = GiftWrap.wrap(
             event: rumor,
