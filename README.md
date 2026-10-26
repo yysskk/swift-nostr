@@ -89,6 +89,27 @@ ChatViewModel(messages: client.messages)
 
 A protocol's requirements are only its primitives; the conveniences and their default arguments come from protocol extensions, so a stub implements just the primitives and a call through `any NostrMessaging` is as short as one through `client.messages`.
 
+#### Extending the client
+
+The capability protocols are also the extension points. A helper added to a protocol in an extension works on `client.events`, on any conformer, and on stubs alike; a namespace of your own is a `Sendable` struct composing the capabilities it needs, exposed through an extension on `NostrClient` and testable against stubs. [Extending the Client](https://yysskk.github.io/swift-nostr/documentation/nostrclient/extendingtheclient) walks through both.
+
+```swift
+extension NostrEventPublishing {
+    func publishStatus(_ status: String) async throws -> PublishedEvent {  // NIP-38
+        try await publish(EventTemplate(kind: Event.Kind(rawValue: 30315), tags: [.identifier("general")], content: status))
+    }
+}
+
+struct ZapsAPI: Sendable {
+    let events: any NostrEventFetching
+    let identity: any NostrIdentityProviding
+}
+
+extension NostrClient {
+    nonisolated var zaps: ZapsAPI { ZapsAPI(events: events, identity: identity) }
+}
+```
+
 ## Quick Start
 
 ### Generate keys

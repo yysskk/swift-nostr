@@ -56,7 +56,8 @@ ChatViewModel(messages: client.messages)
 
 A protocol's requirements are only its primitives; the conveniences and their default arguments
 come from protocol extensions, so a stub implements just the primitives and a call through
-`any NostrMessaging` is as short as one through `client.messages`.
+`any NostrMessaging` is as short as one through `client.messages`. The same protocols are how you
+add NIP helpers and namespaces of your own; see <doc:ExtendingTheClient>.
 
 `NostrClient` itself exposes only its initializers and these namespaces.
 
@@ -66,6 +67,7 @@ come from protocol extensions, so a stub implements just the primitives and a ca
 
 - <doc:GettingStarted>
 - <doc:AdvancedUsage>
+- <doc:ExtendingTheClient>
 - ``NostrClient/NostrClient``
 
 > The event model, keys, signing, encryption, encoding, relay protocol messages, and a single

@@ -75,6 +75,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and content the `DirectMessageBuilder` and `client.messages` sends always have, now from one source.
 - **`DirectMessagePayloadSequence(subscription:parser:)` is public**, so a stub `NostrMessaging`
   conformer can return a payload stream that opens its own subscription's gift wraps.
+- **The capability protocols are the documented way to extend `NostrClient`**: a new "Extending the
+  Client" article covers adding a NIP helper in an extension of a capability protocol, which then
+  works on the client's namespace, on any conformer, and on stubs, and adding a namespace of your
+  own as a `Sendable` struct composing the capabilities it needs, exposed by a `nonisolated`
+  accessor in an `extension NostrClient` and tested against stubs that implement only the
+  primitives. Both need only the existing public API, which a test importing `NostrClient` without
+  `@testable` now exercises.
 
 ### Changed
 
