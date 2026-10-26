@@ -34,8 +34,9 @@ struct NIP51ListTests {
     @Test("address tag with relay")
     func addressTagWithRelay() {
         #expect(
-            Event.Tag.address(kind: .longFormContent, pubkey: .fixture("pk"), identifier: "d", relayURL: "wss://r").rawArray
-                == ["a", "30023:\(PublicKey.fixture("pk").hex):d", "wss://r"]
+            Event.Tag.address(
+                kind: .longFormContent, pubkey: .fixture("pk"), identifier: "d", relayURL: "wss://r"
+            ).rawArray == ["a", "30023:\(PublicKey.fixture("pk").hex):d", "wss://r"]
         )
     }
 

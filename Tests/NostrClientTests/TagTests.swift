@@ -83,7 +83,8 @@ struct TagTests {
             Contact(pubkey: pk1.hex, relayURL: "wss://r.example", petname: "alice"),
         ]
         for contact in contacts {
-            let tag = Event.Tag.pubkey(try PublicKey(hex: contact.pubkey), relayURL: contact.relayURL, petname: contact.petname)
+            let tag = Event.Tag.pubkey(
+                try PublicKey(hex: contact.pubkey), relayURL: contact.relayURL, petname: contact.petname)
             #expect(tag.rawArray == contact.toTag())
         }
     }

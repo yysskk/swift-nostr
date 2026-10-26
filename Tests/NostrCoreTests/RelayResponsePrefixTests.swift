@@ -92,7 +92,8 @@ struct RelayMessageResponsePrefixTests {
 
     @Test("OK message without a prefix has none")
     func okWithoutPrefix() throws {
-        let message = try RelayMessage.parse(#"["OK","abababababababababababababababababababababababababababababababab",true,""]"#)
+        let eventID = String(repeating: "ab", count: 32)
+        let message = try RelayMessage.parse(#"["OK","\#(eventID)",true,""]"#)
         #expect(message.responsePrefix == nil)
     }
 
