@@ -19,7 +19,7 @@ struct EventIDTests {
 
     @Test("uppercase hex is rejected")
     func uppercaseHexIsRejected() {
-        #expect(throws: NostrError.invalidEventID) {
+        #expect(throws: EventID.Error.invalidHex) {
             try EventID(hex: hex.uppercased())
         }
     }
@@ -29,7 +29,7 @@ struct EventIDTests {
         arguments: ["", "ab", String(repeating: "ab", count: 31), String(repeating: "ab", count: 33)]
     )
     func wrongLengthHexIsRejected(hex: String) {
-        #expect(throws: NostrError.invalidEventID) {
+        #expect(throws: EventID.Error.invalidHex) {
             try EventID(hex: hex)
         }
     }
@@ -39,7 +39,7 @@ struct EventIDTests {
         arguments: [String(repeating: "zz", count: 32), "-" + String(repeating: "0", count: 63)]
     )
     func nonHexIsRejected(hex: String) {
-        #expect(throws: NostrError.invalidEventID) {
+        #expect(throws: EventID.Error.invalidHex) {
             try EventID(hex: hex)
         }
     }
@@ -50,7 +50,7 @@ struct EventIDTests {
 
         #expect(try EventID(data: data).data == data)
         for count in [0, 31, 33] {
-            #expect(throws: NostrError.invalidEventID) {
+            #expect(throws: EventID.Error.invalidLength(count)) {
                 try EventID(data: Data(repeating: 1, count: count))
             }
         }
@@ -67,10 +67,20 @@ struct EventIDTests {
         let npub = try PublicKey(hex: hex).npub
         let corrupted = String(note.dropLast()) + (note.hasSuffix("q") ? "p" : "q")
 
-        for string in [npub, corrupted, "", "note1"] {
-            #expect(throws: NostrError.invalidEventID) {
+        let cases: [(String, EventID.Error)] = [
+            (npub, .unexpectedPrefix("npub")),
+            (corrupted, .invalidBech32(.invalidChecksum)),
+            ("", .invalidBech32(.missingSeparator)),
+            ("note1", .invalidBech32(.invalidLength)),
+        ]
+        for (string, expected) in cases {
+            #expect(throws: expected) {
                 try EventID(note: string)
             }
+        }
+        let short = try Bech32.encode(hrp: "note", data: Data(repeating: 1, count: 31))
+        #expect(throws: EventID.Error.invalidLength(31)) {
+            try EventID(note: short)
         }
     }
 

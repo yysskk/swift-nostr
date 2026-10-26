@@ -124,7 +124,7 @@ struct NIP57ZapRequestTests {
     @Test("lnurl encodes and decodes round-trip")
     func lnurlRoundTrip() throws {
         let url = URL(string: "https://example.com/.well-known/lnurlp/alice")!
-        let encoded = try LNURL.encode(url)
+        let encoded = LNURL.encode(url)
         #expect(encoded.hasPrefix("lnurl1"))
         #expect(try LNURL.decode(encoded) == url)
     }

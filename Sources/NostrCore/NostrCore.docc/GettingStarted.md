@@ -21,7 +21,7 @@ If you need the higher-level client (relay pool, gossip routing, direct messages
 import NostrCore
 
 let keyPair = try KeyPair()                  // new random keypair
-print(keyPair.publicKey.npub, try keyPair.nsec)
+print(keyPair.publicKey.npub, keyPair.nsec)
 
 let imported = try KeyPair(nsec: "nsec1...")
 

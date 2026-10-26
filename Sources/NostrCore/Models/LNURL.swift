@@ -30,21 +30,49 @@ public enum LNURL {
     }
 
     /// Decodes a bech32 `lnurl` string (a lud06 value) into its URL.
-    /// - Throws: ``NostrError/invalidBech32`` if the string is not a valid `lnurl` bech32 URL.
-    public static func decode(_ lnurl: String) throws -> URL {
-        let (hrp, data) = try Bech32.decode(lnurl)
-        guard hrp == "lnurl",
-            let string = String(data: data, encoding: .utf8),
-            let url = URL(string: string)
-        else {
-            throw NostrError.invalidBech32
+    /// - Throws: ``LNURL/Error/invalidBech32(_:)`` if the string is not valid bech32,
+    ///   ``LNURL/Error/unexpectedPrefix(_:)`` if its prefix is not `lnurl`, or
+    ///   ``LNURL/Error/invalidURL`` if its payload is not a UTF-8 URL.
+    public static func decode(_ lnurl: String) throws(LNURL.Error) -> URL {
+        let decoded: (hrp: String, data: Data)
+        do throws(Bech32.Error) {
+            decoded = try Bech32.decode(lnurl)
+        } catch {
+            throw .invalidBech32(error)
+        }
+        guard decoded.hrp == "lnurl" else {
+            throw .unexpectedPrefix(decoded.hrp)
+        }
+        guard let string = String(data: decoded.data, encoding: .utf8), let url = URL(string: string) else {
+            throw .invalidURL
         }
         return url
     }
 
     /// Encodes a URL as a bech32 `lnurl` string, as used in a zap request's `lnurl` tag.
-    public static func encode(_ url: URL) throws -> String {
-        try Bech32.encode(hrp: "lnurl", data: Data(url.absoluteString.utf8))
+    public static func encode(_ url: URL) -> String {
+        Bech32.encode(validatedHRP: "lnurl", data: Data(url.absoluteString.utf8))
+    }
+
+    /// Why a string could not be decoded as an `lnurl`.
+    public enum Error: Swift.Error, LocalizedError, Sendable, Equatable {
+        /// The string is not valid bech32.
+        case invalidBech32(Bech32.Error)
+        /// The bech32 string carries a prefix other than `lnurl` (payload: the prefix found).
+        case unexpectedPrefix(String)
+        /// The decoded payload is not a UTF-8 URL.
+        case invalidURL
+
+        public var errorDescription: String? {
+            switch self {
+            case .invalidBech32(let error):
+                return "Invalid lnurl: \(error.errorDescription ?? "invalid bech32")"
+            case .unexpectedPrefix(let prefix):
+                return "Expected an lnurl, got bech32 prefix \(prefix)"
+            case .invalidURL:
+                return "The lnurl does not encode a URL"
+            }
+        }
     }
 }
 

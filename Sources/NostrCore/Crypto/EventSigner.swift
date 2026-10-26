@@ -13,11 +13,15 @@ public struct EventSigner: Sendable {
         self.keyPair = keyPair
     }
 
-    public init(privateKeyHex: String) throws {
+    /// Creates a signer from a hex-encoded private key.
+    /// - Throws: What ``KeyPair/init(privateKeyHex:)`` throws for a malformed key.
+    public init(privateKeyHex: String) throws(KeyPair.Error) {
         self.keyPair = try KeyPair(privateKeyHex: privateKeyHex)
     }
 
-    public init(nsec: String) throws {
+    /// Creates a signer from a NIP-19 `nsec`.
+    /// - Throws: What ``KeyPair/init(nsec:)`` throws for a malformed `nsec`.
+    public init(nsec: String) throws(KeyPair.Error) {
         self.keyPair = try KeyPair(nsec: nsec)
     }
 

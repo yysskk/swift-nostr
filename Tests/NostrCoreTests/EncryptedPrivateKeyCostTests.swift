@@ -36,7 +36,7 @@ struct EncryptedPrivateKeyCostTests {
 
         // Parsing still reports the recorded cost, so a caller can decide what to do about it.
         #expect(encrypted.logN == logN)
-        #expect(throws: NostrError.unsupportedScryptCost(logN)) {
+        #expect(throws: EncryptedPrivateKey.Error.unsupportedScryptCost(logN)) {
             _ = try encrypted.decrypt(password: password)
         }
     }
@@ -48,7 +48,7 @@ struct EncryptedPrivateKeyCostTests {
 
         // The payload was sealed at a different cost, so the key derives to something else and the
         // AEAD tag fails — but it fails on authentication, having passed the cost check.
-        #expect(throws: NostrError.decryptionFailed) {
+        #expect(throws: EncryptedPrivateKey.Error.decryptionFailed) {
             _ = try encrypted.decrypt(password: password)
         }
     }
@@ -57,7 +57,7 @@ struct EncryptedPrivateKeyCostTests {
     func callerCanLowerTheCap() throws {
         let encrypted = try makeEncrypted(logN: 14)
 
-        #expect(throws: NostrError.unsupportedScryptCost(14)) {
+        #expect(throws: EncryptedPrivateKey.Error.unsupportedScryptCost(14)) {
             _ = try encrypted.decrypt(password: password, maximumLogN: 13)
         }
     }
@@ -76,7 +76,7 @@ struct EncryptedPrivateKeyCostTests {
     func capBelowSpecRangeIsRejected() throws {
         let encrypted = try makeEncrypted()
 
-        #expect(throws: NostrError.unsupportedScryptCost(0)) {
+        #expect(throws: EncryptedPrivateKey.Error.unsupportedScryptCost(0)) {
             _ = try encrypted.decrypt(password: password, maximumLogN: 0)
         }
     }
@@ -85,7 +85,7 @@ struct EncryptedPrivateKeyCostTests {
     func capAboveSpecRangeIsRejected() throws {
         let encrypted = try makeEncrypted()
 
-        #expect(throws: NostrError.unsupportedScryptCost(23)) {
+        #expect(throws: EncryptedPrivateKey.Error.unsupportedScryptCost(23)) {
             _ = try encrypted.decrypt(password: password, maximumLogN: 23)
         }
     }

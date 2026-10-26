@@ -20,10 +20,10 @@ struct PublicKeyTests {
 
     @Test("uppercase hex is rejected")
     func uppercaseHexIsRejected() {
-        #expect(throws: NostrError.invalidPublicKey) {
+        #expect(throws: PublicKey.Error.invalidHex) {
             try PublicKey(hex: hex.uppercased())
         }
-        #expect(throws: NostrError.invalidPublicKey) {
+        #expect(throws: PublicKey.Error.invalidHex) {
             try PublicKey(hex: "A" + hex.dropFirst())
         }
     }
@@ -33,7 +33,7 @@ struct PublicKeyTests {
         arguments: ["", "ab", String(repeating: "ab", count: 31), String(repeating: "ab", count: 33), "abc"]
     )
     func wrongLengthHexIsRejected(hex: String) {
-        #expect(throws: NostrError.invalidPublicKey) {
+        #expect(throws: PublicKey.Error.invalidHex) {
             try PublicKey(hex: hex)
         }
     }
@@ -48,7 +48,7 @@ struct PublicKeyTests {
         ]
     )
     func nonHexIsRejected(hex: String) {
-        #expect(throws: NostrError.invalidPublicKey) {
+        #expect(throws: PublicKey.Error.invalidHex) {
             try PublicKey(hex: hex)
         }
     }
@@ -61,7 +61,7 @@ struct PublicKeyTests {
         #expect(publicKey.data == data)
         #expect(publicKey.hex == data.hexEncodedString())
         for count in [0, 31, 33, 64] {
-            #expect(throws: NostrError.invalidPublicKey) {
+            #expect(throws: PublicKey.Error.invalidLength(count)) {
                 try PublicKey(data: Data(repeating: 1, count: count))
             }
         }
@@ -83,22 +83,28 @@ struct PublicKeyTests {
         let note = try EventID(hex: hex).note
         let nsec = try Bech32.encode(hrp: "nsec", data: try PublicKey(hex: hex).data)
 
-        for string in [note, nsec] {
-            #expect(throws: NostrError.invalidPublicKey) {
+        for (string, prefix) in [(note, "note"), (nsec, "nsec")] {
+            #expect(throws: PublicKey.Error.unexpectedPrefix(prefix)) {
                 try PublicKey(npub: string)
             }
         }
     }
 
-    @Test("a malformed npub is rejected as an invalid public key")
+    @Test("a malformed npub is rejected with the reason")
     func malformedNpubIsRejected() throws {
         let corrupted = String(npub.dropLast()) + (npub.hasSuffix("q") ? "p" : "q")
         let short = try Bech32.encode(hrp: "npub", data: Data(repeating: 1, count: 31))
 
-        for string in ["", "npub", corrupted, short] {
-            #expect(throws: NostrError.invalidPublicKey) {
+        for string in ["", "npub"] {
+            #expect(throws: PublicKey.Error.invalidBech32(.missingSeparator)) {
                 try PublicKey(npub: string)
             }
+        }
+        #expect(throws: PublicKey.Error.invalidBech32(.invalidChecksum)) {
+            try PublicKey(npub: corrupted)
+        }
+        #expect(throws: PublicKey.Error.invalidLength(31)) {
+            try PublicKey(npub: short)
         }
     }
 

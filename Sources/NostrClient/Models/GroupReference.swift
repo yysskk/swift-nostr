@@ -69,7 +69,7 @@ public struct GroupReference: Sendable, Hashable {
     /// read URL-style, so a percent-encoded invite code is decoded, with the raw value kept
     /// when the query does not parse as URL components.
     ///
-    /// - Throws: ``NostrError/invalidBech32`` and friends when the coordinate does not
+    /// - Throws: A ``Bech32/Error`` or TLV error when the coordinate does not
     ///   decode, or ``NostrError/invalidNIP19Entity`` when it is not a usable kind-39000
     ///   group coordinate (see ``init(naddr:inviteCode:)``).
     public init(naddrString: String) throws {

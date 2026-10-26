@@ -27,7 +27,7 @@ struct KeyPairTests {
     @Test("Bech32 encoding nsec")
     func bech32Nsec() throws {
         let keyPair = try KeyPair()
-        let nsec = try keyPair.nsec
+        let nsec = keyPair.nsec
 
         #expect(nsec.hasPrefix("nsec1"))
 
@@ -51,15 +51,42 @@ struct KeyPairTests {
     @Test("Invalid private key length throws error")
     func invalidPrivateKeyLength() {
         let shortKey = Data(repeating: 0, count: 16)
-        #expect(throws: NostrError.invalidPrivateKey) {
+        #expect(throws: KeyPair.Error.invalidLength(16)) {
             _ = try KeyPair(privateKey: shortKey)
         }
     }
 
-    @Test("Invalid hex string throws error")
-    func invalidHexString() {
-        #expect(throws: NostrError.invalidHex) {
-            _ = try KeyPair(privateKeyHex: "not-a-hex-string")
+    @Test("Invalid hex string throws error", arguments: ["not-a-hex-string", "abcd"])
+    func invalidHexString(hex: String) {
+        #expect(throws: KeyPair.Error.invalidHex) {
+            _ = try KeyPair(privateKeyHex: hex)
+        }
+    }
+
+    @Test("A key that is not a secp256k1 scalar is rejected")
+    func invalidScalar() {
+        let curveOrder = "fffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141"
+        for hex in [String(repeating: "0", count: 64), curveOrder] {
+            #expect(throws: KeyPair.Error.invalidPrivateKey) {
+                _ = try KeyPair(privateKeyHex: hex)
+            }
+        }
+    }
+
+    @Test("A malformed nsec is rejected with the reason")
+    func invalidNsec() throws {
+        let keyPair = try KeyPair()
+        let corrupted = String(keyPair.nsec.dropLast()) + (keyPair.nsec.hasSuffix("q") ? "p" : "q")
+        let short = try Bech32.encode(hrp: "nsec", data: Data(repeating: 1, count: 31))
+
+        #expect(throws: KeyPair.Error.invalidBech32(.invalidChecksum)) {
+            _ = try KeyPair(nsec: corrupted)
+        }
+        #expect(throws: KeyPair.Error.unexpectedPrefix("npub")) {
+            _ = try KeyPair(nsec: keyPair.publicKey.npub)
+        }
+        #expect(throws: KeyPair.Error.invalidLength(31)) {
+            _ = try KeyPair(nsec: short)
         }
     }
 

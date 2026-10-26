@@ -22,32 +22,39 @@ public struct EventID: Sendable, Hashable {
 
     /// Creates an event id from its canonical hex form.
     /// - Parameter hex: Exactly 64 lowercase hexadecimal digits.
-    /// - Throws: ``NostrError/invalidEventID`` if `hex` has the wrong length, contains anything
+    /// - Throws: ``EventID/Error/invalidHex`` if `hex` has the wrong length, contains anything
     ///   but `0`–`9` and `a`–`f`, or uses uppercase digits.
-    public init(hex: String) throws {
+    public init(hex: String) throws(EventID.Error) {
         guard hex.isCanonicalHex(byteCount: 32) else {
-            throw NostrError.invalidEventID
+            throw .invalidHex
         }
         self.hex = hex
     }
 
     /// Creates an event id from its 32 bytes.
-    /// - Throws: ``NostrError/invalidEventID`` if `data` is not exactly 32 bytes.
-    public init(data: Data) throws {
+    /// - Throws: ``EventID/Error/invalidLength(_:)`` if `data` is not exactly 32 bytes.
+    public init(data: Data) throws(EventID.Error) {
         guard data.count == 32 else {
-            throw NostrError.invalidEventID
+            throw .invalidLength(data.count)
         }
         self.hex = data.hexEncodedString()
     }
 
     /// Creates an event id from a NIP-19 `note` bech32 string.
-    /// - Throws: ``NostrError/invalidEventID`` if `note` is not valid bech32, carries a prefix
-    ///   other than `note`, or does not hold exactly 32 bytes.
-    public init(note: String) throws {
-        guard let (prefix, data) = try? Bech32.decode(note), prefix == "note" else {
-            throw NostrError.invalidEventID
+    /// - Throws: ``EventID/Error/invalidBech32(_:)`` if `note` is not valid bech32,
+    ///   ``EventID/Error/unexpectedPrefix(_:)`` if it carries a prefix other than `note`, or
+    ///   ``EventID/Error/invalidLength(_:)`` if it does not hold exactly 32 bytes.
+    public init(note: String) throws(EventID.Error) {
+        let decoded: (hrp: String, data: Data)
+        do throws(Bech32.Error) {
+            decoded = try Bech32.decode(note)
+        } catch {
+            throw .invalidBech32(error)
         }
-        try self.init(data: data)
+        guard decoded.hrp == "note" else {
+            throw .unexpectedPrefix(decoded.hrp)
+        }
+        try self.init(data: decoded.data)
     }
 }
 
@@ -92,5 +99,32 @@ extension EventID: Codable {
     public func encode(to encoder: any Encoder) throws {
         var container = encoder.singleValueContainer()
         try container.encode(hex)
+    }
+}
+
+extension EventID {
+    /// Why a value could not be parsed as an ``EventID``.
+    public enum Error: Swift.Error, LocalizedError, Sendable, Equatable {
+        /// The string is not 64 lowercase hexadecimal digits.
+        case invalidHex
+        /// The data is not 32 bytes (payload: its byte count).
+        case invalidLength(Int)
+        /// The `note` string is not valid bech32.
+        case invalidBech32(Bech32.Error)
+        /// The bech32 string carries a prefix other than `note` (payload: the prefix found).
+        case unexpectedPrefix(String)
+
+        public var errorDescription: String? {
+            switch self {
+            case .invalidHex:
+                return "An event id must be 64 lowercase hexadecimal digits"
+            case .invalidLength(let count):
+                return "An event id must be 32 bytes, got \(count)"
+            case .invalidBech32(let error):
+                return "Invalid note: \(error.errorDescription ?? "invalid bech32")"
+            case .unexpectedPrefix(let prefix):
+                return "Expected a note, got bech32 prefix \(prefix)"
+            }
+        }
     }
 }

@@ -26,8 +26,6 @@ public enum NostrError: Error, LocalizedError, Sendable, Equatable {
     case authenticationFailed(String)
     case cannotPublishAuthenticationEvent
     case timeout
-    case invalidHex
-    case invalidBech32
     case unknownPrefix(String)
     case invalidTLV
     case invalidNIP19Entity
@@ -38,12 +36,6 @@ public enum NostrError: Error, LocalizedError, Sendable, Equatable {
     case invalidPayloadFormat
     case hmacVerificationFailed
     case invalidPadding
-    case invalidMnemonic
-    case invalidMnemonicWord(String)
-    case invalidMnemonicChecksum
-    case randomGenerationFailed
-    case invalidNcryptsec
-    case unsupportedScryptCost(UInt8)
 
     public var errorDescription: String? {
         switch self {
@@ -92,10 +84,6 @@ public enum NostrError: Error, LocalizedError, Sendable, Equatable {
                 "NIP-42 authentication events (kind 22242) must not be published; they are only sent as AUTH responses"
         case .timeout:
             return "Operation timed out"
-        case .invalidHex:
-            return "Invalid hexadecimal string"
-        case .invalidBech32:
-            return "Invalid bech32 encoding"
         case .unknownPrefix(let prefix):
             return "Unknown bech32 prefix: \(prefix)"
         case .invalidTLV:
@@ -116,18 +104,6 @@ public enum NostrError: Error, LocalizedError, Sendable, Equatable {
             return "HMAC verification failed"
         case .invalidPadding:
             return "Invalid message padding"
-        case .invalidMnemonic:
-            return "Invalid mnemonic phrase"
-        case .invalidMnemonicWord(let word):
-            return "Invalid mnemonic word: \(word)"
-        case .invalidMnemonicChecksum:
-            return "Invalid mnemonic checksum"
-        case .randomGenerationFailed:
-            return "Failed to generate secure random bytes"
-        case .invalidNcryptsec:
-            return "The ncryptsec payload is malformed or has an unsupported version"
-        case .unsupportedScryptCost:
-            return "The ncryptsec declares an unsupported scrypt cost"
         }
     }
 }

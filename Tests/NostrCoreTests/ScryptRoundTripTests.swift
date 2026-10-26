@@ -21,7 +21,7 @@ struct ScryptRoundTripTests {
     /// pairing threw `unsupportedScryptCost` for a key this library had just produced.
     @Test("encrypt refuses a cost the default reader could not open")
     func encryptRefusesUnreadableCost() {
-        #expect(throws: NostrError.unsupportedScryptCost(20)) {
+        #expect(throws: EncryptedPrivateKey.Error.unsupportedScryptCost(20)) {
             _ = try EncryptedPrivateKey.encrypt(
                 privateKey: privateKey, password: password, logN: 20)
         }
@@ -35,7 +35,7 @@ struct ScryptRoundTripTests {
             privateKey: privateKey, password: password, logN: 19, maximumLogN: 19)
 
         #expect(encrypted.logN == 19)
-        #expect(throws: NostrError.unsupportedScryptCost(19)) {
+        #expect(throws: EncryptedPrivateKey.Error.unsupportedScryptCost(19)) {
             _ = try encrypted.decrypt(password: password)
         }
         #expect(try encrypted.decrypt(password: password, maximumLogN: 19) == privateKey)
@@ -45,27 +45,27 @@ struct ScryptRoundTripTests {
     /// guard let a zero cap through, and `1...0` is not a valid range.
     @Test("a cap below the range NIP-49 defines is refused on both sides")
     func capBelowSpecRangeIsRefused() throws {
-        #expect(throws: NostrError.unsupportedScryptCost(0)) {
+        #expect(throws: EncryptedPrivateKey.Error.unsupportedScryptCost(0)) {
             _ = try EncryptedPrivateKey.encrypt(
                 privateKey: privateKey, password: password, logN: 14, maximumLogN: 0)
         }
 
         let keyPair = try KeyPair()
-        #expect(throws: NostrError.unsupportedScryptCost(0)) {
+        #expect(throws: EncryptedPrivateKey.Error.unsupportedScryptCost(0)) {
             _ = try keyPair.encryptedPrivateKey(password: password, logN: 14, maximumLogN: 0)
         }
     }
 
     @Test("a cap beyond the range NIP-49 defines is refused on both sides")
     func capBeyondSpecIsRefused() throws {
-        #expect(throws: NostrError.unsupportedScryptCost(23)) {
+        #expect(throws: EncryptedPrivateKey.Error.unsupportedScryptCost(23)) {
             _ = try EncryptedPrivateKey.encrypt(
                 privateKey: privateKey, password: password, logN: 14, maximumLogN: 23)
         }
 
         let encrypted = try EncryptedPrivateKey.encrypt(
             privateKey: privateKey, password: password, logN: 14)
-        #expect(throws: NostrError.unsupportedScryptCost(23)) {
+        #expect(throws: EncryptedPrivateKey.Error.unsupportedScryptCost(23)) {
             _ = try encrypted.decrypt(password: password, maximumLogN: 23)
         }
     }

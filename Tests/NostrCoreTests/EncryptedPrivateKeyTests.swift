@@ -73,7 +73,7 @@ struct EncryptedPrivateKeyTests {
         arguments: ["", "correct horse battery staple", "🔐🗝️ nostr パスワード"]
     )
     func roundTripsRandomKey(password: String) throws {
-        let privateKey = try SecureRandom.generateBytes(count: 32)
+        let privateKey = SecureRandom.generateBytes(count: 32)
 
         let encrypted = try EncryptedPrivateKey.encrypt(privateKey: privateKey, password: password)
         let decrypted = try encrypted.decrypt(password: password)
@@ -94,7 +94,7 @@ struct EncryptedPrivateKeyTests {
 
     @Test("A small custom cost exponent round-trips")
     func customLogNRoundTrips() throws {
-        let privateKey = try SecureRandom.generateBytes(count: 32)
+        let privateKey = SecureRandom.generateBytes(count: 32)
 
         let encrypted = try EncryptedPrivateKey.encrypt(
             privateKey: privateKey,
@@ -118,7 +118,7 @@ struct EncryptedPrivateKeyTests {
         ]
     )
     func preservesKeySecurity(keySecurity: EncryptedPrivateKey.KeySecurity) throws {
-        let privateKey = try SecureRandom.generateBytes(count: 32)
+        let privateKey = SecureRandom.generateBytes(count: 32)
 
         let encrypted = try EncryptedPrivateKey.encrypt(
             privateKey: privateKey,
@@ -137,29 +137,29 @@ struct EncryptedPrivateKeyTests {
 
     @Test("A wrong password fails to decrypt")
     func wrongPasswordFails() throws {
-        let privateKey = try SecureRandom.generateBytes(count: 32)
+        let privateKey = SecureRandom.generateBytes(count: 32)
         let encrypted = try EncryptedPrivateKey.encrypt(privateKey: privateKey, password: "right")
 
-        #expect(throws: NostrError.decryptionFailed) {
+        #expect(throws: EncryptedPrivateKey.Error.decryptionFailed) {
             try encrypted.decrypt(password: "wrong")
         }
     }
 
     @Test("Encrypting rejects a key that is not 32 bytes")
     func encryptRejectsWrongKeyLength() {
-        #expect(throws: NostrError.invalidPrivateKey) {
+        #expect(throws: KeyPair.Error.invalidLength(31)) {
             try EncryptedPrivateKey.encrypt(privateKey: Data(repeating: 0, count: 31), password: "x")
         }
     }
 
     @Test("Encrypting rejects an out-of-range cost exponent")
     func encryptRejectsUnsupportedCost() throws {
-        let privateKey = try SecureRandom.generateBytes(count: 32)
+        let privateKey = SecureRandom.generateBytes(count: 32)
 
-        #expect(throws: NostrError.unsupportedScryptCost(0)) {
+        #expect(throws: EncryptedPrivateKey.Error.unsupportedScryptCost(0)) {
             try EncryptedPrivateKey.encrypt(privateKey: privateKey, password: "x", logN: 0)
         }
-        #expect(throws: NostrError.unsupportedScryptCost(23)) {
+        #expect(throws: EncryptedPrivateKey.Error.unsupportedScryptCost(23)) {
             try EncryptedPrivateKey.encrypt(privateKey: privateKey, password: "x", logN: 23)
         }
     }
@@ -169,14 +169,14 @@ struct EncryptedPrivateKeyTests {
         // A valid nsec bech32 string carries the wrong HRP.
         let nsec = try KeyPair().nsec
 
-        #expect(throws: NostrError.invalidNcryptsec) {
+        #expect(throws: EncryptedPrivateKey.Error.malformedPayload) {
             try EncryptedPrivateKey(ncryptsec: nsec)
         }
     }
 
     @Test("Parsing rejects a non-bech32 string")
     func rejectsMalformedBech32() {
-        #expect(throws: NostrError.invalidNcryptsec) {
+        #expect(throws: EncryptedPrivateKey.Error.malformedPayload) {
             try EncryptedPrivateKey(ncryptsec: "not a bech32 string")
         }
     }
@@ -189,7 +189,7 @@ struct EncryptedPrivateKeyTests {
             data: Data([0x02] + [UInt8](repeating: 0, count: 89))
         )
 
-        #expect(throws: NostrError.invalidNcryptsec) {
+        #expect(throws: EncryptedPrivateKey.Error.malformedPayload) {
             try EncryptedPrivateKey(ncryptsec: truncated)
         }
     }
@@ -202,7 +202,7 @@ struct EncryptedPrivateKeyTests {
             data: Data([0x01] + [UInt8](repeating: 0, count: 90))
         )
 
-        #expect(throws: NostrError.invalidNcryptsec) {
+        #expect(throws: EncryptedPrivateKey.Error.malformedPayload) {
             try EncryptedPrivateKey(ncryptsec: wrongVersion)
         }
     }
@@ -222,7 +222,7 @@ struct EncryptedPrivateKeyTests {
         let ncryptsec = try Bech32.encode(hrp: "ncryptsec", data: payload)
 
         let encrypted = try EncryptedPrivateKey(ncryptsec: ncryptsec)
-        #expect(throws: NostrError.unsupportedScryptCost(logN)) {
+        #expect(throws: EncryptedPrivateKey.Error.unsupportedScryptCost(logN)) {
             try encrypted.decrypt(password: "anything")
         }
     }

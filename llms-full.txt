@@ -745,7 +745,7 @@ Nostr keypair (struct: Sendable).
 - `privateKey: Data` -- 32-byte private key
 - `publicKey: PublicKey` -- x-only public key (`publicKey.hex`, `publicKey.npub`)
 - `privateKeyHex: String`
-- `nsec: String` (throwing getter)
+- `nsec: String` -- bech32 `nsec`
 
 ### Initialization
 
@@ -761,13 +761,18 @@ let fromMnemonic = try KeyPair(                       // from BIP-39 (NIP-06)
 let (mnemonic, kp) = try KeyPair.generate(wordCount: 12)  // random mnemonic
 ```
 
+The hex, data, and nsec initializers throw `KeyPair.Error`: `invalidHex` (not 64 hex digits),
+`invalidLength(Int)` (not 32 bytes), `invalidBech32(Bech32.Error)` or `unexpectedPrefix(String)` for an
+nsec, and `invalidPrivateKey` for bytes that are not a valid secp256k1 scalar.
+
 ## PublicKey / EventID / Signature
 
 Typed hex values (structs: Sendable, Hashable, Codable, LosslessStringConvertible). Each holds exactly
 one spelling, canonical lowercase hex (`PublicKey`/`EventID`: 64 digits = 32 bytes, `Signature`: 128
 digits = 64 bytes), which is also its `description` and its JSON encoding (a bare string). Uppercase,
-the wrong length, or non-hex is rejected: every failed parse throws `invalidPublicKey` / `invalidEventID`
-/ `invalidSignature` respectively (including an npub or note with another bech32 prefix), the failable
+the wrong length, or non-hex is rejected: each type throws its own `Error` (`PublicKey.Error`,
+`EventID.Error`, `Signature.Error`) -- `invalidHex` for a string, `invalidLength(Int)` for data, and for an
+npub or note `invalidBech32(Bech32.Error)` or `unexpectedPrefix(String)` -- the failable
 `init?(_:)` returns nil, and decoding fails with `DecodingError.dataCorrupted`. `EventID` is `Comparable`
 (byte order, the NIP-01 tie-break).
 
@@ -826,7 +831,7 @@ NIP-49 password-encrypted private key (`ncryptsec1...`), protected with scrypt a
 
 ### Encrypt and Decrypt
 
-Passwords are NFKC-normalized before key derivation. scrypt allocates 2^logN KiB, and the cost byte is chosen by whoever wrote the payload, so both sides are bounded: `encrypt` writes and `decrypt` spends at most `maximumLogN`, defaulting to `EncryptedPrivateKey.defaultMaximumLogN` (18, 256 MiB; NIP-49 permits up to 22). A cost outside the bound throws `NostrError.unsupportedScryptCost` before any derivation. Raise the bound only to write or open a deliberately costlier key; a parsed payload's `logN` is readable first. A wrong password throws `NostrError.decryptionFailed`.
+Passwords are NFKC-normalized before key derivation. scrypt allocates 2^logN KiB, and the cost byte is chosen by whoever wrote the payload, so both sides are bounded: `encrypt` writes and `decrypt` spends at most `maximumLogN`, defaulting to `EncryptedPrivateKey.defaultMaximumLogN` (18, 256 MiB; NIP-49 permits up to 22). A cost outside the bound throws `EncryptedPrivateKey.Error.unsupportedScryptCost` before any derivation. Raise the bound only to write or open a deliberately costlier key; a parsed payload's `logN` is readable first. A wrong password throws `EncryptedPrivateKey.Error.decryptionFailed`, and a string that is not a well-formed payload throws `malformedPayload`.
 
 ```swift
 // Encrypt raw private-key bytes.
@@ -953,6 +958,9 @@ let mnemonic = try Mnemonic(phrase: "word1 word2 ...")
 let mnemonic = try Mnemonic(entropy: entropy)       // 16-32 bytes of BIP-39 entropy
 let seed = mnemonic.seed(passphrase: "optional")  // 64-byte seed
 ```
+
+Failures throw `Mnemonic.Error`: `invalidWordCount(Int)`, `unknownWord(String)`, `invalidChecksum`,
+`invalidEntropyLength(Int)`.
 
 ## KeyDerivation
 
@@ -1628,6 +1636,9 @@ let encoded = try Bech32.encode(hrp: "npub", data: publicKeyData)
 let (hrp, data) = try Bech32.decode("npub1...")
 ```
 
+Both throw `Bech32.Error`: `invalidHumanReadablePart`, `mixedCase`, `missingSeparator`, `invalidLength`,
+`invalidCharacter(Character)`, `invalidChecksum`, `invalidPadding`. Checking the prefix is the caller's job.
+
 ## NIP19Entity
 
 A NIP-19 bech32-encoded entity (enum: Sendable, Hashable). Cases: `npub(PublicKey)`, `nsec(String)` (hex private key), `note(EventID)`, `nprofile(NProfile)`, `nevent(NEvent)`, `naddr(NAddr)`.
@@ -1764,7 +1775,7 @@ for await challenge in await signer.authChallenges() {
 
 Error types (enum: Error, LocalizedError, Sendable, Equatable).
 
-Cases: `invalidPrivateKey`, `invalidPublicKey`, `invalidSignature`, `invalidEventID`, `signingFailed`, `signerNotSet`, `verificationFailed`, `serializationFailed`, `invalidData`, `invalidMessageFormat`, `invalidRelayURL(String)`, `connectionFailed(String)`, `notConnected`, `subscriptionNotFound(String)`, `relayError(String)`, `noRelaysInPool`, `noMatchingRelays([RelayURL])`, `authenticationFailed(String)`, `cannotPublishAuthenticationEvent`, `timeout`, `invalidHex`, `invalidBech32`, `unknownPrefix(String)`, `invalidTLV`, `invalidNIP19Entity`, `invalidNostrURI`, `encryptionFailed`, `decryptionFailed`, `unsupportedEncryptionVersion(UInt8)`, `invalidPayloadFormat`, `hmacVerificationFailed`, `invalidPadding`, `invalidMnemonic`, `invalidMnemonicWord(String)`, `invalidMnemonicChecksum`, `randomGenerationFailed`, `invalidNcryptsec`, `unsupportedScryptCost(UInt8)`.
+Cases: `invalidPrivateKey`, `invalidPublicKey`, `invalidSignature`, `invalidEventID`, `signingFailed`, `signerNotSet`, `verificationFailed`, `serializationFailed`, `invalidData`, `invalidMessageFormat`, `invalidRelayURL(String)`, `connectionFailed(String)`, `notConnected`, `subscriptionNotFound(String)`, `relayError(String)`, `noRelaysInPool`, `noMatchingRelays([RelayURL])`, `authenticationFailed(String)`, `cannotPublishAuthenticationEvent`, `timeout`, `unknownPrefix(String)`, `invalidTLV`, `invalidNIP19Entity`, `invalidNostrURI`, `encryptionFailed`, `decryptionFailed`, `unsupportedEncryptionVersion(UInt8)`, `invalidPayloadFormat`, `hmacVerificationFailed`, `invalidPadding`.
 
 ## Supported NIPs
 

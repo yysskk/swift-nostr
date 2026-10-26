@@ -68,14 +68,14 @@ struct NostrClientNamespaceTests {
 
         #expect(await identity.publicKey == nil)
         try await identity.setPrivateKey(try KeyPair().privateKeyHex)
-        try await identity.setNsec(try keyPair.nsec)
+        try await identity.setNsec(keyPair.nsec)
         #expect(await identity.publicKey == keyPair.publicKey)
 
         // Malformed keys throw before anything is installed, leaving the current signer in place.
-        await #expect(throws: NostrError.invalidHex) {
+        await #expect(throws: KeyPair.Error.invalidHex) {
             try await identity.setPrivateKey("not hex")
         }
-        await #expect(throws: NostrError.unknownPrefix("npub")) {
+        await #expect(throws: KeyPair.Error.unexpectedPrefix("npub")) {
             try await identity.setNsec(keyPair.publicKey.npub)
         }
         #expect(await identity.publicKey == keyPair.publicKey)
