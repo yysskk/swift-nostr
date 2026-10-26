@@ -11,7 +11,7 @@ extension NostrEventFetching {
     ///   - timeout: How long to wait for relays to finish; `nil` uses
     ///     ``RelayPoolConfig/queryTimeout``.
     /// - Returns: The events received, deduplicated across relays.
-    /// - Throws: ``NostrError/noRelaysInPool`` when the pool is empty.
+    /// - Throws: ``RelayPool/Error/emptyPool`` when the pool is empty.
     public func fetch(filters: [Filter], timeout: Duration? = nil) async throws -> [Event] {
         try await fetch(filters: filters, from: nil, timeout: timeout)
     }
@@ -26,7 +26,7 @@ extension NostrEventFetching {
     ///   - timeout: How long to wait for relays to finish; `nil` uses
     ///     ``RelayPoolConfig/queryTimeout``.
     /// - Returns: The events received, deduplicated across relays.
-    /// - Throws: ``NostrError/noMatchingRelays(_:)`` when none of the targeted URLs are in the pool.
+    /// - Throws: ``RelayPool/Error/noMatchingRelays(_:)`` when none of the targeted URLs are in the pool.
     public func fetch(
         filters: [Filter],
         from relayURLs: Set<RelayURL>,
@@ -42,7 +42,7 @@ extension NostrEventFetching {
     ///   - timeout: How long to wait for relays to finish; `nil` uses
     ///     ``RelayPoolConfig/queryTimeout``.
     /// - Returns: The highest count any relay reported.
-    /// - Throws: ``NostrError/noRelaysInPool`` when the pool is empty, or the last relay error when
+    /// - Throws: ``RelayPool/Error/emptyPool`` when the pool is empty, or the last relay error when
     ///   no relay answered.
     public func countEvents(matching filters: [Filter], timeout: Duration? = nil) async throws -> Int {
         try await countEvents(matching: filters, from: nil, timeout: timeout)
@@ -58,7 +58,7 @@ extension NostrEventFetching {
     ///   - timeout: How long to wait for relays to finish; `nil` uses
     ///     ``RelayPoolConfig/queryTimeout``.
     /// - Returns: The highest count any targeted relay reported.
-    /// - Throws: ``NostrError/noMatchingRelays(_:)`` when none of the targeted URLs are in the pool,
+    /// - Throws: ``RelayPool/Error/noMatchingRelays(_:)`` when none of the targeted URLs are in the pool,
     ///   or the last relay error when no targeted relay answered.
     public func countEvents(
         matching filters: [Filter],
@@ -150,7 +150,7 @@ extension NostrEventFetching {
         } else {
             do {
                 events = try await fetch(filters: [filter], from: Set(naddr.relays), timeout: timeout)
-            } catch NostrError.noMatchingRelays {
+            } catch RelayPool.Error.noMatchingRelays {
                 // None of the hints is in the pool. Targeting fails before anything is sent to a
                 // relay, so falling back here queries the whole pool exactly once.
                 events = try await fetch(filters: [filter], timeout: timeout)

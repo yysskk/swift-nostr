@@ -111,7 +111,7 @@ struct EventCapabilityTests {
         try await publishing.publish(event, to: [relayB])
         // An empty set stays a set — it reaches the primitive, which rejects it, rather than
         // collapsing to nil and broadcasting.
-        await #expect(throws: NostrError.noMatchingRelays([])) {
+        await #expect(throws: RelayPool.Error.noMatchingRelays([])) {
             try await publishing.publish(event, to: [])
         }
 

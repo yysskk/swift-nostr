@@ -176,7 +176,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `lastAuthenticationError` is an `(any Error)?` that usually holds a `RelayConnection.Error`, `RelayConnectionTransport` throws
   `RelayConnection.Error.notConnected` with typed throws, and `NostrIdentityAPI.authenticate(relayURL:)`
   throws `missingAuthenticationChallenge`. `NostrError.authenticationFailed` and `timeout` are
-  removed; the pool keeps `NostrError` for its own failures.
+  removed.
+- **Pool and client failures have their own error types, and `NostrError` is removed** (breaking):
+  `RelayPool` throws `RelayPool.Error` — `emptyPool` (was `noRelaysInPool`), `noMatchingRelays([RelayURL])`,
+  `cannotPublishAuthenticationEvent`, `quorumNotMet(acknowledged:required:)` (was
+  `relayError("Publish quorum not met: …")`), `subscriptionSuperseded` and `subscriptionFailed` (were
+  `relayError` strings), and `allConnectionsFailed` (was `connectionFailed("All relays failed to connect")`).
+  `RelayPool.connectAll()`, `RelayPool.subscribe(subscriptionID:filters:to:handler:)`,
+  `client.relays.connect()`, and `client.subscriptions.subscribe(filters:to:bufferingPolicy:)` are
+  `throws(RelayPool.Error)`. Operations that need a signer throw `NostrClient.Error.signerNotSet`
+  (was `NostrError.signerNotSet`), which capability extensions can throw too, and
+  `client.routing.connectDirectMessageInboxRelays()` is `throws(NostrClient.Error)`. `NostrError` is
+  removed: each domain now throws its own error type.
 - **`Event.id`, `Event.pubkey`, and the event signature are typed** (breaking): `id` is an
   `EventID`, `pubkey` a `PublicKey`, and `sig: String` is now `signature: Signature?` — still the
   `sig` field on the wire. `Event.init` takes `signature:` instead of `sig:`. A `nil` signature is an
@@ -281,7 +292,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`KeyPair.publicKey` is a `PublicKey`** (breaking): `KeyPair.publicKeyHex` and `KeyPair.npub`
   are removed in favor of `publicKey.hex` and `publicKey.npub`; the raw bytes are `publicKey.data`.
 - **`EventSigner.npub` no longer throws** (breaking).
-- **`NostrError.invalidEventId` is renamed `invalidEventID`** (breaking).
 - **Relay and pool APIs take and return `RelayURL`** (breaking): there is no relay URL string left to
   validate past the boundary, and no `String`/`URL` overload pair. `RelayConnection(url:)` (both
   initializers) takes a `RelayURL` and `RelayConnection.url` is one; `RelayConnection(urlString:)` is
@@ -295,7 +305,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `client.subscriptions.subscribe` and `events` (and their capability-protocol requirements) was
   `[String]?`. Nil still broadcasts to the whole pool, an empty set still throws, and targets not in
   the pool are still skipped; an invalid target can no longer reach these calls, so they no longer
-  throw `invalidRelayURL`. `NostrError.noMatchingRelays` carries `[RelayURL]`, sorted by canonical
+  throw `invalidRelayURL`. `RelayPool.Error.noMatchingRelays` carries `[RelayURL]`, sorted by canonical
   string.
 - **Relay results are keyed by `RelayURL`** (breaking): `PublishResult.statuses` is
   `[RelayURL: PublishRelayStatus]`, `acceptedRelays` / `failedRelays` / `pendingRelays` are

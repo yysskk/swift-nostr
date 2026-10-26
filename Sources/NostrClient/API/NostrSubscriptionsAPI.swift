@@ -29,14 +29,14 @@ public struct NostrSubscriptionsAPI: NostrSubscribing {
     ///   - bufferingPolicy: How items are buffered while the consumer is slower than the relays.
     ///     Use `.bufferingNewest(n)` for firehose subscriptions where memory matters.
     /// - Returns: The subscription.
-    /// - Throws: ``NostrError/noRelaysInPool`` when the pool is empty,
-    ///   ``NostrError/noMatchingRelays(_:)`` when none of the targeted URLs are in the
-    ///   pool, or ``NostrError/relayError(_:)`` when every relay fails to subscribe.
+    /// - Throws: ``RelayPool/Error/emptyPool`` when the pool is empty,
+    ///   ``RelayPool/Error/noMatchingRelays(_:)`` when none of the targeted URLs are in the
+    ///   pool, or ``RelayPool/Error/subscriptionFailed`` when every relay fails to subscribe.
     public func subscribe(
         filters: [Filter],
         to relayURLs: Set<RelayURL>?,
         bufferingPolicy: AsyncStream<SubscriptionEvent>.Continuation.BufferingPolicy
-    ) async throws -> SubscriptionSequence {
+    ) async throws(RelayPool.Error) -> SubscriptionSequence {
         try await client.subscribe(
             filters: filters,
             toURLs: relayURLs,

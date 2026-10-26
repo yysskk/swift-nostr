@@ -14,8 +14,8 @@ extension NostrSubscribing {
     ///     (default: `.unbounded`). Use `.bufferingNewest(n)` for firehose subscriptions where memory
     ///     matters.
     /// - Returns: The subscription.
-    /// - Throws: ``NostrError/noRelaysInPool`` when the pool is empty, or
-    ///   ``NostrError/relayError(_:)`` when every relay fails to subscribe.
+    /// - Throws: ``RelayPool/Error/emptyPool`` when the pool is empty, or
+    ///   ``RelayPool/Error/subscriptionFailed`` when every relay fails to subscribe.
     public func subscribe(
         filters: [Filter],
         bufferingPolicy: AsyncStream<SubscriptionEvent>.Continuation.BufferingPolicy = .unbounded
@@ -33,8 +33,8 @@ extension NostrSubscribing {
     ///   - bufferingPolicy: How items are buffered while the consumer is slower than the relays
     ///     (default: `.unbounded`).
     /// - Returns: The subscription.
-    /// - Throws: ``NostrError/noMatchingRelays(_:)`` when none of the targeted URLs are in the pool,
-    ///   or ``NostrError/relayError(_:)`` when every targeted relay fails to subscribe.
+    /// - Throws: ``RelayPool/Error/noMatchingRelays(_:)`` when none of the targeted URLs are in the
+    ///   pool, or ``RelayPool/Error/subscriptionFailed`` when every targeted relay fails to subscribe.
     public func subscribe(
         filters: [Filter],
         to relayURLs: Set<RelayURL>,
@@ -60,7 +60,7 @@ extension NostrSubscribing {
     ///   - bufferingPolicy: How items are buffered while the consumer is slower than the relays
     ///     (default: `.unbounded`).
     /// - Returns: The subscription's event payloads.
-    /// - Throws: ``NostrError/noRelaysInPool`` or ``NostrError/relayError(_:)`` — see
+    /// - Throws: ``RelayPool/Error/emptyPool`` or ``RelayPool/Error/subscriptionFailed`` — see
     ///   ``NostrSubscribing/subscribe(filters:bufferingPolicy:)``.
     public func events(
         filters: [Filter],
@@ -79,7 +79,7 @@ extension NostrSubscribing {
     ///   - bufferingPolicy: How items are buffered while the consumer is slower than the relays
     ///     (default: `.unbounded`).
     /// - Returns: The subscription's event payloads.
-    /// - Throws: ``NostrError/noMatchingRelays(_:)`` or ``NostrError/relayError(_:)`` — see
+    /// - Throws: ``RelayPool/Error/noMatchingRelays(_:)`` or ``RelayPool/Error/subscriptionFailed`` — see
     ///   ``NostrSubscribing/subscribe(filters:to:bufferingPolicy:)-(_,Set<RelayURL>,_)``.
     public func events(
         filters: [Filter],

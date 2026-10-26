@@ -35,7 +35,7 @@ struct DirectMessageRoutingTests {
     @Test("routing.connectDirectMessageInboxRelays without a signer throws signerNotSet")
     func connectWithoutSignerThrows() async {
         let client = NostrClient()
-        await #expect(throws: NostrError.signerNotSet) {
+        await #expect(throws: NostrClient.Error.signerNotSet) {
             _ = try await client.routing.connectDirectMessageInboxRelays()
         }
     }
@@ -85,14 +85,14 @@ struct DirectMessageRoutingTests {
         #expect(targets.isEmpty)
     }
 
-    @Test("messages.send on an empty pool throws noRelaysInPool")
+    @Test("messages.send on an empty pool throws emptyPool")
     func sendOnEmptyPoolThrows() async throws {
         let client = NostrClient()
         try await client.identity.setPrivateKey(String(repeating: "1", count: 64))
         let recipient = try KeyPair()
 
         // Empty pool, no cached lists: the recipient copy's pool fallback finds nothing.
-        await #expect(throws: NostrError.noRelaysInPool) {
+        await #expect(throws: RelayPool.Error.emptyPool) {
             try await client.messages.send("hi", to: recipient.publicKey)
         }
     }

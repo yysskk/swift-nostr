@@ -38,7 +38,7 @@ extension NostrRelayManaging {
     /// ])
     /// ```
     /// - Parameter urls: The relays to add before connecting.
-    /// - Throws: ``NostrError/connectionFailed(_:)`` if every relay in the pool fails to
+    /// - Throws: ``RelayPool/Error/allConnectionsFailed`` if every relay in the pool fails to
     ///   connect; partial connection failures are tolerated.
     public func connect(to urls: some Sequence<RelayURL>) async throws {
         await add(urls)

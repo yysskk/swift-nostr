@@ -54,7 +54,7 @@ struct DirectMessageRelayDiscoveryTests {
     @Test("routing.publishDirectMessageRelayList without a signer throws signerNotSet")
     func publishWithoutSignerThrows() async {
         let client = NostrClient()
-        await #expect(throws: NostrError.signerNotSet) {
+        await #expect(throws: NostrClient.Error.signerNotSet) {
             _ = try await client.routing.publishDirectMessageRelayList(relays: [RelayURL("wss://inbox.example.com")!])
         }
     }

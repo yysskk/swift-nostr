@@ -260,10 +260,12 @@ struct NIP29GroupClientTests {
         let (client, socket) = makeClient()
         let group = GroupReference(relayURL: groupRelayURL, id: groupID)
 
-        await #expect(throws: NostrError.signerNotSet) { try await client.groups.join(group) }
-        await #expect(throws: NostrError.signerNotSet) { try await client.groups.leave(group) }
-        await #expect(throws: NostrError.signerNotSet) { try await client.groups.publishMessage("gm", in: group) }
-        await #expect(throws: NostrError.signerNotSet) {
+        await #expect(throws: NostrClient.Error.signerNotSet) { try await client.groups.join(group) }
+        await #expect(throws: NostrClient.Error.signerNotSet) { try await client.groups.leave(group) }
+        await #expect(throws: NostrClient.Error.signerNotSet) {
+            try await client.groups.publishMessage("gm", in: group)
+        }
+        await #expect(throws: NostrClient.Error.signerNotSet) {
             try await client.groups.publishModeration(.createGroup, in: group)
         }
 

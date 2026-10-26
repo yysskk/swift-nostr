@@ -63,7 +63,7 @@ actor RecordingIdentityCapabilities: NostrIdentityProviding {
     // MARK: - Private
 
     private func requireSigner() throws -> any NostrSigning {
-        guard let signer else { throw NostrError.signerNotSet }
+        guard let signer else { throw NostrClient.Error.signerNotSet }
         return signer
     }
 }

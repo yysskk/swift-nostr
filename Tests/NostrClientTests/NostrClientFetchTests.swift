@@ -57,14 +57,14 @@ struct NostrClientFetchTests {
         #expect(tracker.isComplete == true)
     }
 
-    @Test("Fetch on an empty pool throws noRelaysInPool immediately")
+    @Test("Fetch on an empty pool throws emptyPool immediately")
     func fetchOnEmptyPoolThrows() async throws {
         let client = NostrClient()
 
         // The throw happens at subscribe time, before the timeout task could ever
         // start — assert it does not consume the (long) timeout.
         let start = ContinuousClock.now
-        await #expect(throws: NostrError.noRelaysInPool) {
+        await #expect(throws: RelayPool.Error.emptyPool) {
             _ = try await client.events.fetch(filters: [Filter()], timeout: .seconds(10))
         }
         #expect(ContinuousClock.now - start < .seconds(5))

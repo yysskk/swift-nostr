@@ -95,7 +95,7 @@ public protocol NostrRelayManaging: Sendable {
     func remove(_ url: RelayURL) async
 
     /// Connects to all relays in the pool.
-    /// - Throws: ``NostrError/connectionFailed(_:)`` if every relay in the pool fails to connect;
+    /// - Throws: ``RelayPool/Error/allConnectionsFailed`` if every relay in the pool fails to connect;
     ///   partial connection failures are tolerated.
     func connect() async throws
     /// Disconnects from all relays, ending every open subscription.
@@ -130,7 +130,7 @@ public protocol NostrEventPublishing: Sendable {
     ///   - strategy: How many relay acknowledgments to wait for before returning, or nil for the
     ///     pool config's ``RelayPoolConfig/defaultPublishStrategy``.
     /// - Returns: The signed event together with the per-relay publish outcome.
-    /// - Throws: ``NostrError/signerNotSet`` if no signer is set, anything the signer throws, or the
+    /// - Throws: ``NostrClient/Error/signerNotSet`` if no signer is set, anything the signer throws, or the
     ///   errors of ``publish(_:to:strategy:)-(Event,Set<RelayURL>?,_)``.
     @discardableResult
     func publish(
@@ -149,11 +149,12 @@ public protocol NostrEventPublishing: Sendable {
     ///   - strategy: How many relay acknowledgments to wait for before returning, or nil for the
     ///     pool config's ``RelayPoolConfig/defaultPublishStrategy``.
     /// - Returns: The per-relay outcome of the publish, keyed by relay URL.
-    /// - Throws: ``NostrError/noRelaysInPool`` when broadcasting to an empty pool,
-    ///   ``NostrError/noMatchingRelays(_:)`` when none of the targeted URLs are in the pool
+    /// - Throws: ``RelayPool/Error/emptyPool`` when broadcasting to an empty pool,
+    ///   ``RelayPool/Error/noMatchingRelays(_:)`` when none of the targeted URLs are in the pool
     ///   (including an empty set), the last relay's error (a ``RelayRejection`` or a
     ///   ``RelayConnection/Error``) if no targeted relay accepts the event, or
-    ///   ``NostrError/relayError(_:)`` if a `.quorum` strategy cannot be satisfied.
+    ///   ``RelayPool/Error/quorumNotMet(acknowledged:required:)`` if a `.quorum` strategy cannot be
+    ///   satisfied.
     @discardableResult
     func publish(_ event: Event, to relayURLs: Set<RelayURL>?, strategy: PublishStrategy?) async throws -> PublishResult
 }
@@ -175,8 +176,8 @@ public protocol NostrEventFetching: Sendable {
     ///   - timeout: How long to wait for relays to finish, or nil for
     ///     ``RelayPoolConfig/queryTimeout``.
     /// - Returns: The events received, deduplicated across relays.
-    /// - Throws: ``NostrError/noRelaysInPool`` when the pool is empty, or
-    ///   ``NostrError/noMatchingRelays(_:)`` when none of the targeted URLs are in the pool
+    /// - Throws: ``RelayPool/Error/emptyPool`` when the pool is empty, or
+    ///   ``RelayPool/Error/noMatchingRelays(_:)`` when none of the targeted URLs are in the pool
     ///   (including an empty set). Both are thrown before anything is sent to a relay.
     func fetch(filters: [Filter], from relayURLs: Set<RelayURL>?, timeout: Duration?) async throws -> [Event]
 
@@ -193,8 +194,8 @@ public protocol NostrEventFetching: Sendable {
     ///   - timeout: How long to wait for relays to finish, or nil for
     ///     ``RelayPoolConfig/queryTimeout``.
     /// - Returns: The highest count any targeted relay reported.
-    /// - Throws: ``NostrError/noRelaysInPool`` when the pool is empty,
-    ///   ``NostrError/noMatchingRelays(_:)`` when none of the targeted URLs are in the pool, or the
+    /// - Throws: ``RelayPool/Error/emptyPool`` when the pool is empty,
+    ///   ``RelayPool/Error/noMatchingRelays(_:)`` when none of the targeted URLs are in the pool, or the
     ///   last relay's error (a ``RelayRejection`` or a ``RelayConnection/Error``) when no targeted
     ///   relay answered.
     func countEvents(matching filters: [Filter], from relayURLs: Set<RelayURL>?, timeout: Duration?) async throws -> Int
@@ -221,9 +222,9 @@ public protocol NostrSubscribing: Sendable {
     ///   - bufferingPolicy: How items are buffered while the consumer is slower than the relays.
     ///     Use `.bufferingNewest(n)` for firehose subscriptions where memory matters.
     /// - Returns: The subscription.
-    /// - Throws: ``NostrError/noRelaysInPool`` when the pool is empty,
-    ///   ``NostrError/noMatchingRelays(_:)`` when none of the targeted URLs are in the pool
-    ///   (including an empty set), or ``NostrError/relayError(_:)`` when every relay fails to
+    /// - Throws: ``RelayPool/Error/emptyPool`` when the pool is empty,
+    ///   ``RelayPool/Error/noMatchingRelays(_:)`` when none of the targeted URLs are in the pool
+    ///   (including an empty set), or ``RelayPool/Error/subscriptionFailed`` when every relay fails to
     ///   subscribe.
     func subscribe(
         filters: [Filter],
@@ -280,7 +281,7 @@ public protocol NostrRelayRouting: Sendable {
     ///   - kinds: The event kinds to receive.
     ///   - limit: How many stored events each relay sends before live ones, or nil for no limit.
     /// - Returns: The subscription.
-    /// - Throws: ``NostrError/noRelaysInPool`` when the fallback finds the pool empty, or the errors
+    /// - Throws: ``RelayPool/Error/emptyPool`` when the fallback finds the pool empty, or the errors
     ///   of opening the subscription.
     func subscribeOutbox(
         authors: [PublicKey], kinds: [Event.Kind], limit: Int?
@@ -295,7 +296,7 @@ public protocol NostrRelayRouting: Sendable {
     ///   - strategy: How many relay acknowledgments to wait for before returning, or nil for the
     ///     pool config's ``RelayPoolConfig/defaultPublishStrategy``.
     /// - Returns: The per-relay outcome of the publish.
-    /// - Throws: ``NostrError/noRelaysInPool`` when the fallback finds the pool empty, or the errors
+    /// - Throws: ``RelayPool/Error/emptyPool`` when the fallback finds the pool empty, or the errors
     ///   of the publish.
     @discardableResult
     func publishGossip(_ event: Event, strategy: PublishStrategy?) async throws -> PublishResult
@@ -332,7 +333,7 @@ public protocol NostrRelayRouting: Sendable {
     /// Call this before subscribing with ``NostrMessaging/subscribe(limit:)`` or
     /// ``NostrMessaging/giftWraps(limit:)`` so the subscription covers the relays you advertised.
     /// - Returns: The connected inbox relay URLs (empty if you have advertised no DM relay list).
-    /// - Throws: ``NostrError/signerNotSet`` if no signer is configured.
+    /// - Throws: ``NostrClient/Error/signerNotSet`` if no signer is configured.
     @discardableResult
     func connectDirectMessageInboxRelays() async throws -> Set<RelayURL>
 }
@@ -366,8 +367,8 @@ public protocol NostrMessaging: Sendable {
     ///     self-copy always uses the pool default so it never blocks the send.
     /// - Returns: The shared rumor, both gift wraps, and the per-relay publish outcomes. The rumor's
     ///   `id` is the key for matching the payload when it echoes back from a relay.
-    /// - Throws: ``NostrError/signerNotSet`` if no signer is set, anything the signer throws while
-    ///   sealing, or ``NostrError/noRelaysInPool`` when the recipient copy falls back to an empty
+    /// - Throws: ``NostrClient/Error/signerNotSet`` if no signer is set, anything the signer throws while
+    ///   sealing, or ``RelayPool/Error/emptyPool`` when the recipient copy falls back to an empty
     ///   pool.
     @discardableResult
     func sendGiftWrapped(
@@ -381,7 +382,7 @@ public protocol NostrMessaging: Sendable {
     /// reaction (kind 7), or a file message (kind 15).
     /// - Parameter giftWrap: The gift-wrapped event.
     /// - Returns: The decrypted payload.
-    /// - Throws: ``NostrError/signerNotSet`` if no signer is set,
+    /// - Throws: ``NostrClient/Error/signerNotSet`` if no signer is set,
     ///   ``DirectMessagePayload/Error/unexpectedKind(_:)`` for any other inner kind, another
     ///   ``DirectMessagePayload/Error`` for a malformed payload, or what
     ///   ``GiftWrap/unwrap(giftWrap:recipient:)`` throws for a gift wrap that does not open.
@@ -394,14 +395,14 @@ public protocol NostrMessaging: Sendable {
     /// ``DirectMessagePayloadSequence``.
     /// - Parameter limit: How many stored gift wraps each relay sends before live ones.
     /// - Returns: The payload sequence.
-    /// - Throws: ``NostrError/signerNotSet`` if no signer is set, or the errors of opening a
+    /// - Throws: ``NostrClient/Error/signerNotSet`` if no signer is set, or the errors of opening a
     ///   subscription on the whole pool.
     func payloads(limit: Int) async throws -> DirectMessagePayloadSequence
 
     /// Subscribes to the raw gift wraps (kind 1059) addressed to the current user, on the whole pool.
     /// - Parameter limit: How many stored gift wraps each relay sends before live ones.
     /// - Returns: The subscription; open each event with ``parsePayload(_:)``.
-    /// - Throws: ``NostrError/signerNotSet`` if no signer is set, or the errors of opening a
+    /// - Throws: ``NostrClient/Error/signerNotSet`` if no signer is set, or the errors of opening a
     ///   subscription on the whole pool.
     func giftWraps(limit: Int) async throws -> SubscriptionSequence
 }
@@ -420,7 +421,7 @@ public protocol NostrGroupManaging: Sendable {
     /// Signs `template` with the configured signer and publishes it only to the group's relay,
     /// adding the relay to the pool and connecting it on demand.
     ///
-    /// Signing comes first, so without a signer ``NostrError/signerNotSet`` is thrown before the
+    /// Signing comes first, so without a signer ``NostrClient/Error/signerNotSet`` is thrown before the
     /// group's relay is touched. A remote NIP-46 signer works too.
     /// - Parameters:
     ///   - template: The event to sign and publish — usually one of the NIP-29 factories such as
@@ -429,7 +430,7 @@ public protocol NostrGroupManaging: Sendable {
     ///   - strategy: How many relay acknowledgments to wait for before returning, or nil for the
     ///     pool config's ``RelayPoolConfig/defaultPublishStrategy``.
     /// - Returns: The signed event together with the per-relay publish outcome.
-    /// - Throws: ``NostrError/signerNotSet`` without a signer, plus anything the signer,
+    /// - Throws: ``NostrClient/Error/signerNotSet`` without a signer, plus anything the signer,
     ///   connection, or publish throws.
     @discardableResult
     func publish(
@@ -509,7 +510,7 @@ public protocol NostrGroupManaging: Sendable {
     ///   - strategy: How many relay acknowledgments to wait for before returning, or nil for the
     ///     pool config's ``RelayPoolConfig/defaultPublishStrategy``.
     /// - Returns: The signed event together with the per-relay publish outcome.
-    /// - Throws: ``NostrError/signerNotSet`` without a signer, plus anything the signer or publish
+    /// - Throws: ``NostrClient/Error/signerNotSet`` without a signer, plus anything the signer or publish
     ///   throws.
     @discardableResult
     func publishSimpleGroupList(
@@ -533,7 +534,7 @@ public protocol NostrListManaging: Sendable {
     ///   - strategy: How many relay acknowledgments to wait for before returning, or nil for the
     ///     pool config's ``RelayPoolConfig/defaultPublishStrategy``.
     /// - Returns: The signed event together with the per-relay publish outcome.
-    /// - Throws: ``NostrError/signerNotSet`` without a signer, plus anything the signer or publish
+    /// - Throws: ``NostrClient/Error/signerNotSet`` without a signer, plus anything the signer or publish
     ///   throws.
     @discardableResult
     func publish(_ list: NostrList, strategy: PublishStrategy?) async throws -> PublishedEvent
@@ -547,7 +548,7 @@ public protocol NostrListManaging: Sendable {
     ///   - timeout: How long to wait for relays to finish, or nil for
     ///     ``RelayPoolConfig/queryTimeout``.
     /// - Returns: The list, or nil if none was found.
-    /// - Throws: ``NostrError/signerNotSet`` when fetching the current user's list without a signer,
+    /// - Throws: ``NostrClient/Error/signerNotSet`` when fetching the current user's list without a signer,
     ///   or a decryption error when the current user's private items cannot be decrypted
     ///   (republishing such a list would silently drop them).
     func fetch(kind: Event.Kind, for publicKey: PublicKey?, timeout: Duration?) async throws -> NostrList?
@@ -561,7 +562,7 @@ public protocol NostrListManaging: Sendable {
     ///   - strategy: How many relay acknowledgments to wait for before returning, or nil for the
     ///     pool config's ``RelayPoolConfig/defaultPublishStrategy``.
     /// - Returns: The signed event together with the per-relay publish outcome.
-    /// - Throws: ``NostrError/signerNotSet`` without a signer, plus anything the signer or publish
+    /// - Throws: ``NostrClient/Error/signerNotSet`` without a signer, plus anything the signer or publish
     ///   throws.
     @discardableResult
     func publishSet(_ set: NostrListSet, strategy: PublishStrategy?) async throws -> PublishedEvent
@@ -576,7 +577,7 @@ public protocol NostrListManaging: Sendable {
     ///   - timeout: How long to wait for relays to finish, or nil for
     ///     ``RelayPoolConfig/queryTimeout``.
     /// - Returns: The set, or nil if none was found.
-    /// - Throws: ``NostrError/signerNotSet`` when fetching the current user's set without a signer,
+    /// - Throws: ``NostrClient/Error/signerNotSet`` when fetching the current user's set without a signer,
     ///   or a decryption error when the current user's private items cannot be decrypted.
     func fetchSet(
         kind: Event.Kind, identifier: String, for publicKey: PublicKey?, timeout: Duration?
@@ -591,7 +592,7 @@ public protocol NostrListManaging: Sendable {
     ///   - timeout: How long to wait for relays to finish, or nil for
     ///     ``RelayPoolConfig/queryTimeout``.
     /// - Returns: The sets, in no guaranteed order.
-    /// - Throws: ``NostrError/signerNotSet`` when fetching the current user's sets without a signer,
+    /// - Throws: ``NostrClient/Error/signerNotSet`` when fetching the current user's sets without a signer,
     ///   or a decryption error when a set's private items cannot be decrypted.
     func fetchSets(kind: Event.Kind, for publicKey: PublicKey?, timeout: Duration?) async throws -> [NostrListSet]
 }

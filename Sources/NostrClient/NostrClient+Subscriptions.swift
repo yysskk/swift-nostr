@@ -15,7 +15,7 @@ extension NostrClient {
         filters: [Filter],
         toURLs relayURLs: Set<RelayURL>?,
         bufferingPolicy: AsyncStream<SubscriptionEvent>.Continuation.BufferingPolicy = .unbounded
-    ) async throws -> SubscriptionSequence {
+    ) async throws(RelayPool.Error) -> SubscriptionSequence {
         let (stream, continuation) = AsyncStream.makeStream(
             of: SubscriptionEvent.self,
             bufferingPolicy: bufferingPolicy
@@ -60,7 +60,7 @@ extension NostrClient {
         filters: [Filter],
         toURLs relayURLs: Set<RelayURL>?,
         handler: @escaping @Sendable (SubscriptionEvent) -> Void
-    ) async throws -> (id: String, expectedRelays: Set<RelayURL>) {
+    ) async throws(RelayPool.Error) -> (id: String, expectedRelays: Set<RelayURL>) {
         subscriptionCounter += 1
         let subscriptionID = "sub_\(subscriptionCounter)"
 
@@ -86,8 +86,8 @@ extension NostrClient {
             return (subscriptionID, expectedRelayURLs)
         } catch {
             openSubscriptions.removeValue(forKey: subscriptionID)
-            switch error as? NostrError {
-            case .noRelaysInPool?, .noMatchingRelays?:
+            switch error {
+            case .emptyPool, .noMatchingRelays:
                 // Thrown while resolving the targets, before the pool registered anything or sent
                 // a REQ: there is nothing to tear down, and a CLOSE would reach relays that never
                 // saw the subscription.

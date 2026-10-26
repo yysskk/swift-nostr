@@ -136,7 +136,7 @@ struct NostrClientTargetedPublishTests {
         let (client, sockets) = try await makeClient(relayURLs: [urlA, urlB])
         try await client.identity.setPrivateKey(try KeyPair().privateKeyHex)
 
-        await #expect(throws: NostrError.noMatchingRelays([])) {
+        await #expect(throws: RelayPool.Error.noMatchingRelays([])) {
             try await client.events.publish(.textNote("nowhere"), to: [])
         }
         #expect(sockets.allSatisfy { PublishAckSupport.eventFrames(in: $0).isEmpty })
@@ -148,7 +148,7 @@ struct NostrClientTargetedPublishTests {
         let (client, sockets) = try await makeClient(relayURLs: [urlA, urlB])
         let event = try makeEvent()
 
-        await #expect(throws: NostrError.noMatchingRelays([])) {
+        await #expect(throws: RelayPool.Error.noMatchingRelays([])) {
             try await client.events.publish(event, to: [])
         }
         #expect(sockets.allSatisfy { PublishAckSupport.eventFrames(in: $0).isEmpty })
@@ -160,7 +160,7 @@ struct NostrClientTargetedPublishTests {
         let (client, sockets) = try await makeClient(relayURLs: [urlA])
         let event = try makeEvent()
 
-        await #expect(throws: NostrError.noMatchingRelays([RelayURL("wss://unknown.example.com")!])) {
+        await #expect(throws: RelayPool.Error.noMatchingRelays([RelayURL("wss://unknown.example.com")!])) {
             try await client.events.publish(event, to: [RelayURL("wss://Unknown.Example.com/")!])
         }
         #expect(PublishAckSupport.eventFrames(in: sockets[0]).isEmpty)

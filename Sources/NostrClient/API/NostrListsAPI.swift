@@ -132,8 +132,8 @@ public struct NostrListsAPI: NostrListManaging {
     // MARK: - Private
 
     /// The author to query: the given public key, or the signer's own when none is given.
-    /// - Throws: ``NostrError/signerNotSet`` when neither is available.
-    private func author(_ publicKey: PublicKey?) async throws -> PublicKey {
+    /// - Throws: ``NostrClient/Error/signerNotSet`` when neither is available.
+    private func author(_ publicKey: PublicKey?) async throws(NostrClient.Error) -> PublicKey {
         if let publicKey { return publicKey }
         return try await client.requiredPublicKey()
     }

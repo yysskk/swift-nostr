@@ -93,11 +93,11 @@ struct SubscriptionSequenceTests {
         #expect(sequence.events.expectedRelays == [relayURL])
     }
 
-    @Test("subscribe on an empty pool throws noRelaysInPool")
+    @Test("subscribe on an empty pool throws emptyPool")
     func subscribeOnEmptyPoolThrows() async throws {
         let client = NostrClient()
 
-        await #expect(throws: NostrError.noRelaysInPool) {
+        await #expect(throws: RelayPool.Error.emptyPool) {
             _ = try await client.subscriptions.subscribe(filters: [Filter()])
         }
         #expect(await client.activeSubscriptionCount == 0)
@@ -259,7 +259,7 @@ struct SubscriptionSequenceTests {
     @Test("messages.giftWraps requires a signer")
     func subscribeToDirectMessagesRequiresSigner() async throws {
         let (client, _) = try await makeConnectedClient()
-        await #expect(throws: NostrError.self) {
+        await #expect(throws: NostrClient.Error.signerNotSet) {
             _ = try await client.messages.giftWraps()
         }
 

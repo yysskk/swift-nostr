@@ -47,7 +47,7 @@ public struct NostrIdentityAPI: NostrIdentityProviding {
     /// ``NostrEventPublishing/publish(_:to:strategy:)-(EventTemplate,Set<RelayURL>?,_)``.
     /// - Parameter template: The event to sign.
     /// - Returns: The signed ``Event``.
-    /// - Throws: ``NostrError/signerNotSet`` if no signer is set, plus anything the signer throws.
+    /// - Throws: ``NostrClient/Error/signerNotSet`` if no signer is set, plus anything the signer throws.
     public func sign(_ template: EventTemplate) async throws -> Event {
         try await client.sign(template)
     }
@@ -63,7 +63,7 @@ public struct NostrIdentityAPI: NostrIdentityProviding {
     ///   - plaintext: The message to encrypt.
     ///   - recipientPublicKey: The recipient's public key.
     /// - Returns: The NIP-44 payload.
-    /// - Throws: ``NostrError/signerNotSet`` if no signer is set, plus anything the signer throws.
+    /// - Throws: ``NostrClient/Error/signerNotSet`` if no signer is set, plus anything the signer throws.
     public func nip44Encrypt(_ plaintext: String, to recipientPublicKey: PublicKey) async throws -> String {
         try await client.withSigner { signer, _ in
             try await signer.nip44Encrypt(plaintext, to: recipientPublicKey)
@@ -77,7 +77,7 @@ public struct NostrIdentityAPI: NostrIdentityProviding {
     ///   - ciphertext: The NIP-44 payload.
     ///   - senderPublicKey: The sender's public key.
     /// - Returns: The decrypted plaintext.
-    /// - Throws: ``NostrError/signerNotSet`` if no signer is set, plus anything the signer throws.
+    /// - Throws: ``NostrClient/Error/signerNotSet`` if no signer is set, plus anything the signer throws.
     public func nip44Decrypt(_ ciphertext: String, from senderPublicKey: PublicKey) async throws -> String {
         try await client.withSigner { signer, _ in
             try await signer.nip44Decrypt(ciphertext, from: senderPublicKey)
@@ -114,13 +114,13 @@ public struct NostrIdentityAPI: NostrIdentityProviding {
     /// — simply call it again to answer the fresh challenge.
     ///
     /// - Parameter relayURL: The relay to authenticate to; must be in the pool.
-    /// - Throws: ``NostrError/noMatchingRelays(_:)`` when the relay is not in the
+    /// - Throws: ``RelayPool/Error/noMatchingRelays(_:)`` when the relay is not in the
     ///   pool, ``RelayConnection/Error/missingAuthenticationChallenge`` when the relay has not sent
-    ///   a challenge, ``NostrError/signerNotSet`` without a signer, and everything
+    ///   a challenge, ``NostrClient/Error/signerNotSet`` without a signer, and everything
     ///   ``RelayConnection/authenticate(with:)`` throws.
     public func authenticate(relayURL: RelayURL) async throws {
         guard let connection = await client.pool.relay(for: relayURL) else {
-            throw NostrError.noMatchingRelays([relayURL])
+            throw RelayPool.Error.noMatchingRelays([relayURL])
         }
         guard let challenge = await connection.authenticationChallenge else {
             throw RelayConnection.Error.missingAuthenticationChallenge

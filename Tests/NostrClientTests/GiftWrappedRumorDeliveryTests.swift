@@ -142,13 +142,13 @@ struct GiftWrappedRumorDeliveryTests {
         await client.relays.disconnect()
     }
 
-    @Test("an empty pool throws noRelaysInPool")
+    @Test("an empty pool throws emptyPool")
     func emptyPoolThrows() async throws {
         let client = NostrClient()
         try await client.identity.setPrivateKey(senderKey)
         let recipient = try KeyPair()
 
-        await #expect(throws: NostrError.noRelaysInPool) {
+        await #expect(throws: RelayPool.Error.emptyPool) {
             try await client.messages.sendGiftWrapped(
                 makeTemplate(recipient: recipient.publicKey), to: recipient.publicKey)
         }
@@ -159,7 +159,7 @@ struct GiftWrappedRumorDeliveryTests {
         let client = NostrClient()
         let recipient = try KeyPair()
 
-        await #expect(throws: NostrError.signerNotSet) {
+        await #expect(throws: NostrClient.Error.signerNotSet) {
             try await client.messages.sendGiftWrapped(
                 makeTemplate(recipient: recipient.publicKey), to: recipient.publicKey)
         }
