@@ -105,7 +105,8 @@ struct WalletConnectURITests {
     @Test("rejects a malformed secret")
     func rejectsBadSecret() {
         #expect(throws: WalletConnectError.self) {
-            try WalletConnectURI(string: "nostr+walletconnect://\(walletPubkeyHex)?relay=wss%3A%2F%2Fr.example&secret=zz")
+            try WalletConnectURI(
+                string: "nostr+walletconnect://\(walletPubkeyHex)?relay=wss%3A%2F%2Fr.example&secret=zz")
         }
     }
 

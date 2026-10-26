@@ -8,7 +8,8 @@ import Testing
 struct BunkerURITests {
     // A remote signer pubkey (32-byte hex, secp256k1 generator x-coordinate).
     let pubkey = "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
-    let malformedPubkeyError = RemoteSignerError.invalidURI(reason: "remote signer pubkey must be lowercase 32-byte hex")
+    let malformedPubkeyError = RemoteSignerError.invalidURI(
+        reason: "remote signer pubkey must be lowercase 32-byte hex")
 
     @Test("parses a spec-shaped token")
     func parsesSpecShapedToken() throws {

@@ -107,8 +107,8 @@ struct NostrConnectURITests {
         let keyPair = try KeyPair()
         let invitation = try NostrConnectURI(clientPubkey: keyPair.publicKey, relays: relays, secret: "s")
 
-        #expect(
-            invitation.stringValue == "nostrconnect://\(keyPair.publicKey.hex)?relay=wss%3A%2F%2Frelay.example&secret=s")
+        let expected = "nostrconnect://\(keyPair.publicKey.hex)?relay=wss%3A%2F%2Frelay.example&secret=s"
+        #expect(invitation.stringValue == expected)
         #expect(try NostrConnectURI(string: invitation.stringValue).clientPubkey == keyPair.publicKey)
     }
 
