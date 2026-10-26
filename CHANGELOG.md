@@ -106,6 +106,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `PublicKey` — reports a malformed `p` as `missingRecipient`. A received direct message whose `p`
   tag is malformed, or a reaction whose `e` or `p` tag is, fails to parse as `invalidData`; a reply
   marker with a malformed id leaves `replyTo` nil.
+- **NostrConnect and NostrWalletConnect take and return typed keys** (breaking):
+  `RemoteSigner.clientPublicKey` is a `PublicKey` and `remoteSignerPubkey` a `PublicKey?`;
+  `userPublicKey()` and `awaitConnection()` return a `PublicKey`, and `nip04Encrypt(_:to:)` /
+  `nip04Decrypt(_:from:)` take one, as their NIP-44 counterparts already do.
+  `BunkerURI.remoteSignerPubkey`, `NostrConnectURI.clientPubkey`, and `WalletConnectURI.walletPubkey`
+  are `PublicKey`, and `BunkerURI(remoteSignerPubkey:relays:secret:)`,
+  `NostrConnectURI(clientPubkey:relays:secret:permissions:name:url:image:)`, and
+  `WalletConnectURI(walletPubkey:relays:secret:lud16:)` take one, so they no longer validate a key
+  string. `WalletConnectURI.clientPublicKeyHex` is now `clientPublicKey: PublicKey`. The connection
+  strings and the NIP-46 and NIP-47 request bodies are unchanged.
+- **Connection URIs reject a non-canonical key** (breaking): parsing a `bunker://`,
+  `nostrconnect://`, or `nostr+walletconnect://` string whose host is not canonical lowercase hex —
+  uppercase hex included, which used to be folded to lowercase — throws
+  `RemoteSignerError.invalidURI(reason:)` or `WalletConnectError.invalidURI(reason:)`.
 - **`KeyPair.publicKey` is a `PublicKey`** (breaking): `KeyPair.publicKeyHex` and `KeyPair.npub`
   are removed in favor of `publicKey.hex` and `publicKey.npub`; the raw bytes are `publicKey.data`.
 - **`EventSigner.npub` no longer throws** (breaking).

@@ -1,5 +1,5 @@
 import Foundation
-import NostrCore
+public import NostrCore
 
 /// A parsed NIP-46 `bunker://` connection token issued by a remote signer:
 ///
@@ -7,15 +7,16 @@ import NostrCore
 /// bunker://<remote-signer-pubkey>?relay=<wss url>&relay=...&secret=<optional>
 /// ```
 ///
-/// - The host is the remote signer's public key (hex), which is not necessarily the user's key.
+/// - The host is the remote signer's public key in canonical lowercase hex, which is not
+///   necessarily the user's key.
 /// - `relay` is a relay the remote signer listens on; it may appear more than once.
 /// - `secret` is an optional, single-use connection secret the client echoes back in its `connect`
 ///   request. Unlike the NIP-47 wallet secret it is an opaque string, not a 32-byte key.
 ///
 /// https://github.com/nostr-protocol/nips/blob/master/46.md
 public struct BunkerURI: Sendable, Hashable {
-    /// The remote signer's public key (32-byte hex) — not necessarily the user's key.
-    public let remoteSignerPubkey: String
+    /// The remote signer's public key — not necessarily the user's key.
+    public let remoteSignerPubkey: PublicKey
 
     /// The relays the remote signer listens on. Always at least one.
     public let relays: [URL]
@@ -26,18 +27,14 @@ public struct BunkerURI: Sendable, Hashable {
     /// The URI scheme, without the `://` separator.
     public static let scheme = "bunker"
 
-    /// Creates a token from its components, validating the pubkey and relay list.
+    /// Creates a token from its components, validating the relay list.
     ///
     /// - Parameters:
-    ///   - remoteSignerPubkey: The remote signer's public key (must be 32-byte hex).
+    ///   - remoteSignerPubkey: The remote signer's public key.
     ///   - relays: The relays the remote signer listens on (must contain at least one).
     ///   - secret: An optional one-time connection secret.
-    /// - Throws: ``RemoteSignerError/invalidURI(reason:)`` if any field fails validation.
-    public init(remoteSignerPubkey: String, relays: [URL], secret: String? = nil) throws {
-        let normalizedPubkey = remoteSignerPubkey.lowercased()
-        guard Data(hexString: normalizedPubkey)?.count == 32 else {
-            throw RemoteSignerError.invalidURI(reason: "remote signer pubkey must be 32-byte hex")
-        }
+    /// - Throws: ``RemoteSignerError/invalidURI(reason:)`` if the relay list fails validation.
+    public init(remoteSignerPubkey: PublicKey, relays: [URL], secret: String? = nil) throws {
         guard !relays.isEmpty else {
             throw RemoteSignerError.invalidURI(reason: "at least one relay is required")
         }
@@ -45,7 +42,7 @@ public struct BunkerURI: Sendable, Hashable {
             throw RemoteSignerError.invalidURI(reason: "relays must be ws:// or wss:// URLs")
         }
 
-        self.remoteSignerPubkey = normalizedPubkey
+        self.remoteSignerPubkey = remoteSignerPubkey
         self.relays = relays
         self.secret = secret
     }
@@ -54,7 +51,7 @@ public struct BunkerURI: Sendable, Hashable {
     ///
     /// - Parameter string: The connection token issued by the remote signer.
     /// - Throws: ``RemoteSignerError/invalidURI(reason:)`` if the string is malformed or missing
-    ///   required fields.
+    ///   required fields, including a host that is not a canonical lowercase hex public key.
     public init(string: String) throws {
         guard let components = URLComponents(string: string),
             components.scheme?.lowercased() == Self.scheme
@@ -64,6 +61,9 @@ public struct BunkerURI: Sendable, Hashable {
 
         guard let host = components.host, !host.isEmpty else {
             throw RemoteSignerError.invalidURI(reason: "missing remote signer pubkey")
+        }
+        guard let remoteSignerPubkey = PublicKey(host) else {
+            throw RemoteSignerError.invalidURI(reason: "remote signer pubkey must be lowercase 32-byte hex")
         }
 
         let queryItems = components.queryItems ?? []
@@ -76,7 +76,7 @@ public struct BunkerURI: Sendable, Hashable {
 
         let secret = queryItems.first(where: { $0.name == "secret" })?.value
 
-        try self.init(remoteSignerPubkey: host, relays: relays, secret: secret)
+        try self.init(remoteSignerPubkey: remoteSignerPubkey, relays: relays, secret: secret)
     }
 
     /// The canonical connection string, with each relay and the secret percent-encoded.

@@ -53,11 +53,11 @@ struct RemoteSignerCommandsTests {
             RemoteSignerFixtures.response(
                 requestID: request.id, result: PublicKey.fixture("user").hex, client: client, signer: signer))
         let resolved = try await first.value
-        #expect(resolved == PublicKey.fixture("user").hex)
+        #expect(resolved == PublicKey.fixture("user"))
 
         // The second call is served from cache — no new request event is sent.
         let cached = try await remote.userPublicKey()
-        #expect(cached == PublicKey.fixture("user").hex)
+        #expect(cached == PublicKey.fixture("user"))
         #expect(await transport.sentEvents.count == 2)
     }
 
@@ -200,7 +200,7 @@ struct RemoteSignerCommandsTests {
         try await transport.deliver(
             RemoteSignerFixtures.response(
                 requestID: retry.id, result: PublicKey.fixture("user").hex, client: client, signer: signer))
-        #expect(try await second.value == PublicKey.fixture("user").hex)
+        #expect(try await second.value == PublicKey.fixture("user"))
     }
 
     // MARK: - nip44 / nip04
@@ -240,17 +240,33 @@ struct RemoteSignerCommandsTests {
     @Test("nip04Encrypt sends third-party pubkey then plaintext")
     func nip04EncryptRoundTrip() async throws {
         let (remote, transport) = try await connected()
-        let third = try KeyPair().publicKey.hex
+        let third = try KeyPair().publicKey
 
         let ciphertext = Task { try await remote.nip04Encrypt("hi", to: third) }
         let request = try await nextRequest(transport)
         #expect(request.method == RemoteSignerMethod.nip04Encrypt.rawValue)
-        #expect(request.params == [third, "hi"])
+        #expect(request.params == [third.hex, "hi"])
         try await transport.deliver(
             RemoteSignerFixtures.response(
                 requestID: request.id, result: "ct?iv=iv", client: client, signer: signer))
         let resolved = try await ciphertext.value
         #expect(resolved == "ct?iv=iv")
+    }
+
+    @Test("nip04Decrypt sends third-party pubkey then ciphertext and returns the plaintext")
+    func nip04DecryptRoundTrip() async throws {
+        let (remote, transport) = try await connected()
+        let third = try KeyPair().publicKey
+
+        let plaintext = Task { try await remote.nip04Decrypt("ct?iv=iv", from: third) }
+        let request = try await nextRequest(transport)
+        #expect(request.method == RemoteSignerMethod.nip04Decrypt.rawValue)
+        #expect(request.params == [third.hex, "ct?iv=iv"])
+        try await transport.deliver(
+            RemoteSignerFixtures.response(
+                requestID: request.id, result: "hi", client: client, signer: signer))
+        let resolved = try await plaintext.value
+        #expect(resolved == "hi")
     }
 
     // MARK: - switch_relays

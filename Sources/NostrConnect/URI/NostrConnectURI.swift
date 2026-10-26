@@ -8,7 +8,8 @@ public import NostrCore
 /// nostrconnect://<client-pubkey>?relay=...&secret=...&perms=...&name=...&url=...&image=...
 /// ```
 ///
-/// - The host is the client's public key (hex), which originates the connection.
+/// - The host is the client's public key in canonical lowercase hex, which originates the
+///   connection.
 /// - `relay` is a relay the client listens on; it may appear more than once.
 /// - `secret` is a random string the signer must echo back to prove it saw the invitation.
 /// - `perms` is a comma-separated list of the permissions the client requests.
@@ -16,8 +17,8 @@ public import NostrCore
 ///
 /// https://github.com/nostr-protocol/nips/blob/master/46.md
 public struct NostrConnectURI: Sendable, Hashable {
-    /// The client's public key (32-byte hex) — the URI origin.
-    public let clientPubkey: String
+    /// The client's public key — the URI origin.
+    public let clientPubkey: PublicKey
 
     /// The relays the client listens on. Always at least one.
     public let relays: [URL]
@@ -40,19 +41,19 @@ public struct NostrConnectURI: Sendable, Hashable {
     /// The URI scheme, without the `://` separator.
     public static let scheme = "nostrconnect"
 
-    /// Creates an invitation from its components, validating the client pubkey and relay list.
+    /// Creates an invitation from its components, validating the relay list.
     ///
     /// - Parameters:
-    ///   - clientPubkey: The client's public key (must be 32-byte hex).
+    ///   - clientPubkey: The client's public key.
     ///   - relays: The relays the client listens on (must contain at least one).
     ///   - secret: The connection secret the signer must echo back.
     ///   - permissions: The permissions requested from the signer.
     ///   - name: An optional client display name.
     ///   - url: An optional client website.
     ///   - image: An optional client icon.
-    /// - Throws: ``RemoteSignerError/invalidURI(reason:)`` if any field fails validation.
+    /// - Throws: ``RemoteSignerError/invalidURI(reason:)`` if the relay list fails validation.
     public init(
-        clientPubkey: String,
+        clientPubkey: PublicKey,
         relays: [URL],
         secret: String,
         permissions: [RemoteSignerPermission] = [],
@@ -60,10 +61,6 @@ public struct NostrConnectURI: Sendable, Hashable {
         url: URL? = nil,
         image: URL? = nil
     ) throws {
-        let normalizedPubkey = clientPubkey.lowercased()
-        guard Data(hexString: normalizedPubkey)?.count == 32 else {
-            throw RemoteSignerError.invalidURI(reason: "client pubkey must be 32-byte hex")
-        }
         guard !relays.isEmpty else {
             throw RemoteSignerError.invalidURI(reason: "at least one relay is required")
         }
@@ -71,7 +68,7 @@ public struct NostrConnectURI: Sendable, Hashable {
             throw RemoteSignerError.invalidURI(reason: "relays must be ws:// or wss:// URLs")
         }
 
-        self.clientPubkey = normalizedPubkey
+        self.clientPubkey = clientPubkey
         self.relays = relays
         self.secret = secret
         self.permissions = permissions
@@ -100,7 +97,7 @@ public struct NostrConnectURI: Sendable, Hashable {
         image: URL? = nil
     ) throws -> NostrConnectURI {
         try NostrConnectURI(
-            clientPubkey: clientKeyPair.publicKey.hex,
+            clientPubkey: clientKeyPair.publicKey,
             relays: relays,
             secret: URIQuery.randomHex(byteCount: 16),
             permissions: permissions,
@@ -114,7 +111,7 @@ public struct NostrConnectURI: Sendable, Hashable {
     ///
     /// - Parameter string: The invitation string produced by a client.
     /// - Throws: ``RemoteSignerError/invalidURI(reason:)`` if the string is malformed or missing
-    ///   required fields.
+    ///   required fields, including a host that is not a canonical lowercase hex public key.
     public init(string: String) throws {
         guard let components = URLComponents(string: string),
             components.scheme?.lowercased() == Self.scheme
@@ -124,6 +121,9 @@ public struct NostrConnectURI: Sendable, Hashable {
 
         guard let host = components.host, !host.isEmpty else {
             throw RemoteSignerError.invalidURI(reason: "missing client pubkey")
+        }
+        guard let clientPubkey = PublicKey(host) else {
+            throw RemoteSignerError.invalidURI(reason: "client pubkey must be lowercase 32-byte hex")
         }
 
         let queryItems = components.queryItems ?? []
@@ -150,7 +150,7 @@ public struct NostrConnectURI: Sendable, Hashable {
         let image = (queryItems.first(where: { $0.name == "image" })?.value).flatMap { URL(string: $0) }
 
         try self.init(
-            clientPubkey: host,
+            clientPubkey: clientPubkey,
             relays: relays,
             secret: secret,
             permissions: permissions,

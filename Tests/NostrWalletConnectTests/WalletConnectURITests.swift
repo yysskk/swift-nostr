@@ -7,7 +7,7 @@ import Testing
 @Suite("WalletConnectURI Tests")
 struct WalletConnectURITests {
     // Canonical example from NIP-47.
-    let walletPubkey = "b889ff5b1513b641e2a139f661a661364979c5beee91842f8f0ef42ab558e9d4"
+    let walletPubkeyHex = "b889ff5b1513b641e2a139f661a661364979c5beee91842f8f0ef42ab558e9d4"
     let secretHex = "71a8c14c1407c113601079c4302dab36460f0ccd0ad506f1f2dc73b5100e4f3c"
     let canonical =
         "nostr+walletconnect://b889ff5b1513b641e2a139f661a661364979c5beee91842f8f0ef42ab558e9d4"
@@ -17,7 +17,7 @@ struct WalletConnectURITests {
     @Test("parses the canonical NIP-47 connection string")
     func parseCanonical() throws {
         let uri = try WalletConnectURI(string: canonical)
-        #expect(uri.walletPubkey == walletPubkey)
+        #expect(uri.walletPubkey == (try PublicKey(hex: walletPubkeyHex)))
         #expect(uri.relays == [URL(string: "wss://relay.damus.io")!])
         #expect(uri.secret.hexEncodedString() == secretHex)
         #expect(uri.lud16 == nil)
@@ -26,7 +26,7 @@ struct WalletConnectURITests {
     @Test("keeps every relay when relay= is repeated, in order")
     func parseMultipleRelays() throws {
         let string =
-            "nostr+walletconnect://\(walletPubkey)"
+            "nostr+walletconnect://\(walletPubkeyHex)"
             + "?relay=wss%3A%2F%2Frelay.one.example&relay=wss%3A%2F%2Frelay.two.example"
             + "&secret=\(secretHex)"
         let uri = try WalletConnectURI(string: string)
@@ -54,37 +54,58 @@ struct WalletConnectURITests {
     func clientIdentity() throws {
         let uri = try WalletConnectURI(string: canonical)
         let expected = try KeyPair(privateKeyHex: secretHex)
-        #expect(uri.clientKeyPair().publicKey.hex == expected.publicKey.hex)
-        #expect(uri.clientPublicKeyHex == expected.publicKey.hex)
+        #expect(uri.clientKeyPair().publicKey == expected.publicKey)
+        #expect(uri.clientPublicKey == expected.publicKey)
         #expect(uri.clientSigner().publicKey == expected.publicKey)
     }
 
     @Test("rejects a wrong scheme")
     func rejectsWrongScheme() {
         #expect(throws: WalletConnectError.self) {
-            try WalletConnectURI(string: "https://\(walletPubkey)?relay=wss%3A%2F%2Fr.example&secret=\(secretHex)")
+            try WalletConnectURI(string: "https://\(walletPubkeyHex)?relay=wss%3A%2F%2Fr.example&secret=\(secretHex)")
         }
     }
 
     @Test("rejects a non-32-byte-hex wallet pubkey")
     func rejectsBadPubkey() {
-        #expect(throws: WalletConnectError.self) {
+        #expect(throws: WalletConnectError.invalidURI(reason: "wallet pubkey must be lowercase 32-byte hex")) {
             try WalletConnectURI(
                 string: "nostr+walletconnect://deadbeef?relay=wss%3A%2F%2Fr.example&secret=\(secretHex)")
         }
     }
 
+    /// A key has one spelling, so an uppercase host is rejected rather than folded to lowercase.
+    @Test("rejects an uppercase wallet pubkey")
+    func rejectsUppercasePubkey() {
+        #expect(throws: WalletConnectError.invalidURI(reason: "wallet pubkey must be lowercase 32-byte hex")) {
+            try WalletConnectURI(
+                string: "nostr+walletconnect://\(walletPubkeyHex.uppercased())"
+                    + "?relay=wss%3A%2F%2Fr.example&secret=\(secretHex)")
+        }
+    }
+
+    @Test("a URI built from typed components serializes its wallet key as the lowercase hex host")
+    func typedComponentsRoundTrip() throws {
+        let walletPubkey = try PublicKey(hex: walletPubkeyHex)
+        let uri = try WalletConnectURI(
+            walletPubkey: walletPubkey,
+            relays: [URL(string: "wss://relay.damus.io")!],
+            secret: try #require(Data(hexString: secretHex)))
+        #expect(uri.stringValue.hasPrefix("nostr+walletconnect://\(walletPubkeyHex)?"))
+        #expect(try WalletConnectURI(string: uri.stringValue).walletPubkey == walletPubkey)
+    }
+
     @Test("rejects a missing relay")
     func rejectsMissingRelay() {
         #expect(throws: WalletConnectError.self) {
-            try WalletConnectURI(string: "nostr+walletconnect://\(walletPubkey)?secret=\(secretHex)")
+            try WalletConnectURI(string: "nostr+walletconnect://\(walletPubkeyHex)?secret=\(secretHex)")
         }
     }
 
     @Test("rejects a malformed secret")
     func rejectsBadSecret() {
         #expect(throws: WalletConnectError.self) {
-            try WalletConnectURI(string: "nostr+walletconnect://\(walletPubkey)?relay=wss%3A%2F%2Fr.example&secret=zz")
+            try WalletConnectURI(string: "nostr+walletconnect://\(walletPubkeyHex)?relay=wss%3A%2F%2Fr.example&secret=zz")
         }
     }
 
@@ -92,7 +113,7 @@ struct WalletConnectURITests {
     func rejectsShortSecret() {
         #expect(throws: WalletConnectError.self) {
             try WalletConnectURI(
-                walletPubkey: walletPubkey,
+                walletPubkey: try PublicKey(hex: walletPubkeyHex),
                 relays: [URL(string: "wss://r.example")!],
                 secret: Data(repeating: 1, count: 16))
         }

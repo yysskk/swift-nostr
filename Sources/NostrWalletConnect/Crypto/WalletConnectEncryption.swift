@@ -29,40 +29,30 @@ struct WalletConnectCipher: Sendable {
     /// Encrypts `plaintext` from `sender` to the holder of `recipientPubkey`.
     /// - Parameters:
     ///   - plaintext: The message to encrypt.
-    ///   - recipientPubkey: The recipient's 32-byte x-only public key (hex).
+    ///   - recipientPubkey: The recipient's public key.
     ///   - sender: The sender's key pair.
     /// - Returns: The encrypted payload, in the chosen scheme's wire format.
-    func encrypt(_ plaintext: String, recipientPubkey: String, sender: KeyPair) throws -> String {
+    func encrypt(_ plaintext: String, recipientPubkey: PublicKey, sender: KeyPair) throws -> String {
         switch scheme {
         case .nip44:
-            return try SealedMessage.seal(plaintext, for: PublicKey(hex: recipientPubkey), using: sender).payload
+            return try SealedMessage.seal(plaintext, for: recipientPubkey, using: sender).payload
         case .nip04:
-            let peer = try xOnlyKey(recipientPubkey)
-            return try NIP04.encrypt(plaintext, privateKey: sender.privateKey, peerPubkeyXOnly: peer)
+            return try NIP04.encrypt(plaintext, privateKey: sender.privateKey, peerPubkeyXOnly: recipientPubkey.data)
         }
     }
 
     /// Decrypts `payload` sent by the holder of `senderPubkey` to `recipient`.
     /// - Parameters:
     ///   - payload: The encrypted payload, in the chosen scheme's wire format.
-    ///   - senderPubkey: The sender's 32-byte x-only public key (hex).
+    ///   - senderPubkey: The sender's public key.
     ///   - recipient: The recipient's key pair.
     /// - Returns: The decrypted plaintext.
-    func decrypt(_ payload: String, senderPubkey: String, recipient: KeyPair) throws -> String {
+    func decrypt(_ payload: String, senderPubkey: PublicKey, recipient: KeyPair) throws -> String {
         switch scheme {
         case .nip44:
-            return try SealedMessage(payload: payload).open(from: PublicKey(hex: senderPubkey), using: recipient)
+            return try SealedMessage(payload: payload).open(from: senderPubkey, using: recipient)
         case .nip04:
-            let peer = try xOnlyKey(senderPubkey)
-            return try NIP04.decrypt(payload, privateKey: recipient.privateKey, peerPubkeyXOnly: peer)
+            return try NIP04.decrypt(payload, privateKey: recipient.privateKey, peerPubkeyXOnly: senderPubkey.data)
         }
-    }
-
-    /// Decodes a 32-byte x-only public key from hex, or throws ``NostrError/invalidPublicKey``.
-    private func xOnlyKey(_ hex: String) throws -> Data {
-        guard let data = Data(hexString: hex), data.count == 32 else {
-            throw NostrError.invalidPublicKey
-        }
-        return data
     }
 }

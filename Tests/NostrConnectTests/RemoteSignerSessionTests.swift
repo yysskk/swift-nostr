@@ -128,7 +128,7 @@ struct RemoteSignerSessionTests {
         }
 
         let resolved = try await pubkey.value
-        #expect(resolved == PublicKey.fixture("user").hex)
+        #expect(resolved == PublicKey.fixture("user"))
         try await pong.value
     }
 
@@ -240,7 +240,7 @@ struct RemoteSignerSessionTests {
             RemoteSignerFixtures.response(
                 requestID: request.id, result: PublicKey.fixture("user").hex, client: client, signer: signer))
         let resolved = try await pubkey.value
-        #expect(resolved == PublicKey.fixture("user").hex)
+        #expect(resolved == PublicKey.fixture("user"))
     }
 
     // MARK: - disconnect / logout

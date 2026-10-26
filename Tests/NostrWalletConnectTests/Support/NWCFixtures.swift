@@ -7,7 +7,7 @@ import NostrCore
 enum NWCFixtures {
     static func uri(wallet: KeyPair, client: KeyPair) throws -> WalletConnectURI {
         try WalletConnectURI(
-            walletPubkey: wallet.publicKey.hex,
+            walletPubkey: wallet.publicKey,
             relays: [URL(string: "wss://relay.example")!],
             secret: client.privateKey)
     }
@@ -16,14 +16,14 @@ enum NWCFixtures {
     static func encrypt(
         _ json: String, to recipient: KeyPair, from sender: KeyPair, scheme: WalletConnectEncryption = .nip44
     ) throws -> String {
-        try WalletConnectCipher(scheme).encrypt(json, recipientPubkey: recipient.publicKey.hex, sender: sender)
+        try WalletConnectCipher(scheme).encrypt(json, recipientPubkey: recipient.publicKey, sender: sender)
     }
 
     /// Decrypts a request event the client sent to the wallet.
     static func decryptRequest(
         _ event: Event, client: KeyPair, wallet: KeyPair, scheme: WalletConnectEncryption = .nip44
     ) throws -> String {
-        try WalletConnectCipher(scheme).decrypt(event.content, senderPubkey: client.publicKey.hex, recipient: wallet)
+        try WalletConnectCipher(scheme).decrypt(event.content, senderPubkey: client.publicKey, recipient: wallet)
     }
 
     /// Builds a signed kind-23195 response event for a request, encrypting `resultJSON` to the

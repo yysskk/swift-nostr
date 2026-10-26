@@ -15,7 +15,7 @@ enum RemoteSignerFixtures {
     /// Builds a `bunker://` token pointing at `signer`, with an optional connection secret.
     static func bunker(signer: KeyPair, secret: String? = nil) throws -> BunkerURI {
         try BunkerURI(
-            remoteSignerPubkey: signer.publicKey.hex,
+            remoteSignerPubkey: signer.publicKey,
             relays: [URL(string: "wss://relay.example")!],
             secret: secret)
     }

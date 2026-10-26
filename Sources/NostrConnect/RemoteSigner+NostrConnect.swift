@@ -32,7 +32,7 @@ extension RemoteSigner {
         transport: (any RelayTransport)? = nil,
         config: Config = Config()
     ) throws {
-        guard clientKeyPair.publicKey.hex == invitation.clientPubkey else {
+        guard clientKeyPair.publicKey == invitation.clientPubkey else {
             throw RemoteSignerError.invalidURI(reason: "client keypair does not match the invitation pubkey")
         }
         self.init(
@@ -54,13 +54,13 @@ extension RemoteSigner {
     /// Calling this on a session whose signer is already known (a `bunker://` session, or a repeat
     /// call) returns the known pubkey without waiting.
     ///
-    /// - Returns: The remote signer's public key (hex).
+    /// - Returns: The remote signer's public key.
     /// - Throws: ``RemoteSignerError/timedOut`` if no valid response arrives within
     ///   ``Config/requestTimeout``, ``RemoteSignerError/connectionInProgress`` if another
     ///   ``awaitConnection()`` wait is already running on this session,
     ///   ``RemoteSignerError/notConnected`` if the session is torn down, or a transport error.
     @discardableResult
-    public func awaitConnection() async throws -> String {
-        try await discoverSigner().hex
+    public func awaitConnection() async throws -> PublicKey {
+        try await discoverSigner()
     }
 }

@@ -215,7 +215,7 @@ let invitation = try NostrConnectURI.invitation(clientKeyPair: clientKeyPair, re
 displayQRCode(invitation.stringValue)
 
 let signer = try RemoteSigner(invitation: invitation, clientKeyPair: clientKeyPair)
-let remotePubkey = try await signer.awaitConnection()   // resolves once the signer accepts
+let remotePubkey = try await signer.awaitConnection()   // the signer's PublicKey, once it accepts
 ```
 
 `ping`, NIP-44/NIP-04 encrypt and decrypt, `switch_relays`, and `logout` are available too, along with an `authChallenges()` stream for `auth_url` approvals.
