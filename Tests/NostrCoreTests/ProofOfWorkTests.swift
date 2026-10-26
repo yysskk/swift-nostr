@@ -14,7 +14,7 @@ struct ProofOfWorkTests {
         get throws {
             Event(
                 id: try EventID(hex: "000006d8c378af1779d2feebc7603a125d99eca0ccf1085959b307f64e5dd358"),
-                pubkey: try PublicKey(hex: "a48380f4cfcc1ad5378294fcac36439770f9c878dd880ffa94bb74ea54a6f243"),
+                publicKey: try PublicKey(hex: "a48380f4cfcc1ad5378294fcac36439770f9c878dd880ffa94bb74ea54a6f243"),
                 createdAt: Timestamp(rawValue: 1_651_794_653),
                 kind: 1,
                 tags: [["nonce", "776797", "20"]],
@@ -87,7 +87,7 @@ struct ProofOfWorkTests {
 
     private func unsignedNote(for signer: EventSigner, tags: [Event.Tag] = []) throws -> UnsignedEvent {
         UnsignedEvent(
-            pubkey: signer.publicKey,
+            publicKey: signer.publicKey,
             createdAt: Timestamp(rawValue: 1_700_000_000),
             kind: .textNote,
             tags: tags,
@@ -177,7 +177,7 @@ struct ProofOfWorkTests {
         // The id clears 21 bits, but there is no nonce tag to commit to it.
         let event = Event(
             id: specEvent.id,
-            pubkey: specEvent.pubkey,
+            publicKey: specEvent.publicKey,
             createdAt: specEvent.createdAt,
             kind: 1,
             tags: [],

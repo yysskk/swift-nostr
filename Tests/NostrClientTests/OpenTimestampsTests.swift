@@ -42,7 +42,7 @@ struct OpenTimestampsTests {
         let ots = OpenTimestamps(base64EncodedOTS: otsData)
 
         let unsigned = UnsignedEvent(
-            pubkey: keyPair.publicKey,
+            publicKey: keyPair.publicKey,
             kind: .textNote,
             tags: [["t", "test"]],
             content: "Test with OTS"
@@ -74,7 +74,7 @@ struct OpenTimestampsTests {
         let ots = OpenTimestamps(base64EncodedOTS: otsData)
 
         let unsigned = UnsignedEvent(
-            pubkey: keyPair.publicKey,
+            publicKey: keyPair.publicKey,
             kind: .textNote,
             tags: [["p", "somepubkey"]],
             content: "Test content"
@@ -94,7 +94,7 @@ struct OpenTimestampsTests {
         let newOTS = OpenTimestamps(base64EncodedOTS: "bmV3")
 
         let unsigned = UnsignedEvent(
-            pubkey: keyPair.publicKey,
+            publicKey: keyPair.publicKey,
             kind: .textNote,
             tags: [["ots", "b2xk"], ["t", "test"]],
             content: "Test content"

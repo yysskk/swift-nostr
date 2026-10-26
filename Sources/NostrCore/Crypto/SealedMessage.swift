@@ -36,17 +36,17 @@ public struct SealedMessage: Sendable {
     /// Seals a message for a recipient using NIP-44 encryption
     /// - Parameters:
     ///   - message: The plaintext message to seal
-    ///   - recipientPubkey: The recipient's public key
+    ///   - recipientPublicKey: The recipient's public key
     ///   - senderKeyPair: The sender's key pair
     /// - Returns: A SealedMessage containing the encrypted payload
     public static func seal(
         _ message: String,
-        for recipientPubkey: PublicKey,
+        for recipientPublicKey: PublicKey,
         using senderKeyPair: KeyPair
     ) throws -> SealedMessage {
         // Generate a random 32-byte nonce, then delegate to the deterministic implementation.
         let nonce = try generateSecureRandomBytes(count: 32)
-        return try seal(message, for: recipientPubkey, using: senderKeyPair, nonce: nonce)
+        return try seal(message, for: recipientPublicKey, using: senderKeyPair, nonce: nonce)
     }
 
     /// Seals a message with a caller-supplied nonce.
@@ -56,19 +56,19 @@ public struct SealedMessage: Sendable {
     /// generates a fresh random nonce for every message as the spec requires.
     /// - Parameters:
     ///   - message: The plaintext message to seal.
-    ///   - recipientPubkey: The recipient's public key.
+    ///   - recipientPublicKey: The recipient's public key.
     ///   - senderKeyPair: The sender's key pair.
     ///   - nonce: The 32-byte nonce to use.
     /// - Returns: A SealedMessage containing the encrypted payload.
     static func seal(
         _ message: String,
-        for recipientPubkey: PublicKey,
+        for recipientPublicKey: PublicKey,
         using senderKeyPair: KeyPair,
         nonce: Data
     ) throws -> SealedMessage {
         let conversationKey = try Self.conversationKey(
             senderPrivateKey: senderKeyPair.privateKey,
-            recipientPubkey: recipientPubkey.data
+            recipientPublicKey: recipientPublicKey.data
         )
 
         let payload = try encrypt(plaintext: message, conversationKey: conversationKey, nonce: nonce)
@@ -162,13 +162,13 @@ public struct SealedMessage: Sendable {
 
     /// Opens a sealed message from a sender
     /// - Parameters:
-    ///   - senderPubkey: The sender's public key
+    ///   - senderPublicKey: The sender's public key
     ///   - recipientKeyPair: The recipient's key pair
     /// - Returns: The decrypted plaintext message
-    public func open(from senderPubkey: PublicKey, using recipientKeyPair: KeyPair) throws -> String {
+    public func open(from senderPublicKey: PublicKey, using recipientKeyPair: KeyPair) throws -> String {
         let conversationKey = try Self.conversationKey(
             senderPrivateKey: recipientKeyPair.privateKey,
-            recipientPubkey: senderPubkey.data
+            recipientPublicKey: senderPublicKey.data
         )
 
         return try Self.decrypt(payload: payload, conversationKey: conversationKey)
@@ -277,28 +277,28 @@ public struct SealedMessage: Sendable {
         guard let publicKey = Data(hexString: publicKeyHex) else {
             throw NostrError.invalidPublicKey
         }
-        let conversationKey = try Self.conversationKey(senderPrivateKey: privateKey, recipientPubkey: publicKey)
+        let conversationKey = try Self.conversationKey(senderPrivateKey: privateKey, recipientPublicKey: publicKey)
         return conversationKey.hexEncodedString()
     }
 
     /// Computes the conversation key using ECDH + HKDF
-    private static func conversationKey(senderPrivateKey: Data, recipientPubkey: Data) throws -> Data {
+    private static func conversationKey(senderPrivateKey: Data, recipientPublicKey: Data) throws -> Data {
         // Get the private key for ECDH (use KeyAgreement, not Signing)
         let privateKey = try P256K.KeyAgreement.PrivateKey(dataRepresentation: senderPrivateKey)
 
-        // Convert x-only pubkey to full pubkey
+        // Convert x-only public key to full public key
         // Try even parity (0x02) first, then odd parity (0x03) if that fails
         var publicKey: P256K.KeyAgreement.PublicKey
 
-        var evenPubkey = Data([0x02])
-        evenPubkey.append(recipientPubkey)
+        var evenPublicKey = Data([0x02])
+        evenPublicKey.append(recipientPublicKey)
 
-        if let evenKey = try? P256K.KeyAgreement.PublicKey(dataRepresentation: evenPubkey, format: .compressed) {
+        if let evenKey = try? P256K.KeyAgreement.PublicKey(dataRepresentation: evenPublicKey, format: .compressed) {
             publicKey = evenKey
         } else {
-            var oddPubkey = Data([0x03])
-            oddPubkey.append(recipientPubkey)
-            publicKey = try P256K.KeyAgreement.PublicKey(dataRepresentation: oddPubkey, format: .compressed)
+            var oddPublicKey = Data([0x03])
+            oddPublicKey.append(recipientPublicKey)
+            publicKey = try P256K.KeyAgreement.PublicKey(dataRepresentation: oddPublicKey, format: .compressed)
         }
 
         // Compute ECDH shared point

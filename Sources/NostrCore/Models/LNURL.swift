@@ -68,7 +68,7 @@ public struct LNURLPayResponse: Decodable, Sendable, Hashable {
     ///
     /// Nil when the response omits it or carries a value that is not a canonical hex public key,
     /// so such an endpoint does not ``supportsZaps``.
-    public let nostrPubkey: PublicKey?
+    public let nostrPublicKey: PublicKey?
 
     /// The maximum comment length the endpoint accepts, if it accepts comments.
     public let commentAllowed: Int?
@@ -79,24 +79,25 @@ public struct LNURLPayResponse: Decodable, Sendable, Hashable {
         minSendable: Int64,
         maxSendable: Int64,
         allowsNostr: Bool? = nil,
-        nostrPubkey: PublicKey? = nil,
+        nostrPublicKey: PublicKey? = nil,
         commentAllowed: Int? = nil
     ) {
         self.callback = callback
         self.minSendable = minSendable
         self.maxSendable = maxSendable
         self.allowsNostr = allowsNostr
-        self.nostrPubkey = nostrPubkey
+        self.nostrPublicKey = nostrPublicKey
         self.commentAllowed = commentAllowed
     }
 
     private enum CodingKeys: String, CodingKey {
-        case callback, minSendable, maxSendable, allowsNostr, nostrPubkey, commentAllowed
+        case callback, minSendable, maxSendable, allowsNostr, commentAllowed
+        case nostrPublicKey = "nostrPubkey"
     }
 
     /// Decodes an LNURL-pay response.
     ///
-    /// The response comes from a third-party endpoint, so `nostrPubkey` is read leniently: a value
+    /// The response comes from a third-party endpoint, so `nostrPublicKey` is read leniently: a value
     /// that is not a canonical 64-digit lowercase hex public key decodes as nil rather than failing
     /// the whole response. Every other field is decoded strictly.
     public init(from decoder: any Decoder) throws {
@@ -106,15 +107,15 @@ public struct LNURLPayResponse: Decodable, Sendable, Hashable {
             minSendable: try container.decode(Int64.self, forKey: .minSendable),
             maxSendable: try container.decode(Int64.self, forKey: .maxSendable),
             allowsNostr: try container.decodeIfPresent(Bool.self, forKey: .allowsNostr),
-            nostrPubkey: (try? container.decodeIfPresent(String.self, forKey: .nostrPubkey))?
+            nostrPublicKey: (try? container.decodeIfPresent(String.self, forKey: .nostrPublicKey))?
                 .flatMap(PublicKey.init),
             commentAllowed: try container.decodeIfPresent(Int.self, forKey: .commentAllowed)
         )
     }
 
-    /// Whether this endpoint can receive zaps: it advertises Nostr support and a signing pubkey.
+    /// Whether this endpoint can receive zaps: it advertises Nostr support and a signing public key.
     public var supportsZaps: Bool {
-        allowsNostr == true && nostrPubkey != nil
+        allowsNostr == true && nostrPublicKey != nil
     }
 
     /// Builds the LNURL callback URL that requests a Lightning invoice for a zap.

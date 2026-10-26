@@ -40,7 +40,7 @@ public struct RelayResponsePrefix: RawRepresentable, Sendable, Hashable, CustomS
     /// The event does not meet the relay's proof-of-work requirement (NIP-13).
     public static let pow = RelayResponsePrefix(rawValue: "pow")
 
-    /// The relay refuses to serve this client or pubkey.
+    /// The relay refuses to serve this client or public key.
     public static let blocked = RelayResponsePrefix(rawValue: "blocked")
 
     /// The client is sending too fast and should slow down before retrying.
@@ -49,12 +49,12 @@ public struct RelayResponsePrefix: RawRepresentable, Sendable, Hashable, CustomS
     /// The event or request is malformed or fails validation.
     public static let invalid = RelayResponsePrefix(rawValue: "invalid")
 
-    /// The operation is not allowed for this pubkey. Standardized in NIP-01;
+    /// The operation is not allowed for this public key. Standardized in NIP-01;
     /// NIP-42 uses it for operations that remain forbidden even after the
     /// client has authenticated.
     public static let restricted = RelayResponsePrefix(rawValue: "restricted")
 
-    /// The relay has muted this pubkey or content.
+    /// The relay has muted this public key or content.
     public static let mute = RelayResponsePrefix(rawValue: "mute")
 
     /// A failure that fits no other prefix.

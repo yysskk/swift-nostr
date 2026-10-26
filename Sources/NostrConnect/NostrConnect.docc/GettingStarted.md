@@ -107,7 +107,7 @@ Build an ``UnsignedEvent`` and hand it to ``RemoteSigner/sign(_:)``. The signer 
 signed event, which is verified locally and checked against the request before it is returned:
 
 ```swift
-let unsigned = UnsignedEvent(pubkey: userPubkey, kind: .textNote, content: "Signed by my bunker")
+let unsigned = UnsignedEvent(publicKey: userPubkey, kind: .textNote, content: "Signed by my bunker")
 let signed = try await signer.sign(unsigned)
 print(signed.id, try signed.verify())
 ```

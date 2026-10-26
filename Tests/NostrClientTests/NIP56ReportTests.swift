@@ -55,7 +55,7 @@ struct NIP56ReportTests {
         #expect(event.tags.contains(["e", note.id.hex, "illegal"]))
         // The author is named by a bare "p" tag carrying no report type.
         let authorTag = event.tags(named: "p").first
-        #expect(authorTag?.rawArray == ["p", note.pubkey.hex])
+        #expect(authorTag?.rawArray == ["p", note.publicKey.hex])
         #expect(try event.verify())
     }
 
@@ -70,7 +70,7 @@ struct NIP56ReportTests {
         #expect(event.content.isEmpty)
         #expect(event.tags.contains(["e", note.id.hex, "spam"]))
         let authorTag: Event.Tag? = event.tags(named: "p").first
-        #expect(authorTag?.rawArray == ["p", note.pubkey.hex])
+        #expect(authorTag?.rawArray == ["p", note.publicKey.hex])
         #expect(try event.verify())
     }
 

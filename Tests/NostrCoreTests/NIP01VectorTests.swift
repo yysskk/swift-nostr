@@ -34,11 +34,11 @@ import Testing
 @Suite("NIP-01 Vector Tests")
 struct NIP01VectorTests {
     /// The x-only public key for secret key 1 — the x-coordinate of secp256k1's generator point.
-    static let pubkey1 = "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
+    static let publicKey1 = "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798"
 
     /// The x-only public key for secret key `b7e151628aed2a6abf7158809cf4f3c762e7160f38b4da56a784d9045190cfef`,
     /// the key BIP-340's own test vectors use.
-    static let pubkey2 = "dff1d77f2a671c5f36183726db2341be58feae1da2deced843240f7b502ba659"
+    static let publicKey2 = "dff1d77f2a671c5f36183726db2341be58feae1da2deced843240f7b502ba659"
 
     /// A fixed, arbitrary `created_at`.
     static let timestamp = Timestamp(rawValue: 1_700_000_000)
@@ -50,7 +50,7 @@ struct NIP01VectorTests {
     /// serialize to, and the resulting event id.
     struct SerializationVector: CustomTestStringConvertible {
         let label: String
-        let pubkey: String
+        let publicKey: String
         let createdAt: Timestamp
         let kind: Event.Kind
         let rawTags: [[String]]
@@ -65,7 +65,7 @@ struct NIP01VectorTests {
         // A1: plain ASCII content — the baseline shape of the serialized array.
         SerializationVector(
             label: "A1 basic ascii",
-            pubkey: pubkey1,
+            publicKey: publicKey1,
             createdAt: timestamp,
             kind: 1,
             rawTags: [],
@@ -78,7 +78,7 @@ struct NIP01VectorTests {
         // A2: empty content — the shortest serialization an event can have.
         SerializationVector(
             label: "A2 empty content",
-            pubkey: pubkey1,
+            publicKey: publicKey1,
             createdAt: timestamp,
             kind: 1,
             rawTags: [],
@@ -92,7 +92,7 @@ struct NIP01VectorTests {
         // line break, carriage return, tab, backspace, and form feed.
         SerializationVector(
             label: "A3 escapes in content",
-            pubkey: pubkey1,
+            publicKey: publicKey1,
             createdAt: timestamp,
             kind: 1,
             rawTags: [],
@@ -106,7 +106,7 @@ struct NIP01VectorTests {
         // serializer that only escapes the content produces a different id here.
         SerializationVector(
             label: "A4 escapes in tag values",
-            pubkey: pubkey1,
+            publicKey: publicKey1,
             createdAt: timestamp,
             kind: 1,
             rawTags: [["t", "multi\nline\tvalue"], ["title", "a \"quoted\" \\ title"], ["x", "\r\u{08}\u{0C}"]],
@@ -122,7 +122,7 @@ struct NIP01VectorTests {
         // the single most likely way a Swift client silently computes foreign ids.
         SerializationVector(
             label: "A5 unescaped forward slashes",
-            pubkey: pubkey1,
+            publicKey: publicKey1,
             createdAt: timestamp,
             kind: 1,
             rawTags: [["r", "wss://relay.example.com/"], ["proxy", "https://example.com/a/b?c=d#e"]],
@@ -137,7 +137,7 @@ struct NIP01VectorTests {
         // placeholder for a skipped relay hint. Tag order and inner order must be preserved.
         SerializationVector(
             label: "A6 multi-element tags",
-            pubkey: pubkey1,
+            publicKey: publicKey1,
             createdAt: timestamp,
             kind: 1,
             rawTags: [
@@ -169,7 +169,7 @@ struct NIP01VectorTests {
         // escaped a second time, and the content must not be re-encoded as a nested object.
         SerializationVector(
             label: "A7 kind 0 json-in-content",
-            pubkey: pubkey1,
+            publicKey: publicKey1,
             createdAt: timestamp,
             kind: 0,
             rawTags: [],
@@ -185,7 +185,7 @@ struct NIP01VectorTests {
         // created_at is emitted as a bare integer and never as a float or a quoted string.
         SerializationVector(
             label: "A8 large timestamp, addressable kind",
-            pubkey: pubkey1,
+            publicKey: publicKey1,
             createdAt: farFutureTimestamp,
             kind: 30023,
             rawTags: [["d", "nip01-kat"], ["published_at", "253402300799"]],
@@ -198,7 +198,7 @@ struct NIP01VectorTests {
         // A9: a five-digit kind, serialized as a bare integer.
         SerializationVector(
             label: "A9 large kind",
-            pubkey: pubkey1,
+            publicKey: publicKey1,
             createdAt: timestamp,
             kind: 65535,
             rawTags: [],
@@ -216,9 +216,9 @@ struct NIP01VectorTests {
     struct SignatureVector: CustomTestStringConvertible {
         let label: String
         /// The secret key the pinned signature was produced with, recorded so the vector
-        /// can be regenerated. Never used by the tests — verification needs only the pubkey.
+        /// can be regenerated. Never used by the tests — verification needs only the public key.
         let secretKey: String
-        let pubkey: String
+        let publicKey: String
         let createdAt: Timestamp
         let kind: Event.Kind
         let rawTags: [[String]]
@@ -231,7 +231,7 @@ struct NIP01VectorTests {
         var unsignedEvent: UnsignedEvent {
             get throws {
                 UnsignedEvent(
-                    pubkey: try PublicKey(hex: pubkey),
+                    publicKey: try PublicKey(hex: publicKey),
                     createdAt: createdAt,
                     kind: kind,
                     rawTags: rawTags,
@@ -245,7 +245,7 @@ struct NIP01VectorTests {
         func event(content overriddenContent: String? = nil, sig overriddenSig: String? = nil) throws -> Event {
             Event(
                 id: try EventID(hex: id),
-                pubkey: try PublicKey(hex: pubkey),
+                publicKey: try PublicKey(hex: publicKey),
                 createdAt: createdAt,
                 kind: kind,
                 tags: rawTags,
@@ -260,7 +260,7 @@ struct NIP01VectorTests {
         SignatureVector(
             label: "S1 sk=1, kind 1",
             secretKey: "0000000000000000000000000000000000000000000000000000000000000001",
-            pubkey: pubkey1,
+            publicKey: publicKey1,
             createdAt: timestamp,
             kind: 1,
             rawTags: [],
@@ -276,7 +276,7 @@ struct NIP01VectorTests {
         SignatureVector(
             label: "S2 sk=b7e1…cfef, escapes and a url",
             secretKey: "b7e151628aed2a6abf7158809cf4f3c762e7160f38b4da56a784d9045190cfef",
-            pubkey: pubkey2,
+            publicKey: publicKey2,
             createdAt: timestamp,
             kind: 1,
             rawTags: [["t", "interop"], ["client", "swift-nostr"]],
@@ -290,7 +290,7 @@ struct NIP01VectorTests {
         SignatureVector(
             label: "S3 sk=1, addressable kind",
             secretKey: "0000000000000000000000000000000000000000000000000000000000000001",
-            pubkey: pubkey1,
+            publicKey: publicKey1,
             createdAt: farFutureTimestamp,
             kind: 30023,
             rawTags: [["d", "nip01-kat"], ["published_at", "253402300799"]],
@@ -307,7 +307,7 @@ struct NIP01VectorTests {
     @Test("canonical serialization and event id match the reference vectors", arguments: serializationVectors)
     func canonicalSerializationMatchesVector(_ vector: SerializationVector) throws {
         let unsigned = UnsignedEvent(
-            pubkey: try PublicKey(hex: vector.pubkey),
+            publicKey: try PublicKey(hex: vector.publicKey),
             createdAt: vector.createdAt,
             kind: vector.kind,
             rawTags: vector.rawTags,
@@ -337,7 +337,7 @@ struct NIP01VectorTests {
             as: UTF8.self
         )
         let unsigned = UnsignedEvent(
-            pubkey: try PublicKey(hex: Self.pubkey1),
+            publicKey: try PublicKey(hex: Self.publicKey1),
             createdAt: Self.timestamp,
             kind: 1,
             rawTags: [["t", hashtag]],
@@ -366,7 +366,7 @@ struct NIP01VectorTests {
     @Test("control characters serialize as lowercase unicode escapes")
     func controlCharactersSerializeAsUnicodeEscapes() throws {
         let unsigned = UnsignedEvent(
-            pubkey: try PublicKey(hex: Self.pubkey1),
+            publicKey: try PublicKey(hex: Self.publicKey1),
             createdAt: Self.timestamp,
             kind: 1,
             rawTags: [],
@@ -405,7 +405,7 @@ struct NIP01VectorTests {
         let vector = Self.signatureVectors[0]
         let tamperedContent = vector.content + "!"
         let tamperedUnsigned = UnsignedEvent(
-            pubkey: try PublicKey(hex: vector.pubkey),
+            publicKey: try PublicKey(hex: vector.publicKey),
             createdAt: vector.createdAt,
             kind: vector.kind,
             rawTags: vector.rawTags,

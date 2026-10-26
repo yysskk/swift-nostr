@@ -66,7 +66,7 @@ struct RemoteSignerNostrSigningConformanceTests {
         let (remote, transport) = try await connected()
         let signing: any NostrSigning = remote
         let unsigned = UnsignedEvent(
-            pubkey: signer.publicKey, createdAt: Timestamp(rawValue: 1000), kind: .textNote,
+            publicKey: signer.publicKey, createdAt: Timestamp(rawValue: 1000), kind: .textNote,
             content: "hello via protocol")
 
         async let signed = signing.sign(unsigned)
@@ -83,6 +83,6 @@ struct RemoteSignerNostrSigningConformanceTests {
         #expect(try event.verify())
         #expect(event.kind == .textNote)
         #expect(event.content == "hello via protocol")
-        #expect(event.pubkey == signer.publicKey)
+        #expect(event.publicKey == signer.publicKey)
     }
 }

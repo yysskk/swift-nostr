@@ -181,7 +181,7 @@ struct NIP27ContentReferenceTests {
     func quoteTagPadsSkippedRelay() {
         let id = EventID.fixture("id")
         let pubkey = PublicKey.fixture("pk")
-        #expect(Event.Tag.quote(id, pubkey: pubkey).rawArray == ["q", id.hex, "", pubkey.hex])
+        #expect(Event.Tag.quote(id, publicKey: pubkey).rawArray == ["q", id.hex, "", pubkey.hex])
     }
 
     @Test("Tag.quote with only an id emits a two-element tag")

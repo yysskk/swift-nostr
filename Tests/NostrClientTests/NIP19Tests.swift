@@ -280,7 +280,7 @@ struct NIP19Tests {
     private func makeEvent(kind: Event.Kind, tags: [[String]]) -> Event {
         Event(
             id: eventID,
-            pubkey: pubkey,
+            publicKey: pubkey,
             createdAt: Timestamp(rawValue: 0),
             kind: kind,
             tags: tags,

@@ -209,7 +209,7 @@ let signer = try RemoteSigner(bunker: try BunkerURI(string: "bunker://..."))
 // Prove the user's key and sign an event remotely — the signed event is verified locally.
 let userPubkey = try await signer.userPublicKey()
 let signed = try await signer.sign(
-    UnsignedEvent(pubkey: userPubkey, kind: .textNote, content: "Signed by my bunker"))
+    UnsignedEvent(publicKey: userPubkey, kind: .textNote, content: "Signed by my bunker"))
 print(signed.id, try signed.verify())
 ```
 
@@ -231,7 +231,7 @@ A `RemoteSigner` can also drive a `NostrClient`: `client.identity.setSigner(_:)`
 try await client.identity.setSigner(signer)   // any NostrSigning — a RemoteSigner or a local EventSigner
 let userPubkey = try await signer.publicKey
 let signed = try await client.identity.sign(
-    UnsignedEvent(pubkey: userPubkey, kind: .textNote, content: "Signed by my bunker"))
+    UnsignedEvent(publicKey: userPubkey, kind: .textNote, content: "Signed by my bunker"))
 try await client.events.publish(signed)
 ```
 
@@ -248,12 +248,12 @@ request.httpBody = body
 try await request.setNostrAuthorization(signer: signer)  // any NostrSigning
 ```
 
-On the receiving side, `HTTPAuth.validate` runs the full NIP-98 check chain — scheme, decoding, kind, signature, timestamp window, URL, method, body hash — and returns the verified event, whose `pubkey` is the authenticated identity:
+On the receiving side, `HTTPAuth.validate` runs the full NIP-98 check chain — scheme, decoding, kind, signature, timestamp window, URL, method, body hash — and returns the verified event, whose `publicKey` is the authenticated identity:
 
 ```swift
 let event = try HTTPAuth.validate(
     authorization: authorizationHeader, url: requestURL, method: "POST", payload: body)
-let authenticatedPubkey = event.pubkey
+let authenticatedPublicKey = event.publicKey
 ```
 
 ### Relay-based groups (NIP-29)

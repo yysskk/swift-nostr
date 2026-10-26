@@ -44,7 +44,7 @@ public struct NostrGroupsAPI: NostrGroupManaging {
                 groupID: group.id,
                 inviteCode: inviteCode ?? group.inviteCode,
                 reason: reason,
-                pubkey: pubkey
+                publicKey: pubkey
             )
         }
     }
@@ -69,7 +69,7 @@ public struct NostrGroupsAPI: NostrGroupManaging {
         strategy: PublishStrategy? = nil
     ) async throws -> PublishedEvent {
         try await publish(to: group, strategy: strategy) { pubkey in
-            Groups.leaveRequest(groupID: group.id, reason: reason, pubkey: pubkey)
+            Groups.leaveRequest(groupID: group.id, reason: reason, publicKey: pubkey)
         }
     }
 
@@ -113,7 +113,7 @@ public struct NostrGroupsAPI: NostrGroupManaging {
                 content: content,
                 tags: tags,
                 previous: previous,
-                pubkey: pubkey
+                publicKey: pubkey
             )
         }
     }
@@ -146,7 +146,7 @@ public struct NostrGroupsAPI: NostrGroupManaging {
         strategy: PublishStrategy? = nil
     ) async throws -> PublishedEvent {
         try await publish(to: group, strategy: strategy) { pubkey in
-            Groups.moderationEvent(action, groupID: group.id, previous: previous, reason: reason, pubkey: pubkey)
+            Groups.moderationEvent(action, groupID: group.id, previous: previous, reason: reason, publicKey: pubkey)
         }
     }
 
@@ -182,7 +182,7 @@ public struct NostrGroupsAPI: NostrGroupManaging {
         guard let newest = Self.newestStateEvent(ofKind: .groupMetadata, in: events, author: author) else {
             return nil
         }
-        return try Groups.Metadata(event: newest, relayPubkey: author)
+        return try Groups.Metadata(event: newest, relayPublicKey: author)
     }
 
     /// Fetches the group's full relay-generated state snapshot — metadata, admins, members,
@@ -214,19 +214,19 @@ public struct NostrGroupsAPI: NostrGroupManaging {
 
         var state = GroupState()
         if let event = Self.newestStateEvent(ofKind: .groupMetadata, in: events, author: author) {
-            state.metadata = try Groups.Metadata(event: event, relayPubkey: author)
+            state.metadata = try Groups.Metadata(event: event, relayPublicKey: author)
         }
         if let event = Self.newestStateEvent(ofKind: .groupAdmins, in: events, author: author) {
-            state.admins = try Groups.AdminList(event: event, relayPubkey: author)
+            state.admins = try Groups.AdminList(event: event, relayPublicKey: author)
         }
         if let event = Self.newestStateEvent(ofKind: .groupMembers, in: events, author: author) {
-            state.members = try Groups.MemberList(event: event, relayPubkey: author)
+            state.members = try Groups.MemberList(event: event, relayPublicKey: author)
         }
         if let event = Self.newestStateEvent(ofKind: .groupRoles, in: events, author: author) {
-            state.roles = try Groups.RoleList(event: event, relayPubkey: author)
+            state.roles = try Groups.RoleList(event: event, relayPublicKey: author)
         }
         if let event = Self.newestStateEvent(ofKind: .groupPinList, in: events, author: author) {
-            state.pins = try Groups.PinList(event: event, relayPubkey: author)
+            state.pins = try Groups.PinList(event: event, relayPublicKey: author)
         }
         return state
     }

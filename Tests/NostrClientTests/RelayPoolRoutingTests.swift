@@ -16,7 +16,7 @@ struct RelayPoolRoutingTests {
     private var dummyEvent: Event {
         Event(
             id: EventID(String(repeating: "a", count: 64))!,
-            pubkey: PublicKey(String(repeating: "b", count: 64))!,
+            publicKey: PublicKey(String(repeating: "b", count: 64))!,
             createdAt: Timestamp(rawValue: 1_700_000_000),
             kind: 1,
             tags: [],

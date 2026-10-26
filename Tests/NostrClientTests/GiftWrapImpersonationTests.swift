@@ -44,7 +44,7 @@ struct GiftWrapImpersonationTests {
         let senderSigner = EventSigner(keyPair: sender)
         let seal = try senderSigner.sign(
             UnsignedEvent(
-                pubkey: sender.publicKey,
+                publicKey: sender.publicKey,
                 createdAt: Timestamp(rawValue: Timestamp.now.rawValue - 60),
                 kind: .seal,
                 tags: [],
@@ -56,10 +56,10 @@ struct GiftWrapImpersonationTests {
         let ephemeral = EventSigner(keyPair: try KeyPair())
         return try ephemeral.sign(
             UnsignedEvent(
-                pubkey: ephemeral.publicKey,
+                publicKey: ephemeral.publicKey,
                 createdAt: Timestamp(rawValue: Timestamp.now.rawValue - 60),
                 kind: .giftWrap,
-                tags: [Tag.pubkey(recipientPubkey)],
+                tags: [Tag.publicKey(recipientPubkey)],
                 content: try ephemeral.nip44Encrypt(sealJSON, to: recipientPubkey)
             )
         )
@@ -76,7 +76,7 @@ struct GiftWrapImpersonationTests {
         let bob = try KeyPair()
 
         let forged = UnsignedEvent(
-            pubkey: alice.publicKey,
+            publicKey: alice.publicKey,
             createdAt: Timestamp(rawValue: 1_700_000_000),
             kind: .privateDirectMessage,
             rawTags: [["p", bob.publicKey.hex]],
@@ -131,7 +131,7 @@ struct GiftWrapImpersonationTests {
         let bob = try KeyPair()
 
         let forged = UnsignedEvent(
-            pubkey: alice.publicKey,
+            publicKey: alice.publicKey,
             createdAt: Timestamp(rawValue: 1_700_000_000),
             kind: .reaction,
             rawTags: [["p", bob.publicKey.hex]],
@@ -161,7 +161,7 @@ struct GiftWrapImpersonationTests {
         let bob = try KeyPair()
 
         let event = UnsignedEvent(
-            pubkey: alice.publicKey,
+            publicKey: alice.publicKey,
             createdAt: Timestamp(rawValue: 1_700_000_000),
             kind: .privateDirectMessage,
             rawTags: [["p", bob.publicKey.hex]],
@@ -181,7 +181,7 @@ struct GiftWrapImpersonationTests {
             giftWrap: giftWrap, recipient: EventSigner(keyPair: bob))
 
         #expect(unwrapped.senderPubkey == alice.publicKey)
-        #expect(unwrapped.event.pubkey == alice.publicKey)
+        #expect(unwrapped.event.publicKey == alice.publicKey)
         #expect(unwrapped.event.content == "hello")
     }
 
@@ -199,7 +199,7 @@ struct GiftWrapImpersonationTests {
             giftWrap: giftWrap, recipient: EventSigner(keyPair: bob))
 
         #expect(unwrapped.senderPubkey == alice.publicKey)
-        #expect(unwrapped.event.pubkey == alice.publicKey)
+        #expect(unwrapped.event.publicKey == alice.publicKey)
         #expect(unwrapped.event.id == original.id)
         #expect(unwrapped.event.content == "Secret message")
     }

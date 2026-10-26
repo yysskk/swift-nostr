@@ -296,6 +296,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Fetches read from relays** (breaking): `NostrEventsAPI.fetch(filters:to:timeout:)` and the
   `NostrEventFetching` requirement are `fetch(filters:from:timeout:)`, so a scoped fetch reads as
   fetching from those relays. `publish(_:to:)` and `subscribe(filters:to:)` keep `to`.
+- **NostrCore spells public keys `publicKey`** (breaking): the same concept was spelled `pubkey`,
+  `xxxPubkey`, and `publicKey`. Swift names now follow the API Design Guidelines, as `signature` and
+  `createdAt` already did; the JSON keys (`pubkey`, `self`, `nostrPubkey`, `#p`) are unchanged.
+  `Event.pubkey` and `UnsignedEvent.pubkey` (and their `pubkey:` initializer labels) are
+  `publicKey`. `Tag.pubkey(_:relayURL:petname:)` and `Tag.pubkey(_:roles:)` are
+  `Tag.publicKey(...)`, the `pubkey:` labels of `Tag.event`, `Tag.quote`, and `Tag.address` are
+  `publicKey:`, and `Event.referencedPubkeys` is `referencedPublicKeys`. `Filter.pubkeyReferences` is
+  `publicKeyReferences`, and the factories take `publicKey:`/`publicKeys:`
+  (`userNotes(publicKey:limit:)`, `metadata(publicKeys:)`, `mentions(publicKey:limit:)`, and the
+  `contactList`, `relayListMetadata`, and `directMessageRelayList` overloads).
+  `RelayInformation.pubkey`/`selfPubkey` are `publicKey`/`selfPublicKey`, and
+  `LNURLPayResponse.nostrPubkey` is `nostrPublicKey`. In NIP-29, the state parsers take
+  `relayPublicKey:`, `Groups.Admin.pubkey` is `publicKey`, `Groups.ModerationAction.putUser(pubkey:roles:)`
+  and `removeUser(pubkey:)` are `putUser(publicKey:roles:)` and `removeUser(publicKey:)`, and the
+  `joinRequest`, `leaveRequest`, `contentEvent`, and `moderationEvent` builders take `publicKey:`.
+  `EventSigner.signZapRequest(recipientPubkey:...)` is `signZapRequest(recipientPublicKey:...)`, and
+  `RelayConnection.authenticatedPubkeys` is `authenticatedPublicKeys`. The `NostrSigning` and
+  `EventSigner` NIP-44 methods and `SealedMessage` name their parameters `recipientPublicKey` and
+  `senderPublicKey`; their argument labels are unchanged.
 
 ## [0.8.0] - 2026-10-25
 

@@ -123,9 +123,9 @@ struct NIP42AutomaticAuthenticationTests {
 
         let sent = try await acknowledgeAuth(on: connection, mock: mock)
         #expect(sent.kind == .clientAuthentication)
-        #expect(sent.pubkey == signer.publicKey)
+        #expect(sent.publicKey == signer.publicKey)
         #expect(sent.firstTagValue(named: "challenge") == "challengestringhere")
-        #expect(await connection.authenticatedPubkeys == [signer.publicKey])
+        #expect(await connection.authenticatedPublicKeys == [signer.publicKey])
         await connection.disconnect()
     }
 
@@ -336,7 +336,7 @@ struct NIP42AutomaticAuthenticationTests {
 
         let connection = try #require(await client.relays.pool.relay(for: relayURL))
         let sent = try await acknowledgeAuth(on: connection, mock: mock)
-        #expect(sent.pubkey == keyPair.publicKey)
+        #expect(sent.publicKey == keyPair.publicKey)
         #expect(sent.firstTagValue(named: "relay") == relayURL.description)
         #expect(sent.firstTagValue(named: "challenge") == "challengestringhere")
         await client.relays.disconnect()

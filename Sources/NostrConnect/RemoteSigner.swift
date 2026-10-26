@@ -323,7 +323,7 @@ public actor RemoteSigner {
             let json = String(decoding: try JSONEncoder().encode(request), as: UTF8.self)
             let sealed = try SealedMessage.seal(json, for: signerPubkey, using: clientKeyPair)
             let unsigned = UnsignedEvent(
-                pubkey: clientKeyPair.publicKey,
+                publicKey: clientKeyPair.publicKey,
                 kind: .nostrConnect,
                 rawTags: [["p", signerPubkey.hex]],
                 content: sealed.payload)
@@ -346,10 +346,10 @@ public actor RemoteSigner {
 
         // The relay filter already restricts authors, but enforce it here too as defense in depth:
         // ignore anything that is not from the signer.
-        guard event.pubkey == signerPubkey else { return }
+        guard event.publicKey == signerPubkey else { return }
 
         guard
-            let content = try? SealedMessage(payload: event.content).open(from: event.pubkey, using: clientKeyPair),
+            let content = try? SealedMessage(payload: event.content).open(from: event.publicKey, using: clientKeyPair),
             let response = try? JSONDecoder().decode(RemoteSignerResponse.self, from: Data(content.utf8))
         else {
             return
@@ -444,7 +444,7 @@ public actor RemoteSigner {
         guard let expectedInvitationSecret else { return }
 
         guard
-            let content = try? SealedMessage(payload: event.content).open(from: event.pubkey, using: clientKeyPair),
+            let content = try? SealedMessage(payload: event.content).open(from: event.publicKey, using: clientKeyPair),
             let response = try? JSONDecoder().decode(RemoteSignerResponse.self, from: Data(content.utf8)),
             response.result.map({ Self.constantTimeEquals($0, expectedInvitationSecret) }) == true
         else {
@@ -452,11 +452,11 @@ public actor RemoteSigner {
         }
 
         if connectionWaiter != nil {
-            resolveConnection(with: event.pubkey)
+            resolveConnection(with: event.publicKey)
         } else {
             // The waiter isn't registered yet (the response arrived between the subscription being
             // created and ``discoverSigner()`` suspending); hold the pubkey for it to pick up.
-            bufferedDiscovery = event.pubkey
+            bufferedDiscovery = event.publicKey
         }
     }
 
@@ -512,7 +512,8 @@ public actor RemoteSigner {
     /// (a bunker session, or a nostrconnect session after discovery); before a nostrconnect signer
     /// is known it omits `authors` so the client can receive the connect response from any pubkey.
     private var responseFilter: Filter {
-        Filter(authors: signerPubkey.map { [$0] }, kinds: [.nostrConnect], pubkeyReferences: [clientKeyPair.publicKey])
+        Filter(
+            authors: signerPubkey.map { [$0] }, kinds: [.nostrConnect], publicKeyReferences: [clientKeyPair.publicKey])
     }
 
     // MARK: - Testing

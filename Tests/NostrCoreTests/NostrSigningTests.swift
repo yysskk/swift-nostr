@@ -16,11 +16,11 @@ struct NostrSigningTests {
     func signThroughProtocol() async throws {
         let keyPair = try KeyPair()
         let signer: any NostrSigning = EventSigner(keyPair: keyPair)
-        let unsigned = UnsignedEvent(pubkey: keyPair.publicKey, kind: .textNote, content: "hello")
+        let unsigned = UnsignedEvent(publicKey: keyPair.publicKey, kind: .textNote, content: "hello")
 
         let event = try await signer.sign(unsigned)
 
-        #expect(event.pubkey == keyPair.publicKey)
+        #expect(event.publicKey == keyPair.publicKey)
         #expect(event.kind == .textNote)
         #expect(event.content == "hello")
         #expect(try event.verify())

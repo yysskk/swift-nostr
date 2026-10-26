@@ -111,7 +111,7 @@ struct TimestampTests {
     func hostileExpirationRoundTrips() throws {
         let event = Event(
             id: try EventID(hex: String(repeating: "aa", count: 32)),
-            pubkey: try PublicKey(hex: String(repeating: "bb", count: 32)),
+            publicKey: try PublicKey(hex: String(repeating: "bb", count: 32)),
             createdAt: Timestamp(rawValue: 1_700_000_000),
             kind: .textNote,
             tags: [["expiration", "9223372036854775807"]],

@@ -16,7 +16,7 @@ public struct Filter: Codable, Sendable, Hashable {
     public var eventReferences: [EventID]?
 
     /// Public keys to match against the events' "p" tags (`#p` on the wire).
-    public var pubkeyReferences: [PublicKey]?
+    public var publicKeyReferences: [PublicKey]?
 
     /// The earliest `created_at` to match, inclusive.
     public var since: Timestamp?
@@ -40,7 +40,7 @@ public struct Filter: Codable, Sendable, Hashable {
         case authors
         case kinds
         case eventReferences = "#e"
-        case pubkeyReferences = "#p"
+        case publicKeyReferences = "#p"
         case since
         case until
         case limit
@@ -55,7 +55,7 @@ public struct Filter: Codable, Sendable, Hashable {
         authors: [PublicKey]? = nil,
         kinds: [Event.Kind]? = nil,
         eventReferences: [EventID]? = nil,
-        pubkeyReferences: [PublicKey]? = nil,
+        publicKeyReferences: [PublicKey]? = nil,
         since: Timestamp? = nil,
         until: Timestamp? = nil,
         limit: Int? = nil,
@@ -65,7 +65,7 @@ public struct Filter: Codable, Sendable, Hashable {
         self.authors = authors
         self.kinds = kinds
         self.eventReferences = eventReferences
-        self.pubkeyReferences = pubkeyReferences
+        self.publicKeyReferences = publicKeyReferences
         self.since = since
         self.until = until
         self.limit = limit
@@ -83,7 +83,7 @@ public struct Filter: Codable, Sendable, Hashable {
         authors = try container.decodeIfPresent([PublicKey].self, forKey: .authors)
         kinds = try container.decodeIfPresent([Event.Kind].self, forKey: .kinds)
         eventReferences = try container.decodeIfPresent([EventID].self, forKey: .eventReferences)
-        pubkeyReferences = try container.decodeIfPresent([PublicKey].self, forKey: .pubkeyReferences)
+        publicKeyReferences = try container.decodeIfPresent([PublicKey].self, forKey: .publicKeyReferences)
         since = try container.decodeIfPresent(Timestamp.self, forKey: .since)
         until = try container.decodeIfPresent(Timestamp.self, forKey: .until)
         limit = try container.decodeIfPresent(Int.self, forKey: .limit)
@@ -107,7 +107,7 @@ public struct Filter: Codable, Sendable, Hashable {
         try container.encodeIfPresent(authors, forKey: .authors)
         try container.encodeIfPresent(kinds, forKey: .kinds)
         try container.encodeIfPresent(eventReferences, forKey: .eventReferences)
-        try container.encodeIfPresent(pubkeyReferences, forKey: .pubkeyReferences)
+        try container.encodeIfPresent(publicKeyReferences, forKey: .publicKeyReferences)
         try container.encodeIfPresent(since, forKey: .since)
         try container.encodeIfPresent(until, forKey: .until)
         try container.encodeIfPresent(limit, forKey: .limit)
@@ -155,18 +155,18 @@ private struct DynamicCodingKeys: CodingKey {
 // MARK: - Convenience Initializers
 extension Filter {
     /// Create a filter for a specific user's notes
-    public static func userNotes(pubkey: PublicKey, limit: Int? = nil) -> Filter {
+    public static func userNotes(publicKey: PublicKey, limit: Int? = nil) -> Filter {
         Filter(
-            authors: [pubkey],
+            authors: [publicKey],
             kinds: [.textNote],
             limit: limit
         )
     }
 
     /// Create a filter for metadata of specific users
-    public static func metadata(pubkeys: [PublicKey]) -> Filter {
+    public static func metadata(publicKeys: [PublicKey]) -> Filter {
         Filter(
-            authors: pubkeys,
+            authors: publicKeys,
             kinds: [.setMetadata]
         )
     }
@@ -181,10 +181,10 @@ extension Filter {
     }
 
     /// Create a filter for mentions of a specific user
-    public static func mentions(pubkey: PublicKey, limit: Int? = nil) -> Filter {
+    public static func mentions(publicKey: PublicKey, limit: Int? = nil) -> Filter {
         Filter(
             kinds: [.textNote],
-            pubkeyReferences: [pubkey],
+            publicKeyReferences: [publicKey],
             limit: limit
         )
     }
@@ -198,51 +198,51 @@ extension Filter {
     }
 
     /// Create a filter for contact lists of specific users (NIP-02)
-    public static func contactList(pubkeys: [PublicKey]) -> Filter {
+    public static func contactList(publicKeys: [PublicKey]) -> Filter {
         Filter(
-            authors: pubkeys,
+            authors: publicKeys,
             kinds: [.contacts]
         )
     }
 
     /// Create a filter for a specific user's contact list (NIP-02)
-    public static func contactList(pubkey: PublicKey) -> Filter {
+    public static func contactList(publicKey: PublicKey) -> Filter {
         Filter(
-            authors: [pubkey],
+            authors: [publicKey],
             kinds: [.contacts],
             limit: 1
         )
     }
 
     /// Create a filter for relay list metadata of specific users (NIP-65)
-    public static func relayListMetadata(pubkeys: [PublicKey]) -> Filter {
+    public static func relayListMetadata(publicKeys: [PublicKey]) -> Filter {
         Filter(
-            authors: pubkeys,
+            authors: publicKeys,
             kinds: [.relayListMetadata]
         )
     }
 
     /// Create a filter for a specific user's relay list metadata (NIP-65)
-    public static func relayListMetadata(pubkey: PublicKey) -> Filter {
+    public static func relayListMetadata(publicKey: PublicKey) -> Filter {
         Filter(
-            authors: [pubkey],
+            authors: [publicKey],
             kinds: [.relayListMetadata],
             limit: 1
         )
     }
 
     /// Create a filter for DM relay lists of specific users (NIP-17, kind 10050)
-    public static func directMessageRelayList(pubkeys: [PublicKey]) -> Filter {
+    public static func directMessageRelayList(publicKeys: [PublicKey]) -> Filter {
         Filter(
-            authors: pubkeys,
+            authors: publicKeys,
             kinds: [.directMessageRelayList]
         )
     }
 
     /// Create a filter for a specific user's DM relay list (NIP-17, kind 10050)
-    public static func directMessageRelayList(pubkey: PublicKey) -> Filter {
+    public static func directMessageRelayList(publicKey: PublicKey) -> Filter {
         Filter(
-            authors: [pubkey],
+            authors: [publicKey],
             kinds: [.directMessageRelayList],
             limit: 1
         )

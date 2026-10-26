@@ -69,7 +69,8 @@ struct RemoteSignerCommandsTests {
     func signHappyPath() async throws {
         let (remote, transport) = try await connected()
         let unsigned = UnsignedEvent(
-            pubkey: signer.publicKey, createdAt: Timestamp(rawValue: 1000), kind: .textNote, rawTags: [["t", "nostr"]],
+            publicKey: signer.publicKey, createdAt: Timestamp(rawValue: 1000), kind: .textNote,
+            rawTags: [["t", "nostr"]],
             content: "hello from the bunker")
 
         async let signed = remote.sign(unsigned)
@@ -89,14 +90,14 @@ struct RemoteSignerCommandsTests {
         #expect(event.content == "hello from the bunker")
         #expect(event.tags == [["t", "nostr"]])
         #expect(event.createdAt.rawValue == 1000)
-        #expect(event.pubkey == signer.publicKey)
+        #expect(event.publicKey == signer.publicKey)
     }
 
     @Test("sign rejects a tampered event whose content was altered after signing")
     func signRejectsTampered() async throws {
         let (remote, transport) = try await connected()
         let unsigned = UnsignedEvent(
-            pubkey: signer.publicKey, createdAt: Timestamp(rawValue: 1000), kind: .textNote, content: "original")
+            publicKey: signer.publicKey, createdAt: Timestamp(rawValue: 1000), kind: .textNote, content: "original")
 
         let signed = Task { try await remote.sign(unsigned) }
         let request = try await nextRequest(transport)
@@ -116,14 +117,15 @@ struct RemoteSignerCommandsTests {
     func signRejectsMismatchedContent() async throws {
         let (remote, transport) = try await connected()
         let unsigned = UnsignedEvent(
-            pubkey: signer.publicKey, createdAt: Timestamp(rawValue: 1000), kind: .textNote, content: "requested")
+            publicKey: signer.publicKey, createdAt: Timestamp(rawValue: 1000), kind: .textNote, content: "requested")
 
         let signed = Task { try await remote.sign(unsigned) }
         let request = try await nextRequest(transport)
 
         // The signer signs a *different* event (valid signature, wrong content) — must be rejected.
         let other = UnsignedEvent(
-            pubkey: signer.publicKey, createdAt: Timestamp(rawValue: 1000), kind: .textNote, content: "something else")
+            publicKey: signer.publicKey, createdAt: Timestamp(rawValue: 1000), kind: .textNote,
+            content: "something else")
         let json = try RemoteSignerFixtures.signedEventJSON(other, signer: signer)
         try await transport.deliver(
             RemoteSignerFixtures.response(
@@ -136,7 +138,7 @@ struct RemoteSignerCommandsTests {
     func signRejectsWrongPubkey() async throws {
         let (remote, transport) = try await connected()
         let unsigned = UnsignedEvent(
-            pubkey: signer.publicKey, createdAt: Timestamp(rawValue: 1000), kind: .textNote, content: "requested")
+            publicKey: signer.publicKey, createdAt: Timestamp(rawValue: 1000), kind: .textNote, content: "requested")
 
         let signed = Task { try await remote.sign(unsigned) }
         let request = try await nextRequest(transport)
@@ -146,7 +148,7 @@ struct RemoteSignerCommandsTests {
         // must reject it.
         let attacker = try KeyPair()
         let forged = UnsignedEvent(
-            pubkey: attacker.publicKey, createdAt: Timestamp(rawValue: 1000), kind: .textNote, content: "requested")
+            publicKey: attacker.publicKey, createdAt: Timestamp(rawValue: 1000), kind: .textNote, content: "requested")
         let json = try RemoteSignerFixtures.signedEventJSON(forged, signer: attacker)
         try await transport.deliver(
             RemoteSignerFixtures.response(

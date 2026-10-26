@@ -63,7 +63,7 @@ struct EventKindTests {
     func eventEncodesKindAsBareInt() throws {
         let event = Event(
             id: EventID.fixture("id"),
-            pubkey: PublicKey.fixture("pk"),
+            publicKey: PublicKey.fixture("pk"),
             createdAt: Timestamp(rawValue: 1_700_000_000),
             kind: .textNote,
             tags: [],
@@ -101,7 +101,7 @@ struct EventKindTests {
     func signedEventsRoundTrip() throws {
         let signer = EventSigner(keyPair: try KeyPair())
         let unsigned = UnsignedEvent(
-            pubkey: signer.publicKey,
+            publicKey: signer.publicKey,
             kind: Event.Kind(rawValue: 31337),
             content: "custom kind"
         )

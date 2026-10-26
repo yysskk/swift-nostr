@@ -10,7 +10,7 @@ struct WalletInfoTests {
     private func infoEvent(content: String, tags: [[String]] = []) -> Event {
         Event(
             id: .fixture("info"),
-            pubkey: .fixture("wallet"),
+            publicKey: .fixture("wallet"),
             createdAt: Timestamp(rawValue: 0),
             kind: .walletConnectInfo,
             tags: tags,
@@ -77,7 +77,7 @@ struct WalletInfoTests {
     func rejectsWrongKind() {
         let event = Event(
             id: .fixture("info"),
-            pubkey: .fixture("wallet"),
+            publicKey: .fixture("wallet"),
             createdAt: Timestamp(rawValue: 0),
             kind: .textNote,
             tags: [],

@@ -45,13 +45,13 @@ struct RequestResponseSessionTests {
     /// A request event whose content carries `key`, so the transport log can name it.
     private func request(_ key: String) -> Event {
         Event(
-            id: .fixture(key), pubkey: .fixture("client"), createdAt: Timestamp(rawValue: 0), kind: 1, tags: [],
+            id: .fixture(key), publicKey: .fixture("client"), createdAt: Timestamp(rawValue: 0), kind: 1, tags: [],
             content: key, signature: nil)
     }
 
     private func response(for key: String, content: String) -> Event {
         Event(
-            id: .fixture("resp-\(key)"), pubkey: .fixture("peer"), createdAt: Timestamp(rawValue: 0), kind: 1,
+            id: .fixture("resp-\(key)"), publicKey: .fixture("peer"), createdAt: Timestamp(rawValue: 0), kind: 1,
             tags: [["e", key]], content: content, signature: nil)
     }
 

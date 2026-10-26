@@ -26,7 +26,7 @@ struct NIP57ZapReceiptTests {
     private func makeReceipt(signedBy payee: KeyPair, tags: [[String]]) throws -> Event {
         let signer = EventSigner(keyPair: payee)
         return try signer.sign(
-            UnsignedEvent(pubkey: signer.publicKey, kind: .zap, rawTags: tags, content: ""))
+            UnsignedEvent(publicKey: signer.publicKey, kind: .zap, rawTags: tags, content: ""))
     }
 
     /// Builds a JSON-encoded kind-9734 zap request with the given amount and, optionally, zapped event.
@@ -35,7 +35,7 @@ struct NIP57ZapReceiptTests {
     {
         let sender = EventSigner(keyPair: try KeyPair())
         let request = try sender.signZapRequest(
-            recipientPubkey: try PublicKey(hex: recipient), relays: [RelayURL("wss://relay.example.com")!],
+            recipientPublicKey: try PublicKey(hex: recipient), relays: [RelayURL("wss://relay.example.com")!],
             amountMillisats: amountMillisats, eventID: try eventID.map(EventID.init(hex:)))
         return String(decoding: try JSONEncoder().encode(request), as: UTF8.self)
     }
@@ -196,7 +196,7 @@ struct NIP57ZapReceiptTests {
         let sender = EventSigner(keyPair: try KeyPair())
         let request = try sender.sign(
             UnsignedEvent(
-                pubkey: sender.publicKey,
+                publicKey: sender.publicKey,
                 kind: .zapRequest,
                 rawTags: [["p", recipient], ["amount", "not-a-number"]],
                 content: ""
@@ -261,7 +261,7 @@ struct NIP57ZapReceiptTests {
         let replacement: Character = sig.first == "a" ? "b" : "a"
         let badSig = try Signature(hex: String(replacement) + sig.dropFirst())
         let tampered = Event(
-            id: receipt.id, pubkey: receipt.pubkey, createdAt: receipt.createdAt, kind: receipt.kind,
+            id: receipt.id, publicKey: receipt.publicKey, createdAt: receipt.createdAt, kind: receipt.kind,
             tags: receipt.tags, content: receipt.content, signature: badSig)
 
         #expect(throws: ZapReceipt.ValidationError.invalidSignature) {
@@ -429,7 +429,7 @@ struct NIP57ZapReceiptTests {
         let replacement: Character = sig.first == "a" ? "b" : "a"
         let badSig = try Signature(hex: String(replacement) + sig.dropFirst())
         let tampered = Event(
-            id: receipt.id, pubkey: receipt.pubkey, createdAt: receipt.createdAt, kind: receipt.kind,
+            id: receipt.id, publicKey: receipt.publicKey, createdAt: receipt.createdAt, kind: receipt.kind,
             tags: receipt.tags, content: receipt.content, signature: badSig)
 
         #expect(throws: ZapReceipt.ValidationError.invalidSignature) {

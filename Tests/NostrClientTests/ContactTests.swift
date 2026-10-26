@@ -263,7 +263,7 @@ struct ContactListEventTests {
         let signer = EventSigner(keyPair: try KeyPair())
         let event = try signer.sign(
             UnsignedEvent(
-                pubkey: signer.publicKey,
+                publicKey: signer.publicKey,
                 kind: .contacts,
                 rawTags: [
                     ["p", pubkey1.hex],
@@ -304,7 +304,7 @@ struct ContactListFilterTests {
 
     @Test("Contact list filter for single pubkey")
     func contactListFilterSinglePubkey() {
-        let filter = Filter.contactList(pubkey: .fixture("abc123"))
+        let filter = Filter.contactList(publicKey: .fixture("abc123"))
 
         #expect(filter.authors == [.fixture("abc123")])
         #expect(filter.kinds == [3])
@@ -313,7 +313,7 @@ struct ContactListFilterTests {
 
     @Test("Contact list filter for multiple pubkeys")
     func contactListFilterMultiplePubkeys() {
-        let filter = Filter.contactList(pubkeys: [.fixture("abc123"), .fixture("def456")])
+        let filter = Filter.contactList(publicKeys: [.fixture("abc123"), .fixture("def456")])
 
         #expect(filter.authors == [.fixture("abc123"), .fixture("def456")])
         #expect(filter.kinds == [3])

@@ -154,7 +154,7 @@ struct ResponseSchemeTests {
         // Same event, signature replaced with one that does not verify.
         await transport.emit(
             Event(
-                id: genuine.id, pubkey: genuine.pubkey, createdAt: genuine.createdAt,
+                id: genuine.id, publicKey: genuine.publicKey, createdAt: genuine.createdAt,
                 kind: genuine.kind, tags: genuine.tags, content: genuine.content,
                 signature: try Signature(hex: String(repeating: "ab", count: 64))))
 

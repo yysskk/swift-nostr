@@ -16,7 +16,7 @@ struct RelayMessageTests {
         if case .event(let subscriptionID, let event) = message {
             #expect(subscriptionID == "sub1")
             #expect(event.id.hex == String(repeating: "ab", count: 32))
-            #expect(event.pubkey.hex == String(repeating: "cd", count: 32))
+            #expect(event.publicKey.hex == String(repeating: "cd", count: 32))
             #expect(event.signature?.hex == String(repeating: "ef", count: 64))
             #expect(event.content == "Hello")
         } else {
@@ -210,7 +210,7 @@ struct ClientMessageTests {
     func serializeEventMessage() throws {
         let event = Event(
             id: EventID.fixture("id123"),
-            pubkey: PublicKey.fixture("pubkey123"),
+            publicKey: PublicKey.fixture("pubkey123"),
             createdAt: Timestamp(rawValue: 1_234_567_890),
             kind: 1,
             tags: [],

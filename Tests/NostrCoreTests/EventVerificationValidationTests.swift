@@ -2,7 +2,7 @@ import Foundation
 import NostrCore
 import Testing
 
-/// Verification hands the pubkey and signature to libsecp256k1, which parses fixed-width buffers
+/// Verification hands the public key and signature to libsecp256k1, which parses fixed-width buffers
 /// and would read past the end of a short one. Every input here is attacker-controlled in
 /// practice: an event arrives from a relay with whatever `pubkey` and `sig` strings its author
 /// chose. ``PublicKey`` and ``Signature`` only ever hold 32 and 64 bytes, so a structurally
@@ -22,7 +22,7 @@ struct EventVerificationValidationTests {
     }
 
     @Test(
-        "an event with a pubkey that is not 32 bytes does not decode",
+        "an event with a public key that is not 32 bytes does not decode",
         arguments: [
             "",  // zero bytes
             "ab",  // one byte
@@ -30,8 +30,8 @@ struct EventVerificationValidationTests {
             String(repeating: "ab", count: 33),  // one byte long, truncation would hide the excess
         ]
     )
-    func wrongLengthPubkeyIsRejected(pubkey: String) throws {
-        let json = try eventJSON(overriding: ["pubkey": pubkey])
+    func wrongLengthPublicKeyIsRejected(publicKey: String) throws {
+        let json = try eventJSON(overriding: ["pubkey": publicKey])
 
         #expect(throws: DecodingError.self) {
             try JSONDecoder().decode(Event.self, from: json)
@@ -53,7 +53,7 @@ struct EventVerificationValidationTests {
         }
     }
 
-    @Test("an event with a non-hex pubkey or signature does not decode")
+    @Test("an event with a non-hex public key or signature does not decode")
     func nonHexIsRejected() throws {
         for overrides in [["pubkey": String(repeating: "zz", count: 32)], ["sig": String(repeating: "zz", count: 64)]] {
             let json = try eventJSON(overriding: overrides)
@@ -63,15 +63,15 @@ struct EventVerificationValidationTests {
         }
     }
 
-    /// A pubkey longer than 32 bytes must not be silently truncated to its first 32: that would
-    /// let one key be spelled arbitrarily many ways, and any allow/block list keyed on the pubkey
+    /// A public key longer than 32 bytes must not be silently truncated to its first 32: that would
+    /// let one key be spelled arbitrarily many ways, and any allow/block list keyed on the public key
     /// could be bypassed while the signature still verified.
-    @Test("a signed event does not decode under a padded spelling of its own pubkey")
-    func paddedPubkeyIsRejected() throws {
+    @Test("a signed event does not decode under a padded spelling of its own public key")
+    func paddedPublicKeyIsRejected() throws {
         let event = try EventSigner(privateKeyHex: Self.secretKeyHex).signTextNote(content: "gm")
         #expect(try event.verify())
 
-        let json = try eventJSON(overriding: ["pubkey": event.pubkey.hex + "00"])
+        let json = try eventJSON(overriding: ["pubkey": event.publicKey.hex + "00"])
 
         #expect(throws: DecodingError.self) {
             try JSONDecoder().decode(Event.self, from: json)
@@ -90,7 +90,7 @@ struct EventVerificationValidationTests {
         let event = try EventSigner(privateKeyHex: Self.secretKeyHex).signTextNote(content: "gm")
         let other = try EventSigner(keyPair: try KeyPair()).signTextNote(content: "gm")
         let forged = Event(
-            id: event.id, pubkey: event.pubkey, createdAt: event.createdAt, kind: event.kind,
+            id: event.id, publicKey: event.publicKey, createdAt: event.createdAt, kind: event.kind,
             tags: event.tags, content: event.content, signature: other.signature)
 
         #expect(try forged.verify() == false)
@@ -98,7 +98,7 @@ struct EventVerificationValidationTests {
 
     @Test("an unsigned rumor does not verify")
     func rumorDoesNotVerify() throws {
-        let rumor = try UnsignedEvent(pubkey: try KeyPair().publicKey, kind: .textNote, content: "gm").asRumor()
+        let rumor = try UnsignedEvent(publicKey: try KeyPair().publicKey, kind: .textNote, content: "gm").asRumor()
 
         #expect(rumor.signature == nil)
         #expect(throws: NostrError.invalidSignature) {

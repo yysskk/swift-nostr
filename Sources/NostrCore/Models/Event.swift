@@ -8,7 +8,7 @@ public struct Event: Codable, Identifiable, Hashable, Sendable {
     public let id: EventID
 
     /// The public key of the event creator.
-    public let pubkey: PublicKey
+    public let publicKey: PublicKey
 
     /// When the event was created, carried in the `created_at` field on the wire.
     public let createdAt: Timestamp
@@ -32,7 +32,7 @@ public struct Event: Codable, Identifiable, Hashable, Sendable {
 
     enum CodingKeys: String, CodingKey {
         case id
-        case pubkey
+        case publicKey = "pubkey"
         case createdAt = "created_at"
         case kind
         case tags
@@ -47,7 +47,7 @@ public struct Event: Codable, Identifiable, Hashable, Sendable {
     /// - Parameter signature: The event's signature, or `nil` for an unsigned NIP-59 rumor.
     public init(
         id: EventID,
-        pubkey: PublicKey,
+        publicKey: PublicKey,
         createdAt: Timestamp,
         kind: Kind,
         tags: [[String]],
@@ -55,7 +55,7 @@ public struct Event: Codable, Identifiable, Hashable, Sendable {
         signature: Signature?
     ) {
         self.id = id
-        self.pubkey = pubkey
+        self.publicKey = publicKey
         self.createdAt = createdAt
         self.kind = kind
         self.tags = tags
@@ -67,12 +67,12 @@ public struct Event: Codable, Identifiable, Hashable, Sendable {
     ///
     /// A missing `sig` field, or the empty string some implementations write for an unsigned
     /// rumor, decodes as a `nil` ``signature``.
-    /// - Throws: `DecodingError` if a field is missing or mistyped, or if `id`, `pubkey`, or a
+    /// - Throws: `DecodingError` if a field is missing or mistyped, or if `id`, `publicKey`, or a
     ///   non-empty `sig` is not canonical lowercase hex of the right length.
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.id = try container.decode(EventID.self, forKey: .id)
-        self.pubkey = try container.decode(PublicKey.self, forKey: .pubkey)
+        self.publicKey = try container.decode(PublicKey.self, forKey: .publicKey)
         self.createdAt = try container.decode(Timestamp.self, forKey: .createdAt)
         self.kind = try container.decode(Kind.self, forKey: .kind)
         self.tags = try container.decode([[String]].self, forKey: .tags)
@@ -93,7 +93,7 @@ public struct Event: Codable, Identifiable, Hashable, Sendable {
     public func encode(to encoder: any Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(id, forKey: .id)
-        try container.encode(pubkey, forKey: .pubkey)
+        try container.encode(publicKey, forKey: .publicKey)
         try container.encode(createdAt, forKey: .createdAt)
         try container.encode(kind, forKey: .kind)
         try container.encode(tags, forKey: .tags)
@@ -134,7 +134,7 @@ extension Event {
 
         // MARK: NIP-01 Range Semantics
 
-        /// Replaceable kinds: relays keep only the latest event per pubkey
+        /// Replaceable kinds: relays keep only the latest event per public key
         /// (0, 3, and 10000-19999).
         public var isReplaceable: Bool {
             rawValue == 0 || rawValue == 3 || (10000..<20000).contains(rawValue)
@@ -145,7 +145,7 @@ extension Event {
             (20000..<30000).contains(rawValue)
         }
 
-        /// Addressable kinds: replaceable per pubkey and "d" tag (30000-39999).
+        /// Addressable kinds: replaceable per public key and "d" tag (30000-39999).
         public var isAddressable: Bool {
             (30000..<40000).contains(rawValue)
         }
@@ -304,7 +304,7 @@ extension Event.Kind: Codable {
 /// An event before it has been signed
 public struct UnsignedEvent: Sendable {
     /// The creator's public key.
-    public let pubkey: PublicKey
+    public let publicKey: PublicKey
     /// When the event was created.
     public let createdAt: Timestamp
     /// The event kind (NIP-01).
@@ -316,26 +316,27 @@ public struct UnsignedEvent: Sendable {
 
     /// Builds an unsigned event from typed ``Tag``s.
     public init(
-        pubkey: PublicKey,
+        publicKey: PublicKey,
         createdAt: Timestamp = .now,
         kind: Event.Kind,
         tags: [Tag] = [],
         content: String
     ) {
-        self.init(pubkey: pubkey, createdAt: createdAt, kind: kind, rawTags: tags.map(\.rawArray), content: content)
+        self.init(
+            publicKey: publicKey, createdAt: createdAt, kind: kind, rawTags: tags.map(\.rawArray), content: content)
     }
 
     /// Builds an unsigned event from raw NIP-01 tag arrays, e.g. tags copied
     /// from another event. Prefer the ``Tag``-based initializer when
     /// constructing tags yourself.
     public init(
-        pubkey: PublicKey,
+        publicKey: PublicKey,
         createdAt: Timestamp = .now,
         kind: Event.Kind,
         rawTags: [[String]],
         content: String
     ) {
-        self.pubkey = pubkey
+        self.publicKey = publicKey
         self.createdAt = createdAt
         self.kind = kind
         self.tags = rawTags
@@ -346,7 +347,7 @@ public struct UnsignedEvent: Sendable {
     public func serializedForHashing() throws -> Data {
         let serializable: [Any] = [
             0,
-            pubkey.hex,
+            publicKey.hex,
             createdAt.rawValue,
             kind.rawValue,
             tags,
@@ -376,7 +377,7 @@ public struct UnsignedEvent: Sendable {
     public func asRumor() throws -> Event {
         Event(
             id: try computedID,
-            pubkey: pubkey,
+            publicKey: publicKey,
             createdAt: createdAt,
             kind: kind,
             tags: tags,

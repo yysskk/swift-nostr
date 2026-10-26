@@ -33,7 +33,7 @@ struct NIP42AuthenticationEventTests {
         let event = try signer.signClientAuthentication(relayURL: relayURL, challenge: "challengestringhere")
 
         #expect(event.kind == .clientAuthentication)
-        #expect(event.pubkey == signer.publicKey)
+        #expect(event.publicKey == signer.publicKey)
         #expect(event.firstTagValue(named: "relay") == "wss://relay.example.com")
         #expect(event.firstTagValue(named: "challenge") == "challengestringhere")
         #expect(event.content.isEmpty)
@@ -180,7 +180,7 @@ struct NIP42RelayConnectionTests {
         mock.deliver(.string("[\"OK\",\"\(event.id)\",true,\"\"]"))
 
         try await authTask.value
-        #expect(await connection.authenticatedPubkeys == [signer.publicKey])
+        #expect(await connection.authenticatedPublicKeys == [signer.publicKey])
         #expect(await connection.isAuthenticated)
         await connection.disconnect()
     }
@@ -246,7 +246,7 @@ struct NIP42RelayConnectionTests {
         try await pollUntil { mock.sentTextFrames.contains { $0.contains("\"AUTH\"") } }
         let sent = try sentAuthEvent(in: mock)
         #expect(sent.kind == .clientAuthentication)
-        #expect(sent.pubkey == signer.publicKey)
+        #expect(sent.publicKey == signer.publicKey)
         #expect(sent.firstTagValue(named: "relay") == relayURL.description)
         #expect(sent.firstTagValue(named: "challenge") == "challengestringhere")
         #expect(try sent.verify())
@@ -288,7 +288,7 @@ struct NIP42RelayConnectionTests {
             try await authTask.value
         }
 
-        #expect(await connection.authenticatedPubkeys == [alice.publicKey, bob.publicKey])
+        #expect(await connection.authenticatedPublicKeys == [alice.publicKey, bob.publicKey])
         await connection.disconnect()
     }
 
@@ -330,7 +330,7 @@ struct NIP42RelayConnectionTests {
         await connection.disconnect()
 
         #expect(await connection.authenticationChallenge == nil)
-        #expect(await connection.authenticatedPubkeys.isEmpty)
+        #expect(await connection.authenticatedPublicKeys.isEmpty)
         #expect(await connection.isAuthenticated == false)
     }
 

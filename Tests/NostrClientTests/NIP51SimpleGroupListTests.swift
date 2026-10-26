@@ -344,7 +344,7 @@ struct NIP51SimpleGroupListClientTests {
         let typed = SimpleGroupList(publicEntries: entries, relayURLs: relayURLs)
         return try signer.sign(
             UnsignedEvent(
-                pubkey: signer.publicKey,
+                publicKey: signer.publicKey,
                 createdAt: createdAt,
                 kind: .simpleGroupList,
                 tags: typed.list.publicItems,

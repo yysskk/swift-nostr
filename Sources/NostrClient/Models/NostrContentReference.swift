@@ -78,17 +78,17 @@ public struct NostrContentReference: Sendable, Hashable {
     public var tag: Tag {
         switch entity {
         case .npub(let publicKey):
-            return .pubkey(publicKey)
+            return .publicKey(publicKey)
         case .nprofile(let profile):
-            return .pubkey(profile.publicKey, relayURL: profile.relays.first)
+            return .publicKey(profile.publicKey, relayURL: profile.relays.first)
         case .note(let eventID):
             return .quote(eventID)
         case .nevent(let event):
-            return .quote(event.eventID, relayURL: event.relays.first, pubkey: event.author)
+            return .quote(event.eventID, relayURL: event.relays.first, publicKey: event.author)
         case .naddr(let addr):
             return .address(
                 kind: Event.Kind(rawValue: addr.kind),
-                pubkey: addr.author,
+                publicKey: addr.author,
                 identifier: addr.identifier,
                 relayURL: addr.relays.first
             )

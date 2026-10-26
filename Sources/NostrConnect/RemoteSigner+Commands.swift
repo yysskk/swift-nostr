@@ -43,7 +43,7 @@ extension RemoteSigner {
         // it under the pubkey the caller asked for, so a validly-signed event from a different key
         // cannot be substituted.
         guard (try? signed.verify()) == true,
-            signed.pubkey == event.pubkey,
+            signed.publicKey == event.publicKey,
             signed.kind == event.kind,
             signed.content == event.content,
             signed.tags == event.tags,
@@ -67,20 +67,20 @@ extension RemoteSigner {
     /// with the user's key.
     /// - Parameters:
     ///   - plaintext: The message to encrypt.
-    ///   - thirdPartyPubkey: The recipient's public key.
+    ///   - recipientPublicKey: The recipient's public key.
     /// - Returns: The NIP-44 ciphertext.
-    public func nip44Encrypt(_ plaintext: String, to thirdPartyPubkey: PublicKey) async throws -> String {
-        try await performSingle(method: .nip44Encrypt, params: [thirdPartyPubkey.hex, plaintext])
+    public func nip44Encrypt(_ plaintext: String, to recipientPublicKey: PublicKey) async throws -> String {
+        try await performSingle(method: .nip44Encrypt, params: [recipientPublicKey.hex, plaintext])
     }
 
     /// Decrypts a NIP-44 message from a third party (`nip44_decrypt`); the signer performs it with
     /// the user's key.
     /// - Parameters:
     ///   - ciphertext: The NIP-44 ciphertext to decrypt.
-    ///   - thirdPartyPubkey: The sender's public key.
+    ///   - senderPublicKey: The sender's public key.
     /// - Returns: The decrypted plaintext.
-    public func nip44Decrypt(_ ciphertext: String, from thirdPartyPubkey: PublicKey) async throws -> String {
-        try await performSingle(method: .nip44Decrypt, params: [thirdPartyPubkey.hex, ciphertext])
+    public func nip44Decrypt(_ ciphertext: String, from senderPublicKey: PublicKey) async throws -> String {
+        try await performSingle(method: .nip44Decrypt, params: [senderPublicKey.hex, ciphertext])
     }
 
     /// Encrypts `plaintext` for a third party using legacy NIP-04 (`nip04_encrypt`); the signer

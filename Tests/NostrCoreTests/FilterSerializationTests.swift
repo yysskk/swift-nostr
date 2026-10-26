@@ -63,13 +63,13 @@ struct FilterSerializationTests {
         let id = EventID.fixture("id")
         let author = PublicKey.fixture("author")
         let referencedEvent = EventID.fixture("referenced event")
-        let referencedPubkey = PublicKey.fixture("referenced pubkey")
+        let referencedPublicKey = PublicKey.fixture("referenced pubkey")
         let filter = Filter(
             ids: [id],
             authors: [author],
             kinds: [1],
             eventReferences: [referencedEvent],
-            pubkeyReferences: [referencedPubkey],
+            publicKeyReferences: [referencedPublicKey],
             since: Timestamp(rawValue: now),
             until: Timestamp(rawValue: now + 60),
             limit: 10
@@ -81,7 +81,7 @@ struct FilterSerializationTests {
         #expect(dictionary["authors"] as? [String] == [author.hex])
         #expect(dictionary["kinds"] as? [Int] == [1])
         #expect(dictionary["#e"] as? [String] == [referencedEvent.hex])
-        #expect(dictionary["#p"] as? [String] == [referencedPubkey.hex])
+        #expect(dictionary["#p"] as? [String] == [referencedPublicKey.hex])
         #expect(dictionary["since"] as? Int64 == now)
         #expect(dictionary["until"] as? Int64 == now + 60)
         #expect(dictionary["limit"] as? Int == 10)

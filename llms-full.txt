@@ -132,7 +132,7 @@ try await client.messages.send("gift-wrapped by the bunker", to: recipientPubkey
 // Or author an event with no helper: build it under the signer's pubkey and sign it.
 let pubkey = await client.identity.publicKey!
 let signed = try await client.identity.sign(
-    UnsignedEvent(pubkey: pubkey, kind: .textNote, content: "Signed remotely"))
+    UnsignedEvent(publicKey: pubkey, kind: .textNote, content: "Signed remotely"))
 try await client.events.publish(signed)           // generic publish of a pre-signed event
 ```
 
@@ -276,8 +276,8 @@ let byRelay = try await client.relays.pool.countEvents(matching: [filter])  // [
 // Send
 try await client.messages.send("Hello!", to: recipient)   // PublicKey
 
-// Send a rumor of any kind, gift-wrapped and routed like a DM (rumor.pubkey must be the signer's)
-let rumor = UnsignedEvent(pubkey: myPubkey, kind: Event.Kind(rawValue: 30_999), content: payload)
+// Send a rumor of any kind, gift-wrapped and routed like a DM (rumor.publicKey must be the signer's)
+let rumor = UnsignedEvent(publicKey: myPubkey, kind: Event.Kind(rawValue: 30_999), content: payload)
 try await client.messages.sendGiftWrapped(rumor, to: recipient)
 
 // Subscribe to incoming DMs, parsed automatically. Wraps sealed to someone else and malformed
@@ -324,7 +324,7 @@ try await client.groups.publishMessage(
 
 // Moderation (kinds 9000-9002, 9005, 9007-9010): the relay checks the author's role and answers with OK.
 try await client.groups.publishModeration(
-    .putUser(pubkey: memberPubkey, roles: ["moderator"]), in: group, reason: "welcome")
+    .putUser(publicKey: memberPubkey, roles: ["moderator"]), in: group, reason: "welcome")
 
 // Relay-signed state, newest event per kind. With a known relay pubkey (group.relayPubkey,
 // the naddr coordinate's author), wrong-author and invalid-signature events are dropped.
@@ -343,7 +343,7 @@ NIP-01 Nostr Event (struct: Codable, Identifiable, Hashable, Sendable).
 ### Properties
 
 - `id: EventID` -- sha256 of the NIP-01 serialization
-- `pubkey: PublicKey` -- author's public key
+- `publicKey: PublicKey` -- author's public key, `pubkey` on the wire
 - `createdAt: Timestamp` -- creation time in whole Unix seconds, `created_at` on the wire
 - `kind: Event.Kind` -- event kind (RawRepresentable struct, encodes as bare integer)
 - `tags: [[String]]` -- array of tag arrays (raw NIP-01 wire form)
@@ -362,25 +362,25 @@ stays `[[String]]` (the hashed wire form). `Tag` is array-literal expressible, s
 ```swift
 Tag.event(id, relayURL: relay, marker: .reply)  // ["e", id, "wss://r", "reply"]
 Tag.event(id, marker: .root)     // ["e", id, "", "root"] (placeholder padded)
-Tag.pubkey(pk, petname: "alice") // ["p", pk, "", "alice"]
+Tag.publicKey(pk, petname: "alice") // ["p", pk, "", "alice"]
 Tag.hashtag("nostr")             // ["t", "nostr"]
 Tag.identifier("my-article")     // ["d", "my-article"]
 Tag.subject("hi")                // ["subject", "hi"]
 Tag.word("spam")                 // ["word", "spam"] (NIP-51 muted word)
-Tag.quote(id, pubkey: pk)        // ["q", id, "", pk] (NIP-18; optional relayURL:)
-Tag.address(kind: .longFormContent, pubkey: pk, identifier: "d")  // ["a", "30023:<pk>:d"] (optional relayURL:)
+Tag.quote(id, publicKey: pk)        // ["q", id, "", pk] (NIP-18; optional relayURL:)
+Tag.address(kind: .longFormContent, publicKey: pk, identifier: "d")  // ["a", "30023:<pk>:d"] (optional relayURL:)
 Tag.reference("https://x")       // ["r", "https://x"]
 Tag.group("abcdef")              // ["h", "abcdef"] (NIP-29 group scope, on everything a user sends)
 Tag.previous(["12345678"])       // ["previous", ref...] (NIP-29 timeline references)
 Tag.inviteCode("A7fjq2")         // ["code", "A7fjq2"] (NIP-29 kinds 9009/9021)
 Tag.role("mod", description: "kicks")  // ["role", name, description?] (NIP-29 kind 39003)
-Tag.pubkey(pk, roles: ["admin"]) // ["p", pk, role...] (NIP-29; index 1 is a role, not a relay hint)
+Tag.publicKey(pk, roles: ["admin"]) // ["p", pk, role...] (NIP-29; index 1 is a role, not a relay hint)
 Tag.simpleGroup(id: "abcdef", relayURL: try RelayURL(string: "wss://g"), name: "Cool")  // ["group", ...] (NIP-51 kind 10009)
 Tag.expiration(Timestamp(rawValue: 1_700_000_000))  // ["expiration", "1700000000"] (NIP-40)
 Tag(rawArray: ["custom", "x"])   // failable, nil for []
 tag.rawArray                     // [String] wire form
 // Raw escape hatch when you hold [[String]]:
-UnsignedEvent(pubkey: pk, kind: 1, rawTags: rawArrays, content: "...")
+UnsignedEvent(publicKey: pk, kind: 1, rawTags: rawArrays, content: "...")
 ```
 
 Read accessors on `Event`:
@@ -390,7 +390,7 @@ event.structuredTags            // [Tag]
 event.tags(named: "e")          // [Tag]
 event.firstTagValue(named: "subject")  // String?
 event.referencedEventIDs        // [EventID] from "e" tags; malformed values are skipped
-event.referencedPubkeys         // [PublicKey] from "p" tags; malformed values are skipped
+event.referencedPublicKeys         // [PublicKey] from "p" tags; malformed values are skipped
 event.expiration                // Timestamp? from the NIP-40 "expiration" tag
 event.isExpired(asOf: .now)     // true at or after the expiration; false without one
 ```
@@ -455,7 +455,7 @@ Event before signing (struct: Sendable). Same fields as Event minus `id` and `si
 
 ```swift
 let unsigned = UnsignedEvent(
-    pubkey: keyPair.publicKey,
+    publicKey: keyPair.publicKey,
     kind: .textNote,
     tags: [.hashtag("test")],
     content: "Hello"
@@ -473,7 +473,7 @@ NIP-01 Subscription Filter (struct: Codable, Sendable, Hashable).
 - `authors: [PublicKey]?` -- author public keys to match
 - `kinds: [Event.Kind]?` -- event kinds to match
 - `eventReferences: [EventID]?` -- #e tag references
-- `pubkeyReferences: [PublicKey]?` -- #p tag references
+- `publicKeyReferences: [PublicKey]?` -- #p tag references
 - `since: Timestamp?` -- earliest `created_at` to match, inclusive
 - `until: Timestamp?` -- latest `created_at` to match, inclusive
 - `limit: Int?` -- max events to return
@@ -491,12 +491,12 @@ let values = filter.tagQuery("t")
 
 ```swift
 // Ids and keys encode as their hex strings, the NIP-01 wire form.
-Filter.userNotes(pubkey: pk, limit: 50)
-Filter.metadata(pubkeys: [pk])
+Filter.userNotes(publicKey: pk, limit: 50)
+Filter.metadata(publicKeys: [pk])
 Filter.replies(to: eventID, limit: 20)
-Filter.mentions(pubkey: pk)
+Filter.mentions(publicKey: pk)
 Filter.globalFeed(limit: 100)
-Filter.contactList(pubkey: pk)   // also relayListMetadata(pubkey:), directMessageRelayList(pubkey:), and pubkeys: variants
+Filter.contactList(publicKey: pk)   // also relayListMetadata(publicKey:), directMessageRelayList(publicKey:), and publicKeys: variants
 Filter.search("nostr", kinds: [.textNote], limit: 20)  // NIP-50 full-text search
 Filter.groupTimeline(groupID: "abcdef", kinds: [.chatMessage], since: .now, limit: 50)  // NIP-29 "#h" timeline
 Filter.groupState(groupID: "abcdef")  // NIP-29 kind-39xxx state by "#d" (all five kinds by default)
@@ -767,8 +767,8 @@ let eventReport = try signer.signReport(event: note, type: .illegal, reason: "re
 
 ```swift
 // Encrypt/decrypt with NIP-44 v2 as this signer's identity (self as sender/recipient).
-let ct = try signer.nip44Encrypt("secret", to: recipientPubkey)   // PublicKey in, base64 payload out
-let pt = try signer.nip44Decrypt(ct, from: senderPubkey)
+let ct = try signer.nip44Encrypt("secret", to: recipientPublicKey)   // PublicKey in, base64 payload out
+let pt = try signer.nip44Decrypt(ct, from: senderPublicKey)
 ```
 
 ## NostrSigning
@@ -779,8 +779,8 @@ A signer abstraction over a local key (`EventSigner`) and a remote NIP-46 signer
 public protocol NostrSigning: Sendable {
     var publicKey: PublicKey { get async throws }   // author key (the user key for a remote signer)
     func sign(_ event: UnsignedEvent) async throws -> Event
-    func nip44Encrypt(_ plaintext: String, to recipientPubkey: PublicKey) async throws -> String
-    func nip44Decrypt(_ ciphertext: String, from senderPubkey: PublicKey) async throws -> String
+    func nip44Encrypt(_ plaintext: String, to recipientPublicKey: PublicKey) async throws -> String
+    func nip44Decrypt(_ ciphertext: String, from senderPublicKey: PublicKey) async throws -> String
 }
 
 let signer: any NostrSigning = EventSigner(keyPair: keyPair)   // or a RemoteSigner
@@ -852,7 +852,7 @@ Uses ECDH shared secret, HKDF key derivation, ChaCha20 encryption, HMAC-SHA256 a
 
 ```swift
 // Seal
-let sealed = try SealedMessage.seal("message", for: recipientPubkey, using: senderKeyPair)  // PublicKey
+let sealed = try SealedMessage.seal("message", for: recipientPublicKey, using: senderKeyPair)  // PublicKey
 print(sealed.payload)  // base64-encoded
 
 // Open
@@ -1115,7 +1115,7 @@ groups require NIP-42 AUTH. `event.groupID` reads the "h" tag value, or the "d" 
 
 ### Event Builders
 
-Every builder has an unsigned variant (pass `pubkey:`, returns `UnsignedEvent`) and a signing
+Every builder has an unsigned variant (pass `publicKey:`, returns `UnsignedEvent`) and a signing
 variant (pass `signer:`, any `NostrSigning` — local or NIP-46 remote — returns `Event`):
 
 ```swift
@@ -1130,11 +1130,11 @@ let message = try await Groups.contentEvent(
     previous: Groups.previousReferences(from: recentEvents, excludingAuthor: signer.publicKey),
     signer: signer)
 
-// Moderation (kinds 9000-9002, 9005, 9007-9010) via Groups.ModerationAction: .putUser(pubkey:roles:),
-// .removeUser(pubkey:), .editMetadata(Metadata), .deleteEvent(id:), .createGroup,
+// Moderation (kinds 9000-9002, 9005, 9007-9010) via Groups.ModerationAction: .putUser(publicKey:roles:),
+// .removeUser(publicKey:), .editMetadata(Metadata), .deleteEvent(id:), .createGroup,
 // .deleteGroup, .createInvite(code:), .updatePinList([PinnedItem]).
 let promote = try await Groups.moderationEvent(
-    .putUser(pubkey: memberPubkey, roles: ["moderator"]),
+    .putUser(publicKey: memberPubkey, roles: ["moderator"]),
     groupID: "abcdef", reason: "welcome", signer: signer)
 ```
 
@@ -1154,7 +1154,7 @@ A deterministic overload `previousReferences(from:excludingAuthor:maxCount:using
 
 ### Relay-Generated State (kinds 39000-39005)
 
-Parsers check the kind, read the group id from the "d" tag, and — when `relayPubkey` (a
+Parsers check the kind, read the group id from the "d" tag, and — when `relayPublicKey` (a
 `PublicKey`) is given — reject any other author; they never verify signatures (call
 `event.verify()` yourself). A "p" or "e" entry whose value is not a canonical hex key or id is
 skipped. All
@@ -1162,7 +1162,7 @@ throw `Groups.ValidationError` (`invalidEventKind`, `missingGroupID`, `unexpecte
 `missingTag`, `unsupportedModerationKind`).
 
 ```swift
-let meta = try Groups.Metadata(event: e39000, relayPubkey: relayPubkey)
+let meta = try Groups.Metadata(event: e39000, relayPublicKey: relayPublicKey)
 // meta.groupID, .name, .picture, .banner, .about, .isPrivate, .isRestricted, .isHidden,
 // .isClosed, .isLiveKitEnabled, .supportedKinds, .parentGroupID, .childGroupIDs,
 // .additionalTags (uninterpreted tags, lossless), .tags / .fieldTags for re-emission
@@ -1301,7 +1301,7 @@ NIP-11 Relay Information Document (struct: Codable, Sendable, Hashable). All fie
 let info = try await RelayInformation.fetch(from: try RelayURL(string: "wss://relay.example.com"))
 print(info.name)            // String?
 print(info.supportedNIPs)   // [Int]?
-print(info.pubkey)          // PublicKey? -- nil when absent or not canonical hex (decoded leniently)
+print(info.publicKey)       // PublicKey? -- nil when absent or not canonical hex (decoded leniently)
 print(info.limitation?.authRequired)
 print(info.limitation?.createdAtLowerLimit)  // Duration? -- how far in the past created_at may be
 
@@ -1404,7 +1404,7 @@ Manages WebSocket connection to a single relay (actor).
 - `state: RelayConnectionState` -- current connection state
 - `config: RelayConnectionConfig`
 - `authenticationChallenge: String?` -- latest NIP-42 AUTH challenge (session-scoped)
-- `authenticatedPubkeys: Set<PublicKey>` / `isAuthenticated: Bool` -- NIP-42 session state
+- `authenticatedPublicKeys: Set<PublicKey>` / `isAuthenticated: Bool` -- NIP-42 session state
 
 ### Configuration
 
@@ -1510,7 +1510,7 @@ A `nostr:` reference found inside event content (NIP-27; struct: Sendable, Hasha
 - `var tag: Tag` -- the tag this reference contributes: `p` for npub/nprofile, `q` for note/nevent, `a` for `naddr`, each carrying the entity's first relay hint when present
 - `static func tags(for content: String) -> [Tag]` -- the deduplicated tags for every reference, in first-seen order
 
-The matching `q` tag is built with `Tag.quote(_ id:relayURL:pubkey:)` -- a NIP-18 `["q", id, relay, pubkey]` tag with empty-string placeholders for skipped middle elements.
+The matching `q` tag is built with `Tag.quote(_ id:relayURL:publicKey:)` -- a NIP-18 `["q", id, relay, pubkey]` tag with empty-string placeholders for skipped middle elements.
 
 ```swift
 let content = "gm nostr:npub1... quoting nostr:note1..."
@@ -1580,7 +1580,7 @@ let userPubkey = try await signer.userPublicKey()  // the same value as `try awa
 
 // sign_event: signs remotely, then verifies the returned event and checks its kind/content/tags/
 // created_at match the request (throws RemoteSignerError.responseValidationFailed otherwise).
-let signed = try await signer.sign(UnsignedEvent(pubkey: userPubkey, kind: .textNote, content: "hi"))
+let signed = try await signer.sign(UnsignedEvent(publicKey: userPubkey, kind: .textNote, content: "hi"))
 
 try await signer.ping()                                       // expects "pong"
 let ct = try await signer.nip44Encrypt("hi", to: thirdParty)   // PublicKey

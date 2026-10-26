@@ -11,12 +11,12 @@ struct EventTests {
     func createUnsignedEvent() throws {
         let keyPair = try KeyPair()
         let unsigned = UnsignedEvent(
-            pubkey: keyPair.publicKey,
+            publicKey: keyPair.publicKey,
             kind: .textNote,
             content: "Hello, Nostr!"
         )
 
-        #expect(unsigned.pubkey == keyPair.publicKey)
+        #expect(unsigned.publicKey == keyPair.publicKey)
         #expect(unsigned.kind == 1)
         #expect(unsigned.content == "Hello, Nostr!")
         #expect(unsigned.tags.isEmpty)
@@ -26,7 +26,7 @@ struct EventTests {
     func serializeForHashing() throws {
         let pubkey = "a".padding(toLength: 64, withPad: "0", startingAt: 0)
         let unsigned = UnsignedEvent(
-            pubkey: try PublicKey(hex: pubkey),
+            publicKey: try PublicKey(hex: pubkey),
             createdAt: Timestamp(rawValue: 1_234_567_890),
             kind: 1,
             tags: [["p", "test"]],
@@ -52,7 +52,7 @@ struct EventTests {
         let signer = EventSigner(keyPair: keyPair)
 
         let unsigned = UnsignedEvent(
-            pubkey: keyPair.publicKey,
+            publicKey: keyPair.publicKey,
             kind: .textNote,
             content: "Test message"
         )
@@ -61,7 +61,7 @@ struct EventTests {
 
         #expect(signed.id.hex.count == 64)
         #expect(signed.signature?.hex.count == 128)
-        #expect(signed.pubkey == keyPair.publicKey)
+        #expect(signed.publicKey == keyPair.publicKey)
         #expect(signed.content == "Test message")
 
         // Verify the signature
@@ -111,7 +111,7 @@ struct EventTests {
         #expect(reaction.kind == 7)
         #expect(reaction.content == "🤙")
         #expect(reaction.tags.contains { $0.first == "e" && $0.contains(targetEvent.id.hex) })
-        #expect(reaction.tags.contains { $0.first == "p" && $0.contains(targetEvent.pubkey.hex) })
+        #expect(reaction.tags.contains { $0.first == "p" && $0.contains(targetEvent.publicKey.hex) })
         #expect(try reaction.verify())
     }
 
@@ -140,7 +140,7 @@ struct EventTests {
         let decoded = try decoder.decode(Event.self, from: data)
 
         #expect(decoded.id == event.id)
-        #expect(decoded.pubkey == event.pubkey)
+        #expect(decoded.publicKey == event.publicKey)
         #expect(decoded.content == event.content)
         #expect(decoded.signature == event.signature)
     }

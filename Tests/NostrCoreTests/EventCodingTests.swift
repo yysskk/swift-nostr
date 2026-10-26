@@ -24,7 +24,7 @@ struct EventCodingTests {
         #expect(object["sig"] as? String == event.signature?.hex)
         #expect(object["signature"] == nil)
         #expect(object["id"] as? String == event.id.hex)
-        #expect(object["pubkey"] as? String == event.pubkey.hex)
+        #expect(object["pubkey"] as? String == event.publicKey.hex)
         #expect(Set(object.keys) == ["id", "pubkey", "created_at", "kind", "tags", "content", "sig"])
 
         let decoded = try decode(object)
@@ -32,9 +32,23 @@ struct EventCodingTests {
         #expect(try decoded.verify())
     }
 
+    @Test("a NIP-01 event decodes its pubkey field into publicKey")
+    func nip01PubkeyFieldDecodesIntoPublicKey() throws {
+        let publicKeyHex = String(repeating: "cd", count: 32)
+        let json = #"""
+            {"id":"\#(String(repeating: "ab", count: 32))","pubkey":"\#(publicKeyHex)","created_at":1234567890,\#
+            "kind":1,"tags":[],"content":"Hello","sig":"\#(String(repeating: "ef", count: 64))"}
+            """#
+
+        let event = try JSONDecoder().decode(Event.self, from: Data(json.utf8))
+
+        #expect(event.publicKey == (try PublicKey(hex: publicKeyHex)))
+        #expect(try jsonObject(event)["pubkey"] as? String == publicKeyHex)
+    }
+
     @Test("an unsigned rumor encodes without a sig key and decodes back as unsigned")
     func rumorOmitsSig() throws {
-        let rumor = try UnsignedEvent(pubkey: try KeyPair().publicKey, kind: .privateDirectMessage, content: "hi")
+        let rumor = try UnsignedEvent(publicKey: try KeyPair().publicKey, kind: .privateDirectMessage, content: "hi")
             .asRumor()
         let object = try jsonObject(rumor)
 
@@ -49,7 +63,7 @@ struct EventCodingTests {
 
     @Test("an empty sig decodes as an unsigned rumor")
     func emptySigDecodesAsRumor() throws {
-        let rumor = try UnsignedEvent(pubkey: try KeyPair().publicKey, kind: .textNote, content: "hi").asRumor()
+        let rumor = try UnsignedEvent(publicKey: try KeyPair().publicKey, kind: .textNote, content: "hi").asRumor()
         var object = try jsonObject(rumor)
         object["sig"] = ""
 
@@ -95,10 +109,10 @@ struct EventCodingTests {
 
     @Test("a signed event's id is the id its unsigned form computes")
     func idMatchesComputedID() throws {
-        let unsigned = UnsignedEvent(pubkey: try KeyPair().publicKey, kind: .textNote, content: "gm")
+        let unsigned = UnsignedEvent(publicKey: try KeyPair().publicKey, kind: .textNote, content: "gm")
         let rumor = try unsigned.asRumor()
 
         #expect(rumor.id == (try unsigned.computedID))
-        #expect(rumor.pubkey == unsigned.pubkey)
+        #expect(rumor.publicKey == unsigned.publicKey)
     }
 }

@@ -77,7 +77,7 @@ struct NostrClientNamespaceTests {
         #expect(await identity.authenticationMode == .manual)
 
         let signed = try await identity.sign(
-            UnsignedEvent(pubkey: keyPair.publicKey, kind: .textNote, content: "signed")
+            UnsignedEvent(publicKey: keyPair.publicKey, kind: .textNote, content: "signed")
         )
         #expect(try signed.verify())
 
@@ -156,7 +156,7 @@ struct NostrClientNamespaceTests {
 
         #expect(published.event.kind == .relayListMetadata)
         // Publishing seeds the cache, so the author's list resolves without a network round trip.
-        let cached = await routing.cachedRelayList(for: published.event.pubkey)
+        let cached = await routing.cachedRelayList(for: published.event.publicKey)
         #expect(cached?.writeRelays == [RelayURL("wss://write.example.com")!])
         await client.relays.disconnect()
     }

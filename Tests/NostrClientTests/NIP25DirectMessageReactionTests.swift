@@ -29,7 +29,7 @@ struct NIP25DirectMessageReactionTests {
         #expect(result.rumor.content == "🤙")
         #expect(result.rumor.signature == nil)  // NIP-17 rumors are never signed
         #expect(result.rumor.referencedEventIDs == [messageID])
-        #expect(result.rumor.referencedPubkeys == [authorKey])
+        #expect(result.rumor.referencedPublicKeys == [authorKey])
         #expect(result.rumor.firstTagValue(named: "k") == "14")
         #expect(result.recipientGiftWrap.kind == .giftWrap)
     }
@@ -108,8 +108,8 @@ struct NIP25DirectMessageReactionTests {
 
         // Hand-built kind-7 rumor with no "e" tag — not a valid reaction.
         let rumor = try UnsignedEvent(
-            pubkey: sender.publicKey, kind: .reaction,
-            tags: [.pubkey(sender.publicKey)], content: "+"
+            publicKey: sender.publicKey, kind: .reaction,
+            tags: [.publicKey(sender.publicKey)], content: "+"
         ).asRumor()
         let giftWrap = try await GiftWrap.wrap(
             event: rumor, signer: EventSigner(keyPair: sender), recipientPubkey: recipient.publicKey)
@@ -125,7 +125,7 @@ struct NIP25DirectMessageReactionTests {
 
         // Hand-built kind-7 rumor with an "e" tag but no "p" tag — author is unknown.
         let rumor = try UnsignedEvent(
-            pubkey: sender.publicKey, kind: .reaction,
+            publicKey: sender.publicKey, kind: .reaction,
             tags: [.event(messageID)], content: "+"
         ).asRumor()
         let giftWrap = try await GiftWrap.wrap(
@@ -147,7 +147,7 @@ struct NIP25DirectMessageReactionTests {
         let recipient = try KeyPair()
 
         let rumor = try UnsignedEvent(
-            pubkey: sender.publicKey, kind: .reaction, rawTags: rawTags, content: "+"
+            publicKey: sender.publicKey, kind: .reaction, rawTags: rawTags, content: "+"
         ).asRumor()
         let giftWrap = try await GiftWrap.wrap(
             event: rumor, signer: EventSigner(keyPair: sender), recipientPubkey: recipient.publicKey)

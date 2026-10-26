@@ -59,7 +59,7 @@ public enum ProofOfWork {
         var iterations = 0
         while true {
             let candidate = UnsignedEvent(
-                pubkey: event.pubkey,
+                publicKey: event.publicKey,
                 createdAt: event.createdAt,
                 kind: event.kind,
                 rawTags: strippedTags + [["nonce", String(nonce), target]],
