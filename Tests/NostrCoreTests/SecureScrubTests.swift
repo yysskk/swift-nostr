@@ -64,7 +64,7 @@ struct SecureScrubTests {
         let encrypted = try EncryptedPrivateKey.encrypt(
             privateKey: privateKey, password: "hunter2", logN: 14)
 
-        #expect(try encrypted.decrypt(password: "hunter2", maxLogN: 14) == privateKey)
+        #expect(try encrypted.decrypt(password: "hunter2", maximumLogN: 14) == privateKey)
     }
 
     @Test("a conversation key is the same across repeated derivations")

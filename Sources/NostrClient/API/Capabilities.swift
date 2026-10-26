@@ -78,9 +78,9 @@ public protocol NostrRelayManaging: Sendable {
     /// Every relay connection in the pool, in no guaranteed order.
     var connections: [RelayConnection] { get async }
     /// The number of relays in the pool, connected or not.
-    var count: Int { get async }
+    var relayCount: Int { get async }
     /// The number of relays currently connected.
-    func connectedCount() async -> Int
+    func connectedRelayCount() async -> Int
     /// The pool's connection for a relay URL, or nil when it is not in the pool.
     func relay(for url: RelayURL) async -> RelayConnection?
     /// Clears every subscription's event deduplication cache in the relay pool.
@@ -140,9 +140,9 @@ public protocol NostrEventPublishing: Sendable {
 /// Implemented by ``NostrEventsAPI``.
 public protocol NostrEventFetching: Sendable {
     /// Fetches events matching `filters`, ending at EOSE or `timeout`.
-    func fetch(filters: [Filter], to relayURLs: Set<RelayURL>?, timeout: Duration?) async throws -> [Event]
+    func fetch(filters: [Filter], from relayURLs: Set<RelayURL>?, timeout: Duration?) async throws -> [Event]
     /// Requests the NIP-45 count of events matching `filters`.
-    func count(filters: [Filter], to relayURLs: Set<RelayURL>?, timeout: Duration?) async throws -> Int
+    func countEvents(matching filters: [Filter], from relayURLs: Set<RelayURL>?, timeout: Duration?) async throws -> Int
     /// Fetches a single event by id.
     func fetchEvent(id: EventID, timeout: Duration?) async throws -> Event?
     /// Fetches a user's metadata.

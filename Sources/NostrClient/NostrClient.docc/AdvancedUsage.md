@@ -819,7 +819,7 @@ let isValid = try signed.verify()
 ``RelayPool`` automatically deduplicates events across relays using an in-memory cache.
 Deduplication is scoped to a single subscription: an event stored on several relays is
 delivered once, while an event matching two subscriptions is delivered to both — so
-overlapping feeds and repeated ``NostrEventsAPI/fetch(filters:to:timeout:)`` calls each see it.
+overlapping feeds and repeated ``NostrEventsAPI/fetch(filters:from:timeout:)`` calls each see it.
 A subscription's cache is discarded when it ends, so a later subscription receives events its
 predecessor already delivered.
 

@@ -44,10 +44,10 @@ struct DependencyInjectionTests {
             RelayURL("wss://relay.example.com")!, RelayURL("wss://relay2.example.com")!,
         ])
 
-        #expect(await client.relays.pool.count == 2)
+        #expect(await client.relays.pool.relayCount == 2)
         // connect(to:) only throws when *every* relay fails, so assert both sockets
         // actually reached `.connected` rather than just being registered.
-        #expect(await client.relays.pool.connectedCount() == 2)
+        #expect(await client.relays.pool.connectedRelayCount() == 2)
         await client.relays.disconnect()
     }
 
@@ -61,7 +61,7 @@ struct DependencyInjectionTests {
             RelayURL("wss://relay.example.com")!, RelayURL("wss://relay2.example.com")!,
         ])
 
-        #expect(await client.relays.pool.connectedCount() == 2)
+        #expect(await client.relays.pool.connectedRelayCount() == 2)
         await client.relays.disconnect()
     }
 }

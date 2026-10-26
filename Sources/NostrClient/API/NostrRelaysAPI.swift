@@ -14,8 +14,8 @@ public struct NostrRelaysAPI: NostrRelayManaging {
     /// The relay pool backing the client.
     ///
     /// Use it for the per-relay detail this namespace deliberately flattens — for example
-    /// ``RelayPool/count(filters:to:timeout:)`` per relay rather than
-    /// ``NostrEventsAPI/count(filters:to:timeout:)``'s single best estimate.
+    /// ``RelayPool/countEvents(matching:from:timeout:)`` per relay rather than
+    /// ``NostrEventsAPI/countEvents(matching:from:timeout:)``'s single best estimate.
     ///
     /// Only on the concrete namespace, not on ``NostrRelayManaging``: the pool carries publish,
     /// subscribe, and count too, which a relay-management dependency has no business reaching.
@@ -84,13 +84,13 @@ public struct NostrRelaysAPI: NostrRelayManaging {
     }
 
     /// The number of relays in the pool, connected or not.
-    public var count: Int {
-        get async { await client.pool.count }
+    public var relayCount: Int {
+        get async { await client.pool.relayCount }
     }
 
     /// The number of relays currently connected.
-    public func connectedCount() async -> Int {
-        await client.pool.connectedCount()
+    public func connectedRelayCount() async -> Int {
+        await client.pool.connectedRelayCount()
     }
 
     /// The pool's connection for a relay URL, or nil when it is not in the pool.

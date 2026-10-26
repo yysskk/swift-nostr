@@ -145,7 +145,7 @@ struct RelayListStoreTests {
 
         #expect(available == [RelayURL("wss://relay.example.com")!])
         #expect(socketCount.current == 1)
-        #expect(await pool.count == 1)
+        #expect(await pool.relayCount == 1)
         await pool.disconnectAll()
     }
 

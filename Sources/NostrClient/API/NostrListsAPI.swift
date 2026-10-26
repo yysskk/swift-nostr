@@ -39,7 +39,7 @@ public struct NostrListsAPI: NostrListManaging {
         let target = try await author(pubkey)
         let events = try await client.fetch(
             filters: [Filter(authors: [target], kinds: [kind], limit: 1)],
-            toURLs: nil,
+            fromURLs: nil,
             timeout: timeout
         )
         // Replaceable event: pick the newest the requested author actually signed, so a stale or
@@ -91,7 +91,7 @@ public struct NostrListsAPI: NostrListManaging {
         let target = try await author(pubkey)
         var filter = Filter(authors: [target], kinds: [kind])
         filter.addTagQuery("d", values: [identifier])
-        let events = try await client.fetch(filters: [filter], toURLs: nil, timeout: timeout)
+        let events = try await client.fetch(filters: [filter], fromURLs: nil, timeout: timeout)
         // Addressable event: the identifier is part of its coordinates, so it is matched alongside
         // the author and kind before the newest signed copy is chosen.
         guard
@@ -121,7 +121,7 @@ public struct NostrListsAPI: NostrListManaging {
         let target = try await author(pubkey)
         let events = try await client.fetch(
             filters: [Filter(authors: [target], kinds: [kind])],
-            toURLs: nil,
+            fromURLs: nil,
             timeout: timeout
         )
         // Addressable events: keep the newest event per `d` identifier, ignoring any without one.
@@ -151,7 +151,7 @@ public struct NostrListsAPI: NostrListManaging {
     public func fetchSet(naddr: NAddr, timeout: Duration? = nil) async throws -> NostrListSet? {
         var filter = Filter(authors: [naddr.author], kinds: [Event.Kind(rawValue: naddr.kind)])
         filter.addTagQuery("d", values: [naddr.identifier])
-        let events = try await client.fetch(filters: [filter], toURLs: nil, timeout: timeout)
+        let events = try await client.fetch(filters: [filter], fromURLs: nil, timeout: timeout)
         guard
             let newest = VerifiedEventSelection.newest(
                 in: events,

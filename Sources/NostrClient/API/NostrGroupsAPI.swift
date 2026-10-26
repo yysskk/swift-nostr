@@ -176,7 +176,7 @@ public struct NostrGroupsAPI: NostrGroupManaging {
         let author = authorPubkey ?? group.relayPubkey
         let events = try await client.fetch(
             filters: [.groupState(groupID: group.id, kinds: [.groupMetadata])],
-            toURLs: [relayURL],
+            fromURLs: [relayURL],
             timeout: timeout
         )
         guard let newest = Self.newestStateEvent(ofKind: .groupMetadata, in: events, author: author) else {
@@ -208,7 +208,7 @@ public struct NostrGroupsAPI: NostrGroupManaging {
         let author = authorPubkey ?? group.relayPubkey
         let events = try await client.fetch(
             filters: [.groupState(groupID: group.id)],
-            toURLs: [relayURL],
+            fromURLs: [relayURL],
             timeout: timeout
         )
 

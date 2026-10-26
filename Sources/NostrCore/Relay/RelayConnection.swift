@@ -89,7 +89,7 @@ public actor RelayConnection {
 
     /// Continuations waiting for a NIP-45 COUNT response, keyed by the generated
     /// COUNT subscription id. One waiter per subid: the ids are unique per
-    /// request, so a reply correlates to exactly one in-flight ``count(filters:timeout:)``.
+    /// request, so a reply correlates to exactly one in-flight ``countEvents(matching:timeout:)``.
     /// `internal` (not `private`) because the receive loop in `+Receiving` settles them.
     var pendingCountWaiters: [String: AsyncThrowingStream<EventCount, any Error>.Continuation] = [:]
 
@@ -795,7 +795,7 @@ public actor RelayConnection {
     ///   ``RelayConnectionConfig/queryTimeout``.
     /// - Throws: ``NostrError/notConnected`` when not connected or torn down while waiting.
     /// https://github.com/nostr-protocol/nips/blob/master/45.md
-    public func count(filters: [Filter], timeout: Duration? = nil) async throws -> EventCount {
+    public func countEvents(matching filters: [Filter], timeout: Duration? = nil) async throws -> EventCount {
         guard state == .connected else {
             throw NostrError.notConnected
         }

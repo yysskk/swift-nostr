@@ -125,7 +125,7 @@ struct RelayPoolRoutingTests {
         let second = await pool.addRelay(RelayURL("wss://relay.example.com")!)
         let third = await pool.addRelay(RelayURL("wss://relay.example.com:443")!)
 
-        #expect(await pool.count == 1)
+        #expect(await pool.relayCount == 1)
         #expect(first === second)
         #expect(second === third)
         #expect(first.url == RelayURL("wss://relay.example.com")!)
@@ -138,7 +138,7 @@ struct RelayPoolRoutingTests {
 
         #expect(await pool.relay(for: RelayURL("wss://Relay.Example.com/")!) === added)
         await pool.removeRelay(RelayURL("wss://RELAY.EXAMPLE.COM")!)
-        #expect(await pool.count == 0)
+        #expect(await pool.relayCount == 0)
     }
 
     @Test("removeRelay then re-adding under another spelling yields a fresh connection")
@@ -153,7 +153,7 @@ struct RelayPoolRoutingTests {
         await pool.removeRelay(RelayURL("wss://relay.example.com")!)
         let second = await pool.addRelay(RelayURL("wss://Relay.Example.com/")!)
 
-        #expect(await pool.count == 1)
+        #expect(await pool.relayCount == 1)
         #expect(first !== second)
         await pool.disconnectAll()
     }
@@ -214,10 +214,10 @@ struct RelayPoolRoutingTests {
         #expect(absent == nil)
     }
 
-    @Test("count reflects added relays")
-    func poolCount() async throws {
+    @Test("relayCount reflects added relays")
+    func poolRelayCount() async throws {
         let pool = try await makePool()
-        let count = await pool.count
+        let count = await pool.relayCount
         #expect(count == 3)
     }
 }

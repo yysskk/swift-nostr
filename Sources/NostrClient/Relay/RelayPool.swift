@@ -279,17 +279,15 @@ public actor RelayPool {
     /// subset; targets not in the pool are skipped. An empty set always throws — an
     /// accidentally-empty computed target list must not fan out to the whole pool.
     ///
-    /// Distinct from ``count`` (the number of relays in the pool): this returns per-relay
-    /// event counts reported over the wire.
     /// - Parameter timeout: How long to wait for relays to finish; `nil` uses
     ///   ``RelayPoolConfig/queryTimeout``.
     /// - Returns: the per-relay count for every relay that answered, keyed by relay URL.
     /// - Throws: ``NostrError/noRelaysInPool`` when the pool is empty,
     ///   ``NostrError/noMatchingRelays(_:)`` when none of the targeted URLs are in the
     ///   pool, or the last relay error when no targeted relay answered.
-    public func count(
-        filters: [Filter],
-        to relayURLs: Set<RelayURL>? = nil,
+    public func countEvents(
+        matching filters: [Filter],
+        from relayURLs: Set<RelayURL>? = nil,
         timeout: Duration? = nil
     ) async throws -> [RelayURL: EventCount] {
         let connections = try targetConnections(relayURLs)
@@ -301,7 +299,7 @@ public actor RelayPool {
             for connection in connections {
                 group.addTask {
                     do {
-                        let count = try await connection.count(filters: filters, timeout: timeout)
+                        let count = try await connection.countEvents(matching: filters, timeout: timeout)
                         return (connection.url, .success(count))
                     } catch {
                         return (connection.url, .failure(error))
@@ -582,12 +580,12 @@ public actor RelayPool {
     var subscriptionTaskCount: Int { subscriptionTasks.count }
 
     /// Returns the number of relays in the pool
-    public var count: Int {
+    public var relayCount: Int {
         relays.count
     }
 
     /// Returns the number of connected relays
-    public func connectedCount() async -> Int {
+    public func connectedRelayCount() async -> Int {
         var count = 0
         for connection in relays.values {
             if await connection.state == .connected {

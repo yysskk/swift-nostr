@@ -11,7 +11,7 @@ struct NostrClientConnectTests {
     func connectToEmptyListIsNoOp() async throws {
         let client = NostrClient()
         try await client.relays.connect(to: [])
-        #expect(await client.relays.pool.count == 0)
+        #expect(await client.relays.pool.relayCount == 0)
     }
 
     @Test("relays.add(_:config:) applies the per-relay configuration")
@@ -33,14 +33,14 @@ struct NostrClientConnectTests {
     func removeRelayNormalizesAndIgnoresAbsent() async throws {
         let client = NostrClient()
         _ = await client.relays.add(RelayURL("wss://relay.example.com")!)
-        #expect(await client.relays.pool.count == 1)
+        #expect(await client.relays.pool.relayCount == 1)
 
         await client.relays.remove(RelayURL("wss://Relay.Example.com/")!)
-        #expect(await client.relays.pool.count == 0)
+        #expect(await client.relays.pool.relayCount == 0)
 
         // Removing an absent relay is a no-op.
         await client.relays.remove(RelayURL("wss://absent.example.com")!)
-        #expect(await client.relays.pool.count == 0)
+        #expect(await client.relays.pool.relayCount == 0)
     }
 
     @Test("connect(to:) adds the relays and surfaces total connection failure")
@@ -56,6 +56,6 @@ struct NostrClientConnectTests {
             try await client.relays.connect(to: [RelayURL("ws://127.0.0.1:9")!])
         }
         // The relay was added even though connecting failed.
-        #expect(await client.relays.pool.count == 1)
+        #expect(await client.relays.pool.relayCount == 1)
     }
 }

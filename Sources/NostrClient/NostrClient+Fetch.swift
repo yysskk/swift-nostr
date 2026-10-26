@@ -11,10 +11,10 @@ extension NostrClient {
     /// the whole pool. A nil `timeout` resolves to the pool's ``RelayPoolConfig/queryTimeout``
     /// here, so the public wrappers just forward the caller's optional.
     ///
-    /// Backs ``NostrEventsAPI/fetch(filters:to:timeout:)``.
+    /// Backs ``NostrEventsAPI/fetch(filters:from:timeout:)``.
     func fetch(
         filters: [Filter],
-        toURLs relayURLs: Set<RelayURL>?,
+        fromURLs relayURLs: Set<RelayURL>?,
         timeout: Duration?
     ) async throws -> [Event] {
         let timeout = timeout ?? pool.config.queryTimeout
