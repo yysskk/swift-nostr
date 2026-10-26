@@ -151,7 +151,7 @@ for try await payload in try await client.messages.payloads() {
 ### DM Relay Lists (NIP-17 kind 10050)
 
 NIP-17 routes each gift wrap to its addressee's advertised DM relays. Advertise where you receive
-DMs with ``NostrRoutingAPI/publishDirectMessageRelayList(relays:strategy:)`` (NIP-17 suggests 1–3
+DMs with ``NostrRelayRouting/publishDirectMessageRelayList(relays:strategy:)`` (NIP-17 suggests 1–3
 relays), connect your own inbox relays before receiving with
 ``NostrRoutingAPI/connectDirectMessageInboxRelays()``, and look up another user's DM relays with
 ``NostrRoutingAPI/fetchDirectMessageRelayList(for:timeout:)``:
@@ -462,7 +462,7 @@ signer is set.
 
 Groups are shared as the `naddr` of their kind-39000 metadata event, sometimes with an invite
 code appended as `?invite=<code>`. ``GroupReference`` parses both parts, and
-``NostrGroupsAPI/join(_:inviteCode:reason:strategy:)`` applies the parsed code automatically
+``NostrGroupManaging/join(_:inviteCode:reason:strategy:)`` applies the parsed code automatically
 (closed groups accept a valid code without waiting for an admin):
 
 ```swift
@@ -587,7 +587,7 @@ for joining or subscribing.
 
 The outbox (gossip) model routes reads and writes to each user's declared relays instead of
 broadcasting everywhere. Publish your relay list (kind 10002) with
-``NostrRoutingAPI/publishRelayList(read:write:strategy:)``, then let the client resolve and connect the
+``NostrRelayRouting/publishRelayList(read:write:strategy:)``, then let the client resolve and connect the
 right relays automatically.
 
 ```swift

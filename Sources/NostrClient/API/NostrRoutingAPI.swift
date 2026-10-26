@@ -7,16 +7,18 @@ import NostrCore
 ///
 /// Both lists are cached per public key, newest wins, and both grow the pool per the client's
 /// ``GossipRelayPolicy`` when a route resolves to a relay that is not connected yet.
+///
+/// Implements the ``NostrRelayRouting`` primitives over the client's relay-list caches and pool;
+/// ``NostrRelayRouting/publishRelayList(read:write:strategy:)``,
+/// ``NostrRelayRouting/publishDirectMessageRelayList(relays:strategy:)``, and the short forms come
+/// from the protocol's extension.
 public struct NostrRoutingAPI: NostrRelayRouting {
     let client: NostrClient
 
     // MARK: - Relay list metadata (NIP-65)
 
     /// Fetches a user's NIP-65 relay list (kind 10002), caching it (newer wins).
-    /// - Parameter timeout: How long to wait for relays to finish; `nil` uses
-    ///   ``RelayPoolConfig/queryTimeout``.
-    /// - Returns: The relay list, or nil if none was found.
-    public func fetchRelayList(for publicKey: PublicKey, timeout: Duration? = nil) async throws -> RelayListMetadata? {
+    public func fetchRelayList(for publicKey: PublicKey, timeout: Duration?) async throws -> RelayListMetadata? {
         let events = try await client.fetch(
             filters: [.relayListMetadata(publicKey: publicKey)], fromURLs: nil, timeout: timeout
         )
@@ -38,13 +40,12 @@ public struct NostrRoutingAPI: NostrRelayRouting {
         await client.relayListStore.cachedList(for: publicKey)
     }
 
-    /// Signs and publishes the current user's relay list metadata (kind 10002, NIP-65).
-    /// The list is broadcast to all relays in the pool for discoverability.
-    /// - Returns: The signed event together with the per-relay publish outcome.
+    /// Signs and publishes the current user's relay list metadata (kind 10002, NIP-65) to the whole
+    /// pool, and caches it.
     @discardableResult
     public func publishRelayList(
         _ relayList: RelayListMetadata,
-        strategy: PublishStrategy? = nil
+        strategy: PublishStrategy?
     ) async throws -> PublishedEvent {
         let event = try await client.sign(.relayListMetadata(relayList))
         let result = try await client.pool.publish(event, strategy: strategy)
@@ -52,47 +53,22 @@ public struct NostrRoutingAPI: NostrRelayRouting {
         return PublishedEvent(event: event, result: result)
     }
 
-    /// Signs and publishes the current user's relay list metadata from read/write relay URLs (NIP-65).
-    /// - Returns: The signed event together with the per-relay publish outcome.
-    @discardableResult
-    public func publishRelayList(
-        read: [RelayURL] = [],
-        write: [RelayURL] = [],
-        strategy: PublishStrategy? = nil
-    ) async throws -> PublishedEvent {
-        try await publishRelayList(RelayListMetadata(read: read, write: write), strategy: strategy)
-    }
-
-    /// Subscribes to events from multiple authors using the NIP-65 outbox model.
-    ///
-    /// For each author, resolves their WRITE relays (fetching the relay list if not cached),
-    /// connects them per the gossip policy, and issues a single subscription scoped to those relays.
-    /// If any author has no known relay list, the subscription falls back to the full relay pool so
-    /// no author is silently dropped; the fallback throws ``NostrError/noRelaysInPool`` when the
-    /// pool is also empty.
+    /// Subscribes to authors on their own WRITE relays (the NIP-65 outbox model), falling back to
+    /// the whole pool when any author has no known relay list.
     public func subscribeOutbox(
         authors: [PublicKey],
-        kinds: [Event.Kind] = [.textNote],
-        limit: Int? = nil
+        kinds: [Event.Kind],
+        limit: Int?
     ) async throws -> SubscriptionSequence {
         let routeSet = await resolveOutboxRelays(authors: authors)
         let filter = Filter(authors: authors, kinds: kinds, limit: limit)
         return try await client.subscribe(filters: [filter], toURLs: routeSet)
     }
 
-    /// Publishes a signed event using the NIP-65 gossip model.
-    ///
-    /// Routes the event to the author's own WRITE relays plus the READ (inbox) relays of every
-    /// public key referenced in the event's "p" tags, so mentions and replies reach their recipients.
-    /// Falls back to the full relay pool if nothing resolves; the fallback throws
-    /// ``NostrError/noRelaysInPool`` when the pool is also empty.
-    /// - Parameters:
-    ///   - event: The already-signed event to route.
-    ///   - strategy: How many relay acknowledgments to wait for before returning
-    ///     (default: the pool config's ``RelayPoolConfig/defaultPublishStrategy``).
-    /// - Returns: The per-relay outcome of the publish.
+    /// Publishes a signed event to the author's WRITE relays and its mentions' READ relays (the
+    /// NIP-65 gossip model), falling back to the whole pool when nothing resolves.
     @discardableResult
-    public func publishGossip(_ event: Event, strategy: PublishStrategy? = nil) async throws -> PublishResult {
+    public func publishGossip(_ event: Event, strategy: PublishStrategy?) async throws -> PublishResult {
         var targets: Set<RelayURL> = []
 
         targets.formUnion(await writeRelays(for: event.publicKey))
@@ -114,14 +90,9 @@ public struct NostrRoutingAPI: NostrRelayRouting {
     // MARK: - Direct message relay list (NIP-17, kind 10050)
 
     /// Fetches a user's NIP-17 DM relay list (kind 10050), caching it (newer wins).
-    ///
-    /// Look this up to learn where to deliver a recipient's gift-wrapped direct messages.
-    /// - Parameter timeout: How long to wait for relays to finish; `nil` uses
-    ///   ``RelayPoolConfig/queryTimeout``.
-    /// - Returns: The DM relay list, or nil if none was found.
     public func fetchDirectMessageRelayList(
         for publicKey: PublicKey,
-        timeout: Duration? = nil
+        timeout: Duration?
     ) async throws -> DirectMessageRelayList? {
         let events = try await client.fetch(
             filters: [.directMessageRelayList(publicKey: publicKey)], fromURLs: nil, timeout: timeout
@@ -146,15 +117,12 @@ public struct NostrRoutingAPI: NostrRelayRouting {
         await client.dmRelayListStore.cachedList(for: publicKey)
     }
 
-    /// Signs and publishes the current user's DM relay list (kind 10050, NIP-17).
-    ///
-    /// The list advertises where the user receives private direct messages. It is broadcast to all
-    /// relays in the pool for discoverability. NIP-17 recommends keeping the list short (1–3 relays).
-    /// - Returns: The signed event together with the per-relay publish outcome.
+    /// Signs and publishes the current user's DM relay list (kind 10050, NIP-17) to the whole pool,
+    /// and caches it.
     @discardableResult
     public func publishDirectMessageRelayList(
         _ relayList: DirectMessageRelayList,
-        strategy: PublishStrategy? = nil
+        strategy: PublishStrategy?
     ) async throws -> PublishedEvent {
         let event = try await client.sign(.directMessageRelayList(relayList))
         let result = try await client.pool.publish(event, strategy: strategy)
@@ -162,24 +130,8 @@ public struct NostrRoutingAPI: NostrRelayRouting {
         return PublishedEvent(event: event, result: result)
     }
 
-    /// Signs and publishes the current user's DM relay list from relay URLs (NIP-17, kind 10050).
-    /// - Returns: The signed event together with the per-relay publish outcome.
-    @discardableResult
-    public func publishDirectMessageRelayList(
-        relays: [RelayURL],
-        strategy: PublishStrategy? = nil
-    ) async throws -> PublishedEvent {
-        try await publishDirectMessageRelayList(DirectMessageRelayList(relays: relays), strategy: strategy)
-    }
-
-    /// Ensures the current user's own NIP-17 DM inbox relays (kind 10050) are present and connected
-    /// in the pool, so gift-wrapped messages addressed there are received. Fetches the user's DM
-    /// relay list first if it is not already cached.
-    ///
-    /// Call this before subscribing with ``NostrMessaging/subscribe(limit:)`` or
-    /// ``NostrMessaging/giftWraps(limit:)`` so the subscription covers the relays you advertised.
-    /// - Returns: The connected inbox relay URLs (empty if you have advertised no DM relay list).
-    /// - Throws: ``NostrError/signerNotSet`` if no signer is configured.
+    /// Ensures the current user's own NIP-17 DM inbox relays (kind 10050) are in the pool and
+    /// connected, fetching the list first when it is not cached.
     @discardableResult
     public func connectDirectMessageInboxRelays() async throws -> Set<RelayURL> {
         await connectedInboxRelays(for: try await client.requiredPublicKey())

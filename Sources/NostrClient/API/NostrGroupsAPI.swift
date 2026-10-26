@@ -8,161 +8,44 @@ import NostrCore
 /// and connecting it on demand. Private groups require NIP-42 AUTH before the relay serves or
 /// accepts their events; the client's automatic responder answers challenges when a signer is set.
 ///
+/// Implements the ``NostrGroupManaging`` primitives over the client's signer, relay pool, and
+/// ``NostrClient/lists``; ``NostrGroupManaging/join(_:inviteCode:reason:strategy:)``,
+/// ``NostrGroupManaging/leave(_:reason:strategy:)``,
+/// ``NostrGroupManaging/publishMessage(_:kind:in:tags:previous:strategy:)``, and
+/// ``NostrGroupManaging/publishModeration(_:in:previous:reason:strategy:)`` build their NIP-29
+/// templates in the protocol's extension and publish them through ``publish(_:in:strategy:)``.
+///
 /// https://github.com/nostr-protocol/nips/blob/master/29.md
 public struct NostrGroupsAPI: NostrGroupManaging {
     let client: NostrClient
 
-    // MARK: - Membership
+    // MARK: - Publishing
 
-    /// Requests to join a group (kind 9021), publishing only to the group's relay.
+    /// Signs `template` with the configured signer and publishes it to the group's relay only,
+    /// adding and connecting the relay on demand.
     ///
-    /// The invite code applied is `inviteCode ?? group.inviteCode`, so a reference parsed
-    /// from a share link with a "?invite=<code>" suffix works unchanged. Closed groups
-    /// accept the request automatically for a valid code; otherwise an admin decides, and
-    /// the relay reports an already-member state with a "duplicate:" OK message.
-    ///
-    /// Signing goes through the active signer, so a remote NIP-46 signer works too.
-    ///
-    /// - Parameters:
-    ///   - group: The group to join; its relay is added to the pool and connected on demand.
-    ///   - inviteCode: An invite code overriding `group.inviteCode`, if any.
-    ///   - reason: An optional free-form message to the group's admins (the event content).
-    ///   - strategy: How many relay acknowledgments to wait for before returning
-    ///     (default: the pool config's ``RelayPoolConfig/defaultPublishStrategy``).
-    /// - Returns: The signed event together with the per-relay publish outcome.
-    /// - Throws: ``NostrError/signerNotSet`` without a signer, plus anything the signer,
-    ///   connection, or publish throws.
+    /// Signing comes first, so without a signer ``NostrError/signerNotSet`` is thrown before the
+    /// group's relay is touched.
     @discardableResult
-    public func join(
-        _ group: GroupReference,
-        inviteCode: String? = nil,
-        reason: String? = nil,
-        strategy: PublishStrategy? = nil
-    ) async throws -> PublishedEvent {
-        try await publish(
-            .groupJoinRequest(groupID: group.id, inviteCode: inviteCode ?? group.inviteCode, reason: reason),
-            to: group,
-            strategy: strategy
-        )
-    }
-
-    /// Requests to leave a group (kind 9022), publishing only to the group's relay; the
-    /// relay answers by issuing a kind-9001 removal for the author.
-    ///
-    /// Signing goes through the active signer, so a remote NIP-46 signer works too.
-    ///
-    /// - Parameters:
-    ///   - group: The group to leave; its relay is added to the pool and connected on demand.
-    ///   - reason: An optional free-form message (the event content).
-    ///   - strategy: How many relay acknowledgments to wait for before returning
-    ///     (default: the pool config's ``RelayPoolConfig/defaultPublishStrategy``).
-    /// - Returns: The signed event together with the per-relay publish outcome.
-    /// - Throws: ``NostrError/signerNotSet`` without a signer, plus anything the signer,
-    ///   connection, or publish throws.
-    @discardableResult
-    public func leave(
-        _ group: GroupReference,
-        reason: String? = nil,
-        strategy: PublishStrategy? = nil
-    ) async throws -> PublishedEvent {
-        try await publish(.groupLeaveRequest(groupID: group.id, reason: reason), to: group, strategy: strategy)
-    }
-
-    // MARK: - Posting
-
-    /// Publishes a content event into a group, only to the group's relay.
-    ///
-    /// NIP-29 defines no content kinds of its own; the default kind is the NIP-C7 chat
-    /// message (kind 9). The event's first tag is the group's "h" tag, followed by `tags`,
-    /// then a "previous" tag when `previous` is non-empty. Timeline references stay a
-    /// caller-supplied parameter — sample them from recently seen group events with
-    /// ``Groups/previousReferences(from:excludingAuthor:maxCount:)``; nothing is fetched
-    /// behind your back.
-    ///
-    /// Signing goes through the active signer, so a remote NIP-46 signer works too.
-    ///
-    /// - Parameters:
-    ///   - content: The event content.
-    ///   - kind: The content kind (default: ``Event/Kind/chatMessage``).
-    ///   - group: The group to post into; its relay is added to the pool and connected on demand.
-    ///   - tags: Additional tags, appended after the "h" tag in order.
-    ///   - previous: Timeline references for a trailing "previous" tag. Omitted when empty.
-    ///   - strategy: How many relay acknowledgments to wait for before returning
-    ///     (default: the pool config's ``RelayPoolConfig/defaultPublishStrategy``).
-    /// - Returns: The signed event together with the per-relay publish outcome.
-    /// - Throws: ``NostrError/signerNotSet`` without a signer, plus anything the signer,
-    ///   connection, or publish throws.
-    @discardableResult
-    public func publishMessage(
-        _ content: String,
-        kind: Event.Kind = .chatMessage,
+    public func publish(
+        _ template: EventTemplate,
         in group: GroupReference,
-        tags: [Tag] = [],
-        previous: [String] = [],
-        strategy: PublishStrategy? = nil
+        strategy: PublishStrategy?
     ) async throws -> PublishedEvent {
-        try await publish(
-            .groupContent(groupID: group.id, kind: kind, content: content, tags: tags, previous: previous),
-            to: group,
-            strategy: strategy
-        )
-    }
-
-    /// Publishes a moderation action (kinds 9000-9002, 9005, 9007-9010), only to the group's relay,
-    /// which enforces the author's role permissions and answers with an OK message.
-    ///
-    /// See ``Groups/ModerationAction`` for the actions and their tag layouts. Timeline
-    /// references stay a caller-supplied parameter — sample them with
-    /// ``Groups/previousReferences(from:excludingAuthor:maxCount:)``.
-    ///
-    /// Signing goes through the active signer, so a remote NIP-46 signer works too.
-    ///
-    /// - Parameters:
-    ///   - action: The moderation action to request.
-    ///   - group: The group to moderate; its relay is added to the pool and connected on demand.
-    ///   - previous: Timeline references for a trailing "previous" tag. Omitted when empty.
-    ///   - reason: An optional human-readable reason (the event content).
-    ///   - strategy: How many relay acknowledgments to wait for before returning
-    ///     (default: the pool config's ``RelayPoolConfig/defaultPublishStrategy``).
-    /// - Returns: The signed event together with the per-relay publish outcome.
-    /// - Throws: ``NostrError/signerNotSet`` without a signer, plus anything the signer,
-    ///   connection, or publish throws.
-    @discardableResult
-    public func publishModeration(
-        _ action: Groups.ModerationAction,
-        in group: GroupReference,
-        previous: [String] = [],
-        reason: String? = nil,
-        strategy: PublishStrategy? = nil
-    ) async throws -> PublishedEvent {
-        try await publish(
-            .groupModeration(action, groupID: group.id, previous: previous, reason: reason),
-            to: group,
-            strategy: strategy
-        )
+        let event = try await client.sign(template)
+        let relayURL = try await ensureRelay(group)
+        let result = try await client.pool.publish(event, to: [relayURL], strategy: strategy)
+        return PublishedEvent(event: event, result: result)
     }
 
     // MARK: - Reading
 
-    /// Fetches the group's kind-39000 metadata from its relay, newest-wins across stale copies.
-    ///
-    /// When `authorPublicKey ?? group.relayPublicKey` is non-nil, candidate events are verified
-    /// (``Event/verify()``) and events by any other author are dropped before the
-    /// newest-wins pick, and the parser applies the same author check; when nil, the newest
-    /// event is parsed as-is — the relay you are already trusting as transport is the
-    /// authority on its own groups.
-    ///
-    /// - Parameters:
-    ///   - group: The group to query; its relay is added to the pool and connected on demand.
-    ///   - authorPublicKey: The relay public key to validate against, overriding `group.relayPublicKey`.
-    ///   - timeout: How long to wait for relays to finish; `nil` uses ``RelayPoolConfig/queryTimeout``.
-    /// - Returns: The parsed metadata, or nil when the relay returned no usable event.
-    /// - Throws: ``Groups/ValidationError`` when the winning event does not parse,
-    ///   plus anything the connection or fetch throws.
+    /// Fetches the group's kind-39000 metadata from its relay, newest-wins across stale copies,
+    /// validated against `authorPublicKey ?? group.relayPublicKey` when either is set.
     public func fetchMetadata(
         for group: GroupReference,
-        authorPublicKey: PublicKey? = nil,
-        timeout: Duration? = nil
+        authorPublicKey: PublicKey?,
+        timeout: Duration?
     ) async throws -> Groups.Metadata? {
         let relayURL = try await ensureRelay(group)
         let author = authorPublicKey ?? group.relayPublicKey
@@ -177,24 +60,13 @@ public struct NostrGroupsAPI: NostrGroupManaging {
         return try Groups.Metadata(event: newest, relayPublicKey: author)
     }
 
-    /// Fetches the group's full relay-generated state snapshot — metadata, admins, members,
-    /// roles, and pins — from its relay in one round trip (``Filter/groupState(groupID:kinds:)``).
-    ///
-    /// The newest event per kind wins, with the same author-validation semantics as
-    /// ``fetchMetadata(for:authorPublicKey:timeout:)``. Fields stay nil when the relay
-    /// published nothing for that kind — for example the member list of a private group.
-    ///
-    /// - Parameters:
-    ///   - group: The group to query; its relay is added to the pool and connected on demand.
-    ///   - authorPublicKey: The relay public key to validate against, overriding `group.relayPublicKey`.
-    ///   - timeout: How long to wait for relays to finish; `nil` uses ``RelayPoolConfig/queryTimeout``.
-    /// - Returns: The snapshot, with a nil field per kind the relay did not answer for.
-    /// - Throws: ``Groups/ValidationError`` when a winning event does not parse,
-    ///   plus anything the connection or fetch throws.
+    /// Fetches the group's full relay-generated state snapshot from its relay in one round trip,
+    /// newest per kind, with the same author validation as
+    /// ``fetchMetadata(for:authorPublicKey:timeout:)-(_,PublicKey?,_)``.
     public func fetchState(
         for group: GroupReference,
-        authorPublicKey: PublicKey? = nil,
-        timeout: Duration? = nil
+        authorPublicKey: PublicKey?,
+        timeout: Duration?
     ) async throws -> GroupState {
         let relayURL = try await ensureRelay(group)
         let author = authorPublicKey ?? group.relayPublicKey
@@ -223,24 +95,13 @@ public struct NostrGroupsAPI: NostrGroupManaging {
         return state
     }
 
-    /// Subscribes to the live timeline of the group's content — events carrying its "h"
-    /// tag — from its relay only.
-    ///
-    /// Iteration termination automatically sends CLOSE, like every subscription from
-    /// ``NostrSubscribing/subscribe(filters:to:bufferingPolicy:)-(_,Set<RelayURL>?,_)``.
-    ///
-    /// - Parameters:
-    ///   - group: The group to follow; its relay is added to the pool and connected on demand.
-    ///   - kinds: The content kinds to receive; nil (the default) receives all kinds.
-    ///   - since: Only events whose `created_at` is at or after this time, if given.
-    ///   - limit: The maximum number of stored events the relay should send, if given.
-    /// - Returns: The subscription as an async sequence of relay-aware events.
-    /// - Throws: Anything the connection or subscribe throws.
+    /// Subscribes to the live timeline of the group's content — events carrying its "h" tag — from
+    /// its relay only.
     public func timeline(
         _ group: GroupReference,
-        kinds: [Event.Kind]? = nil,
-        since: Timestamp? = nil,
-        limit: Int? = nil
+        kinds: [Event.Kind]?,
+        since: Timestamp?,
+        limit: Int?
     ) async throws -> SubscriptionSequence {
         let relayURL = try await ensureRelay(group)
         let filter = Filter.groupTimeline(
@@ -254,23 +115,13 @@ public struct NostrGroupsAPI: NostrGroupManaging {
 
     // MARK: - Membership list (NIP-51 kind 10009)
 
-    /// Fetches the newest kind-10009 simple group list — the NIP-29 groups a user is in.
-    ///
-    /// With no `publicKey` it fetches the current user's list and decrypts private entries;
-    /// for another public key only public entries are returned. A thin typed wrapper over
-    /// ``NostrListsAPI/fetch(kind:for:timeout:)`` with the same throwing behavior: fetching the
-    /// current user's own list throws when the list's private content cannot be decrypted
-    /// (republishing such a list would silently drop the private entries).
+    /// Fetches the newest kind-10009 simple group list — a thin typed wrapper over
+    /// ``NostrListsAPI/fetch(kind:for:timeout:)`` with the same decryption and throwing behavior.
     ///
     /// https://github.com/nostr-protocol/nips/blob/master/51.md
-    ///
-    /// - Parameters:
-    ///   - publicKey: The list's author; nil (the default) fetches the current user's list.
-    ///   - timeout: How long to wait for relays to finish; `nil` uses ``RelayPoolConfig/queryTimeout``.
-    /// - Returns: The typed list, or nil if none was found.
     public func fetchSimpleGroupList(
-        for publicKey: PublicKey? = nil,
-        timeout: Duration? = nil
+        for publicKey: PublicKey?,
+        timeout: Duration?
     ) async throws -> SimpleGroupList? {
         guard let list = try await client.lists.fetch(kind: .simpleGroupList, for: publicKey, timeout: timeout) else {
             return nil
@@ -278,47 +129,19 @@ public struct NostrGroupsAPI: NostrGroupManaging {
         return try SimpleGroupList(list: list)
     }
 
-    /// Signs and publishes the list (kind 10009), replacing the user's current simple
-    /// group list.
-    ///
-    /// Unlike the group flows, which target a group's single relay, this broadcasts to
-    /// the whole pool — a replaceable list lives everywhere, so every relay carrying the
-    /// user's events receives the fresh copy. Wraps ``NostrListsAPI/publish(_:strategy:)``:
-    /// private entries are NIP-44-encrypted to the user's own key through the configured signer,
-    /// local or remote (with no signer, ``NostrError/signerNotSet``).
+    /// Signs and publishes the list (kind 10009) to the whole pool, replacing the user's current
+    /// simple group list — a wrapper over ``NostrListsAPI/publish(_:strategy:)``.
     ///
     /// https://github.com/nostr-protocol/nips/blob/master/51.md
-    ///
-    /// - Parameters:
-    ///   - list: The list to publish.
-    ///   - strategy: How many relay acknowledgments to wait for before returning
-    ///     (default: the pool config's ``RelayPoolConfig/defaultPublishStrategy``).
-    /// - Returns: The signed event together with the per-relay publish outcome.
     @discardableResult
     public func publishSimpleGroupList(
         _ list: SimpleGroupList,
-        strategy: PublishStrategy? = nil
+        strategy: PublishStrategy?
     ) async throws -> PublishedEvent {
         try await client.lists.publish(list.list, strategy: strategy)
     }
 
     // MARK: - Private
-
-    /// Signs `template` with the configured signer and publishes it to the group's relay only —
-    /// the shape every write flow above shares.
-    ///
-    /// Signing comes first, so without a signer ``NostrError/signerNotSet`` is thrown before the
-    /// group's relay is touched.
-    private func publish(
-        _ template: EventTemplate,
-        to group: GroupReference,
-        strategy: PublishStrategy?
-    ) async throws -> PublishedEvent {
-        let event = try await client.sign(template)
-        let relayURL = try await ensureRelay(group)
-        let result = try await client.pool.publish(event, to: [relayURL], strategy: strategy)
-        return PublishedEvent(event: event, result: result)
-    }
 
     /// Ensures the group's relay is in the pool and connected, returning its routing URL.
     ///
