@@ -320,7 +320,7 @@ struct NIP29GroupClientTests {
         let (client, socket) = makeClient()
         try await client.relays.connect(to: [groupRelayURL.absoluteString])
         let viaReference = GroupReference(
-            relayURL: groupRelayURL.absoluteString, id: groupID, relayPubkey: relaySigner.publicKey.hex)
+            relayURL: groupRelayURL.absoluteString, id: groupID, relayPubkey: relaySigner.publicKey)
         let metadata = try await answering(socket, with: [genuine, impostor]) {
             try await client.groups.fetchMetadata(for: viaReference)
         }
@@ -332,7 +332,7 @@ struct NIP29GroupClientTests {
         try await parameterClient.relays.connect(to: [groupRelayURL.absoluteString])
         let bare = GroupReference(relayURL: groupRelayURL.absoluteString, id: groupID)
         let parameterMetadata = try await answering(parameterSocket, with: [genuine, impostor]) {
-            try await parameterClient.groups.fetchMetadata(for: bare, authorPubkey: relaySigner.publicKey.hex)
+            try await parameterClient.groups.fetchMetadata(for: bare, authorPubkey: relaySigner.publicKey)
         }
         #expect(parameterMetadata?.name == "Genuine")
         await parameterClient.relays.disconnect()
@@ -377,7 +377,7 @@ struct NIP29GroupClientTests {
             createdAt: 1_700_000_002, signer: relaySigner)
 
         let group = GroupReference(
-            relayURL: groupRelayURL.absoluteString, id: groupID, relayPubkey: relaySigner.publicKey.hex)
+            relayURL: groupRelayURL.absoluteString, id: groupID, relayPubkey: relaySigner.publicKey)
         let state = try await answering(socket, with: [metadata, admins, roles]) {
             try await client.groups.fetchState(for: group)
         }

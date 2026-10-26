@@ -1,4 +1,5 @@
 import Foundation
+import NostrCore
 
 /// A NIP-25 reaction to a NIP-17 private direct message.
 ///
@@ -7,20 +8,20 @@ import Foundation
 /// its rumor id.
 /// https://github.com/nostr-protocol/nips/blob/master/25.md
 public struct DirectMessageReaction: Sendable, Identifiable, Hashable {
-    /// Unique identifier (from the reaction rumor's event id).
-    public var id: String { rumorId }
+    /// Unique identifier (the reaction rumor's event id).
+    public var id: EventID { rumorID }
 
     /// The reaction rumor's event id.
-    public let rumorId: String
+    public let rumorID: EventID
 
-    /// The reactor's public key (hex).
-    public let senderPubkey: String
+    /// The reactor's public key.
+    public let senderPubkey: PublicKey
 
     /// The rumor id of the message being reacted to (the reaction's "e" tag).
-    public let messageId: String
+    public let messageID: EventID
 
     /// The public key of the reacted-to message's author (the reaction's "p" tag).
-    public let messageAuthorPubkey: String
+    public let messageAuthorPubkey: PublicKey
 
     /// The reaction content — typically "+" (like), "-" (dislike), or an emoji.
     public let content: String
@@ -31,18 +32,19 @@ public struct DirectMessageReaction: Sendable, Identifiable, Hashable {
     /// Optional NIP-40 expiration carried on the gift wrap.
     public let expiresAt: Date?
 
+    /// Creates a reaction from its parsed parts.
     public init(
-        rumorId: String,
-        senderPubkey: String,
-        messageId: String,
-        messageAuthorPubkey: String,
+        rumorID: EventID,
+        senderPubkey: PublicKey,
+        messageID: EventID,
+        messageAuthorPubkey: PublicKey,
         content: String,
         createdAt: Date,
         expiresAt: Date? = nil
     ) {
-        self.rumorId = rumorId
+        self.rumorID = rumorID
         self.senderPubkey = senderPubkey
-        self.messageId = messageId
+        self.messageID = messageID
         self.messageAuthorPubkey = messageAuthorPubkey
         self.content = content
         self.createdAt = createdAt

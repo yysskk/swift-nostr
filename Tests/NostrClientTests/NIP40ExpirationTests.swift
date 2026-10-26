@@ -72,7 +72,7 @@ struct NIP40ExpirationTests {
 
         let builder = DirectMessageBuilder(signer: EventSigner(keyPair: sender))
         let result = try await builder.createMessageWithSelfCopy(
-            content: "self-destructs", to: recipient.publicKey.hex, expiration: expiry)
+            content: "self-destructs", to: recipient.publicKey, expiration: expiry)
 
         // The public gift wraps carry the expiration; the encrypted rumor stays untouched
         // so the plaintext leaks nothing.
@@ -89,7 +89,7 @@ struct NIP40ExpirationTests {
 
         let builder = DirectMessageBuilder(signer: EventSigner(keyPair: sender))
         let result = try await builder.createMessageWithSelfCopy(
-            content: "self-destructs", to: recipient.publicKey.hex, expiration: expiry)
+            content: "self-destructs", to: recipient.publicKey, expiration: expiry)
 
         let parser = DirectMessageParser(signer: EventSigner(keyPair: recipient))
         let message = try await parser.parse(result.recipientGiftWrap)
@@ -103,7 +103,7 @@ struct NIP40ExpirationTests {
         let recipient = try KeyPair()
 
         let builder = DirectMessageBuilder(signer: EventSigner(keyPair: sender))
-        let result = try await builder.createMessageWithSelfCopy(content: "hi", to: recipient.publicKey.hex)
+        let result = try await builder.createMessageWithSelfCopy(content: "hi", to: recipient.publicKey)
 
         #expect(result.recipientGiftWrap.expiration == nil)
 

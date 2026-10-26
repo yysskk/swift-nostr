@@ -27,7 +27,7 @@ struct NIP27ContentReferenceTests {
         #expect(reference.text == "nostr:\(npubVector)")
         // The native String.Index range slices back to exactly the matched text.
         #expect(String(content[reference.range]) == reference.text)
-        #expect(reference.entity == .npub(npubPubkeyHex))
+        #expect(reference.entity == .npub(PublicKey(npubPubkeyHex)!))
     }
 
     @Test("a case-folding-unstable character before a reference keeps the range accurate")
@@ -41,7 +41,7 @@ struct NIP27ContentReferenceTests {
         let reference = try #require(references.first)
         #expect(String(content[reference.range]) == reference.text)
         #expect(reference.text == "nostr:\(npubVector)")
-        #expect(reference.entity == .npub(npubPubkeyHex))
+        #expect(reference.entity == .npub(PublicKey(npubPubkeyHex)!))
     }
 
     @Test("multiple references are returned in order of appearance")
@@ -49,8 +49,8 @@ struct NIP27ContentReferenceTests {
         let content = "see nostr:\(npubVector) and nostr:\(noteVector) today"
         let references = NostrContentReference.references(in: content)
         #expect(references.count == 2)
-        #expect(references[0].entity == .npub(npubPubkeyHex))
-        #expect(references[1].entity == .note(noteIdHex))
+        #expect(references[0].entity == .npub(PublicKey(npubPubkeyHex)!))
+        #expect(references[1].entity == .note(EventID(noteIdHex)!))
     }
 
     @Test("trailing punctuation is excluded from the match")
@@ -59,7 +59,7 @@ struct NIP27ContentReferenceTests {
         let references = NostrContentReference.references(in: content)
         #expect(references.count == 1)
         #expect(references[0].text == "nostr:\(noteVector)")
-        #expect(references[0].entity == .note(noteIdHex))
+        #expect(references[0].entity == .note(EventID(noteIdHex)!))
     }
 
     @Test("a letter before the scheme is not a word boundary and is not matched")
@@ -102,7 +102,7 @@ struct NIP27ContentReferenceTests {
     @Test("an nprofile maps to a p tag carrying its first relay hint")
     func nprofileMapsToPubkeyTagWithRelay() throws {
         let profile = try NProfile(
-            publicKey: pubkeyHex,
+            publicKey: PublicKey(pubkeyHex)!,
             relays: ["wss://relay.example.com", "wss://relay2.example.com"]
         )
         let uri = try NIP19Entity.nprofile(profile).nostrURI
@@ -120,9 +120,9 @@ struct NIP27ContentReferenceTests {
     @Test("an nevent with author maps to a q tag with relay and pubkey")
     func neventMapsToQuoteTagWithRelayAndPubkey() throws {
         let event = try NEvent(
-            eventId: eventIdHex,
+            eventID: EventID(eventIdHex)!,
             relays: ["wss://relay.example.com"],
-            author: pubkeyHex,
+            author: PublicKey(pubkeyHex)!,
             kind: 1
         )
         let uri = try NIP19Entity.nevent(event).nostrURI
@@ -134,7 +134,7 @@ struct NIP27ContentReferenceTests {
     func naddrMapsToAddressTag() throws {
         let addr = try NAddr(
             identifier: "1700847963",
-            author: pubkeyHex,
+            author: PublicKey(pubkeyHex)!,
             kind: 30023,
             relays: ["wss://relay3.example.com"]
         )

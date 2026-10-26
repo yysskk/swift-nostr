@@ -101,7 +101,7 @@ struct FetchVerificationTests {
             tags: [["relay", "wss://attacker.example.com"]])
 
         let list = try await answering(socket, with: [real, forgery]) {
-            try await client.routing.fetchDirectMessageRelayList(for: victim.publicKey.hex)
+            try await client.routing.fetchDirectMessageRelayList(for: victim.publicKey)
         }
 
         #expect(list?.relays == ["wss://real.example.com"])
@@ -120,7 +120,7 @@ struct FetchVerificationTests {
             tags: [["relay", "wss://attacker.example.com"]])
 
         let list = try await answering(socket, with: [strangersList]) {
-            try await client.routing.fetchDirectMessageRelayList(for: victim.publicKey.hex)
+            try await client.routing.fetchDirectMessageRelayList(for: victim.publicKey)
         }
 
         #expect(list == nil)
@@ -142,7 +142,7 @@ struct FetchVerificationTests {
             tags: [["r", "wss://attacker.example.com"]])
 
         let list = try await answering(socket, with: [real, forgery]) {
-            try await client.routing.fetchRelayList(for: victim.publicKey.hex)
+            try await client.routing.fetchRelayList(for: victim.publicKey)
         }
 
         #expect(list?.entries.map(\.url) == ["wss://real.example.com"])
@@ -166,7 +166,7 @@ struct FetchVerificationTests {
 
         // The forgery arrives first and is the newest by timestamp: both old selections favoured it.
         let metadata = try await answering(socket, with: [forgery, stale, current]) {
-            try await client.events.fetchMetadata(pubkey: victim.publicKey.hex)
+            try await client.events.fetchMetadata(pubkey: victim.publicKey)
         }
 
         #expect(metadata?.name == "current")
@@ -182,7 +182,7 @@ struct FetchVerificationTests {
         let (client, socket) = try await makeClient()
         let signer = EventSigner(keyPair: try KeyPair())
         let substitute = try signed(signer, kind: .textNote, createdAt: 1_700_000_000, content: "not it")
-        let requestedID = String(repeating: "cd", count: 32)
+        let requestedID = try EventID(hex: String(repeating: "cd", count: 32))
 
         let event = try await answering(socket, with: [substitute]) {
             try await client.events.fetchEvent(id: requestedID)
@@ -199,7 +199,7 @@ struct FetchVerificationTests {
         let wanted = try signed(signer, kind: .textNote, createdAt: 1_700_000_000, content: "the one")
 
         let event = try await answering(socket, with: [wanted]) {
-            try await client.events.fetchEvent(id: wanted.id.hex)
+            try await client.events.fetchEvent(id: wanted.id)
         }
 
         #expect(event?.id == wanted.id)

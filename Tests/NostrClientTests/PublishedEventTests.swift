@@ -131,7 +131,7 @@ struct PublishedEventTests {
         #expect(metadata.event.kind == .setMetadata)
 
         let deletion = try await PublishAckSupport.acknowledgingPublishes(on: socket) {
-            try await client.events.publishDeletion(eventIds: [metadata.id.hex], reason: "cleanup")
+            try await client.events.publishDeletion(eventIDs: [metadata.id], reason: "cleanup")
         }
         #expect(deletion.event.kind == .eventDeletion)
         #expect(deletion.event.tags.contains(["e", metadata.id.hex]))
@@ -164,12 +164,12 @@ struct PublishedEventTests {
         let sender = await client.identity.publicKey!
         // Confirmed-absent DM relay lists: both copies fall back to the pool's relay
         // without a discovery fetch.
-        await client.dmRelayListStore.markNoList(for: recipient.publicKey.hex)
+        await client.dmRelayListStore.markNoList(for: recipient.publicKey)
         await client.dmRelayListStore.markNoList(for: sender)
 
         // Two EVENT frames: the recipient gift wrap and the self-copy gift wrap.
         let result = try await PublishAckSupport.acknowledgingPublishes(2, on: socket) {
-            try await client.messages.send("hi", to: recipient.publicKey.hex)
+            try await client.messages.send("hi", to: recipient.publicKey)
         }
 
         #expect(result.recipientPublishResult?.acceptedRelays == [relayURL])
@@ -182,7 +182,7 @@ struct PublishedEventTests {
         let alice = try KeyPair()
         let bob = try KeyPair()
         let builder = DirectMessageBuilder(signer: EventSigner(keyPair: alice))
-        let result = try await builder.createMessageWithSelfCopy(content: "hi", to: bob.publicKey.hex)
+        let result = try await builder.createMessageWithSelfCopy(content: "hi", to: bob.publicKey)
 
         #expect(result.recipientPublishResult == nil)
         #expect(result.selfCopyPublishResult == nil)
@@ -209,7 +209,7 @@ struct PublishedEventTests {
             _ = try await client.events.publishMetadata(UserMetadata(name: "x"))
         }
         await #expect(throws: NostrError.signerNotSet) {
-            _ = try await client.messages.send("hi", to: "pk")
+            _ = try await client.messages.send("hi", to: .fixture("pk"))
         }
         await #expect(throws: NostrError.signerNotSet) {
             _ = try await client.messages.subscribe()
@@ -225,7 +225,7 @@ struct PublishedEventTests {
         let alice = try KeyPair()
         let bob = try KeyPair()
         let giftWrap = try await DirectMessageBuilder(signer: EventSigner(keyPair: alice))
-            .createMessageWithSelfCopy(content: "hi", to: bob.publicKey.hex)
+            .createMessageWithSelfCopy(content: "hi", to: bob.publicKey)
             .recipientGiftWrap
 
         await #expect(throws: NostrError.signerNotSet) {

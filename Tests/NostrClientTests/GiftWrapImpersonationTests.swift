@@ -180,7 +180,7 @@ struct GiftWrapImpersonationTests {
         let unwrapped = try await GiftWrap.unwrap(
             giftWrap: giftWrap, recipient: EventSigner(keyPair: bob))
 
-        #expect(unwrapped.senderPubkey == alice.publicKey.hex)
+        #expect(unwrapped.senderPubkey == alice.publicKey)
         #expect(unwrapped.event.pubkey == alice.publicKey)
         #expect(unwrapped.event.content == "hello")
     }
@@ -194,11 +194,11 @@ struct GiftWrapImpersonationTests {
 
         let original = try signer.signTextNote(content: "Secret message")
         let giftWrap = try await GiftWrap.wrap(
-            event: original, signer: signer, recipientPubkey: bob.publicKey.hex)
+            event: original, signer: signer, recipientPubkey: bob.publicKey)
         let unwrapped = try await GiftWrap.unwrap(
             giftWrap: giftWrap, recipient: EventSigner(keyPair: bob))
 
-        #expect(unwrapped.senderPubkey == alice.publicKey.hex)
+        #expect(unwrapped.senderPubkey == alice.publicKey)
         #expect(unwrapped.event.pubkey == alice.publicKey)
         #expect(unwrapped.event.id == original.id)
         #expect(unwrapped.event.content == "Secret message")

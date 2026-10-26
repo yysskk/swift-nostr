@@ -48,7 +48,7 @@ struct DirectMessageRelayDiscoveryTests {
     @Test("cachedDirectMessageRelayList is nil before any fetch or publish")
     func cachedNilInitially() async {
         let client = NostrClient()
-        #expect(await client.routing.cachedDirectMessageRelayList(for: "somepubkey") == nil)
+        #expect(await client.routing.cachedDirectMessageRelayList(for: .fixture("somepubkey")) == nil)
     }
 
     @Test("routing.publishDirectMessageRelayList without a signer throws signerNotSet")

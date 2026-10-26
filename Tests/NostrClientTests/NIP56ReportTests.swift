@@ -1,5 +1,6 @@
 import Foundation
 import NostrCore
+import NostrTestSupport
 import Testing
 
 @testable import NostrClient
@@ -20,7 +21,7 @@ struct NIP56ReportTests {
         let signer = EventSigner(keyPair: try KeyPair())
         let target = try KeyPair()
 
-        let event = try signer.signReport(pubkey: target.publicKey.hex, type: .nudity, reason: "explicit content")
+        let event = try signer.signReport(pubkey: target.publicKey, type: .nudity, reason: "explicit content")
 
         #expect(event.kind == .report)
         #expect(event.content == "explicit content")
@@ -33,7 +34,7 @@ struct NIP56ReportTests {
         let signer = EventSigner(keyPair: try KeyPair())
         let target = try KeyPair()
 
-        let event = try signer.signReport(pubkey: target.publicKey.hex, type: .impersonation)
+        let event = try signer.signReport(pubkey: target.publicKey, type: .impersonation)
 
         #expect(event.kind == .report)
         #expect(event.content.isEmpty)
@@ -78,7 +79,7 @@ struct NIP56ReportTests {
         let client = NostrClient()
 
         await #expect(throws: NostrError.signerNotSet) {
-            _ = try await client.events.publishReport(pubkey: "deadbeef", type: .spam)
+            _ = try await client.events.publishReport(pubkey: .fixture("target"), type: .spam)
         }
     }
 }

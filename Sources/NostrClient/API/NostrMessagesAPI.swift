@@ -28,9 +28,9 @@ public struct NostrMessagesAPI: NostrMessaging {
     /// self-copy stays best-effort.
     /// - Parameters:
     ///   - content: The message content
-    ///   - recipientPubkey: The recipient's public key (hex)
+    ///   - recipientPubkey: The recipient's public key
     ///   - subject: Optional conversation subject
-    ///   - replyTo: Optional event ID to reply to
+    ///   - replyTo: Optional id of the event to reply to
     ///   - expiration: Optional NIP-40 expiration for a disappearing message. Set on both gift
     ///     wraps (the stored kind-1059 events) so relays stop serving the message after this time.
     ///   - strategy: How many relay acknowledgments to wait for on the recipient
@@ -43,9 +43,9 @@ public struct NostrMessagesAPI: NostrMessaging {
     @discardableResult
     public func send(
         _ content: String,
-        to recipientPubkey: String,
+        to recipientPubkey: PublicKey,
         subject: String? = nil,
-        replyTo: String? = nil,
+        replyTo: EventID? = nil,
         expiration: Date? = nil,
         strategy: PublishStrategy? = nil
     ) async throws -> SendDirectMessageResult {
@@ -84,7 +84,7 @@ public struct NostrMessagesAPI: NostrMessaging {
         let result = try await client.withSigner { signer, _ in
             try await DirectMessageBuilder(signer: signer).createReactionWithSelfCopy(
                 reaction: reaction,
-                to: message.rumorId,
+                to: message.rumorID,
                 author: message.senderPubkey,
                 recipientPubkey: message.senderPubkey,
                 expiration: expiration
@@ -107,7 +107,7 @@ public struct NostrMessagesAPI: NostrMessaging {
     ///   - size: Optional size of the encrypted file in bytes.
     ///   - dimensions: Optional pixel dimensions as "<width>x<height>".
     ///   - blurhash: Optional blurhash placeholder for progressive display.
-    ///   - recipientPubkey: The recipient's public key (hex).
+    ///   - recipientPubkey: The recipient's public key.
     ///   - expiration: Optional NIP-40 expiration applied to both gift wraps.
     ///   - strategy: How many relay acknowledgments to wait for on the recipient gift wrap before
     ///     returning (default: the pool config's ``RelayPoolConfig/defaultPublishStrategy``).
@@ -120,7 +120,7 @@ public struct NostrMessagesAPI: NostrMessaging {
         size: Int? = nil,
         dimensions: String? = nil,
         blurhash: String? = nil,
-        to recipientPubkey: String,
+        to recipientPubkey: PublicKey,
         expiration: Date? = nil,
         strategy: PublishStrategy? = nil
     ) async throws -> SendDirectMessageResult {
@@ -151,23 +151,21 @@ public struct NostrMessagesAPI: NostrMessaging {
     /// - Parameters:
     ///   - rumor: The event to deliver. Its `pubkey` must be the signer's public key; it is never
     ///     signed.
-    ///   - recipientPubkey: The recipient's public key (hex).
+    ///   - recipientPubkey: The recipient's public key.
     ///   - expiration: Optional NIP-40 expiration applied to both gift wraps.
     ///   - strategy: How many relay acknowledgments to wait for on the recipient gift wrap before
     ///     returning (default: the pool config's ``RelayPoolConfig/defaultPublishStrategy``).
     /// - Returns: The shared rumor, both gift wraps, and the per-relay publish outcomes.
-    /// - Throws: ``NostrError/invalidPublicKey`` when `recipientPubkey` is not a hex public key or
-    ///   `rumor.pubkey` is not the signer's public key (the recipient's unwrap would reject it as an
-    ///   impersonation), or
+    /// - Throws: ``NostrError/invalidPublicKey`` when `rumor.pubkey` is not the signer's public key
+    ///   (the recipient's unwrap would reject it as an impersonation), or
     ///   ``NostrError/noRelaysInPool`` when the recipient copy falls back to an empty pool.
     @discardableResult
     public func sendGiftWrapped(
         _ rumor: UnsignedEvent,
-        to recipientPubkey: String,
+        to recipientPubkey: PublicKey,
         expiration: Date? = nil,
         strategy: PublishStrategy? = nil
     ) async throws -> SendDirectMessageResult {
-        let recipient = try PublicKey(callerHex: recipientPubkey)
         let result = try await client.withSigner { signer, publicKey in
             guard rumor.pubkey == publicKey else {
                 throw NostrError.invalidPublicKey
@@ -175,7 +173,7 @@ public struct NostrMessagesAPI: NostrMessaging {
             return try await DirectMessageBuilder(signer: signer).wrapWithSelfCopy(
                 rumor: try rumor.asRumor(),
                 senderPubkey: publicKey,
-                to: recipient,
+                to: recipientPubkey,
                 expiration: expiration
             )
         }
@@ -270,12 +268,12 @@ public struct NostrMessagesAPI: NostrMessaging {
     /// the best-effort self-copy never blocks or fails the primary send.
     private func deliver(
         _ result: SendDirectMessageResult,
-        to recipientPubkey: String,
+        to recipientPubkey: PublicKey,
         strategy: PublishStrategy?
     ) async throws -> SendDirectMessageResult {
         async let recipientTargetsTask = inboxTargets(for: recipientPubkey)
         // The rumor is authored under the sender's key, so it names the self-copy's addressee.
-        async let senderTargetsTask = inboxTargets(for: result.rumor.pubkey.hex)
+        async let senderTargetsTask = inboxTargets(for: result.rumor.pubkey)
         let recipientTargets = await recipientTargetsTask
         let senderTargets = await senderTargetsTask
 
@@ -307,7 +305,7 @@ public struct NostrMessagesAPI: NostrMessaging {
     /// them per the gossip policy.
     /// - Returns: The connected inbox relays, or nil when the addressee advertised no DM relay
     ///   list (or none could be connected) — signalling a fall back to the full relay pool.
-    private func inboxTargets(for pubkey: String) async -> Set<URL>? {
+    private func inboxTargets(for pubkey: PublicKey) async -> Set<URL>? {
         let connected = await client.routing.connectedInboxRelays(for: pubkey)
         return connected.isEmpty ? nil : connected
     }

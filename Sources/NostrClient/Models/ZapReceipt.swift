@@ -37,14 +37,17 @@ public struct ZapReceipt: Sendable, Hashable {
     /// The zap request the provider echoed back (the `description` tag), as its raw JSON string.
     public var descriptionJSON: String? { event.firstTagValue(named: "description") }
 
-    /// The pubkey that was zapped (the `p` tag).
-    public var recipientPubkey: String? { event.firstTagValue(named: "p") }
+    /// The pubkey that was zapped (the `p` tag), or nil if the tag is absent or not a canonical hex
+    /// public key.
+    public var recipientPubkey: PublicKey? { event.firstTagValue(named: "p").flatMap(PublicKey.init) }
 
-    /// The pubkey that sent the zap (the uppercase `P` tag), if provided.
-    public var senderPubkey: String? { event.firstTagValue(named: "P") }
+    /// The pubkey that sent the zap (the uppercase `P` tag), or nil if the tag is absent or not a
+    /// canonical hex public key.
+    public var senderPubkey: PublicKey? { event.firstTagValue(named: "P").flatMap(PublicKey.init) }
 
-    /// The id of the event that was zapped (the `e` tag), if the zap targeted an event.
-    public var zappedEventId: String? { event.firstTagValue(named: "e") }
+    /// The id of the event that was zapped (the `e` tag), or nil if the zap targeted no event or
+    /// the tag is not a canonical hex event id.
+    public var zappedEventID: EventID? { event.firstTagValue(named: "e").flatMap(EventID.init) }
 
     /// The coordinate of the addressable event that was zapped (the `a` tag), if any.
     public var zappedEventCoordinate: String? { event.firstTagValue(named: "a") }
@@ -86,7 +89,8 @@ extension ZapReceipt {
         case missingAmount
         /// The zap request's `amount` tag is not a number.
         case invalidAmount
-        /// The receipt has no `p` tag, so it does not say who was zapped (NIP-57 requires one).
+        /// The receipt has no `p` tag holding a canonical hex public key, so it does not say who was
+        /// zapped (NIP-57 requires one).
         case missingRecipient
         /// The receipt's `p` tag does not match the zap request's recipient.
         case recipientMismatch
@@ -155,12 +159,12 @@ extension ZapReceipt {
     ///     provider is known to omit it and you accept losing that binding.
     /// - Throws: ``ValidationError`` if any check fails.
     public func validate(
-        lnurlProviderPubkey: String,
+        lnurlProviderPubkey: PublicKey,
         expectedAmountMillisats: Int64? = nil,
         requiringDescriptionHash: Bool = true
     ) throws {
         // 1. The receipt must claim to come from the provider's key.
-        guard event.pubkey.hex == lnurlProviderPubkey.lowercased() else {
+        guard event.pubkey == lnurlProviderPubkey else {
             throw ValidationError.payeePubkeyMismatch
         }
 
@@ -208,17 +212,19 @@ extension ZapReceipt {
 
         // 7. NIP-57 requires the receipt to name who was zapped, and it must be the same recipient
         //    and event the request named, so a provider cannot redirect a zap to a different
-        //    `p`/`e` than the sender asked for.
+        //    `p`/`e` than the sender asked for. A `p` that is not a canonical hex key names no one,
+        //    so it counts as missing; the `e` values are compared verbatim, so a malformed one can
+        //    only ever match an identical value in the request.
         guard let receiptRecipient = recipientPubkey else {
             throw ValidationError.missingRecipient
         }
         if let zapRequest {
             if let requestRecipient = zapRequest.firstTagValue(named: "p"),
-                receiptRecipient != requestRecipient
+                receiptRecipient.hex != requestRecipient
             {
                 throw ValidationError.recipientMismatch
             }
-            if let receiptEvent = zappedEventId,
+            if let receiptEvent = event.firstTagValue(named: "e"),
                 let requestEvent = zapRequest.firstTagValue(named: "e"),
                 receiptEvent != requestEvent
             {

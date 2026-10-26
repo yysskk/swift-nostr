@@ -84,12 +84,22 @@ enum TLV {
         return Int(value)
     }
 
-    /// Validates a 32-byte hex string and returns its canonical lowercase form.
-    static func normalizedHex32(_ hex: String) throws -> String {
-        guard let data = Data(hexString: hex), data.count == 32 else {
-            throw NostrError.invalidHex
+    /// The public key a 32-byte ``Kind/special`` or ``Kind/author`` record carries.
+    /// - Throws: ``NostrError/invalidNIP19Entity`` if the record does not hold exactly 32 bytes.
+    static func publicKey(_ record: Record) throws -> PublicKey {
+        guard let key = try? PublicKey(data: record.value) else {
+            throw NostrError.invalidNIP19Entity
         }
-        return data.hexEncodedString()
+        return key
+    }
+
+    /// The event id a 32-byte ``Kind/special`` record carries.
+    /// - Throws: ``NostrError/invalidNIP19Entity`` if the record does not hold exactly 32 bytes.
+    static func eventID(_ record: Record) throws -> EventID {
+        guard let id = try? EventID(data: record.value) else {
+            throw NostrError.invalidNIP19Entity
+        }
+        return id
     }
 
     /// Ensures each relay URL fits within a single TLV record (255 bytes).
@@ -139,10 +149,14 @@ enum TLV {
         Record(type: Kind.special.rawValue, value: value)
     }
 
-    /// A ``Kind/special`` record carrying a value decoded from 32-byte hex
-    /// (the `nprofile` pubkey or `nevent` event id).
-    static func specialRecord(hex: String) -> Record {
-        specialRecord(Data(hexString: hex) ?? Data())
+    /// A ``Kind/special`` record carrying the `nprofile` public key.
+    static func specialRecord(_ publicKey: PublicKey) -> Record {
+        specialRecord(publicKey.data)
+    }
+
+    /// A ``Kind/special`` record carrying the `nevent` event id.
+    static func specialRecord(_ eventID: EventID) -> Record {
+        specialRecord(eventID.data)
     }
 
     /// ``Kind/relay`` records, one per relay-hint URL.
@@ -150,9 +164,9 @@ enum TLV {
         urls.map { Record(type: Kind.relay.rawValue, value: Data($0.utf8)) }
     }
 
-    /// A ``Kind/author`` record carrying a pubkey decoded from 32-byte hex.
-    static func authorRecord(hex: String) -> Record {
-        Record(type: Kind.author.rawValue, value: Data(hexString: hex) ?? Data())
+    /// A ``Kind/author`` record carrying the author's public key.
+    static func authorRecord(_ author: PublicKey) -> Record {
+        Record(type: Kind.author.rawValue, value: author.data)
     }
 
     /// A ``Kind/kind`` record carrying a big-endian event kind.

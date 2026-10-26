@@ -129,7 +129,7 @@ public struct LongFormContent: Sendable, Hashable {
     ///
     /// Articles are the addressable target, so the coordinate always uses kind 30023
     /// (``Event/Kind/longFormContent``); drafts (kind 30024) are not typically addressed by `naddr`.
-    public func naddr(author: String, relays: [String] = []) throws -> NAddr {
+    public func naddr(author: PublicKey, relays: [String] = []) throws -> NAddr {
         try NAddr(
             identifier: identifier,
             author: author,

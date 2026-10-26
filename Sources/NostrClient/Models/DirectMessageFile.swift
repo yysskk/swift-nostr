@@ -1,4 +1,5 @@
 import Foundation
+import NostrCore
 
 /// A NIP-17 kind-15 file message: an encrypted file shared in a private direct-message
 /// conversation.
@@ -8,17 +9,17 @@ import Foundation
 /// ``EncryptedFile/decrypt(_:key:nonce:)`` using ``decryptionKey`` and ``decryptionNonce``.
 /// https://github.com/nostr-protocol/nips/blob/master/17.md
 public struct DirectMessageFile: Sendable, Identifiable, Hashable {
-    /// Unique identifier (from the rumor event id).
-    public var id: String { rumorId }
+    /// Unique identifier (the rumor's event id).
+    public var id: EventID { rumorID }
 
-    /// The rumor event id.
-    public let rumorId: String
+    /// The rumor's event id.
+    public let rumorID: EventID
 
-    /// The sender's public key (hex).
-    public let senderPubkey: String
+    /// The sender's public key.
+    public let senderPubkey: PublicKey
 
-    /// The recipient's public key (hex).
-    public let recipientPubkey: String
+    /// The recipient's public key.
+    public let recipientPubkey: PublicKey
 
     /// URL of the encrypted file (the kind-15 content).
     public let url: String
@@ -53,10 +54,11 @@ public struct DirectMessageFile: Sendable, Identifiable, Hashable {
     /// Optional NIP-40 expiration carried on the gift wrap.
     public let expiresAt: Date?
 
+    /// Creates a file message from its parsed parts.
     public init(
-        rumorId: String,
-        senderPubkey: String,
-        recipientPubkey: String,
+        rumorID: EventID,
+        senderPubkey: PublicKey,
+        recipientPubkey: PublicKey,
         url: String,
         mimeType: String?,
         decryptionKey: Data,
@@ -69,7 +71,7 @@ public struct DirectMessageFile: Sendable, Identifiable, Hashable {
         createdAt: Date,
         expiresAt: Date? = nil
     ) {
-        self.rumorId = rumorId
+        self.rumorID = rumorID
         self.senderPubkey = senderPubkey
         self.recipientPubkey = recipientPubkey
         self.url = url

@@ -182,9 +182,9 @@ struct NIP51SetTests {
 
     @Test("coordinate is kind:pubkey:identifier")
     func coordinate() throws {
-        let author = String(repeating: "a", count: 64)
+        let author = PublicKey.fixture("author")
         let set = try NostrListSet(kind: .bookmarkSet, identifier: "reading")
-        #expect(set.coordinate(author: author) == "30003:\(author):reading")
+        #expect(set.coordinate(author: author) == "30003:\(author.hex):reading")
     }
 
     @Test("naddr round-trips and matches NAddr(event:)")
@@ -193,9 +193,9 @@ struct NIP51SetTests {
         let set = try NostrListSet(kind: .bookmarkSet, identifier: "reading")
         let event = try signer.signSet(set)
 
-        let naddr = try set.naddr(author: signer.publicKey.hex)
+        let naddr = try set.naddr(author: signer.publicKey)
         #expect(naddr.identifier == "reading")
-        #expect(naddr.author == signer.publicKey.hex)
+        #expect(naddr.author == signer.publicKey)
         #expect(naddr.kind == 30003)
 
         // Round-trips through its bech32 encoding.

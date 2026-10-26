@@ -21,9 +21,9 @@ public struct GroupReference: Sendable, Hashable {
     /// The group's id on its relay.
     public let id: String
 
-    /// The relay's public key (hex) — the expected author of the group's kind-39xxx state.
+    /// The relay's public key — the expected author of the group's kind-39xxx state.
     /// Nil when unknown.
-    public let relayPubkey: String?
+    public let relayPubkey: PublicKey?
 
     /// An invite code from a "?invite=<code>" share-link suffix. Nil when absent.
     public let inviteCode: String?
@@ -32,7 +32,13 @@ public struct GroupReference: Sendable, Hashable {
     /// percent-encoded by ``shareableString()`` so ``init(naddrString:)`` round-trips it.
     private static let inviteCodeAllowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-._~"))
 
-    public init(relayURL: String, id: String, relayPubkey: String? = nil, inviteCode: String? = nil) {
+    /// Creates a reference to the group `id` on the relay at `relayURL`.
+    /// - Parameters:
+    ///   - relayURL: The URL of the relay hosting the group.
+    ///   - id: The group's id on its relay.
+    ///   - relayPubkey: The relay's public key, if known; group state is validated against it.
+    ///   - inviteCode: An invite code to send with a join request, if any.
+    public init(relayURL: String, id: String, relayPubkey: PublicKey? = nil, inviteCode: String? = nil) {
         self.relayURL = relayURL
         self.id = id
         self.relayPubkey = relayPubkey

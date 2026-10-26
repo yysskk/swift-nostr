@@ -1,4 +1,5 @@
 import Foundation
+import NostrCore
 
 /// An in-memory cache of NIP-01 replaceable events: the newest value per key wins.
 ///
@@ -9,13 +10,13 @@ import Foundation
 /// This is a plain value type; callers provide isolation (the relay-list stores
 /// own it inside an actor).
 struct ReplaceableCache<Value> {
-    private var entries: [String: (value: Value, createdAt: Int64)] = [:]
+    private var entries: [PublicKey: (value: Value, createdAt: Int64)] = [:]
 
     /// Stores `value` for `key` if it is newer than the cached one. An equal
     /// `createdAt` keeps the existing entry.
     /// - Returns: The effective (possibly pre-existing) value.
     @discardableResult
-    mutating func store(_ value: Value, createdAt: Int64, for key: String) -> Value {
+    mutating func store(_ value: Value, createdAt: Int64, for key: PublicKey) -> Value {
         if let existing = entries[key], existing.createdAt >= createdAt {
             return existing.value
         }
@@ -24,7 +25,7 @@ struct ReplaceableCache<Value> {
     }
 
     /// Returns the cached value for `key`, if any.
-    func value(for key: String) -> Value? {
+    func value(for key: PublicKey) -> Value? {
         entries[key]?.value
     }
 }

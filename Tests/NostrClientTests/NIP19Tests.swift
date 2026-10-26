@@ -7,8 +7,8 @@ import Testing
 @Suite("NIP-19 Entity Tests")
 struct NIP19Tests {
     // Canonical NIP-19 fixtures.
-    let pubkeyHex = "3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d"
-    let eventIdHex = "5c83da77af1dec6d7289834998ad7aafbd9e2191396d75ec3cc27f5a77226f36"
+    let pubkey = PublicKey("3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d")!
+    let eventID = EventID("5c83da77af1dec6d7289834998ad7aafbd9e2191396d75ec3cc27f5a77226f36")!
     let npubVector = "npub180cvv07tjdrrgpa0j7j7tmnyl2yr6yr7l8j4s3evf6u64th6gkwsyjh6w6"
     let nprofileVector =
         "nprofile1qqsrhuxx8l9ex335q7he0f09aej04zpazpl0ne2cgukyawd24mayt8gpp4mhxue69uhhytnc9e3k7mgpz4mhxue69uhkg6nzv9ejuumpv34kytnrdaksjlyr9p"
@@ -17,16 +17,17 @@ struct NIP19Tests {
 
     @Test("note round-trips through encode/decode")
     func noteRoundTrip() throws {
-        let encoded = try NIP19Entity.note(eventIdHex).encoded
-        #expect(encoded.hasPrefix("note1"))
-        #expect(try NIP19Entity.decode(encoded) == .note(eventIdHex))
+        let encoded = try NIP19Entity.note(eventID).encoded
+        #expect(encoded == eventID.note)
+        #expect(try NIP19Entity.decode(encoded) == .note(eventID))
     }
 
     // MARK: - npub canonical vector
 
     @Test("decode canonical npub vector")
     func decodeNpubVector() throws {
-        #expect(try NIP19Entity.decode(npubVector) == .npub(pubkeyHex))
+        #expect(try NIP19Entity.decode(npubVector) == .npub(pubkey))
+        #expect(try NIP19Entity.npub(pubkey).encoded == npubVector)
     }
 
     // MARK: - nprofile canonical vector (TLV correctness gate)
@@ -37,19 +38,19 @@ struct NIP19Tests {
             Issue.record("expected nprofile")
             return
         }
-        #expect(profile.publicKey == pubkeyHex)
+        #expect(profile.publicKey == pubkey)
         #expect(profile.relays == ["wss://r.x.com", "wss://djbas.sadkb.com"])
     }
 
     @Test("encode nprofile matches canonical vector")
     func encodeNprofileVector() throws {
-        let profile = try NProfile(publicKey: pubkeyHex, relays: ["wss://r.x.com", "wss://djbas.sadkb.com"])
+        let profile = try NProfile(publicKey: pubkey, relays: ["wss://r.x.com", "wss://djbas.sadkb.com"])
         #expect(try profile.encoded == nprofileVector)
     }
 
     @Test("nprofile round-trips without relays")
     func nprofileRoundTripNoRelays() throws {
-        let profile = try NProfile(publicKey: pubkeyHex)
+        let profile = try NProfile(publicKey: pubkey)
         let decoded = try NProfile(bech32String: profile.encoded)
         #expect(decoded == profile)
         #expect(decoded.relays.isEmpty)
@@ -60,9 +61,9 @@ struct NIP19Tests {
     @Test("nevent round-trips with all fields")
     func neventRoundTripFull() throws {
         let event = try NEvent(
-            eventId: eventIdHex,
+            eventID: eventID,
             relays: ["wss://relay.example.com"],
-            author: pubkeyHex,
+            author: pubkey,
             kind: 1
         )
         let encoded = try event.encoded
@@ -70,14 +71,14 @@ struct NIP19Tests {
 
         let decoded = try NEvent(bech32String: encoded)
         #expect(decoded == event)
-        #expect(decoded.author == pubkeyHex)
+        #expect(decoded.author == pubkey)
         #expect(decoded.kind == 1)
         #expect(decoded.relays == ["wss://relay.example.com"])
     }
 
     @Test("nevent round-trips with only the event id")
     func neventRoundTripMinimal() throws {
-        let event = try NEvent(eventId: eventIdHex)
+        let event = try NEvent(eventID: eventID)
         let decoded = try NEvent(bech32String: event.encoded)
         #expect(decoded == event)
         #expect(decoded.author == nil)
@@ -91,7 +92,7 @@ struct NIP19Tests {
     func naddrRoundTripFull() throws {
         let addr = try NAddr(
             identifier: "1700847963",
-            author: pubkeyHex,
+            author: pubkey,
             kind: 30023,
             relays: ["wss://relay3.example.com"]
         )
@@ -106,7 +107,7 @@ struct NIP19Tests {
 
     @Test("naddr round-trips with an empty identifier")
     func naddrRoundTripEmptyIdentifier() throws {
-        let addr = try NAddr(identifier: "", author: pubkeyHex, kind: 30000)
+        let addr = try NAddr(identifier: "", author: pubkey, kind: 30000)
         let decoded = try NAddr(bech32String: addr.encoded)
         #expect(decoded == addr)
         #expect(decoded.identifier.isEmpty)
@@ -118,8 +119,8 @@ struct NIP19Tests {
     func neventFromEvent() throws {
         let event = makeEvent(kind: 1, tags: [])
         let nevent = try NEvent(event: event, relays: ["wss://relay.example.com"])
-        #expect(nevent.eventId == eventIdHex)
-        #expect(nevent.author == pubkeyHex)
+        #expect(nevent.eventID == eventID)
+        #expect(nevent.author == pubkey)
         #expect(nevent.kind == 1)
         #expect(nevent.relays == ["wss://relay.example.com"])
     }
@@ -129,7 +130,7 @@ struct NIP19Tests {
         let event = makeEvent(kind: 30023, tags: [["t", "nostr"], ["d", "my-article"]])
         let addr = try NAddr(event: event)
         #expect(addr.identifier == "my-article")
-        #expect(addr.author == pubkeyHex)
+        #expect(addr.author == pubkey)
         #expect(addr.kind == 30023)
     }
 
@@ -169,10 +170,54 @@ struct NIP19Tests {
         }
     }
 
-    @Test("invalid hex throws invalidHex")
-    func invalidHexThrows() {
-        #expect(throws: NostrError.invalidHex) {
-            _ = try NProfile(publicKey: "zz")
+    @Test(
+        "a bare npub, nsec, or note whose payload is not 32 bytes throws invalidNIP19Entity",
+        arguments: ["npub", "nsec", "note"], [31, 33])
+    func barePayloadOfWrongLengthThrows(prefix: String, byteCount: Int) throws {
+        let encoded = try Bech32.encode(hrp: prefix, data: Data(repeating: 0xAB, count: byteCount))
+        #expect(throws: NostrError.invalidNIP19Entity) {
+            _ = try NIP19Entity.decode(encoded)
+        }
+    }
+
+    @Test("an nprofile whose public key is not 32 bytes throws invalidNIP19Entity")
+    func nprofileShortPublicKeyThrows() throws {
+        let tlv = Data([0x00, 0x1F]) + pubkey.data.prefix(31)
+        let encoded = try Bech32.encode(hrp: "nprofile", data: tlv)
+        #expect(throws: NostrError.invalidNIP19Entity) {
+            _ = try NProfile(bech32String: encoded)
+        }
+    }
+
+    @Test("an nevent whose event id or author is not 32 bytes throws invalidNIP19Entity")
+    func neventMalformedRecordsThrow() throws {
+        let shortID = Data([0x00, 0x1F]) + eventID.data.prefix(31)
+        let longAuthor = Data([0x00, 0x20]) + eventID.data + Data([0x02, 0x21]) + pubkey.data + Data([0x00])
+        for tlv in [shortID, longAuthor] {
+            let encoded = try Bech32.encode(hrp: "nevent", data: tlv)
+            #expect(throws: NostrError.invalidNIP19Entity) {
+                _ = try NEvent(bech32String: encoded)
+            }
+        }
+    }
+
+    @Test("an naddr whose author is not 32 bytes throws invalidNIP19Entity")
+    func naddrShortAuthorThrows() throws {
+        let tlv =
+            Data([0x00, 0x03]) + Data("abc".utf8)
+            + Data([0x02, 0x1F]) + pubkey.data.prefix(31)
+            + Data([0x03, 0x04, 0x00, 0x00, 0x75, 0x27])
+        let encoded = try Bech32.encode(hrp: "naddr", data: tlv)
+        #expect(throws: NostrError.invalidNIP19Entity) {
+            _ = try NAddr(bech32String: encoded)
+        }
+    }
+
+    @Test("an nevent without an event id throws invalidNIP19Entity")
+    func neventMissingIDThrows() throws {
+        let encoded = try Bech32.encode(hrp: "nevent", data: Data([0x02, 0x20]) + pubkey.data)
+        #expect(throws: NostrError.invalidNIP19Entity) {
+            _ = try NEvent(bech32String: encoded)
         }
     }
 
@@ -190,12 +235,8 @@ struct NIP19Tests {
 
     @Test("unknown TLV types are ignored on decode")
     func unknownTLVIgnored() throws {
-        guard let pubkey = Data(hexString: pubkeyHex) else {
-            Issue.record("bad fixture")
-            return
-        }
         // type 0 = pubkey (32 bytes), type 9 = unknown 2-byte payload.
-        var tlv = Data([0x00, 0x20]) + pubkey
+        var tlv = Data([0x00, 0x20]) + pubkey.data
         tlv += Data([0x09, 0x02, 0xAB, 0xCD])
         let encoded = try Bech32.encode(hrp: "nprofile", data: tlv)
 
@@ -203,15 +244,15 @@ struct NIP19Tests {
             Issue.record("expected nprofile")
             return
         }
-        #expect(profile.publicKey == pubkeyHex)
+        #expect(profile.publicKey == pubkey)
     }
 
     // MARK: - helpers
 
     private func makeEvent(kind: Event.Kind, tags: [[String]]) -> Event {
         Event(
-            id: EventID(eventIdHex)!,
-            pubkey: PublicKey(pubkeyHex)!,
+            id: eventID,
+            pubkey: pubkey,
             createdAt: 0,
             kind: kind,
             tags: tags,

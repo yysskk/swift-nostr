@@ -48,7 +48,7 @@ struct DirectMessageRoutingTests {
         try await pool.addRelay(inboxURL)
         let client = NostrClient(relayPool: pool, gossipPolicy: .requirePresent)
 
-        let recipient = "recipientpubkey"
+        let recipient = PublicKey.fixture("recipient")
         await client.dmRelayListStore.store(
             DirectMessageRelayList(relays: ["wss://inbox.example.com", "wss://absent.example.com"]),
             createdAt: 1,
@@ -65,14 +65,14 @@ struct DirectMessageRoutingTests {
         // No connected relay to query, so discovery is skipped and nothing resolves —
         // the caller then falls back to the full pool.
         let client = NostrClient()
-        let targets = await client.routing.connectedInboxRelays(for: "nobody")
+        let targets = await client.routing.connectedInboxRelays(for: PublicKey.fixture("nobody"))
         #expect(targets.isEmpty)
     }
 
     @Test("A recipient with an empty DM relay list resolves to no relays (pool fallback)")
     func recipientWithEmptyListResolvesEmpty() async {
         let client = NostrClient()
-        let recipient = "recipientpubkey"
+        let recipient = PublicKey.fixture("recipient")
         // The recipient advertised a kind 10050 with no relays; routing resolves to nothing,
         // so the caller falls back to the full pool.
         await client.dmRelayListStore.store(
@@ -91,7 +91,7 @@ struct DirectMessageRoutingTests {
 
         // Empty pool, no cached lists: the recipient copy's pool fallback finds nothing.
         await #expect(throws: NostrError.noRelaysInPool) {
-            try await client.messages.send("hi", to: recipient.publicKey.hex)
+            try await client.messages.send("hi", to: recipient.publicKey)
         }
     }
 
@@ -103,11 +103,11 @@ struct DirectMessageRoutingTests {
         let sender = await client.identity.publicKey!
         // Confirmed-absent DM relay lists: both copies fall back to the pool's relay
         // without a discovery fetch.
-        await client.dmRelayListStore.markNoList(for: recipient.publicKey.hex)
+        await client.dmRelayListStore.markNoList(for: recipient.publicKey)
         await client.dmRelayListStore.markNoList(for: sender)
 
         let result = try await PublishAckSupport.acknowledgingPublishes(2, on: socket) {
-            try await client.messages.send("hi", to: recipient.publicKey.hex)
+            try await client.messages.send("hi", to: recipient.publicKey)
         }
 
         let poolRelay = ConnectedClientFixture.defaultRelayURL

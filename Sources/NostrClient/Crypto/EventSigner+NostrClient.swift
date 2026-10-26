@@ -12,17 +12,13 @@ extension EventSigner {
     }
 
     /// Creates and signs a contact list event (kind 3, NIP-02)
-    /// - Throws: ``NostrError/invalidPublicKey`` if a contact's pubkey is not a hex public key.
     public func signContactList(_ contacts: [Contact]) throws -> Event {
-        let tags = try contacts.map {
-            Tag.pubkey(try PublicKey(callerHex: $0.pubkey), relayURL: $0.relayURL, petname: $0.petname)
-        }
+        let tags = contacts.map { Tag.pubkey($0.pubkey, relayURL: $0.relayURL, petname: $0.petname) }
         return try sign(UnsignedEvent(pubkey: publicKey, kind: .contacts, tags: tags, content: ""))
     }
 
     /// Creates and signs a contact list event from pubkeys
-    /// - Throws: ``NostrError/invalidPublicKey`` if a pubkey is not a hex public key.
-    public func signContactList(pubkeys: [String]) throws -> Event {
+    public func signContactList(pubkeys: [PublicKey]) throws -> Event {
         let contacts = pubkeys.map { Contact(pubkey: $0) }
         return try signContactList(contacts)
     }
@@ -54,7 +50,7 @@ extension EventSigner {
 
     /// Creates and signs a report of a pubkey (kind 1984, NIP-56).
     /// The report type rides on the "p" tag; `reason` becomes the content.
-    public func signReport(pubkey: String, type: ReportType, reason: String = "") throws -> Event {
+    public func signReport(pubkey: PublicKey, type: ReportType, reason: String = "") throws -> Event {
         try sign(.report(pubkey: publicKey, target: pubkey, type: type, reason: reason))
     }
 

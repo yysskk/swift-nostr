@@ -1,4 +1,5 @@
 import Foundation
+import NostrCore
 
 #if canImport(FoundationNetworking)
     import FoundationNetworking
@@ -16,13 +17,18 @@ public struct InternetIdentifier: Sendable {
         /// The full identifier (e.g., "alice@example.com")
         public let identifier: String
 
-        /// The verified public key (hex)
-        public let pubkey: String
+        /// The verified public key
+        public let pubkey: PublicKey
 
         /// Optional relay URLs recommended for this user
         public let relays: [String]
 
-        public init(identifier: String, pubkey: String, relays: [String] = []) {
+        /// Creates a verification result.
+        /// - Parameters:
+        ///   - identifier: The full identifier (e.g., "alice@example.com").
+        ///   - pubkey: The public key the identifier resolved to.
+        ///   - relays: Relay URLs the server recommends for this user.
+        public init(identifier: String, pubkey: PublicKey, relays: [String] = []) {
             self.identifier = identifier
             self.pubkey = pubkey
             self.relays = relays
@@ -118,6 +124,10 @@ public struct InternetIdentifier: Sendable {
     }
 
     /// Verifies an internet identifier and returns the associated public key
+    ///
+    /// The server's `names` entry must be a canonical hex public key (64 lowercase hex digits, as
+    /// NIP-05 requires); any other value names no key, so it is reported as
+    /// ``VerificationError/pubkeyNotFound``.
     /// - Parameter identifier: The identifier (e.g., "alice@example.com")
     /// - Returns: The verification result containing pubkey and optional relays
     public static func verify(_ identifier: String) async throws -> VerificationResult {
@@ -129,47 +139,61 @@ public struct InternetIdentifier: Sendable {
             throw VerificationError.invalidIdentifier
         }
 
-        let response: InternetIdentifierResponse
+        let data: Data
         do {
-            let (data, urlResponse) = try await URLSession.shared.data(from: url)
+            let (body, urlResponse) = try await URLSession.shared.data(from: url)
 
             guard let httpResponse = urlResponse as? HTTPURLResponse,
                 (200...299).contains(httpResponse.statusCode)
             else {
                 throw VerificationError.invalidResponse
             }
-
-            response = try JSONDecoder().decode(InternetIdentifierResponse.self, from: data)
+            data = body
         } catch let error as VerificationError {
             throw error
-        } catch is DecodingError {
-            throw VerificationError.invalidResponse
         } catch {
             throw VerificationError.networkError(error.localizedDescription)
         }
 
-        guard let pubkey = response.names[name.lowercased()] ?? response.names[name] else {
-            throw VerificationError.pubkeyNotFound
+        return try result(for: identifier, name: name, in: data)
+    }
+
+    /// Resolves `name` in a `nostr.json` document served for `identifier`.
+    ///
+    /// The document is third-party data: a `names` value that is not a canonical hex public key
+    /// is treated as absent.
+    /// - Throws: ``VerificationError/invalidResponse`` if `data` is not a `nostr.json` document, or
+    ///   ``VerificationError/pubkeyNotFound`` if it has no usable key for `name`.
+    static func result(for identifier: String, name: String, in data: Data) throws -> VerificationResult {
+        let response: InternetIdentifierResponse
+        do {
+            response = try JSONDecoder().decode(InternetIdentifierResponse.self, from: data)
+        } catch {
+            throw VerificationError.invalidResponse
         }
 
-        let relays = response.relays?[pubkey] ?? []
+        guard let hex = response.names[name.lowercased()] ?? response.names[name],
+            let pubkey = PublicKey(hex)
+        else {
+            throw VerificationError.pubkeyNotFound
+        }
 
         return VerificationResult(
             identifier: identifier,
             pubkey: pubkey,
-            relays: relays
+            relays: response.relays?[pubkey.hex] ?? []
         )
     }
 
     /// Verifies an internet identifier matches an expected public key
     /// - Parameters:
     ///   - identifier: The identifier
-    ///   - expectedPubkey: The expected public key (hex)
+    ///   - expectedPubkey: The expected public key
     /// - Returns: The verification result if successful
-    public static func verify(_ identifier: String, expectedPubkey: String) async throws -> VerificationResult {
+    public static func verify(_ identifier: String, expectedPubkey: PublicKey) async throws -> VerificationResult {
         let result = try await verify(identifier)
 
-        guard result.pubkey.lowercased() == expectedPubkey.lowercased() else {
+        guard result.pubkey == expectedPubkey else {
             throw VerificationError.pubkeyMismatch
         }
 
@@ -178,8 +202,8 @@ public struct InternetIdentifier: Sendable {
 
     /// Looks up a public key from an internet identifier
     /// - Parameter identifier: The identifier
-    /// - Returns: The public key (hex) if found
-    public static func lookupPubkey(_ identifier: String) async throws -> String {
+    /// - Returns: The public key the identifier resolves to
+    public static func lookupPubkey(_ identifier: String) async throws -> PublicKey {
         let result = try await verify(identifier)
         return result.pubkey
     }
@@ -215,8 +239,9 @@ extension String {
     }
 
     /// Verifies this string as an internet identifier against an expected pubkey
-    public func verifyAsInternetIdentifier(expectedPubkey: String) async throws -> InternetIdentifier.VerificationResult
-    {
+    public func verifyAsInternetIdentifier(
+        expectedPubkey: PublicKey
+    ) async throws -> InternetIdentifier.VerificationResult {
         try await InternetIdentifier.verify(self, expectedPubkey: expectedPubkey)
     }
 }

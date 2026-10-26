@@ -81,12 +81,12 @@ public struct NostrListSet: Sendable, Hashable {
     static let reservedTagNames: Set<String> = ["d", "title", "image", "description"]
 
     /// The `kind:pubkey:identifier` coordinate used in `a`-tag references to this set.
-    public func coordinate(author: String) -> String {
-        "\(kind.rawValue):\(author):\(identifier)"
+    public func coordinate(author: PublicKey) -> String {
+        "\(kind.rawValue):\(author.hex):\(identifier)"
     }
 
     /// A NIP-19 `naddr` addressing this set for `author`.
-    public func naddr(author: String, relays: [String] = []) throws -> NAddr {
+    public func naddr(author: PublicKey, relays: [String] = []) throws -> NAddr {
         try NAddr(identifier: identifier, author: author, kind: kind.rawValue, relays: relays)
     }
 }

@@ -8,8 +8,8 @@ public struct NAddr: Sendable, Hashable {
     /// The `d` tag value identifying the event. May be empty.
     public let identifier: String
 
-    /// The author's public key (32-byte lowercase hex).
-    public let author: String
+    /// The author's public key.
+    public let author: PublicKey
 
     /// The event kind.
     public let kind: Int
@@ -17,16 +17,19 @@ public struct NAddr: Sendable, Hashable {
     /// Relay hints where the event may be found.
     public let relays: [String]
 
-    /// Creates an addressable-event coordinate. Throws if `author` is not 32-byte hex
-    /// or `kind` does not fit in a 32-bit unsigned integer.
-    public init(identifier: String, author: String, kind: Int, relays: [String] = []) throws {
+    /// Creates an addressable-event coordinate.
+    /// - Throws: ``NostrError/invalidNIP19Entity`` if `kind` does not fit in a 32-bit unsigned
+    ///   integer, or ``NostrError/invalidTLV`` if a relay hint is longer than 255 bytes.
+    public init(identifier: String, author: PublicKey, kind: Int, relays: [String] = []) throws {
         self.identifier = identifier
-        self.author = try TLV.normalizedHex32(author)
+        self.author = author
         self.kind = try TLV.validatedKind(kind)
         self.relays = try TLV.validatedRelays(relays)
     }
 
     /// Decodes an `naddr` bech32 string.
+    /// - Throws: ``NostrError/invalidNIP19Entity`` if the payload lacks an identifier, author, or
+    ///   kind, or has an author that is not 32 bytes, besides the bech32 and TLV errors.
     public init(bech32String: String) throws {
         try self.init(tlvData: TLV.payload(fromBech32: bech32String, prefix: "naddr"))
     }
@@ -34,12 +37,12 @@ public struct NAddr: Sendable, Hashable {
     /// Builds an `naddr` coordinate from an addressable event, extracting its `d` tag.
     public init(event: Event, relays: [String] = []) throws {
         let identifier = event.tags.first { $0.first == "d" }.flatMap { $0.count > 1 ? $0[1] : "" } ?? ""
-        try self.init(identifier: identifier, author: event.pubkey.hex, kind: event.kind.rawValue, relays: relays)
+        try self.init(identifier: identifier, author: event.pubkey, kind: event.kind.rawValue, relays: relays)
     }
 
     init(tlvData: Data) throws {
         var identifier: String?
-        var author: String?
+        var author: PublicKey?
         var kind: Int?
         var relays: [String] = []
         for record in try TLV.decode(tlvData) {
@@ -49,10 +52,7 @@ public struct NAddr: Sendable, Hashable {
             case TLV.Kind.relay.rawValue:
                 relays.append(String(decoding: record.value, as: UTF8.self))
             case TLV.Kind.author.rawValue:
-                guard record.value.count == 32 else {
-                    throw NostrError.invalidNIP19Entity
-                }
-                author = record.value.hexEncodedString()
+                author = try TLV.publicKey(record)
             case TLV.Kind.kind.rawValue:
                 kind = try TLV.decodeKind(record.value)
             default:
@@ -74,7 +74,7 @@ public struct NAddr: Sendable, Hashable {
             let records =
                 [TLV.specialRecord(Data(identifier.utf8))]
                 + TLV.relayRecords(relays)
-                + [TLV.authorRecord(hex: author), TLV.kindRecord(kind)]
+                + [TLV.authorRecord(author), TLV.kindRecord(kind)]
             return try TLV.bech32(records, prefix: "naddr")
         }
     }
