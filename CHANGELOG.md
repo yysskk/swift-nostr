@@ -398,7 +398,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Wallet queries read as `fetch`** (breaking): `WalletConnection.getBalance()` is
   `fetchBalance()` and `getInfo()` is `fetchNodeInfo()`, matching `fetchInfo()` and the client's
   `fetchEvent`. `get_info` returns the wallet's Lightning node info, so it is named apart from
-  `fetchInfo()`, which reads the kind-13194 info event. The `WalletConnectMethod` cases and the
+  `fetchInfo()`, which reads the kind-13194 info event. The `WalletConnectMethod` constants and the
   `GetBalanceResult`/`GetInfoResult` types keep their NIP-47 method names.
 - **`Filter.getTagQuery(_:)` is removed** (breaking): use `tagQuery(_:)`, which it forwarded to.
 - **Direct message times are `Timestamp`** (breaking): `createdAt` and `expiresAt` on
@@ -612,6 +612,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `fetchSimpleGroupList(for:timeout:)` for a non-optional `PublicKey`, and
   `publishSimpleGroupList(_:)`. An optional `authorPublicKey`, `kinds`, `since`, or `publicKey`
   therefore needs every argument spelled out.
+- **`WalletConnectMethod` and `WalletConnectErrorCode` are open types** (breaking): NIP-47 adds
+  methods and error codes over time, so both are `RawRepresentable` structs with a non-failable
+  `init(rawValue:)`, the current methods and codes as static constants under the same names, and a
+  bare JSON string encoding. `WalletConnectMethod` is no longer `CaseIterable`, and
+  `WalletConnectErrorCode.unknown(_:)` is gone: a code NIP-47 does not define is
+  `WalletConnectErrorCode(rawValue:)`. `WalletInfo.methods` keeps every token the wallet advertises,
+  recognized or not, and `WalletInfo.unknownMethods` is removed.
+  `WalletConnectError.unexpectedResultType(expected:received:)` carries `WalletConnectMethod`
+  values instead of strings.
 
 - **`RemoteSignerMethod` is an open struct** (breaking): it was a closed `enum` and is now a
   `RawRepresentable` struct over the wire token, with a non-failable `init(rawValue:)` and the same

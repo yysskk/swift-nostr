@@ -18,7 +18,7 @@ struct WalletConnectResponse<Result: Decodable>: Decodable {
 
 /// The `error` object of a NIP-47 response.
 struct WalletConnectResponseError: Decodable, Sendable, Equatable {
-    let code: String
+    let code: WalletConnectErrorCode
     let message: String
 }
 

@@ -193,6 +193,25 @@ struct WalletConnectionRoundTripTests {
         }
     }
 
+    @Test("a wallet error with an unrecognized code keeps the code verbatim")
+    func walletErrorWithUnknownCode() async throws {
+        let (connection, transport, client, wallet) = try makeConnection()
+
+        let payment = Task { try await connection.payInvoice("lnbc1") }
+        let request = try await NWCFixtures.waitForSentEvents(transport, count: 1)[0]
+        await transport.emit(
+            try NWCFixtures.response(
+                resultJSON: #"{"result_type":"pay_invoice","error":{"code":"ROUTE_BLOCKED","message":"later"}}"#,
+                requestID: request.id, client: client, wallet: wallet))
+
+        await #expect(
+            throws: WalletConnectError.walletError(
+                code: WalletConnectErrorCode(rawValue: "ROUTE_BLOCKED"), message: "later")
+        ) {
+            _ = try await payment.value
+        }
+    }
+
     @Test("a request times out when no response arrives")
     func requestTimeout() async throws {
         let (connection, _, _, _) = try makeConnection(timeout: .milliseconds(200))

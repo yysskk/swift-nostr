@@ -7,11 +7,9 @@ public import NostrCore
 /// that omits the `encryption` tag is assumed to use NIP-04 (the spec's legacy default).
 /// https://github.com/nostr-protocol/nips/blob/master/47.md
 public struct WalletInfo: Sendable, Hashable {
-    /// The recognized commands the wallet supports.
+    /// The commands the wallet advertises, in order, including methods this package has no
+    /// constant for.
     public let methods: [WalletConnectMethod]
-
-    /// Method tokens advertised by the wallet that this library does not model.
-    public let unknownMethods: [String]
 
     /// The encryption schemes the wallet supports. Never empty: defaults to `[.nip04]` when the
     /// wallet advertises no `encryption` tag.
@@ -25,17 +23,9 @@ public struct WalletInfo: Sendable, Hashable {
     public init?(infoEvent: Event) {
         guard infoEvent.kind == .walletConnectInfo else { return nil }
 
-        var methods: [WalletConnectMethod] = []
-        var unknownMethods: [String] = []
-        for token in infoEvent.content.split(whereSeparator: \.isWhitespace).map(String.init) {
-            if let method = WalletConnectMethod(rawValue: token) {
-                methods.append(method)
-            } else {
-                unknownMethods.append(token)
-            }
+        self.methods = infoEvent.content.split(whereSeparator: \.isWhitespace).map {
+            WalletConnectMethod(rawValue: String($0))
         }
-        self.methods = methods
-        self.unknownMethods = unknownMethods
 
         // A missing encryption tag — or a tag listing only unrecognized schemes (e.g. a future
         // nip44_v3) — means NIP-04 only (the spec's backward-compatible default), keeping

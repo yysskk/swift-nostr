@@ -50,10 +50,19 @@ if info.supports(.payInvoice) {
     print(payment.preimage)
 }
 
-print("Methods:", info.methods)              // recognized commands
-print("Unknown methods:", info.unknownMethods) // tokens this library does not model
-print("Encryptions:", info.encryptions)      // never empty; defaults to [.nip04]
-print("Notifications:", info.notifications)   // e.g. ["payment_received", "payment_sent"]
+print("Methods:", info.methods)             // every advertised command
+print("Encryptions:", info.encryptions)     // never empty; defaults to [.nip04]
+print("Notifications:", info.notifications) // e.g. ["payment_received", "payment_sent"]
+```
+
+``WalletConnectMethod`` is open-ended: ``WalletInfo/methods`` keeps every token the wallet
+advertises, and a method this package has no constant for is checked with
+``WalletConnectMethod/init(rawValue:)``:
+
+```swift
+if info.supports(WalletConnectMethod(rawValue: "sign_message")) {
+    // the wallet advertises a command outside the built-in set
+}
 ```
 
 ## Invoices and Balance
@@ -232,8 +241,9 @@ including non-Apple platforms.
 ## Error Handling
 
 Every command throws ``WalletConnectError``. A wallet that rejects a request reports it as
-``WalletConnectError/walletError(code:message:)`` carrying a typed ``WalletConnectErrorCode`` —
-unrecognized codes are preserved as ``WalletConnectErrorCode/unknown(_:)`` rather than dropped:
+``WalletConnectError/walletError(code:message:)`` carrying a typed ``WalletConnectErrorCode``.
+The set of codes is open-ended, so a code NIP-47 does not define is preserved verbatim in its
+``WalletConnectErrorCode/rawValue`` rather than dropped:
 
 ```swift
 do {
@@ -243,7 +253,6 @@ do {
     case .insufficientBalance: print("insufficient balance: \(message)")
     case .quotaExceeded:       print("quota exceeded: \(message)")
     case .restricted, .unauthorized: print("not permitted: \(message)")
-    case .unknown(let raw):    print("unmodeled code \(raw): \(message)")
     default:                   print("\(code.rawValue): \(message)")
     }
 } catch WalletConnectError.timedOut {

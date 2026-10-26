@@ -124,29 +124,13 @@ struct WalletConnectResponseTests {
         let response = try decode(json, as: PayInvoiceResult.self)
         #expect(response.result == nil)
         let error = try #require(response.error)
-        #expect(error.code == "INSUFFICIENT_BALANCE")
-        #expect(WalletConnectErrorCode(rawValue: error.code) == .insufficientBalance)
+        #expect(error.code == .insufficientBalance)
     }
 
-    @Test("maps every known error code and preserves unknown ones")
-    func errorCodeMapping() {
-        let known: [(String, WalletConnectErrorCode)] = [
-            ("RATE_LIMITED", .rateLimited),
-            ("NOT_IMPLEMENTED", .notImplemented),
-            ("INSUFFICIENT_BALANCE", .insufficientBalance),
-            ("QUOTA_EXCEEDED", .quotaExceeded),
-            ("RESTRICTED", .restricted),
-            ("UNAUTHORIZED", .unauthorized),
-            ("INTERNAL", .internal),
-            ("UNSUPPORTED_ENCRYPTION", .unsupportedEncryption),
-            ("PAYMENT_FAILED", .paymentFailed),
-            ("OTHER", .other),
-        ]
-        for (raw, code) in known {
-            #expect(WalletConnectErrorCode(rawValue: raw) == code)
-            #expect(code.rawValue == raw)
-        }
-        #expect(WalletConnectErrorCode(rawValue: "SOMETHING_NEW") == .unknown("SOMETHING_NEW"))
-        #expect(WalletConnectErrorCode.unknown("SOMETHING_NEW").rawValue == "SOMETHING_NEW")
+    @Test("decodes an unrecognized error code verbatim")
+    func decodeUnknownErrorCode() throws {
+        let json = #"{"result_type":"pay_invoice","error":{"code":"SOMETHING_NEW","message":"?"}}"#
+        let error = try #require(try decode(json, as: PayInvoiceResult.self).error)
+        #expect(error.code == WalletConnectErrorCode(rawValue: "SOMETHING_NEW"))
     }
 }
