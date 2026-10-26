@@ -262,7 +262,7 @@ struct NIP42AuthRetryTests {
         var iterator = messages.makeAsyncIterator()
         _ = await iterator.next()
 
-        try await connection.unsubscribe(subscriptionID: "sub-1")
+        await connection.unsubscribe(subscriptionID: "sub-1")
 
         mock.deliver(.string(#"["AUTH","challengestringhere"]"#))
         try await NIP42TestSupport.acknowledgeAuth(on: connection, mock: mock)

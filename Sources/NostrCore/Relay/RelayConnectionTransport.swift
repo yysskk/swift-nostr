@@ -74,15 +74,20 @@ public actor RelayConnectionTransport: RelayTransport {
 
     public func unsubscribe(id: String) async {
         for relay in relays {
-            try? await relay.unsubscribe(subscriptionID: id)
+            await relay.unsubscribe(subscriptionID: id)
         }
     }
 
-    /// Sends the event to every relay.
+    /// Sends the event to every relay, connecting first a relay that is not connected — a session
+    /// connects the transport once, so a relay that dropped since is reconnected here even with
+    /// auto-reconnect off.
     /// - Throws: ``RelayConnection/Error/notConnected`` when no relay accepts the send.
     public func send(_ event: Event) async throws(RelayConnection.Error) {
         var sent = 0
         for relay in relays {
+            if await relay.state != .connected {
+                try? await relay.connect()
+            }
             if (try? await relay.send(.event(event))) != nil {
                 sent += 1
             }

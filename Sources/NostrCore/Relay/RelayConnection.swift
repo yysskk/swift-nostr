@@ -464,19 +464,18 @@ public actor RelayConnection {
         }
     }
 
-    /// Sends a client message to the relay, connecting first when the connection is not established.
+    /// Sends a client message to the relay.
     ///
-    /// - Throws: Everything ``connect()`` throws, the error ``ClientMessage/serialize()`` throws,
+    /// Fails fast with ``RelayConnection/Error/notConnected`` when the connection is not established —
+    /// like ``publish(_:)``, a send never connects inline. Call ``connect()`` first; reconnection
+    /// after a drop is owned by the background auto-reconnect.
+    ///
+    /// - Throws: ``RelayConnection/Error/notConnected`` when the connection is not established or
+    ///   the socket fails the send, the error ``ClientMessage/serialize()`` throws, or
     ///   ``RelayConnection/Error/timedOut`` when the send does not complete within
-    ///   ``RelayConnectionConfig/sendTimeout``, or ``RelayConnection/Error/notConnected`` when there
-    ///   is no socket or the socket fails the send.
+    ///   ``RelayConnectionConfig/sendTimeout``.
     public func send(_ message: ClientMessage) async throws {
-        // Reconnect if not connected
-        if state != .connected {
-            try await connect()
-        }
-
-        guard let task = webSocketTask else {
+        guard state == .connected, let task = webSocketTask else {
             throw Error.notConnected
         }
         let generation = socketGeneration
@@ -855,14 +854,30 @@ public actor RelayConnection {
         }
     }
 
-    /// Subscribes to events matching the given filters
+    /// Subscribes to events matching the given filters, connecting first when the connection is not
+    /// established.
+    ///
+    /// The subscription is re-requested after every automatic reconnection until
+    /// ``unsubscribe(subscriptionID:)`` or ``disconnect()``.
+    ///
+    /// - Throws: Everything ``connect()`` throws, or what ``send(_:)`` throws.
     public func subscribe(subscriptionID: String, filters: [Filter]) async throws {
+        if state != .connected {
+            try await connect()
+        }
         try await send(.request(subscriptionID: subscriptionID, filters: filters))
     }
 
-    /// Unsubscribes from a subscription
-    public func unsubscribe(subscriptionID: String) async throws {
-        try await send(.close(subscriptionID: subscriptionID))
+    /// Unsubscribes from a subscription.
+    ///
+    /// The subscription is forgotten at once, so a reconnection does not re-request it. A CLOSE goes
+    /// out only when the connection is established and holds the subscription; otherwise this does
+    /// nothing, and it never connects — a dropped socket took the relay's subscription with it. A
+    /// CLOSE that fails to send is not reported: the failure discards the socket, and the relay's
+    /// subscription with it.
+    public func unsubscribe(subscriptionID: String) async {
+        guard subscriptions.removeValue(forKey: subscriptionID) != nil, state == .connected else { return }
+        try? await send(.close(subscriptionID: subscriptionID))
     }
 
     /// Returns an async stream of messages from this relay.

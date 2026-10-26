@@ -1585,7 +1585,7 @@ let pooled = await pool.relay(for: relay)  // RelayConnection?
 try await pool.connectAll()      // tolerates partial failures
 await pool.disconnectAll()
 try await pool.subscribe(subscriptionID: "sub1", filters: [filter]) { message in }
-try await pool.unsubscribe(subscriptionID: "sub1")
+await pool.unsubscribe(subscriptionID: "sub1")    // CLOSE only to connected relays holding it
 try await pool.publish(signedEvent)
 try await pool.publish(signedEvent, to: [relay])  // targeted; PublishResult keyed by RelayURL
 try await pool.countEvents(matching: [filter])   // [RelayURL: EventCount], per relay (NIP-45)
@@ -1648,8 +1648,9 @@ Every period is a `Duration`.
 ```swift
 await connection.connect()
 await connection.disconnect()
-try await connection.subscribe(subscriptionID: "sub1", filters: [filter]) { message in }
-try await connection.unsubscribe(subscriptionID: "sub1")
+try await connection.subscribe(subscriptionID: "sub1", filters: [filter])  // connects first if needed
+await connection.unsubscribe(subscriptionID: "sub1")  // no-op unless connected and holding it
+try await connection.send(.event(signedEvent))  // no OK wait; never connects, throws notConnected
 try await connection.publish(signedEvent)
 try await connection.countEvents(matching: [filter])         // EventCount from this relay (NIP-45)
 try await connection.authenticate(using: signer)      // answer the stored challenge with any NostrSigning (NIP-42)

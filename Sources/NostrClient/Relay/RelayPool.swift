@@ -530,7 +530,11 @@ public actor RelayPool {
     }
 
     /// Unsubscribes from a subscription on all relays, discarding its deduplication cache.
-    /// Tolerates partial failures - best effort unsubscription.
+    ///
+    /// A CLOSE goes only to the connected relays holding the subscription; a disconnected,
+    /// failed, or reconnecting relay is not reconnected to receive one (see
+    /// ``RelayConnection/unsubscribe(subscriptionID:)``). Best effort: a CLOSE that fails to send is
+    /// not reported.
     public func unsubscribe(subscriptionID: String) async {
         subscriptionHandlers.removeValue(forKey: subscriptionID)
         cancelListenerTasks(for: subscriptionID)
@@ -541,7 +545,7 @@ public actor RelayPool {
         await withTaskGroup(of: Void.self) { group in
             for connection in relays.values {
                 group.addTask {
-                    try? await connection.unsubscribe(subscriptionID: subscriptionID)
+                    await connection.unsubscribe(subscriptionID: subscriptionID)
                 }
             }
         }

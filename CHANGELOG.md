@@ -97,6 +97,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`RelayConnection.send(_:)` no longer connects** (breaking): like `publish(_:)`, it throws
+  `RelayConnection.Error.notConnected` when the connection is not established instead of spending
+  up to `connectionTimeout` on a reconnect; call `connect()` first. `subscribe(subscriptionID:filters:)`
+  still connects on demand. `RelayConnection.unsubscribe(subscriptionID:)` no longer throws: it
+  forgets the subscription and sends `CLOSE` only when the connection is established and holds it,
+  so drop the `try` at call sites. `RelayConnectionTransport.send(_:)` still reconnects a relay
+  that dropped before sending to it.
 - **`RemoteSignerError.secretMismatch` is removed** (breaking): nothing threw it. A signer that
   answers `connect` with a secret other than the one sent fails with `connectionRejected(message:)`.
 - **Bounds are spelled `maximum` and `minimum`** (breaking): the remaining `max` and `min` names
@@ -678,6 +685,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   when none of the targeted relays was in the pool (`noMatchingRelays`), the client still sent `CLOSE`
   for the never-opened subscription to every relay in the pool. Nothing is sent now, so `fetchLongFormContent(naddr:)` falling back from relay
   hints that are not in the pool to the whole pool sends a single `REQ`.
+- **Ending a subscription no longer reconnects relays to close it**: `RelayPool.unsubscribe` — run
+  when a `for await` over a client subscription ends — sent `CLOSE` to every relay in the pool, and
+  each disconnected, failed, or backing-off relay reconnected (blocking up to `connectionTimeout`)
+  just to send it. `CLOSE` now goes only to the connected relays holding the subscription.
 
 ## [0.8.0] - 2026-10-25
 
