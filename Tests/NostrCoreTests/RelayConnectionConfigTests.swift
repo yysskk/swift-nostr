@@ -11,6 +11,7 @@ struct RelayConnectionConfigTests {
         #expect(config.connectionTimeout == .seconds(10))
         #expect(config.sendTimeout == .seconds(10))
         #expect(config.publishAckTimeout == .seconds(30))
+        #expect(config.queryTimeout == .seconds(10))
         #expect(config.pingInterval == .seconds(30))
         #expect(config.autoReconnect == true)
         #expect(config.maxReconnectAttempts == 0)

@@ -140,19 +140,19 @@ public protocol NostrEventPublishing: Sendable {
 /// Implemented by ``NostrEventsAPI``.
 public protocol NostrEventFetching: Sendable {
     /// Fetches events matching `filters`, ending at EOSE or `timeout`.
-    func fetch(filters: [Filter], to relayURLs: Set<RelayURL>?, timeout: TimeInterval) async throws -> [Event]
+    func fetch(filters: [Filter], to relayURLs: Set<RelayURL>?, timeout: Duration?) async throws -> [Event]
     /// Requests the NIP-45 count of events matching `filters`.
-    func count(filters: [Filter], to relayURLs: Set<RelayURL>?, timeout: TimeInterval) async throws -> Int
+    func count(filters: [Filter], to relayURLs: Set<RelayURL>?, timeout: Duration?) async throws -> Int
     /// Fetches a single event by id.
-    func fetchEvent(id: EventID, timeout: TimeInterval) async throws -> Event?
+    func fetchEvent(id: EventID, timeout: Duration?) async throws -> Event?
     /// Fetches a user's metadata.
-    func fetchMetadata(pubkey: PublicKey, timeout: TimeInterval) async throws -> UserMetadata?
+    func fetchMetadata(pubkey: PublicKey, timeout: Duration?) async throws -> UserMetadata?
     /// Fetches a NIP-23 article by author and identifier.
     func fetchLongFormContent(
-        author: PublicKey, identifier: String, timeout: TimeInterval
+        author: PublicKey, identifier: String, timeout: Duration?
     ) async throws -> LongFormContent?
     /// Fetches the NIP-23 article addressed by an `naddr`.
-    func fetchLongFormContent(naddr: NAddr, timeout: TimeInterval) async throws -> LongFormContent?
+    func fetchLongFormContent(naddr: NAddr, timeout: Duration?) async throws -> LongFormContent?
 }
 
 // MARK: - Subscriptions
@@ -192,7 +192,7 @@ public protocol NostrSubscribing: Sendable {
 /// and routing by those lists. Implemented by ``NostrRoutingAPI``.
 public protocol NostrRelayRouting: Sendable {
     /// Fetches and caches a user's NIP-65 relay list.
-    func fetchRelayList(for pubkey: PublicKey, timeout: TimeInterval) async throws -> RelayListMetadata?
+    func fetchRelayList(for pubkey: PublicKey, timeout: Duration?) async throws -> RelayListMetadata?
     /// The cached NIP-65 relay list for a pubkey, without a network fetch.
     func cachedRelayList(for pubkey: PublicKey) async -> RelayListMetadata?
     /// Publishes the current user's NIP-65 relay list.
@@ -215,7 +215,7 @@ public protocol NostrRelayRouting: Sendable {
 
     /// Fetches and caches a user's NIP-17 DM relay list.
     func fetchDirectMessageRelayList(
-        for pubkey: PublicKey, timeout: TimeInterval
+        for pubkey: PublicKey, timeout: Duration?
     ) async throws -> DirectMessageRelayList?
     /// The cached NIP-17 DM relay list for a pubkey, without a network fetch.
     func cachedDirectMessageRelayList(for pubkey: PublicKey) async -> DirectMessageRelayList?
@@ -326,11 +326,11 @@ public protocol NostrGroupManaging: Sendable {
 
     /// Fetches a group's kind-39000 metadata.
     func fetchMetadata(
-        for group: GroupReference, authorPubkey: PublicKey?, timeout: TimeInterval
+        for group: GroupReference, authorPubkey: PublicKey?, timeout: Duration?
     ) async throws -> Groups.Metadata?
     /// Fetches a group's full relay-generated state snapshot.
     func fetchState(
-        for group: GroupReference, authorPubkey: PublicKey?, timeout: TimeInterval
+        for group: GroupReference, authorPubkey: PublicKey?, timeout: Duration?
     ) async throws -> GroupState
     /// Subscribes to a group's live timeline.
     func timeline(
@@ -338,7 +338,7 @@ public protocol NostrGroupManaging: Sendable {
     ) async throws -> SubscriptionSequence
 
     /// Fetches the kind-10009 list of groups a user is in.
-    func fetchSimpleGroupList(for pubkey: PublicKey?, timeout: TimeInterval) async throws -> SimpleGroupList?
+    func fetchSimpleGroupList(for pubkey: PublicKey?, timeout: Duration?) async throws -> SimpleGroupList?
     /// Publishes the current user's kind-10009 group list.
     @discardableResult
     func publishSimpleGroupList(
@@ -354,17 +354,17 @@ public protocol NostrListManaging: Sendable {
     @discardableResult
     func publish(_ list: NostrList, strategy: PublishStrategy?) async throws -> PublishedEvent
     /// Fetches the newest list of a kind.
-    func fetch(kind: Event.Kind, for pubkey: PublicKey?, timeout: TimeInterval) async throws -> NostrList?
+    func fetch(kind: Event.Kind, for pubkey: PublicKey?, timeout: Duration?) async throws -> NostrList?
 
     /// Publishes a NIP-51 set, replacing any prior set with the same kind and `d` identifier.
     @discardableResult
     func publishSet(_ set: NostrListSet, strategy: PublishStrategy?) async throws -> PublishedEvent
     /// Fetches one set by kind and `d` identifier.
     func fetchSet(
-        kind: Event.Kind, identifier: String, for pubkey: PublicKey?, timeout: TimeInterval
+        kind: Event.Kind, identifier: String, for pubkey: PublicKey?, timeout: Duration?
     ) async throws -> NostrListSet?
     /// Fetches every set of a kind for an author, newest per `d` identifier.
-    func fetchSets(kind: Event.Kind, for pubkey: PublicKey?, timeout: TimeInterval) async throws -> [NostrListSet]
+    func fetchSets(kind: Event.Kind, for pubkey: PublicKey?, timeout: Duration?) async throws -> [NostrListSet]
     /// Fetches the set addressed by a NIP-19 `naddr`.
-    func fetchSet(naddr: NAddr, timeout: TimeInterval) async throws -> NostrListSet?
+    func fetchSet(naddr: NAddr, timeout: Duration?) async throws -> NostrListSet?
 }

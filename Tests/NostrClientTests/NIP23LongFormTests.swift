@@ -279,7 +279,8 @@ struct NIP23LongFormTests {
         try await connection.connect()
 
         let task = Task {
-            try await client.events.fetchLongFormContent(author: signer.publicKey, identifier: "same-d", timeout: 2)
+            try await client.events.fetchLongFormContent(
+                author: signer.publicKey, identifier: "same-d", timeout: .seconds(2))
         }
 
         try await pollUntil { mock.sentTextFrames.contains { $0.hasPrefix("[\"REQ\"") } }
@@ -316,7 +317,7 @@ struct NIP23LongFormTests {
         // A relay hint matching the pooled relay: the fetch targets it (the new `to:` param).
         let naddr = try article.naddr(author: signer.publicKey, relays: [relayURL])
 
-        let task = Task { try await client.events.fetchLongFormContent(naddr: naddr, timeout: 2) }
+        let task = Task { try await client.events.fetchLongFormContent(naddr: naddr, timeout: .seconds(2)) }
 
         try await pollUntil { mock.sentTextFrames.contains { $0.hasPrefix("[\"REQ\"") } }
         let reqFrame = try #require(mock.sentTextFrames.first { $0.hasPrefix("[\"REQ\"") })

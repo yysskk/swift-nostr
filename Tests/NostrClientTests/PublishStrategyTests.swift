@@ -65,6 +65,8 @@ struct PublishStrategyTests {
     func defaultStrategyIsFirstAck() {
         #expect(RelayPoolConfig.default.defaultPublishStrategy == .firstAck)
         #expect(RelayPoolConfig().defaultPublishStrategy == .firstAck)
+        #expect(RelayPoolConfig.default.queryTimeout == .seconds(10))
+        #expect(RelayPoolConfig().queryTimeout == .seconds(10))
     }
 
     @Test("pool config accepts a custom default strategy")

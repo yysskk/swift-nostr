@@ -65,7 +65,7 @@ struct NostrClientFetchTests {
         // start — assert it does not consume the (long) timeout.
         let start = ContinuousClock.now
         await #expect(throws: NostrError.noRelaysInPool) {
-            _ = try await client.events.fetch(filters: [Filter()], timeout: 10)
+            _ = try await client.events.fetch(filters: [Filter()], timeout: .seconds(10))
         }
         #expect(ContinuousClock.now - start < .seconds(5))
     }
@@ -77,7 +77,7 @@ struct NostrClientFetchTests {
         let (client, _) = try await ConnectedClientFixture.make()
 
         let fetchTask = Task {
-            try await client.events.fetch(filters: [Filter()], timeout: 10)
+            try await client.events.fetch(filters: [Filter()], timeout: .seconds(10))
         }
 
         try await Task.sleep(for: .milliseconds(100))
@@ -86,6 +86,65 @@ struct NostrClientFetchTests {
         await #expect(throws: CancellationError.self) {
             _ = try await fetchTask.value
         }
+        await client.relays.disconnect()
+    }
+
+    // MARK: - Query timeout
+
+    /// A client whose pool holds one connected mock relay that never sends EOSE, with the given
+    /// pool-wide query timeout.
+    private func makeSilentRelayClient(queryTimeout: Duration) async throws -> NostrClient {
+        let socket = MockWebSocketSession()
+        let pool = RelayPool(
+            config: RelayPoolConfig(
+                defaultRelayConfig: ConnectedClientFixture.noReconnectConfig,
+                queryTimeout: queryTimeout
+            ),
+            webSocketFactory: MockWebSocketSessionFactory(makeSession: { socket })
+        )
+        let client = NostrClient(relayPool: pool)
+        let connection = await pool.addRelay(ConnectedClientFixture.defaultRelayURL)
+        try await connection.connect()
+        return client
+    }
+
+    @Test("Fetch without a timeout ends after the pool's queryTimeout")
+    func fetchWithoutTimeoutUsesQueryTimeout() async throws {
+        let client = try await makeSilentRelayClient(queryTimeout: .milliseconds(50))
+
+        let start = ContinuousClock.now
+        let events = try await client.events.fetch(filters: [Filter()])
+        let elapsed = ContinuousClock.now - start
+
+        #expect(events.isEmpty)
+        #expect(elapsed >= .milliseconds(40))
+        #expect(elapsed < .seconds(5))
+        await client.relays.disconnect()
+    }
+
+    @Test("An explicit fetch timeout overrides a longer queryTimeout")
+    func explicitFetchTimeoutOverridesLongerQueryTimeout() async throws {
+        let client = try await makeSilentRelayClient(queryTimeout: .seconds(30))
+
+        let start = ContinuousClock.now
+        let events = try await client.events.fetch(filters: [Filter()], timeout: .milliseconds(50))
+
+        #expect(events.isEmpty)
+        #expect(ContinuousClock.now - start < .seconds(5))
+        await client.relays.disconnect()
+    }
+
+    @Test("An explicit fetch timeout overrides a shorter queryTimeout")
+    func explicitFetchTimeoutOverridesShorterQueryTimeout() async throws {
+        let client = try await makeSilentRelayClient(queryTimeout: .milliseconds(20))
+
+        let start = ContinuousClock.now
+        let events = try await client.events.fetch(filters: [Filter()], timeout: .milliseconds(300))
+        let elapsed = ContinuousClock.now - start
+
+        #expect(events.isEmpty)
+        #expect(elapsed >= .milliseconds(250))
+        #expect(elapsed < .seconds(5))
         await client.relays.disconnect()
     }
 }

@@ -208,11 +208,13 @@ public struct NostrEventsAPI: NostrEventPublishing, NostrEventFetching {
     }
 
     /// Fetches an article by author and identifier, keeping the newest copy across relays.
+    /// - Parameter timeout: How long to wait for relays to finish; `nil` uses
+    ///   ``RelayPoolConfig/queryTimeout``.
     /// - Returns: The article, or nil if none was found.
     public func fetchLongFormContent(
         author: PublicKey,
         identifier: String,
-        timeout: TimeInterval = 10
+        timeout: Duration? = nil
     ) async throws -> LongFormContent? {
         var filter = Filter(authors: [author], kinds: [.longFormContent])
         filter.addTagQuery("d", values: [identifier])
@@ -231,8 +233,10 @@ public struct NostrEventsAPI: NostrEventPublishing, NostrEventFetching {
     ///
     /// Any relay hints carried by the coordinate are used only when they are already in the pool;
     /// otherwise the whole pool is queried.
+    /// - Parameter timeout: How long to wait for relays to finish; `nil` uses
+    ///   ``RelayPoolConfig/queryTimeout``.
     /// - Returns: The article, or nil if none was found.
-    public func fetchLongFormContent(naddr: NAddr, timeout: TimeInterval = 10) async throws -> LongFormContent? {
+    public func fetchLongFormContent(naddr: NAddr, timeout: Duration? = nil) async throws -> LongFormContent? {
         var filter = Filter(authors: [naddr.author], kinds: [Event.Kind(rawValue: naddr.kind)])
         filter.addTagQuery("d", values: [naddr.identifier])
 
@@ -267,12 +271,14 @@ public struct NostrEventsAPI: NostrEventPublishing, NostrEventFetching {
     /// Pass relay URLs to scope the fetch to a subset of relays (e.g. `naddr` relay hints);
     /// the default `nil` fetches from all relays in the pool. Targets not in the pool are
     /// skipped; an empty set always throws.
+    /// - Parameter timeout: How long to wait for relays to finish; `nil` uses
+    ///   ``RelayPoolConfig/queryTimeout``.
     /// - Throws: ``NostrError/noRelaysInPool`` or ``NostrError/noMatchingRelays(_:)``
     ///   (via the underlying subscribe) when nothing can be targeted.
     public func fetch(
         filters: [Filter],
         to relayURLs: Set<RelayURL>? = nil,
-        timeout: TimeInterval = 10
+        timeout: Duration? = nil
     ) async throws -> [Event] {
         try await client.fetch(
             filters: filters,
@@ -288,12 +294,14 @@ public struct NostrEventsAPI: NostrEventPublishing, NostrEventFetching {
     /// `relayURLs` is nil (the default) to query the whole pool, or the relays to target a
     /// subset; an empty set always throws. For per-relay results use
     /// ``RelayPool/count(filters:to:timeout:)`` on ``NostrRelaysAPI/pool``.
+    /// - Parameter timeout: How long to wait for relays to finish; `nil` uses
+    ///   ``RelayPoolConfig/queryTimeout``.
     /// - Throws: ``NostrError/noRelaysInPool`` when the pool is empty, or
     ///   ``NostrError/noMatchingRelays(_:)`` when none of the targeted URLs are in the pool.
     public func count(
         filters: [Filter],
         to relayURLs: Set<RelayURL>? = nil,
-        timeout: TimeInterval = 10
+        timeout: Duration? = nil
     ) async throws -> Int {
         let results = try await client.pool.count(
             filters: filters,
@@ -307,7 +315,9 @@ public struct NostrEventsAPI: NostrEventPublishing, NostrEventFetching {
     ///
     /// The returned event is the one that was asked for: a relay that ignores the id filter can
     /// answer with anything, and its signature is checked before it is handed back.
-    public func fetchEvent(id: EventID, timeout: TimeInterval = 10) async throws -> Event? {
+    /// - Parameter timeout: How long to wait for relays to finish; `nil` uses
+    ///   ``RelayPoolConfig/queryTimeout``.
+    public func fetchEvent(id: EventID, timeout: Duration? = nil) async throws -> Event? {
         let events = try await client.fetch(filters: [Filter(ids: [id])], toURLs: nil, timeout: timeout)
         return VerifiedEventSelection.event(withID: id, in: events)
     }
@@ -316,7 +326,9 @@ public struct NostrEventsAPI: NostrEventPublishing, NostrEventFetching {
     ///
     /// Kind 0 is replaceable, so the newest profile the named pubkey signed wins; taking whichever
     /// copy arrived first made the result depend on which relay answered soonest.
-    public func fetchMetadata(pubkey: PublicKey, timeout: TimeInterval = 10) async throws -> UserMetadata? {
+    /// - Parameter timeout: How long to wait for relays to finish; `nil` uses
+    ///   ``RelayPoolConfig/queryTimeout``.
+    public func fetchMetadata(pubkey: PublicKey, timeout: Duration? = nil) async throws -> UserMetadata? {
         let events = try await client.fetch(
             filters: [.metadata(pubkeys: [pubkey])], toURLs: nil, timeout: timeout
         )
