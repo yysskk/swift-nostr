@@ -249,17 +249,9 @@ struct SubscriptionGenerationTests {
         var supersededCount = 0
         for attempt in 0..<50 {
             let id = "sub-\(attempt)"
-            async let first = Result { () async throws(RelayPool.Error) in
-                try await pool.subscribe(subscriptionID: id, filters: [Filter(kinds: [1])]) { _ in }
-            }
-            async let second = Result { () async throws(RelayPool.Error) in
-                try await pool.subscribe(subscriptionID: id, filters: [Filter(kinds: [1])]) { _ in }
-            }
-            let results = await [first, second]
-            let failures = results.compactMap { result -> RelayPool.Error? in
-                if case .failure(let error) = result { return error }
-                return nil
-            }
+            async let first = subscribeFailure(on: pool, subscriptionID: id)
+            async let second = subscribeFailure(on: pool, subscriptionID: id)
+            let failures = await [first, second].compactMap { $0 }
             #expect(failures.allSatisfy { $0 == .subscriptionSuperseded })
             #expect(failures.count < 2)
             supersededCount += failures.count
@@ -269,6 +261,16 @@ struct SubscriptionGenerationTests {
         #expect(supersededCount > 0)
 
         await client.relays.disconnect()
+    }
+
+    /// Subscribes on `pool` and returns the pool error it threw, or nil when it succeeded.
+    private func subscribeFailure(on pool: RelayPool, subscriptionID: String) async -> RelayPool.Error? {
+        do {
+            try await pool.subscribe(subscriptionID: subscriptionID, filters: [Filter(kinds: [1])]) { _ in }
+            return nil
+        } catch {
+            return error
+        }
     }
 
     private func pollUntil(_ condition: @Sendable () async -> Bool) async throws {
