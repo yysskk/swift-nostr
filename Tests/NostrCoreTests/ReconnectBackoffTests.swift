@@ -46,7 +46,7 @@ struct ReconnectBackoffTests {
         var delay = config.resolvedInitialReconnectDelay
         var seen: [Duration] = [delay]
         for _ in 0..<4 {
-            delay = config.boundedReconnectDelay(delay * config.resolvedBackoffMultiplier)
+            delay = config.nextReconnectDelay(after: delay)
             seen.append(delay)
         }
 
@@ -67,7 +67,7 @@ struct ReconnectBackoffTests {
         #expect(config.resolvedBackoffMultiplier == 1)
 
         let delay = config.resolvedInitialReconnectDelay
-        #expect(config.boundedReconnectDelay(delay * config.resolvedBackoffMultiplier) == delay)
+        #expect(config.nextReconnectDelay(after: delay) == delay)
     }
 
     /// A multiplier of exactly 1 is a deliberate choice — retry at a fixed rate — and is left alone.
@@ -77,7 +77,7 @@ struct ReconnectBackoffTests {
         config.reconnectBackoffMultiplier = 1
 
         #expect(config.resolvedBackoffMultiplier == 1)
-        #expect(config.boundedReconnectDelay(.seconds(2) * 1) == .seconds(2))
+        #expect(config.nextReconnectDelay(after: .seconds(2)) == .seconds(2))
     }
 
     @Test("the delay is capped at the configured maximum")
@@ -85,8 +85,22 @@ struct ReconnectBackoffTests {
         let config = RelayConnectionConfig(
             initialReconnectDelay: .seconds(1), maxReconnectDelay: .seconds(5), reconnectBackoffMultiplier: 10)
 
-        #expect(config.boundedReconnectDelay(.seconds(1) * 10) == .seconds(5))
+        #expect(config.nextReconnectDelay(after: .seconds(1)) == .seconds(5))
         #expect(config.boundedReconnectDelay(.seconds(1_000)) == .seconds(5))
+    }
+
+    /// Multiplying a `Duration` by a non-finite or huge factor traps, so these must be absorbed
+    /// before the next delay is formed.
+    @Test(
+        "a non-finite or huge multiplier never traps",
+        arguments: [Double.nan, .infinity, 1e300]
+    )
+    func extremeMultiplierIsAbsorbed(multiplier: Double) {
+        var config = RelayConnectionConfig(initialReconnectDelay: .seconds(1), maxReconnectDelay: .seconds(60))
+        config.reconnectBackoffMultiplier = multiplier
+
+        let next = config.nextReconnectDelay(after: .seconds(1))
+        #expect(next == (multiplier.isNaN ? .seconds(1) : .seconds(60)))
     }
 
     /// A ceiling below the floor would otherwise clamp every delay back under the minimum.

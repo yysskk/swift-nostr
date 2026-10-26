@@ -58,9 +58,7 @@ extension RelayConnection {
             guard !Task.isCancelled else { return }
 
             // Calculate next delay with exponential backoff
-            currentReconnectDelay = config.boundedReconnectDelay(
-                delay * config.resolvedBackoffMultiplier
-            )
+            currentReconnectDelay = config.nextReconnectDelay(after: delay)
             reconnectAttempts += 1
 
             do {

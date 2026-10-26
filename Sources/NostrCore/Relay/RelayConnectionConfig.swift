@@ -96,9 +96,20 @@ extension RelayConnectionConfig {
     /// The backoff multiplier, floored at 1 so a delay can hold steady but never shrink.
     ///
     /// A multiplier of exactly 1 is a legitimate choice — retrying at a fixed rate — so it is left
-    /// alone. Anything below it would walk the delay back toward zero.
+    /// alone. Anything below it would walk the delay back toward zero, and NaN is treated as 1.
     var resolvedBackoffMultiplier: Double {
-        max(reconnectBackoffMultiplier, 1)
+        reconnectBackoffMultiplier.isNaN ? 1 : max(reconnectBackoffMultiplier, 1)
+    }
+
+    /// The delay that follows `delay`: grown by the backoff multiplier and kept inside the bounds.
+    ///
+    /// Multiplying a `Duration` by an infinite or very large factor traps, so the growth is checked
+    /// against the ceiling in floating point first and only multiplied exactly when it stays below.
+    func nextReconnectDelay(after delay: Duration) -> Duration {
+        let multiplier = resolvedBackoffMultiplier
+        let ceiling = resolvedMaxReconnectDelay
+        guard delay.timeInterval * multiplier < ceiling.timeInterval else { return ceiling }
+        return boundedReconnectDelay(delay * multiplier)
     }
 
     /// Applies `delay` to the ceiling, keeping every wait inside the configured bounds.
