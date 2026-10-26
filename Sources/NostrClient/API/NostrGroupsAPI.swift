@@ -227,7 +227,7 @@ public struct NostrGroupsAPI: NostrGroupManaging {
     /// tag — from its relay only.
     ///
     /// Iteration termination automatically sends CLOSE, like every subscription from
-    /// ``NostrSubscriptionsAPI/subscribe(filters:to:bufferingPolicy:)``.
+    /// ``NostrSubscribing/subscribe(filters:to:bufferingPolicy:)-(_,Set<RelayURL>?,_)``.
     ///
     /// - Parameters:
     ///   - group: The group to follow; its relay is added to the pool and connected on demand.

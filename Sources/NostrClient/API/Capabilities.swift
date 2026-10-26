@@ -25,15 +25,25 @@ import NostrCore
 
 /// Managing the signer the client authors events with, and proving it to relays (NIP-42).
 /// Implemented by ``NostrIdentityAPI``.
+///
+/// The requirements are the primitives; ``setPrivateKey(_:)`` and ``setNsec(_:)`` are provided by
+/// an extension built on ``setSigner(_:)-(EventSigner)``.
 public protocol NostrIdentityProviding: Sendable {
     /// Sets a local signer.
+    ///
+    /// While ``authenticationMode`` is ``AuthenticationMode/automatic`` (the default), setting a
+    /// signer also starts answering NIP-42 AUTH challenges with it on every relay in the pool.
+    /// - Parameter signer: The local signer to author events with.
     func setSigner(_ signer: EventSigner) async
+
     /// Sets a local or remote (NIP-46) signer.
+    ///
+    /// The signer's ``NostrSigning/publicKey`` is resolved once here and cached, so ``publicKey``
+    /// stays a single actor hop even for a remote signer.
+    /// - Parameter signer: The signer to author events with — a local ``EventSigner`` or a remote
+    ///   NIP-46 signer.
+    /// - Throws: Anything the signer throws while resolving its public key.
     func setSigner(_ signer: any NostrSigning) async throws
-    /// Sets a local signer from a private key hex string.
-    func setPrivateKey(_ privateKeyHex: String) async throws
-    /// Sets a local signer from an nsec.
-    func setNsec(_ nsec: String) async throws
 
     /// The public key events are authored under, or nil when no signer is set.
     var publicKey: PublicKey? { get async }
@@ -58,30 +68,37 @@ public protocol NostrIdentityProviding: Sendable {
 /// Managing which relays the client talks to and whether they are connected.
 /// Implemented by ``NostrRelaysAPI``.
 ///
+/// The requirements are the primitives; ``add(_:)-(RelayURL)``, ``add(_:)-(Sequence<RelayURL>)``,
+/// ``connect(to:)``, and ``relayCount`` are provided by an extension built on them.
+///
 /// Deliberately does not vend the underlying ``RelayPool``: handing it over would give a
 /// relay-management dependency the pool's publish, subscribe, and count as well, and would force
 /// every stub to stand up a real pool. Take ``NostrRelaysAPI`` concretely when you need
 /// ``NostrRelaysAPI/pool``.
 public protocol NostrRelayManaging: Sendable {
-    /// Adds a relay, optionally with a per-relay connection configuration.
+    /// Adds a relay with a per-relay connection configuration, or the pool's default (nil).
+    ///
+    /// Relay URLs compare by their canonical form, so re-adding a relay already in the pool returns
+    /// the existing connection and ignores `config`.
+    /// - Parameters:
+    ///   - url: The relay to add.
+    ///   - config: The relay's connection configuration, or nil for the pool config's
+    ///     ``RelayPoolConfig/defaultRelayConfig``.
+    /// - Returns: The relay's connection in the pool.
     @discardableResult
     func add(_ url: RelayURL, config: RelayConnectionConfig?) async -> RelayConnection
-    /// Adds multiple relays.
-    func add(_ urls: some Sequence<RelayURL>) async
-    /// Removes a relay from the pool, disconnecting it.
+    /// Removes a relay from the pool, disconnecting it; removing an absent relay is a no-op.
     func remove(_ url: RelayURL) async
 
     /// Connects to all relays in the pool.
+    /// - Throws: ``NostrError/connectionFailed(_:)`` if every relay in the pool fails to connect;
+    ///   partial connection failures are tolerated.
     func connect() async throws
-    /// Adds the given relays, then connects to all relays in the pool.
-    func connect(to urls: some Sequence<RelayURL>) async throws
-    /// Disconnects from all relays.
+    /// Disconnects from all relays, ending every open subscription.
     func disconnect() async
 
     /// Every relay connection in the pool, in no guaranteed order.
     var connections: [RelayConnection] { get async }
-    /// The number of relays in the pool, connected or not.
-    var relayCount: Int { get async }
     /// The number of relays currently connected.
     func connectedRelayCount() async -> Int
     /// The pool's connection for a relay URL, or nil when it is not in the pool.
@@ -180,32 +197,38 @@ public protocol NostrEventFetching: Sendable {
 // MARK: - Subscriptions
 
 /// Opening live subscriptions. Implemented by ``NostrSubscriptionsAPI``.
+///
+/// The requirements are the subscribe and unsubscribe primitives; ``events(filters:bufferingPolicy:)``,
+/// the feeds (``userTimeline(publicKey:limit:)``, ``globalFeed(limit:)``, …), and the short forms of
+/// ``subscribe(filters:to:bufferingPolicy:)-(_,Set<RelayURL>?,_)`` are provided by an extension
+/// built on them.
 public protocol NostrSubscribing: Sendable {
-    /// Opens a subscription as a sequence of relay-aware events.
+    /// Opens a subscription on the whole pool (nil) or the given relays, as an async sequence of
+    /// relay-aware events.
+    ///
+    /// Targets not in the pool are skipped; an empty set always throws. Iteration termination
+    /// (breaking out of the loop, task cancellation, or discarding the sequence) sends CLOSE to the
+    /// relays.
+    /// - Parameters:
+    ///   - filters: The NIP-01 filters the relays match events against.
+    ///   - relayURLs: The relays to subscribe on, or nil for the whole pool.
+    ///   - bufferingPolicy: How items are buffered while the consumer is slower than the relays.
+    ///     Use `.bufferingNewest(n)` for firehose subscriptions where memory matters.
+    /// - Returns: The subscription.
+    /// - Throws: ``NostrError/noRelaysInPool`` when the pool is empty,
+    ///   ``NostrError/noMatchingRelays(_:)`` when none of the targeted URLs are in the pool
+    ///   (including an empty set), or ``NostrError/relayError(_:)`` when every relay fails to
+    ///   subscribe.
     func subscribe(
         filters: [Filter],
         to relayURLs: Set<RelayURL>?,
         bufferingPolicy: AsyncStream<SubscriptionEvent>.Continuation.BufferingPolicy
     ) async throws -> SubscriptionSequence
-    /// Opens a subscription as a sequence of event payloads only.
-    func events(
-        filters: [Filter],
-        to relayURLs: Set<RelayURL>?,
-        bufferingPolicy: AsyncStream<SubscriptionEvent>.Continuation.BufferingPolicy
-    ) async throws -> SubscriptionSequence.Events
-    /// Closes one subscription.
+
+    /// Closes one subscription; a no-op for unknown IDs.
     func unsubscribe(subscriptionID: String) async
     /// Closes every open subscription.
     func unsubscribeAll() async
-
-    /// Subscribes to a user's timeline.
-    func userTimeline(publicKey: PublicKey, limit: Int) async throws -> SubscriptionSequence
-    /// Subscribes to the global feed.
-    func globalFeed(limit: Int) async throws -> SubscriptionSequence
-    /// Subscribes to mentions of a user.
-    func mentions(publicKey: PublicKey, limit: Int) async throws -> SubscriptionSequence
-    /// Subscribes to metadata updates for a list of public keys.
-    func metadata(publicKeys: [PublicKey]) async throws -> SubscriptionSequence
 }
 
 // MARK: - Routing

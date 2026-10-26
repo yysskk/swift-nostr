@@ -66,6 +66,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   chosen relays, with the same targeting rules as publishing a signed event (an empty set throws,
   relays not in the pool are skipped). It returns a `PublishedEvent`. `publish(_:strategy:)` is the
   whole-pool short form.
+- **`SubscriptionSequence(id:expectedRelays:stream:onClose:)` is public**, so a stub
+  `NostrSubscribing` conformer can return a subscription over its own `AsyncStream`; `onClose` runs on
+  every `close()`.
 
 ### Changed
 
@@ -431,6 +434,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `client.events`. The targeted short forms take a non-optional `Set<RelayURL>`, so
   `publish(event, to: nil)` without a `strategy:` and `fetch(filters:from: nil)` without a `timeout:`
   no longer compile: omit `to:` / `from:` to reach the whole pool.
+
+- **`NostrSubscribing`, `NostrRelayManaging`, and `NostrIdentityProviding` require only their
+  primitives** (breaking): `NostrSubscribing` requires `subscribe(filters:to:bufferingPolicy:)`,
+  `unsubscribe(subscriptionID:)`, and `unsubscribeAll()`; `NostrRelayManaging` requires
+  `add(_:config:)`, `remove(_:)`, `connect()`, `disconnect()`, `connections`,
+  `connectedRelayCount()`, `relay(for:)`, and `clearDeduplicationCache()`; `NostrIdentityProviding`
+  keeps every requirement but `setPrivateKey(_:)` and `setNsec(_:)`. Both `events(filters:…)`
+  shapes, `userTimeline`, `globalFeed`, `mentions`, `metadata(publicKeys:)`, `add(_:)` for one relay
+  and for a sequence, `connect(to:)`, `relayCount`, `setPrivateKey(_:)`, and `setNsec(_:)` move to
+  protocol extensions built on those primitives, with the same filters, defaults, and errors, as do
+  the short forms `subscribe(filters:bufferingPolicy:)` and `subscribe(filters:to:bufferingPolicy:)`
+  for a non-optional `Set<RelayURL>`, so `subscribe(filters:to: nil)` without a `bufferingPolicy:`
+  and `events(filters:to: nil)` no longer compile: omit `to:` to subscribe on the whole pool.
 
 ### Fixed
 

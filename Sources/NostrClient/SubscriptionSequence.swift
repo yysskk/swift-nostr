@@ -3,8 +3,8 @@ import NostrCore
 
 /// A live relay subscription delivered as an async sequence of relay-aware events.
 ///
-/// Returned by ``NostrSubscriptionsAPI/subscribe(filters:to:bufferingPolicy:)`` and the
-/// convenience subscription methods. Iterate it with `for await`:
+/// Returned by ``NostrSubscribing/subscribe(filters:to:bufferingPolicy:)-(_,Set<RelayURL>?,_)`` and
+/// the convenience subscription methods. Iterate it with `for await`:
 ///
 /// ```swift
 /// let subscription = try await client.subscriptions.subscribe(filters: [filter])
@@ -38,6 +38,25 @@ public struct SubscriptionSequence: AsyncSequence, Sendable {
 
     let stream: AsyncStream<SubscriptionEvent>
     let onClose: @Sendable () async -> Void
+
+    /// Creates a subscription that yields the items of `stream` — for a stub ``NostrSubscribing``
+    /// conformer; the client builds its own.
+    /// - Parameters:
+    ///   - id: The subscription ID.
+    ///   - expectedRelays: The relays that accepted the REQ.
+    ///   - stream: The relay-aware items the subscription yields.
+    ///   - onClose: Runs on every call to ``close()``.
+    public init(
+        id: String,
+        expectedRelays: Set<RelayURL>,
+        stream: AsyncStream<SubscriptionEvent>,
+        onClose: @escaping @Sendable () async -> Void
+    ) {
+        self.id = id
+        self.expectedRelays = expectedRelays
+        self.stream = stream
+        self.onClose = onClose
+    }
 
     /// Closes the subscription: sends CLOSE to the relays and ends iteration.
     /// Calling it more than once is harmless.
