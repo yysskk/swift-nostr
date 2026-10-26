@@ -4,262 +4,65 @@ import NostrCore
 /// NIP-17 private direct messages: gift-wrapped sends, reactions, files, rumors of any kind, and
 /// the streams that deliver them already unwrapped. Reached as ``NostrClient/messages``.
 ///
+/// Implements the ``NostrMessaging`` primitives over the client's signer and relay pool, and
+/// inherits every convenience from the protocol's extension:
+/// ``NostrMessaging/send(_:to:subject:replyTo:expiration:strategy:)``,
+/// ``NostrMessaging/react(to:reaction:expiration:strategy:)``, and
+/// ``NostrMessaging/sendFile(url:mimeType:encryption:size:dimensions:blurhash:to:expiration:strategy:)``
+/// gift-wrap a template through ``sendGiftWrapped(_:to:expiration:strategy:)-(_,_,Timestamp?,_)``; the parse helpers
+/// unwrap through ``parsePayload(_:)``; and ``NostrMessaging/subscribe(limit:)`` keeps the messages
+/// of ``payloads(limit:)``.
+///
 /// Every send is routed by the addressee's NIP-17 DM relay list (kind 10050) via
 /// ``NostrClient/routing``, discovering and caching the list as needed and falling back to the
 /// full pool when an addressee has advertised none.
 public struct NostrMessagesAPI: NostrMessaging {
     let client: NostrClient
 
-    // MARK: - Sending
+    // MARK: - NostrMessaging
 
-    /// Sends a private direct message to a recipient using NIP-17.
-    ///
-    /// One unsigned kind-14 rumor is wrapped twice: once for the recipient and once
-    /// for the sender (the NIP-17 self-copy that provides sent history and
-    /// multi-device sync). Both gift wraps are published in parallel; the message
-    /// succeeds when the recipient copy is accepted, and a failed self-copy publish
-    /// is non-fatal.
-    ///
-    /// Each gift wrap is routed to its addressee's NIP-17 DM relays (kind 10050): the recipient
-    /// copy to the recipient's inbox relays and the self-copy to the sender's own, discovering
-    /// and caching the lists as needed. When an addressee has advertised no DM relay list, that
-    /// copy falls back to the full relay pool rather than being dropped; the recipient copy's
-    /// fallback throws ``NostrError/noRelaysInPool`` when the pool is also empty, while the
-    /// self-copy stays best-effort.
-    /// - Parameters:
-    ///   - content: The message content
-    ///   - recipientPublicKey: The recipient's public key
-    ///   - subject: Optional conversation subject
-    ///   - replyTo: Optional id of the event to reply to
-    ///   - expiration: Optional NIP-40 expiration for a disappearing message. Set on both gift
-    ///     wraps (the stored kind-1059 events) so relays stop serving the message after this time.
-    ///   - strategy: How many relay acknowledgments to wait for on the recipient
-    ///     gift wrap before returning (default: the pool config's
-    ///     ``RelayPoolConfig/defaultPublishStrategy``). The best-effort self-copy
-    ///     always uses the pool default so it never blocks the send.
-    /// - Returns: The shared rumor, both gift wraps, and the per-relay publish
-    ///   outcomes. The rumor's `id` is the key for matching the message when it
-    ///   echoes back from a relay.
-    @discardableResult
-    public func send(
-        _ content: String,
-        to recipientPublicKey: PublicKey,
-        subject: String? = nil,
-        replyTo: EventID? = nil,
-        expiration: Timestamp? = nil,
-        strategy: PublishStrategy? = nil
-    ) async throws -> SendDirectMessageResult {
-        let result = try await client.withSigner { signer, _ in
-            try await DirectMessageBuilder(signer: signer).createMessageWithSelfCopy(
-                content: content,
-                to: recipientPublicKey,
-                subject: subject,
-                replyTo: replyTo,
-                expiration: expiration
-            )
-        }
-
-        return try await deliver(result, to: recipientPublicKey, strategy: strategy)
-    }
-
-    /// Sends a NIP-25 reaction to a received direct message, gift-wrapped like the message itself.
-    ///
-    /// The reaction (an unsigned kind-7 rumor) references the message's rumor id and author, and is
-    /// delivered to the message author's NIP-17 DM relays plus the sender's own self-copy — the same
-    /// routing as ``send(_:to:subject:replyTo:expiration:strategy:)``.
-    /// - Parameters:
-    ///   - message: The message being reacted to. Its author receives the reaction.
-    ///   - reaction: The reaction content (default "+", a NIP-25 like). Use "-" or an emoji.
-    ///   - expiration: Optional NIP-40 expiration applied to both gift wraps.
-    ///   - strategy: How many relay acknowledgments to wait for on the recipient gift wrap before
-    ///     returning (default: the pool config's ``RelayPoolConfig/defaultPublishStrategy``).
-    /// - Returns: The shared rumor, both gift wraps, and the per-relay publish outcomes.
-    @discardableResult
-    public func react(
-        to message: DirectMessage,
-        reaction: String = "+",
-        expiration: Timestamp? = nil,
-        strategy: PublishStrategy? = nil
-    ) async throws -> SendDirectMessageResult {
-        let result = try await client.withSigner { signer, _ in
-            try await DirectMessageBuilder(signer: signer).createReactionWithSelfCopy(
-                reaction: reaction,
-                to: message.rumorID,
-                author: message.senderPublicKey,
-                recipientPublicKey: message.senderPublicKey,
-                expiration: expiration
-            )
-        }
-
-        return try await deliver(result, to: message.senderPublicKey, strategy: strategy)
-    }
-
-    /// Sends a NIP-17 kind-15 file message, gift-wrapped and routed like a text message.
-    ///
-    /// Encrypt the file with ``EncryptedFile/encrypt(_:)`` and upload the resulting
-    /// ``EncryptedFile/ciphertext`` to your host first, then pass the URL and the `EncryptedFile`
-    /// here. The message carries the URL plus the key, nonce, and hashes the recipient needs to
-    /// download and decrypt it.
-    /// - Parameters:
-    ///   - url: The URL of the uploaded encrypted file.
-    ///   - mimeType: The file's MIME type before encryption (e.g. "image/jpeg").
-    ///   - encryption: The encryption result from ``EncryptedFile/encrypt(_:)``.
-    ///   - size: Optional size of the encrypted file in bytes.
-    ///   - dimensions: Optional pixel dimensions as "<width>x<height>".
-    ///   - blurhash: Optional blurhash placeholder for progressive display.
-    ///   - recipientPublicKey: The recipient's public key.
-    ///   - expiration: Optional NIP-40 expiration applied to both gift wraps.
-    ///   - strategy: How many relay acknowledgments to wait for on the recipient gift wrap before
-    ///     returning (default: the pool config's ``RelayPoolConfig/defaultPublishStrategy``).
-    /// - Returns: The shared rumor, both gift wraps, and the per-relay publish outcomes.
-    @discardableResult
-    public func sendFile(
-        url: String,
-        mimeType: String,
-        encryption: EncryptedFile,
-        size: Int? = nil,
-        dimensions: String? = nil,
-        blurhash: String? = nil,
-        to recipientPublicKey: PublicKey,
-        expiration: Timestamp? = nil,
-        strategy: PublishStrategy? = nil
-    ) async throws -> SendDirectMessageResult {
-        let result = try await client.withSigner { signer, _ in
-            try await DirectMessageBuilder(signer: signer).createFileMessageWithSelfCopy(
-                url: url,
-                mimeType: mimeType,
-                encryption: encryption,
-                size: size,
-                dimensions: dimensions,
-                blurhash: blurhash,
-                to: recipientPublicKey,
-                expiration: expiration
-            )
-        }
-
-        return try await deliver(result, to: recipientPublicKey, strategy: strategy)
-    }
-
-    /// Sends a rumor of any kind gift-wrapped (NIP-59), delivered like a NIP-17 direct message.
-    ///
-    /// The event is turned into an unsigned rumor and wrapped twice — for the recipient and as the
-    /// sender's self-copy — then routed exactly like
-    /// ``send(_:to:subject:replyTo:expiration:strategy:)``: to each addressee's kind-10050 DM
-    /// relays, falling back to the full pool. Use it for private payloads other than kinds 14, 15,
-    /// and 7. To build the gift wraps without publishing, use
-    /// ``GiftWrap/wrap(event:signer:recipientPublicKey:expiration:)``.
-    /// - Parameters:
-    ///   - rumor: The event to deliver. Its `publicKey` must be the signer's public key; it is never
-    ///     signed.
-    ///   - recipientPublicKey: The recipient's public key.
-    ///   - expiration: Optional NIP-40 expiration applied to both gift wraps.
-    ///   - strategy: How many relay acknowledgments to wait for on the recipient gift wrap before
-    ///     returning (default: the pool config's ``RelayPoolConfig/defaultPublishStrategy``).
-    /// - Returns: The shared rumor, both gift wraps, and the per-relay publish outcomes.
-    /// - Throws: ``NostrError/invalidPublicKey`` when `rumor.publicKey` is not the signer's public key
-    ///   (the recipient's unwrap would reject it as an impersonation), or
-    ///   ``NostrError/noRelaysInPool`` when the recipient copy falls back to an empty pool.
+    /// Authors `template` as an unsigned rumor under the configured signer's public key and sends it
+    /// gift-wrapped for the recipient plus the sender's self-copy, each routed to its addressee's DM
+    /// relays.
     @discardableResult
     public func sendGiftWrapped(
-        _ rumor: UnsignedEvent,
+        _ template: EventTemplate,
         to recipientPublicKey: PublicKey,
-        expiration: Timestamp? = nil,
-        strategy: PublishStrategy? = nil
+        expiration: Timestamp?,
+        strategy: PublishStrategy?
     ) async throws -> SendDirectMessageResult {
         let result = try await client.withSigner { signer, publicKey in
-            guard rumor.publicKey == publicKey else {
-                throw NostrError.invalidPublicKey
-            }
-            return try await DirectMessageBuilder(signer: signer).wrapWithSelfCopy(
-                rumor: try rumor.asRumor(),
-                senderPublicKey: publicKey,
-                to: recipientPublicKey,
-                expiration: expiration
-            )
+            try await DirectMessageBuilder(signer: signer).wrapWithSelfCopy(
+                template, senderPublicKey: publicKey, to: recipientPublicKey, expiration: expiration)
         }
 
         return try await deliver(result, to: recipientPublicKey, strategy: strategy)
     }
 
-    // MARK: - Parsing
-
-    /// Parses a received gift-wrapped direct message
-    /// - Parameter giftWrap: The gift-wrapped event
-    /// - Returns: The parsed DirectMessage
-    public func parse(_ giftWrap: Event) async throws -> DirectMessage {
-        try await client.withSigner { signer, _ in
-            try await DirectMessageParser(signer: signer).parse(giftWrap)
-        }
-    }
-
-    /// Parses a received gift-wrapped NIP-25 reaction to a direct message.
-    /// - Parameter giftWrap: The gift-wrapped event
-    /// - Returns: The parsed reaction
-    public func parseReaction(_ giftWrap: Event) async throws -> DirectMessageReaction {
-        try await client.withSigner { signer, _ in
-            try await DirectMessageParser(signer: signer).parseReaction(giftWrap)
-        }
-    }
-
-    /// Parses a received gift-wrapped NIP-17 kind-15 file message.
-    /// - Parameter giftWrap: The gift-wrapped event
-    /// - Returns: The parsed file message
-    public func parseFile(_ giftWrap: Event) async throws -> DirectMessageFile {
-        try await client.withSigner { signer, _ in
-            try await DirectMessageParser(signer: signer).parseFileMessage(giftWrap)
-        }
-    }
-
-    /// Parses a received gift wrap into a ``DirectMessagePayload`` — a message, a reaction, or a file.
-    /// - Parameter giftWrap: The gift-wrapped event
-    /// - Returns: The decrypted payload
+    /// Unwraps a received gift wrap into the message, reaction, or file message it carries.
     public func parsePayload(_ giftWrap: Event) async throws -> DirectMessagePayload {
         try await client.withSigner { signer, _ in
             try await DirectMessageParser(signer: signer).parsePayload(giftWrap)
         }
     }
 
-    // MARK: - Receiving
-
-    /// Subscribes to the current user's private direct messages (NIP-17),
-    /// delivering each message already unwrapped and parsed.
-    ///
-    /// Gift wraps that are not readable messages for the signer are skipped, while a signer that
-    /// could not attempt the read throws out of the iteration — see ``DirectMessageSequence``. Use
-    /// ``giftWraps(limit:)`` for the raw gift-wrap events.
-    /// - Parameter limit: Maximum number of messages to fetch
-    public func subscribe(limit: Int = 100) async throws -> DirectMessageSequence {
+    /// Subscribes to the current user's gift wraps on the whole pool, delivering each readable one
+    /// unwrapped.
+    public func payloads(limit: Int) async throws -> DirectMessagePayloadSequence {
         let parser = try await parser()
         let subscription = try await client.subscribe(filters: [try await giftWrapFilter(limit: limit)], toURLs: nil)
-        return DirectMessageSequence(base: subscription, parser: parser)
+        return DirectMessagePayloadSequence(subscription: subscription, parser: parser)
     }
 
-    /// Subscribes to the current user's direct messages **and** reactions (NIP-17 + NIP-25),
-    /// delivering each gift wrap already unwrapped and classified as a ``DirectMessagePayload``.
-    ///
-    /// Use this instead of ``subscribe(limit:)`` when you also want reactions; messages and
-    /// reactions share the same kind-1059 gift-wrap stream. Unreadable gift wraps are skipped and
-    /// signer failures throw, as in ``DirectMessageSequence``.
-    /// - Parameter limit: Maximum number of gift wraps to fetch
-    public func payloads(limit: Int = 100) async throws -> DirectMessagePayloadSequence {
-        let parser = try await parser()
-        let subscription = try await client.subscribe(filters: [try await giftWrapFilter(limit: limit)], toURLs: nil)
-        return DirectMessagePayloadSequence(base: subscription, parser: parser)
-    }
-
-    /// Subscribes to private direct messages (gift-wrapped events) for the current user.
-    /// - Parameter limit: Maximum number of messages to fetch
-    /// - Returns: A subscription sequence of gift-wrapped events; parse each with
-    ///   ``parse(_:)`` — or use ``subscribe(limit:)`` to receive them already parsed.
-    public func giftWraps(limit: Int = 100) async throws -> SubscriptionSequence {
+    /// Subscribes to the raw gift wraps addressed to the current user, on the whole pool.
+    public func giftWraps(limit: Int) async throws -> SubscriptionSequence {
         try await client.subscribe(filters: [try await giftWrapFilter(limit: limit)], toURLs: nil)
     }
 
     // MARK: - Private
 
     /// Routes a built result's gift wraps to the recipient's and sender's kind-10050 DM relays and
-    /// publishes them, returning the result enriched with per-relay outcomes. Shared by every send
-    /// path.
+    /// publishes them, returning the result enriched with per-relay outcomes.
     ///
     /// A nil target means the addressee advertised no DM relay list (or none could be connected), so
     /// the copy falls back to the full pool rather than being dropped; the recipient copy's fallback

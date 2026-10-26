@@ -282,55 +282,69 @@ public protocol NostrRelayRouting: Sendable {
 // MARK: - Messages
 
 /// Sending and receiving NIP-17 private direct messages. Implemented by ``NostrMessagesAPI``.
+///
+/// The requirements are the primitives — gift-wrapping a template, unwrapping a gift wrap, and the
+/// two gift-wrap streams; ``send(_:to:subject:replyTo:expiration:strategy:)``,
+/// ``react(to:reaction:expiration:strategy:)``,
+/// ``sendFile(url:mimeType:encryption:size:dimensions:blurhash:to:expiration:strategy:)``,
+/// ``parse(_:)``, ``parseReaction(_:)``, ``parseFile(_:)``, ``subscribe(limit:)``, and the short
+/// forms of the primitives are provided by an extension built on them.
 public protocol NostrMessaging: Sendable {
-    /// Sends a private direct message.
-    @discardableResult
-    func send(
-        _ content: String,
-        to recipientPublicKey: PublicKey,
-        subject: String?,
-        replyTo: EventID?,
-        expiration: Timestamp?,
-        strategy: PublishStrategy?
-    ) async throws -> SendDirectMessageResult
-    /// Sends a NIP-25 reaction to a received message.
-    @discardableResult
-    func react(
-        to message: DirectMessage, reaction: String, expiration: Timestamp?, strategy: PublishStrategy?
-    ) async throws -> SendDirectMessageResult
-    /// Sends a kind-15 encrypted file message.
-    @discardableResult
-    func sendFile(
-        url: String,
-        mimeType: String,
-        encryption: EncryptedFile,
-        size: Int?,
-        dimensions: String?,
-        blurhash: String?,
-        to recipientPublicKey: PublicKey,
-        expiration: Timestamp?,
-        strategy: PublishStrategy?
-    ) async throws -> SendDirectMessageResult
-    /// Sends a rumor of any kind gift-wrapped, routed like a direct message.
+    /// Authors `template` as an unsigned rumor under the configured signer's public key and sends it
+    /// gift-wrapped (NIP-59), delivered like a NIP-17 direct message.
+    ///
+    /// The rumor is wrapped twice — for the recipient and as the sender's self-copy — and never
+    /// signed; its `created_at` is the template's ``EventTemplate/createdAt``. Each gift wrap is
+    /// routed to its addressee's NIP-17 DM relays (kind 10050), discovering and caching the lists as
+    /// needed; an addressee with no list gets the full pool instead. Both wraps are published in
+    /// parallel: the send succeeds when the recipient copy is accepted, and the self-copy is
+    /// best-effort.
+    /// - Parameters:
+    ///   - template: The rumor's kind, tags, content, and creation time.
+    ///   - recipientPublicKey: The recipient's public key.
+    ///   - expiration: A NIP-40 expiration set on both gift wraps (the stored kind-1059 events), so
+    ///     relays stop serving them after this time, or nil for none.
+    ///   - strategy: How many relay acknowledgments to wait for on the recipient gift wrap before
+    ///     returning, or nil for the pool config's ``RelayPoolConfig/defaultPublishStrategy``. The
+    ///     self-copy always uses the pool default so it never blocks the send.
+    /// - Returns: The shared rumor, both gift wraps, and the per-relay publish outcomes. The rumor's
+    ///   `id` is the key for matching the payload when it echoes back from a relay.
+    /// - Throws: ``NostrError/signerNotSet`` if no signer is set, anything the signer throws while
+    ///   sealing, or ``NostrError/noRelaysInPool`` when the recipient copy falls back to an empty
+    ///   pool.
     @discardableResult
     func sendGiftWrapped(
-        _ rumor: UnsignedEvent, to recipientPublicKey: PublicKey, expiration: Timestamp?, strategy: PublishStrategy?
+        _ template: EventTemplate,
+        to recipientPublicKey: PublicKey,
+        expiration: Timestamp?,
+        strategy: PublishStrategy?
     ) async throws -> SendDirectMessageResult
 
-    /// Unwraps a received gift wrap as a message.
-    func parse(_ giftWrap: Event) async throws -> DirectMessage
-    /// Unwraps a received gift wrap as a reaction.
-    func parseReaction(_ giftWrap: Event) async throws -> DirectMessageReaction
-    /// Unwraps a received gift wrap as a file message.
-    func parseFile(_ giftWrap: Event) async throws -> DirectMessageFile
-    /// Unwraps a received gift wrap into whichever payload it carries.
+    /// Unwraps a received gift wrap into whichever payload it carries: a message (kind 14), a
+    /// reaction (kind 7), or a file message (kind 15).
+    /// - Parameter giftWrap: The gift-wrapped event.
+    /// - Returns: The decrypted payload.
+    /// - Throws: ``NostrError/signerNotSet`` if no signer is set, ``NostrError/invalidData`` for any
+    ///   other inner kind or a malformed payload, or what ``GiftWrap/unwrap(giftWrap:recipient:)``
+    ///   throws for a gift wrap that does not open.
     func parsePayload(_ giftWrap: Event) async throws -> DirectMessagePayload
 
-    /// Subscribes to the current user's messages, already unwrapped.
-    func subscribe(limit: Int) async throws -> DirectMessageSequence
-    /// Subscribes to the current user's messages and reactions, already unwrapped.
+    /// Subscribes to the current user's gift-wrap stream on the whole pool, delivering each
+    /// readable gift wrap unwrapped as a ``DirectMessagePayload`` — a message, a reaction, or a file.
+    ///
+    /// Unreadable gift wraps are skipped and signer failures throw out of the iteration — see
+    /// ``DirectMessagePayloadSequence``.
+    /// - Parameter limit: How many stored gift wraps each relay sends before live ones.
+    /// - Returns: The payload sequence.
+    /// - Throws: ``NostrError/signerNotSet`` if no signer is set, or the errors of opening a
+    ///   subscription on the whole pool.
     func payloads(limit: Int) async throws -> DirectMessagePayloadSequence
-    /// Subscribes to the raw gift wraps addressed to the current user.
+
+    /// Subscribes to the raw gift wraps (kind 1059) addressed to the current user, on the whole pool.
+    /// - Parameter limit: How many stored gift wraps each relay sends before live ones.
+    /// - Returns: The subscription; open each event with ``parsePayload(_:)``.
+    /// - Throws: ``NostrError/signerNotSet`` if no signer is set, or the errors of opening a
+    ///   subscription on the whole pool.
     func giftWraps(limit: Int) async throws -> SubscriptionSequence
 }
 

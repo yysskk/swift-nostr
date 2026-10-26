@@ -111,7 +111,11 @@ as one through `client.events`. `NostrSubscribing` (`subscribe(filters:to:buffer
 `publicKey`, `sign(_:)`, NIP-44, and NIP-42 authentication) follow the same pattern: `events(filters:)`,
 the feeds, `add(_:)`, `connect(to:)`, `relayCount`, `setPrivateKey(_:)`, `setNsec(_:)`, and the short
 forms come from their extensions; a stub returns a `SubscriptionSequence(id:expectedRelays:stream:onClose:)`
-over its own `AsyncStream`. The other protocols still spell out every parameter of every
+over its own `AsyncStream`. `NostrMessaging` requires `sendGiftWrapped(_:to:expiration:strategy:)`
+for an `EventTemplate`, `parsePayload(_:)`, `payloads(limit:)`, and `giftWraps(limit:)`; `send`,
+`react`, `sendFile`, `parse`, `parseReaction`, `parseFile`, `subscribe(limit:)`, and the short forms
+(`sendGiftWrapped(_:to:)`, `payloads()`, `giftWraps()`) come from its extension, and a stub returns a
+`DirectMessagePayloadSequence(subscription:parser:)`. The other protocols still spell out every parameter of every
 requirement; the concrete namespaces supply the defaults, and calls through those protocols pass the
 full argument list. `NostrRelayManaging` deliberately omits `pool`: the pool carries publish,
 subscribe, and count too, so it stays on the concrete `NostrRelaysAPI`.
@@ -289,9 +293,8 @@ let byRelay = try await client.relays.pool.countEvents(matching: [filter])  // [
 // Send
 try await client.messages.send("Hello!", to: recipient)   // PublicKey
 
-// Send a rumor of any kind, gift-wrapped and routed like a DM (rumor.publicKey must be the signer's)
-let rumor = UnsignedEvent(publicKey: myPublicKey, kind: Event.Kind(rawValue: 30_999), content: payload)
-try await client.messages.sendGiftWrapped(rumor, to: recipient)
+// Send a rumor of any kind, gift-wrapped and routed like a DM (authored under the signer's key)
+try await client.messages.sendGiftWrapped(EventTemplate(kind: Event.Kind(rawValue: 30_999), content: payload), to: recipient)
 
 // Subscribe to incoming DMs, parsed automatically. Wraps sealed to someone else and malformed
 // ones are skipped; a signer that cannot be reached (a remote NIP-46 timeout/disconnect) throws,
@@ -497,6 +500,9 @@ try EventTemplate.metadata(UserMetadata(name: "Alice"))      // kind 0, JSON con
 EventTemplate.contactList([Contact(publicKey: alice)])       // kind 3, one p tag per contact (NIP-02)
 EventTemplate.relayListMetadata(RelayListMetadata(read: [inbox], write: [outbox]))  // kind 10002, r tags (NIP-65)
 EventTemplate.directMessageRelayList(DirectMessageRelayList(relays: [inbox]))      // kind 10050, relay tags (NIP-17)
+EventTemplate.directMessage("hi", to: bob, subject: nil, replyTo: nil)  // kind 14 rumor: p, subject, e reply-marker tags (NIP-17)
+EventTemplate.directMessageReaction(to: message.rumorID, author: alice, content: "+")  // kind 7 rumor: e, p, k 14 (NIP-25)
+EventTemplate.fileMessage(url: url, mimeType: "image/jpeg", encryption: encrypted, to: bob)  // kind 15 rumor (NIP-17)
 EventTemplate.report(author, type: .impersonation, reason: "")  // kind 1984, type on the p tag (NIP-56)
 EventTemplate.report(event, type: .illegal, reason: "")      // type on the e tag + bare p tag for the author
 EventTemplate.longFormContent(article, draft: false)         // kind 30023 / 30024 draft; stamps a nil publishedAt (NIP-23)

@@ -31,7 +31,7 @@ reported on the result as `recipientPublishResult` and `selfCopyPublishResult`.
 
 ### Receiving
 
-``NostrMessagesAPI/subscribe(limit:)`` delivers messages already unwrapped and parsed. A
+``NostrMessaging/subscribe(limit:)`` delivers messages already unwrapped and parsed. A
 gift-wrap stream carries everyone's messages, so wraps sealed to someone else — and malformed
 ones — are skipped. A signer that cannot *attempt* the read is a different matter: with a remote
 NIP-46 signer every unwrap is a relay round-trip, so a timeout, a disconnect, or a refused request
@@ -44,7 +44,7 @@ for try await message in try await client.messages.subscribe() {
 }
 ```
 
-For the raw gift-wrap events, use ``NostrMessagesAPI/giftWraps(limit:)``
+For the raw gift-wrap events, use ``NostrMessaging/giftWraps(limit:)``
 and parse manually:
 
 ```swift
@@ -64,7 +64,7 @@ print("Message: \(dm.content)")
 
 ### Reactions (NIP-25)
 
-React to a received message with ``NostrMessagesAPI/react(to:reaction:expiration:strategy:)``.
+React to a received message with ``NostrMessaging/react(to:reaction:expiration:strategy:)``.
 The reaction is gift-wrapped exactly like a message, so it stays private and sender-anonymous:
 
 ```swift
@@ -76,7 +76,7 @@ try await client.messages.react(to: message, reaction: "🤙")
 A file message carries an *encrypted* file's URL together with the keys needed to decrypt it. Encrypt
 the bytes with ``EncryptedFile/encrypt(_:)``, upload the ciphertext to any host (Blossom, NIP-96, …),
 then send the URL and keys with
-``NostrMessagesAPI/sendFile(url:mimeType:encryption:size:dimensions:blurhash:to:expiration:strategy:)``:
+``NostrMessaging/sendFile(url:mimeType:encryption:size:dimensions:blurhash:to:expiration:strategy:)``:
 
 ```swift
 let encrypted = try EncryptedFile.encrypt(imageData)
@@ -96,21 +96,21 @@ let data = try EncryptedFile.decrypt(blob, key: file.decryptionKey, nonce: file.
 
 ### Gift-Wrapped Rumors of Any Kind
 
-``NostrMessagesAPI/sendGiftWrapped(_:to:expiration:strategy:)`` delivers a rumor of any kind with the
-same wrapping and routing as ``NostrMessagesAPI/send(_:to:subject:replyTo:expiration:strategy:)``: a
-recipient copy and a self-copy, each sent to its addressee's DM relays. The rumor must be authored
-under the signer's public key and is never signed:
+``NostrMessaging/sendGiftWrapped(_:to:expiration:strategy:)-(_,_,Timestamp?,_)`` delivers a rumor of
+any kind with the same wrapping and routing as
+``NostrMessaging/send(_:to:subject:replyTo:expiration:strategy:)``: a recipient copy and a self-copy,
+each sent to its addressee's DM relays. The client authors the rumor from an ``EventTemplate`` under
+the signer's public key and never signs it:
 
 ```swift
-let rumor = UnsignedEvent(
-    publicKey: myPublicKey, kind: Event.Kind(rawValue: 30_999),
-    tags: [.publicKey(recipient)], content: payload
+let template = EventTemplate(
+    kind: Event.Kind(rawValue: 30_999), tags: [.publicKey(recipient)], content: payload
 )
-try await client.messages.sendGiftWrapped(rumor, to: recipient)
+try await client.messages.sendGiftWrapped(template, to: recipient)
 ```
 
 To build the gift wrap without publishing, use ``GiftWrap/wrap(event:signer:recipientPublicKey:expiration:)``.
-On the receiving side, read the raw stream from ``NostrMessagesAPI/giftWraps(limit:)`` and open each
+On the receiving side, read the raw stream from ``NostrMessaging/giftWraps(limit:)`` and open each
 event with ``GiftWrap/unwrap(giftWrap:recipient:)``; the parsing helpers understand only kinds 14, 15,
 and 7.
 
@@ -130,7 +130,7 @@ try await client.messages.send(
 
 ### Receiving Mixed Payloads
 
-``NostrMessagesAPI/payloads(limit:)`` delivers messages, reactions, and file messages
+``NostrMessaging/payloads(limit:)`` delivers messages, reactions, and file messages
 together as a ``DirectMessagePayload``, so one loop can handle every kind:
 
 ```swift

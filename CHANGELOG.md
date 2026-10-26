@@ -69,6 +69,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`SubscriptionSequence(id:expectedRelays:stream:onClose:)` is public**, so a stub
   `NostrSubscribing` conformer can return a subscription over its own `AsyncStream`; `onClose` runs on
   every `close()`.
+- **NIP-17 rumors are built as `EventTemplate`s**: `directMessage(_:to:subject:replyTo:)` (kind 14),
+  `directMessageReaction(to:author:content:)` (kind 7, NIP-25), and
+  `fileMessage(url:mimeType:encryption:size:dimensions:blurhash:to:)` (kind 15) produce the same tags
+  and content the `DirectMessageBuilder` and `client.messages` sends always have, now from one source.
+- **`DirectMessagePayloadSequence(subscription:parser:)` is public**, so a stub `NostrMessaging`
+  conformer can return a payload stream that opens its own subscription's gift wraps.
 
 ### Changed
 
@@ -447,6 +453,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the short forms `subscribe(filters:bufferingPolicy:)` and `subscribe(filters:to:bufferingPolicy:)`
   for a non-optional `Set<RelayURL>`, so `subscribe(filters:to: nil)` without a `bufferingPolicy:`
   and `events(filters:to: nil)` no longer compile: omit `to:` to subscribe on the whole pool.
+
+- **`NostrMessaging` requires only its primitives, and `sendGiftWrapped` takes an `EventTemplate`**
+  (breaking): the requirements are `sendGiftWrapped(_:to:expiration:strategy:)`,
+  `parsePayload(_:)`, `payloads(limit:)`, and `giftWraps(limit:)`. `sendGiftWrapped` now authors the
+  rumor from a template under the configured signer's public key, so the `UnsignedEvent` overload and
+  its `invalidPublicKey` check for a rumor authored under another key are gone. `send`, `react`, and
+  `sendFile` move to a protocol extension that gift-wraps the matching `EventTemplate` factory
+  through `sendGiftWrapped`, with the same tags, routing, defaults, and errors; `parse`,
+  `parseReaction`, and `parseFile` unwrap the matching case of `parsePayload(_:)`, throwing
+  `invalidData` for any other payload; and `subscribe(limit:)` delivers the messages of
+  `payloads(limit:)`. The extension also adds the short forms `sendGiftWrapped(_:to:strategy:)`,
+  `sendGiftWrapped(_:to:expiration:strategy:)` for a non-optional `Timestamp`, `payloads()`, and
+  `giftWraps()`, so an optional `expiration:` without a `strategy:` no longer compiles: pass
+  `strategy: nil` as well, or omit a nil `expiration:`.
 
 ### Fixed
 
