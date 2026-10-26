@@ -10,8 +10,8 @@ public struct RelayPoolConfig: Sendable {
     /// received by evicting the oldest. Below 1 turns deduplication off.
     public var maxDeduplicationCacheSize: Int
 
-    /// Time-to-live for cached event IDs in seconds
-    public var deduplicationCacheTTL: TimeInterval
+    /// How long a cached event ID is remembered.
+    public var deduplicationCacheTTL: Duration
 
     /// Publish strategy used when `RelayPool.publish` is called without an explicit strategy
     public var defaultPublishStrategy: PublishStrategy
@@ -20,14 +20,21 @@ public struct RelayPoolConfig: Sendable {
     public static let `default` = RelayPoolConfig(
         defaultRelayConfig: .default,
         maxDeduplicationCacheSize: 10000,
-        deduplicationCacheTTL: 300,
+        deduplicationCacheTTL: .seconds(300),
         defaultPublishStrategy: .firstAck
     )
 
+    /// Creates a configuration; every parameter defaults to the value ``default`` uses.
+    /// - Parameters:
+    ///   - defaultRelayConfig: The connection configuration for new relays.
+    ///   - maxDeduplicationCacheSize: The maximum number of cached event IDs, or below 1 to turn
+    ///     deduplication off.
+    ///   - deduplicationCacheTTL: How long a cached event ID is remembered.
+    ///   - defaultPublishStrategy: The strategy `RelayPool.publish` uses without an explicit one.
     public init(
         defaultRelayConfig: RelayConnectionConfig = .default,
         maxDeduplicationCacheSize: Int = 10000,
-        deduplicationCacheTTL: TimeInterval = 300,
+        deduplicationCacheTTL: Duration = .seconds(300),
         defaultPublishStrategy: PublishStrategy = .firstAck
     ) {
         self.defaultRelayConfig = defaultRelayConfig

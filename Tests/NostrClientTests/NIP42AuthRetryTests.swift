@@ -14,15 +14,15 @@ struct NIP42AuthRetryTests {
 
     private let relayURL = RelayURL("wss://relay.example.com")!
 
-    private func makeConnection(publishAckTimeout: TimeInterval = 5) -> (RelayConnection, MockWebSocketSession) {
+    private func makeConnection(publishAckTimeout: Duration = .seconds(5)) -> (RelayConnection, MockWebSocketSession) {
         let mock = MockWebSocketSession()
         let connection = RelayConnection(
             url: relayURL,
             webSocketFactory: MockWebSocketSessionFactory(makeSession: { mock }),
             config: RelayConnectionConfig(
-                connectionTimeout: 1,
+                connectionTimeout: .seconds(1),
                 publishAckTimeout: publishAckTimeout,
-                pingInterval: 60,
+                pingInterval: .seconds(60),
                 autoReconnect: false
             )
         )
@@ -127,7 +127,7 @@ struct NIP42AuthRetryTests {
 
     @Test("publish falls back to the original rejection when no authentication concludes")
     func publishTimesOutWaitingForAuthentication() async throws {
-        let (connection, mock) = makeConnection(publishAckTimeout: 0.1)
+        let (connection, mock) = makeConnection(publishAckTimeout: .milliseconds(100))
         let signer = EventSigner(keyPair: try KeyPair())
         await connection.setAuthenticationResponder(makeResponder(signer: signer))
         try await connection.connect()

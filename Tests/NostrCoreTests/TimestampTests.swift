@@ -126,4 +126,65 @@ struct TimestampTests {
         #expect(tag.values == ["9223372036854775807"])
         #expect(event.isExpired(asOf: Timestamp(Date(timeIntervalSince1970: .infinity))) == false)
     }
+
+    // MARK: - Arithmetic
+
+    @Test(
+        "advancing moves by the duration's whole seconds",
+        arguments: [
+            (Duration.seconds(60), Int64(1_700_000_060)),
+            (.seconds(-60), 1_699_999_940),
+            (.zero, 1_700_000_000),
+        ])
+    func advancedByWholeSeconds(duration: Duration, expected: Int64) {
+        #expect(Timestamp(rawValue: 1_700_000_000).advanced(by: duration).rawValue == expected)
+    }
+
+    @Test(
+        "advancing truncates the sub-second part toward zero",
+        arguments: [
+            (Duration.milliseconds(1_900), Int64(1_700_000_001)),
+            (.milliseconds(-1_900), 1_699_999_999),
+            (.milliseconds(999), 1_700_000_000),
+            (.milliseconds(-999), 1_700_000_000),
+        ])
+    func advancedTruncatesFractions(duration: Duration, expected: Int64) {
+        #expect(Timestamp(rawValue: 1_700_000_000).advanced(by: duration).rawValue == expected)
+    }
+
+    @Test("advancing past the bounds of Int64 saturates instead of trapping")
+    func advancedSaturates() {
+        #expect(Timestamp(rawValue: .max).advanced(by: .seconds(1)).rawValue == .max)
+        #expect(Timestamp(rawValue: .min).advanced(by: .seconds(-1)).rawValue == .min)
+        #expect(Timestamp(rawValue: 1).advanced(by: .seconds(Int64.max)).rawValue == .max)
+        #expect(Timestamp(rawValue: -2).advanced(by: .seconds(Int64.min)).rawValue == .min)
+        // Durations whose whole seconds do not fit in Int64 at all.
+        #expect(Timestamp(rawValue: 0).advanced(by: .seconds(Int64.max) * 4).rawValue == .max)
+        #expect(Timestamp(rawValue: 0).advanced(by: .seconds(Int64.min) * 4).rawValue == .min)
+    }
+
+    @Test("advancing by more than Int64 seconds lands exactly when the result fits")
+    func advancedBeyondInt64SecondsWhenResultFits() {
+        let span = Duration.seconds(Int64.max) + .seconds(Int64.max) + .milliseconds(500)
+        #expect(Timestamp(rawValue: .min).advanced(by: span).rawValue == Int64.max - 1)
+        #expect(Timestamp(rawValue: .max).advanced(by: .zero - span).rawValue == Int64.min + 1)
+    }
+
+    @Test("duration(to:) measures the signed distance in whole seconds")
+    func durationTo() {
+        let start = Timestamp(rawValue: 1_700_000_000)
+
+        #expect(start.duration(to: Timestamp(rawValue: 1_700_000_090)) == .seconds(90))
+        #expect(start.duration(to: Timestamp(rawValue: 1_699_999_910)) == .seconds(-90))
+        #expect(start.duration(to: start) == .zero)
+        let other = Timestamp(rawValue: 1_234_567_890)
+        #expect(start.advanced(by: start.duration(to: other)) == other)
+    }
+
+    @Test("duration(to:) spans the full range of Int64 without overflowing")
+    func durationToFullRange() {
+        let span = Timestamp(rawValue: .min).duration(to: Timestamp(rawValue: .max))
+        #expect(span == .seconds(Int64.max) + .seconds(Int64.max) + .seconds(1))
+        #expect(Timestamp(rawValue: .min).advanced(by: span) == Timestamp(rawValue: .max))
+    }
 }

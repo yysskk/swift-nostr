@@ -15,9 +15,9 @@ struct ReconnectBackoffTests {
 
     @Test(
         "a delay that would never pause is floored",
-        arguments: [0, -1, -100, 0.0001]
+        arguments: [Duration.zero, .seconds(-1), .seconds(-100), .microseconds(100)]
     )
-    func degenerateInitialDelayIsFloored(delay: TimeInterval) {
+    func degenerateInitialDelayIsFloored(delay: Duration) {
         var config = RelayConnectionConfig()
         config.initialReconnectDelay = delay
 
@@ -29,10 +29,10 @@ struct ReconnectBackoffTests {
     /// initializer would miss entirely.
     @Test("a delay mutated after initialization is still floored")
     func mutatedDelayIsFloored() {
-        var config = RelayConnectionConfig(initialReconnectDelay: 5)
-        #expect(config.resolvedInitialReconnectDelay == 5)
+        var config = RelayConnectionConfig(initialReconnectDelay: .seconds(5))
+        #expect(config.resolvedInitialReconnectDelay == .seconds(5))
 
-        config.initialReconnectDelay = 0
+        config.initialReconnectDelay = .zero
         #expect(config.resolvedInitialReconnectDelay == RelayConnectionConfig.minimumReconnectDelay)
     }
 
@@ -41,16 +41,19 @@ struct ReconnectBackoffTests {
     @Test("backoff grows away from a degenerate starting delay")
     func backoffGrowsFromDegenerateStart() {
         var config = RelayConnectionConfig(reconnectBackoffMultiplier: 2)
-        config.initialReconnectDelay = 0
+        config.initialReconnectDelay = .zero
 
         var delay = config.resolvedInitialReconnectDelay
-        var seen: [TimeInterval] = [delay]
+        var seen: [Duration] = [delay]
         for _ in 0..<4 {
-            delay = config.boundedReconnectDelay(delay * config.resolvedBackoffMultiplier)
+            delay = config.nextReconnectDelay(after: delay)
             seen.append(delay)
         }
 
-        #expect(seen == [0.1, 0.2, 0.4, 0.8, 1.6])
+        #expect(
+            seen == [
+                .milliseconds(100), .milliseconds(200), .milliseconds(400), .milliseconds(800), .milliseconds(1600),
+            ])
     }
 
     @Test(
@@ -64,36 +67,50 @@ struct ReconnectBackoffTests {
         #expect(config.resolvedBackoffMultiplier == 1)
 
         let delay = config.resolvedInitialReconnectDelay
-        #expect(config.boundedReconnectDelay(delay * config.resolvedBackoffMultiplier) == delay)
+        #expect(config.nextReconnectDelay(after: delay) == delay)
     }
 
     /// A multiplier of exactly 1 is a deliberate choice — retry at a fixed rate — and is left alone.
     @Test("a multiplier of one holds the delay steady")
     func multiplierOfOneIsPreserved() {
-        var config = RelayConnectionConfig(initialReconnectDelay: 2)
+        var config = RelayConnectionConfig(initialReconnectDelay: .seconds(2))
         config.reconnectBackoffMultiplier = 1
 
         #expect(config.resolvedBackoffMultiplier == 1)
-        #expect(config.boundedReconnectDelay(2 * 1) == 2)
+        #expect(config.nextReconnectDelay(after: .seconds(2)) == .seconds(2))
     }
 
     @Test("the delay is capped at the configured maximum")
     func delayIsCapped() {
         let config = RelayConnectionConfig(
-            initialReconnectDelay: 1, maxReconnectDelay: 5, reconnectBackoffMultiplier: 10)
+            initialReconnectDelay: .seconds(1), maxReconnectDelay: .seconds(5), reconnectBackoffMultiplier: 10)
 
-        #expect(config.boundedReconnectDelay(1 * 10) == 5)
-        #expect(config.boundedReconnectDelay(1_000) == 5)
+        #expect(config.nextReconnectDelay(after: .seconds(1)) == .seconds(5))
+        #expect(config.boundedReconnectDelay(.seconds(1_000)) == .seconds(5))
+    }
+
+    /// Multiplying a `Duration` by a non-finite or huge factor traps, so these must be absorbed
+    /// before the next delay is formed.
+    @Test(
+        "a non-finite or huge multiplier never traps",
+        arguments: [Double.nan, .infinity, 1e300]
+    )
+    func extremeMultiplierIsAbsorbed(multiplier: Double) {
+        var config = RelayConnectionConfig(initialReconnectDelay: .seconds(1), maxReconnectDelay: .seconds(60))
+        config.reconnectBackoffMultiplier = multiplier
+
+        let next = config.nextReconnectDelay(after: .seconds(1))
+        #expect(next == (multiplier.isNaN ? .seconds(1) : .seconds(60)))
     }
 
     /// A ceiling below the floor would otherwise clamp every delay back under the minimum.
     @Test("a maximum below the initial delay is raised to it")
     func maxBelowInitialIsRaised() {
-        var config = RelayConnectionConfig(initialReconnectDelay: 10)
-        config.maxReconnectDelay = 1
+        var config = RelayConnectionConfig(initialReconnectDelay: .seconds(10))
+        config.maxReconnectDelay = .seconds(1)
 
-        #expect(config.resolvedMaxReconnectDelay == 10)
-        #expect(config.boundedReconnectDelay(10) == 10)
+        #expect(config.resolvedMaxReconnectDelay == .seconds(10))
+        #expect(config.boundedReconnectDelay(.seconds(10)) == .seconds(10))
     }
 
     // MARK: - Jitter through a live reconnect
@@ -108,7 +125,7 @@ struct ReconnectBackoffTests {
         let connection = RelayConnection(
             url: RelayURL("wss://relay.example.com")!,
             webSocketFactory: MockWebSocketSessionFactory(makeSession: { sockets.next() }),
-            config: RelayConnectionConfig(autoReconnect: true, initialReconnectDelay: 0),
+            config: RelayConnectionConfig(autoReconnect: true, initialReconnectDelay: .zero),
             jitter: { range in
                 ranges.record(range)
                 return range.lowerBound
@@ -134,7 +151,7 @@ struct ReconnectBackoffTests {
             url: RelayURL("wss://relay.example.com")!,
             webSocketFactory: MockWebSocketSessionFactory(makeSession: { sockets.next() }),
             config: RelayConnectionConfig(
-                autoReconnect: true, initialReconnectDelay: 0, reconnectBackoffMultiplier: 0),
+                autoReconnect: true, initialReconnectDelay: .zero, reconnectBackoffMultiplier: 0),
             jitter: { $0.lowerBound }
         )
 

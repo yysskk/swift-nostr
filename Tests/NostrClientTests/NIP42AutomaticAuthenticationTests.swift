@@ -15,7 +15,7 @@ struct NIP42AutomaticAuthenticationTests {
     private let relayURL = RelayURL("wss://relay.example.com")!
 
     private var noReconnectConfig: RelayConnectionConfig {
-        RelayConnectionConfig(connectionTimeout: 1, pingInterval: 60, autoReconnect: false)
+        RelayConnectionConfig(connectionTimeout: .seconds(1), pingInterval: .seconds(60), autoReconnect: false)
     }
 
     private func makeConnection() -> (RelayConnection, MockWebSocketSession) {

@@ -53,14 +53,12 @@ extension RelayConnection {
             // was configured: the fields are mutable, so a zero or negative delay set after init
             // would otherwise turn the unlimited-attempt default into a loop with no pause at all.
             let delay = config.boundedReconnectDelay(currentReconnectDelay)
-            try? await Task.sleep(for: .seconds(delay * jitter(Self.jitterRange)))
+            try? await Task.sleep(for: delay * jitter(Self.jitterRange))
 
             guard !Task.isCancelled else { return }
 
             // Calculate next delay with exponential backoff
-            currentReconnectDelay = config.boundedReconnectDelay(
-                delay * config.resolvedBackoffMultiplier
-            )
+            currentReconnectDelay = config.nextReconnectDelay(after: delay)
             reconnectAttempts += 1
 
             do {

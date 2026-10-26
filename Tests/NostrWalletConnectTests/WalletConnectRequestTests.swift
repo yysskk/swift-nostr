@@ -50,6 +50,27 @@ struct WalletConnectRequestTests {
         #expect(params["descriptionHash"] == nil)
     }
 
+    @Test("make_invoice encodes expiry as whole seconds, truncating a fraction")
+    func makeInvoiceExpiryEncodesSeconds() throws {
+        let hour = try wire(MakeInvoiceParams(amount: 1000, expiry: .seconds(3600)))
+        #expect(hour["expiry"] == .int(3600))
+
+        let fractional = try wire(MakeInvoiceParams(amount: 1000, expiry: .milliseconds(90_900)))
+        #expect(fractional["expiry"] == .int(90))
+
+        let absent = try wire(MakeInvoiceParams(amount: 1000))
+        #expect(absent["expiry"] == nil)
+    }
+
+    @Test("make_invoice decodes expiry from integer seconds")
+    func makeInvoiceExpiryDecodesSeconds() throws {
+        let json = Data(#"{"amount":1000,"description":"coffee","expiry":600}"#.utf8)
+        let params = try JSONDecoder().decode(MakeInvoiceParams.self, from: json)
+
+        #expect(params == MakeInvoiceParams(amount: 1000, description: "coffee", expiry: .seconds(600)))
+        #expect(try JSONDecoder().decode(MakeInvoiceParams.self, from: Data(#"{"amount":1}"#.utf8)).expiry == nil)
+    }
+
     @Test("pay_keysend encodes tlv_records with a numeric type")
     func payKeysendTLV() throws {
         let root = try wire(

@@ -16,7 +16,7 @@ struct RelayConnectionTeardownTests {
         RelayConnection(
             url: relayURL,
             webSocketFactory: MockWebSocketSessionFactory(makeSession: { socket }),
-            config: RelayConnectionConfig(publishAckTimeout: 30, autoReconnect: false)
+            config: RelayConnectionConfig(publishAckTimeout: .seconds(30), autoReconnect: false)
         )
     }
 

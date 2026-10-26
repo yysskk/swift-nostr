@@ -51,7 +51,7 @@ public actor RelayConnection {
     var reconnectAttempts: Int = 0
 
     /// Current reconnect delay
-    var currentReconnectDelay: TimeInterval = 1
+    var currentReconnectDelay: Duration = .seconds(1)
 
     /// Draws the random factor each reconnect delay is scaled by. Injectable so tests can pin it.
     var jitter: ReconnectJitter = { range in Double.random(in: range) }
@@ -276,7 +276,7 @@ public actor RelayConnection {
 
         var request = URLRequest(url: url.url)
         request.setValue("websocket", forHTTPHeaderField: "Upgrade")
-        request.timeoutInterval = config.connectionTimeout
+        request.timeoutInterval = config.connectionTimeout.timeInterval
 
         let task = webSocketFactory.makeWebSocket(with: request)
         let generation = installSocket(task)
@@ -468,7 +468,7 @@ public actor RelayConnection {
                 }
 
                 group.addTask {
-                    try await Task.sleep(for: .seconds(self.config.sendTimeout))
+                    try await Task.sleep(for: self.config.sendTimeout)
                     throw NostrError.timeout
                 }
 
@@ -599,7 +599,7 @@ public actor RelayConnection {
             }
 
             group.addTask {
-                try await Task.sleep(for: .seconds(self.config.publishAckTimeout))
+                try await Task.sleep(for: self.config.publishAckTimeout)
                 throw NostrError.timeout
             }
 
@@ -753,7 +753,7 @@ public actor RelayConnection {
             }
 
             group.addTask {
-                try await Task.sleep(for: .seconds(self.config.publishAckTimeout))
+                try await Task.sleep(for: self.config.publishAckTimeout)
                 throw NostrError.timeout
             }
 

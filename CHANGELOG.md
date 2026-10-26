@@ -30,6 +30,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Timestamp(_ date:)` truncates toward zero and clamps to ±2^53 seconds, infinity and NaN included,
   and `date` clamps the same way, so neither conversion traps. `Timestamp.now` is the current time;
   the type is `Comparable` and its `description` is the decimal seconds.
+  `advanced(by:)` and `duration(to:)` do `Duration` arithmetic without going through `Date`:
+  advancing drops the sub-second part of the duration (truncating toward zero) and saturates at the
+  bounds of `Int64` instead of trapping.
 
 ### Changed
 
@@ -248,6 +251,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `NostrGroupManaging` requirement, and `Bolt11Invoice.timestamp` were `Date`; NIP-47
   `WalletConnectTransaction.createdAt`, `expiresAt`, and `settledAt` and `ListTransactionsParams.from`
   and `until` were `Int64`. The NIP-47 JSON is unchanged.
+- **Relay connection periods are `Duration`** (breaking): `RelayConnectionConfig.connectionTimeout`,
+  `sendTimeout`, `publishAckTimeout`, `pingInterval`, `initialReconnectDelay`, and
+  `maxReconnectDelay` were `TimeInterval`, and `RelayConnectionConfig.minimumReconnectDelay` is now
+  `.milliseconds(100)`. The defaults are unchanged.
+- **`RelayPoolConfig.deduplicationCacheTTL` is a `Duration`** (breaking); the default is still five
+  minutes.
+- **Session timeouts are `Duration`** (breaking): `RemoteSigner.Config.requestTimeout` and
+  `authChallengeTimeout`, and `WalletConnection.Config.requestTimeout`, were `TimeInterval`. The
+  defaults are unchanged.
+- **`HTTPAuth.validate` takes a `Duration` tolerance and a `Timestamp` clock** (breaking):
+  `tolerance:` was `TimeInterval` (default `.seconds(60)`) and `now:` was `Date` (default `.now`).
+- **Invoice expiries are `Duration`** (breaking): `Bolt11Invoice.expirySeconds: Int64?` is now
+  `expiry: Duration?`, and NIP-47 `MakeInvoiceParams.expiry` was `Int64?`. The NIP-47 `expiry`
+  field still carries whole seconds; a sub-second part is truncated toward zero when encoding.
+- **NIP-11 periods are `Duration`** (breaking): `RelayInformation.Limitation`'s
+  `createdAtLowerLimit` and `createdAtUpperLimit` were `Int64?` documented as Unix times; NIP-11
+  defines them as offsets from the relay's current time, which is what they now model.
+  `FeeSchedule.period` and `Retention.time` were `Int?`; a retention `time` of `.zero` still means
+  events are not stored, and `nil` means no time limit. The document still carries integer seconds,
+  and a non-integer value still fails decoding.
 
 ## [0.8.0] - 2026-10-25
 

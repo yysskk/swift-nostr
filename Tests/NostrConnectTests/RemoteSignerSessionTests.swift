@@ -16,7 +16,7 @@ struct RemoteSignerSessionTests {
     }
 
     private func makeSigner(
-        secret: String? = nil, transport: FakeRemoteSignerTransport, requestTimeout: TimeInterval = 1
+        secret: String? = nil, transport: FakeRemoteSignerTransport, requestTimeout: Duration = .seconds(1)
     ) throws -> RemoteSigner {
         try RemoteSigner(
             bunker: RemoteSignerFixtures.bunker(signer: signer, secret: secret),
@@ -26,6 +26,13 @@ struct RemoteSignerSessionTests {
     }
 
     // MARK: - connect handshake
+
+    @Test("the default configuration waits 30 seconds, and 5 minutes after a challenge")
+    func configDefaults() {
+        let config = RemoteSigner.Config()
+        #expect(config.requestTimeout == .seconds(30))
+        #expect(config.authChallengeTimeout == .seconds(300))
+    }
 
     @Test("connect sends a kind-24133 connect request p-tagging the signer")
     func connectSendsRequest() async throws {
@@ -135,7 +142,7 @@ struct RemoteSignerSessionTests {
     @Test("a response with an unknown id is ignored")
     func unknownIDIgnored() async throws {
         let transport = FakeRemoteSignerTransport()
-        let remote = try makeSigner(transport: transport, requestTimeout: 0.3)
+        let remote = try makeSigner(transport: transport, requestTimeout: .milliseconds(300))
         try await connectHandshake(remote, transport: transport)
 
         let ping = Task { try await remote.ping() }
@@ -153,7 +160,7 @@ struct RemoteSignerSessionTests {
     @Test("a response from a non-signer pubkey is ignored")
     func nonSignerResponseIgnored() async throws {
         let transport = FakeRemoteSignerTransport()
-        let remote = try makeSigner(transport: transport, requestTimeout: 0.3)
+        let remote = try makeSigner(transport: transport, requestTimeout: .milliseconds(300))
         try await connectHandshake(remote, transport: transport)
 
         let ping = Task { try await remote.ping() }
@@ -177,7 +184,7 @@ struct RemoteSignerSessionTests {
     @Test("a request with no response times out")
     func requestTimesOut() async throws {
         let transport = FakeRemoteSignerTransport()
-        let remote = try makeSigner(transport: transport, requestTimeout: 0.2)
+        let remote = try makeSigner(transport: transport, requestTimeout: .milliseconds(200))
         try await connectHandshake(remote, transport: transport)
 
         await #expect(throws: RemoteSignerError.timedOut) {
@@ -212,7 +219,7 @@ struct RemoteSignerSessionTests {
             bunker: RemoteSignerFixtures.bunker(signer: signer),
             clientKeyPair: client,
             transport: transport,
-            config: .init(requestTimeout: 0.3, authChallengeTimeout: 2))
+            config: .init(requestTimeout: .milliseconds(300), authChallengeTimeout: .seconds(2)))
         try await connectHandshake(remote, transport: transport)
 
         let challenges = await remote.authChallenges()
@@ -248,7 +255,7 @@ struct RemoteSignerSessionTests {
     @Test("disconnect fails in-flight requests with notConnected")
     func disconnectFailsPending() async throws {
         let transport = FakeRemoteSignerTransport()
-        let remote = try makeSigner(transport: transport, requestTimeout: 5)
+        let remote = try makeSigner(transport: transport, requestTimeout: .seconds(5))
         try await connectHandshake(remote, transport: transport)
 
         let ping = Task { try await remote.ping() }
@@ -262,7 +269,7 @@ struct RemoteSignerSessionTests {
     @Test("logout sends a logout request then disconnects")
     func logoutSendsThenDisconnects() async throws {
         let transport = FakeRemoteSignerTransport()
-        let remote = try makeSigner(transport: transport, requestTimeout: 5)
+        let remote = try makeSigner(transport: transport, requestTimeout: .seconds(5))
         try await connectHandshake(remote, transport: transport)
 
         async let logout: Void = remote.logout()

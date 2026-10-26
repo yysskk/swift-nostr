@@ -37,7 +37,7 @@ struct NostrSigningClientTests {
     private let relayURL = RelayURL("wss://relay.example.com")!
 
     private var noReconnectConfig: RelayConnectionConfig {
-        RelayConnectionConfig(connectionTimeout: 1, pingInterval: 60, autoReconnect: false)
+        RelayConnectionConfig(connectionTimeout: .seconds(1), pingInterval: .seconds(60), autoReconnect: false)
     }
 
     /// Builds a client whose single relay speaks to a test-controlled socket, so signing and

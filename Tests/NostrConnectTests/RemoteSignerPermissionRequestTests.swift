@@ -28,7 +28,7 @@ struct RemoteSignerPermissionRequestTests {
             clientKeyPair: client,
             requesting: permissions,
             transport: transport,
-            config: .init(requestTimeout: 1))
+            config: .init(requestTimeout: .seconds(1)))
     }
 
     /// The params are positional, so the permissions sit third — after the secret slot, which has to
@@ -145,7 +145,7 @@ struct RemoteSignerPermissionRequestTests {
             bunker: RemoteSignerFixtures.bunker(signer: signer),
             clientKeyPair: client,
             transport: transport,
-            config: .init(requestTimeout: 0.2, authChallengeTimeout: 0.5))
+            config: .init(requestTimeout: .milliseconds(200), authChallengeTimeout: .milliseconds(500)))
 
         let connectTask = Task { try await remote.connect() }
         let connectSent = try await RemoteSignerFixtures.waitForSentEvents(transport, count: 1)
@@ -197,7 +197,7 @@ struct RemoteSignerPermissionRequestTests {
             bunker: RemoteSignerFixtures.bunker(signer: signer),
             clientKeyPair: client,
             transport: transport,
-            config: .init(requestTimeout: 0.3, authChallengeTimeout: 5))
+            config: .init(requestTimeout: .milliseconds(300), authChallengeTimeout: .seconds(5)))
 
         let connectTask = Task { try await remote.connect() }
         let sent = try await RemoteSignerFixtures.waitForSentEvents(transport, count: 1)

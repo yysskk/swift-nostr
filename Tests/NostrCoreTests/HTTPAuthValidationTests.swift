@@ -13,11 +13,11 @@ struct HTTPAuthValidationTests {
         method: String = "GET",
         payload: Data? = nil,
         createdAt: Timestamp = Timestamp(rawValue: 1_700_000_000)
-    ) async throws -> (header: String, now: Date, signer: EventSigner) {
+    ) async throws -> (header: String, now: Timestamp, signer: EventSigner) {
         let signer = EventSigner(keyPair: try KeyPair())
         let header = try await HTTPAuth.authorizationHeaderValue(
             url: url, method: method, payload: payload, createdAt: createdAt, signer: signer)
-        return (header, createdAt.date, signer)
+        return (header, createdAt, signer)
     }
 
     /// Encodes an arbitrary event as a header value, bypassing the
@@ -76,7 +76,7 @@ struct HTTPAuthValidationTests {
                 authorization: header,
                 url: URL(string: "https://api.snort.social/api/v1/n5sp/list")!,
                 method: "GET",
-                now: Date(timeIntervalSince1970: 1_682_327_852)
+                now: Timestamp(rawValue: 1_682_327_852)
             )
         }
     }
@@ -197,23 +197,23 @@ struct HTTPAuthValidationTests {
         #expect(throws: Never.self) {
             try HTTPAuth.validate(
                 authorization: header, url: url, method: "GET",
-                now: createdAt.date.addingTimeInterval(60))
+                now: createdAt.advanced(by: .seconds(60)))
         }
         #expect(throws: Never.self) {
             try HTTPAuth.validate(
                 authorization: header, url: url, method: "GET",
-                now: createdAt.date.addingTimeInterval(-60))
+                now: createdAt.advanced(by: .seconds(-60)))
         }
         // One second past the tolerance, in both directions: rejected.
         #expect(throws: HTTPAuth.ValidationError.timestampOutOfTolerance(createdAt: createdAt)) {
             try HTTPAuth.validate(
                 authorization: header, url: url, method: "GET",
-                now: createdAt.date.addingTimeInterval(61))
+                now: createdAt.advanced(by: .seconds(61)))
         }
         #expect(throws: HTTPAuth.ValidationError.timestampOutOfTolerance(createdAt: createdAt)) {
             try HTTPAuth.validate(
                 authorization: header, url: url, method: "GET",
-                now: createdAt.date.addingTimeInterval(-61))
+                now: createdAt.advanced(by: .seconds(-61)))
         }
     }
 
@@ -228,7 +228,7 @@ struct HTTPAuthValidationTests {
         #expect(throws: HTTPAuth.ValidationError.timestampOutOfTolerance(createdAt: createdAt)) {
             try HTTPAuth.validate(
                 authorization: header, url: url, method: "GET",
-                now: Date(timeIntervalSince1970: 1_700_000_000))
+                now: Timestamp(rawValue: 1_700_000_000))
         }
     }
 
@@ -240,7 +240,24 @@ struct HTTPAuthValidationTests {
         #expect(throws: Never.self) {
             try HTTPAuth.validate(
                 authorization: header, url: url, method: "GET",
-                tolerance: 300, now: createdAt.date.addingTimeInterval(200))
+                tolerance: .seconds(300), now: createdAt.advanced(by: .seconds(200)))
+        }
+    }
+
+    @Test("a sub-second tolerance accepts only an exact match")
+    func subSecondTolerance() async throws {
+        let createdAt = Timestamp(rawValue: 1_700_000_000)
+        let (header, _, _) = try await signedHeader(createdAt: createdAt)
+
+        #expect(throws: Never.self) {
+            try HTTPAuth.validate(
+                authorization: header, url: url, method: "GET",
+                tolerance: .milliseconds(500), now: createdAt)
+        }
+        #expect(throws: HTTPAuth.ValidationError.timestampOutOfTolerance(createdAt: createdAt)) {
+            try HTTPAuth.validate(
+                authorization: header, url: url, method: "GET",
+                tolerance: .milliseconds(500), now: createdAt.advanced(by: .seconds(1)))
         }
     }
 

@@ -12,7 +12,7 @@ import Testing
 struct ResponseSchemeTests {
     private func makeConnection(
         preferred: WalletConnectEncryption? = .nip44,
-        timeout: TimeInterval = 2
+        timeout: Duration = .seconds(2)
     ) throws -> (
         connection: WalletConnection, transport: FakeWalletConnectTransport, client: KeyPair, wallet: KeyPair
     ) {
@@ -123,7 +123,7 @@ struct ResponseSchemeTests {
     /// beside it — the two together are what make a response this wallet's answer.
     @Test("a response from another pubkey is ignored")
     func responseFromAnotherPubkeyIsIgnored() async throws {
-        let (connection, transport, client, _) = try makeConnection(timeout: 0.3)
+        let (connection, transport, client, _) = try makeConnection(timeout: .milliseconds(300))
         let impostor = try KeyPair()
 
         let payment = Task { try await connection.payInvoice("lnbc1") }
@@ -143,7 +143,7 @@ struct ResponseSchemeTests {
     /// nobody satisfied the request outright.
     @Test("a response whose signature does not verify is ignored")
     func unsignedResponseIsIgnored() async throws {
-        let (connection, transport, client, wallet) = try makeConnection(timeout: 0.3)
+        let (connection, transport, client, wallet) = try makeConnection(timeout: .milliseconds(300))
 
         let payment = Task { try await connection.payInvoice("lnbc1") }
 
