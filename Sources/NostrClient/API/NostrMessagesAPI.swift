@@ -156,7 +156,7 @@ public struct NostrMessagesAPI: NostrMessaging {
     ///   - strategy: How many relay acknowledgments to wait for on the recipient gift wrap before
     ///     returning (default: the pool config's ``RelayPoolConfig/defaultPublishStrategy``).
     /// - Returns: The shared rumor, both gift wraps, and the per-relay publish outcomes.
-    /// - Throws: ``NostrError/invalidPublicKey`` when `rumor.pubkey` is not the signer's public key
+    /// - Throws: ``NostrError/invalidPublicKey`` when `rumor.publicKey` is not the signer's public key
     ///   (the recipient's unwrap would reject it as an impersonation), or
     ///   ``NostrError/noRelaysInPool`` when the recipient copy falls back to an empty pool.
     @discardableResult
@@ -167,7 +167,7 @@ public struct NostrMessagesAPI: NostrMessaging {
         strategy: PublishStrategy? = nil
     ) async throws -> SendDirectMessageResult {
         let result = try await client.withSigner { signer, publicKey in
-            guard rumor.pubkey == publicKey else {
+            guard rumor.publicKey == publicKey else {
                 throw NostrError.invalidPublicKey
             }
             return try await DirectMessageBuilder(signer: signer).wrapWithSelfCopy(
@@ -273,7 +273,7 @@ public struct NostrMessagesAPI: NostrMessaging {
     ) async throws -> SendDirectMessageResult {
         async let recipientTargetsTask = inboxTargets(for: recipientPubkey)
         // The rumor is authored under the sender's key, so it names the self-copy's addressee.
-        async let senderTargetsTask = inboxTargets(for: result.rumor.pubkey)
+        async let senderTargetsTask = inboxTargets(for: result.rumor.publicKey)
         let recipientTargets = await recipientTargetsTask
         let senderTargets = await senderTargetsTask
 
@@ -314,7 +314,7 @@ public struct NostrMessagesAPI: NostrMessaging {
     private func giftWrapFilter(limit: Int) async throws -> Filter {
         Filter(
             kinds: [.giftWrap],
-            pubkeyReferences: [try await client.requiredPublicKey()],
+            publicKeyReferences: [try await client.requiredPublicKey()],
             limit: limit
         )
     }

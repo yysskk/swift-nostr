@@ -13,8 +13,8 @@ struct GiftWrappedRumorDeliveryTests {
 
     private func makeRumor(pubkey: PublicKey, recipient: PublicKey) -> UnsignedEvent {
         UnsignedEvent(
-            pubkey: pubkey, kind: customKind,
-            tags: [.pubkey(recipient), .hashtag("friend-request")],
+            publicKey: pubkey, kind: customKind,
+            tags: [.publicKey(recipient), .hashtag("friend-request")],
             content: "{\"bundle\":\"abc\"}"
         )
     }

@@ -118,7 +118,7 @@ public struct DirectMessageBuilder: Sendable {
         subject: String? = nil
     ) async throws -> [Event] {
         // Build tags with all recipients
-        var tags: [Tag] = recipientPubkeys.map { Tag.pubkey($0) }
+        var tags: [Tag] = recipientPubkeys.map { Tag.publicKey($0) }
 
         if let subject = subject {
             tags.append(.subject(subject))
@@ -191,7 +191,7 @@ public struct DirectMessageBuilder: Sendable {
         replyTo: EventID?
     ) -> [Tag] {
         var tags: [Tag] = [
-            .pubkey(recipientPubkey)
+            .publicKey(recipientPubkey)
         ]
 
         if let subject = subject {
@@ -210,7 +210,7 @@ public struct DirectMessageBuilder: Sendable {
     /// be cryptographic proof of authorship and destroy deniability).
     private func makeRumor(senderPubkey: PublicKey, content: String, tags: [Tag]) throws -> Event {
         let unsigned = UnsignedEvent(
-            pubkey: senderPubkey,
+            publicKey: senderPubkey,
             kind: .privateDirectMessage,
             tags: tags,
             content: content
@@ -224,11 +224,11 @@ public struct DirectMessageBuilder: Sendable {
     ) throws -> Event {
         let tags: [Tag] = [
             .event(messageID),
-            .pubkey(author),
+            .publicKey(author),
             .kind(.privateDirectMessage),
         ]
         let unsigned = UnsignedEvent(
-            pubkey: senderPubkey,
+            publicKey: senderPubkey,
             kind: .reaction,
             tags: tags,
             content: reaction
@@ -249,7 +249,7 @@ public struct DirectMessageBuilder: Sendable {
         blurhash: String?
     ) throws -> Event {
         var tags: [Tag] = [
-            .pubkey(recipientPubkey),
+            .publicKey(recipientPubkey),
             Tag(name: "file-type", values: [mimeType]),
             Tag(name: "encryption-algorithm", values: ["aes-gcm"]),
             Tag(name: "decryption-key", values: [encryption.key.base64EncodedString()]),
@@ -268,7 +268,7 @@ public struct DirectMessageBuilder: Sendable {
         }
 
         let unsigned = UnsignedEvent(
-            pubkey: senderPubkey,
+            publicKey: senderPubkey,
             kind: .fileMessage,
             tags: tags,
             content: url

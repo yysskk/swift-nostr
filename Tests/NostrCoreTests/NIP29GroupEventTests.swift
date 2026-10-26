@@ -21,12 +21,12 @@ private struct SeededGenerator: RandomNumberGenerator {
 /// is irrelevant.
 private func makeEvent(
     id: EventID = EventID(String(repeating: "a", count: 64))!,
-    pubkey: PublicKey = .fixture("pk"),
+    publicKey: PublicKey = .fixture("pk"),
     createdAt: Timestamp = Timestamp(rawValue: 1_700_000_000),
     kind: Event.Kind = .chatMessage,
     tags: [[String]] = []
 ) -> Event {
-    Event(id: id, pubkey: pubkey, createdAt: createdAt, kind: kind, tags: tags, content: "", signature: nil)
+    Event(id: id, publicKey: publicKey, createdAt: createdAt, kind: kind, tags: tags, content: "", signature: nil)
 }
 
 /// The 64-character event id whose first 8 characters encode `index` in hex.
@@ -44,7 +44,7 @@ private func timelineFixture() -> [Event] {
     (0..<60).map { index in
         makeEvent(
             id: paddedID(index),
-            pubkey: .fixture(index.isMultiple(of: 2) ? "author-even" : "author-odd"),
+            publicKey: .fixture(index.isMultiple(of: 2) ? "author-even" : "author-odd"),
             createdAt: Timestamp(rawValue: 1_700_000_000 + Int64(index))
         )
     }
@@ -112,11 +112,12 @@ struct NIP29GroupKindAndTagTests {
                 == ["group", "abcdef", "wss://groups.example.com", "Cooking"])
     }
 
-    @Test("a p tag with roles appends them after the pubkey")
-    func pubkeyRolesTag() {
+    @Test("a p tag with roles appends them after the public key")
+    func publicKeyRolesTag() {
         let pk = PublicKey.fixture("member")
-        #expect(Event.Tag.pubkey(pk, roles: ["admin", "moderator"]).rawArray == ["p", pk.hex, "admin", "moderator"])
-        #expect(Event.Tag.pubkey(pk, roles: []).rawArray == ["p", pk.hex])
+        #expect(
+            Event.Tag.publicKey(pk, roles: ["admin", "moderator"]).rawArray == ["p", pk.hex, "admin", "moderator"])
+        #expect(Event.Tag.publicKey(pk, roles: []).rawArray == ["p", pk.hex])
     }
 }
 
@@ -132,12 +133,12 @@ struct NIP29GroupEventBuilderTests {
             groupID: "abcdef",
             inviteCode: "invite123",
             reason: "let me in",
-            pubkey: PublicKey.fixture("author"),
+            publicKey: PublicKey.fixture("author"),
             createdAt: createdAt
         )
 
         #expect(unsigned.kind == .groupJoinRequest)
-        #expect(unsigned.pubkey == PublicKey.fixture("author"))
+        #expect(unsigned.publicKey == PublicKey.fixture("author"))
         #expect(unsigned.createdAt.rawValue == 1_700_000_000)
         #expect(unsigned.tags == [["h", "abcdef"], ["code", "invite123"]])
         #expect(unsigned.content == "let me in")
@@ -145,7 +146,7 @@ struct NIP29GroupEventBuilderTests {
 
     @Test("a join request without an invite code or reason has one tag and empty content")
     func unsignedJoinRequestDefaults() {
-        let unsigned = Groups.joinRequest(groupID: "abcdef", pubkey: PublicKey.fixture("author"))
+        let unsigned = Groups.joinRequest(groupID: "abcdef", publicKey: PublicKey.fixture("author"))
 
         #expect(unsigned.tags == [["h", "abcdef"]])
         #expect(unsigned.content.isEmpty)
@@ -161,10 +162,10 @@ struct NIP29GroupEventBuilderTests {
     )
     func extremeTimestamps(createdAt: Timestamp) async throws {
         let author = PublicKey.fixture("author")
-        let join = Groups.joinRequest(groupID: "abcdef", pubkey: author, createdAt: createdAt)
-        let leave = Groups.leaveRequest(groupID: "abcdef", pubkey: author, createdAt: createdAt)
+        let join = Groups.joinRequest(groupID: "abcdef", publicKey: author, createdAt: createdAt)
+        let leave = Groups.leaveRequest(groupID: "abcdef", publicKey: author, createdAt: createdAt)
         let content = Groups.contentEvent(
-            groupID: "abcdef", kind: .chatMessage, content: "gm", pubkey: author, createdAt: createdAt)
+            groupID: "abcdef", kind: .chatMessage, content: "gm", publicKey: author, createdAt: createdAt)
 
         #expect(join.createdAt == createdAt)
         #expect(leave.createdAt == createdAt)
@@ -189,7 +190,7 @@ struct NIP29GroupEventBuilderTests {
         )
 
         #expect(event.kind == .groupJoinRequest)
-        #expect(event.pubkey == signer.publicKey)
+        #expect(event.publicKey == signer.publicKey)
         #expect(event.createdAt.rawValue == 1_700_000_000)
         #expect(event.tags == [["h", "abcdef"], ["code", "invite123"]])
         #expect(event.content == "let me in")
@@ -203,16 +204,16 @@ struct NIP29GroupEventBuilderTests {
         let unsigned = Groups.leaveRequest(
             groupID: "abcdef",
             reason: "goodbye",
-            pubkey: PublicKey.fixture("author"),
+            publicKey: PublicKey.fixture("author"),
             createdAt: createdAt
         )
 
         #expect(unsigned.kind == .groupLeaveRequest)
-        #expect(unsigned.pubkey == PublicKey.fixture("author"))
+        #expect(unsigned.publicKey == PublicKey.fixture("author"))
         #expect(unsigned.createdAt.rawValue == 1_700_000_000)
         #expect(unsigned.tags == [["h", "abcdef"]])
         #expect(unsigned.content == "goodbye")
-        #expect(Groups.leaveRequest(groupID: "abcdef", pubkey: PublicKey.fixture("author")).content.isEmpty)
+        #expect(Groups.leaveRequest(groupID: "abcdef", publicKey: PublicKey.fixture("author")).content.isEmpty)
     }
 
     @Test("a signed leave request verifies with kind 9022 and never carries a code tag")
@@ -222,7 +223,7 @@ struct NIP29GroupEventBuilderTests {
         let event = try await Groups.leaveRequest(groupID: "abcdef", createdAt: createdAt, signer: signer)
 
         #expect(event.kind == .groupLeaveRequest)
-        #expect(event.pubkey == signer.publicKey)
+        #expect(event.publicKey == signer.publicKey)
         #expect(event.tags == [["h", "abcdef"]])
         #expect(event.content.isEmpty)
         #expect(try event.verify())
@@ -236,9 +237,9 @@ struct NIP29GroupEventBuilderTests {
             groupID: "abcdef",
             kind: .chatMessage,
             content: "hello",
-            tags: [.hashtag("nostr"), .pubkey(PublicKey.fixture("pk1"))],
+            tags: [.hashtag("nostr"), .publicKey(PublicKey.fixture("pk1"))],
             previous: ["00000001", "00000002"],
-            pubkey: PublicKey.fixture("author"),
+            publicKey: PublicKey.fixture("author"),
             createdAt: createdAt
         )
 
@@ -256,7 +257,7 @@ struct NIP29GroupEventBuilderTests {
     @Test("contentEvent omits the previous tag when no references are given")
     func contentEventWithoutPrevious() {
         let unsigned = Groups.contentEvent(
-            groupID: "abcdef", kind: .chatMessage, content: "hello", pubkey: PublicKey.fixture("author"))
+            groupID: "abcdef", kind: .chatMessage, content: "hello", publicKey: PublicKey.fixture("author"))
 
         #expect(unsigned.tags == [["h", "abcdef"]])
     }
@@ -264,7 +265,8 @@ struct NIP29GroupEventBuilderTests {
     @Test("contentEvent honors arbitrary content kinds")
     func contentEventArbitraryKind() {
         let article = Groups.contentEvent(
-            groupID: "abcdef", kind: Event.Kind(rawValue: 30023), content: "post", pubkey: PublicKey.fixture("author"))
+            groupID: "abcdef", kind: Event.Kind(rawValue: 30023), content: "post",
+            publicKey: PublicKey.fixture("author"))
 
         #expect(article.kind.rawValue == 30023)
         #expect(article.tags.first == ["h", "abcdef"])
@@ -283,7 +285,7 @@ struct NIP29GroupEventBuilderTests {
         )
 
         #expect(event.kind == .chatMessage)
-        #expect(event.pubkey == signer.publicKey)
+        #expect(event.publicKey == signer.publicKey)
         #expect(event.createdAt.rawValue == 1_700_000_000)
         #expect(event.tags == [["h", "abcdef"]])
         #expect(event.content == "hello")

@@ -41,7 +41,7 @@ enum RemoteSignerFixtures {
         let sealed = try SealedMessage.seal(json, for: client.publicKey, using: signer)
         return Event(
             id: .fixture("resp-\(requestID)"),
-            pubkey: signer.publicKey,
+            publicKey: signer.publicKey,
             createdAt: Timestamp(rawValue: 0),
             kind: .nostrConnect,
             tags: [["p", client.publicKey.hex]],
@@ -69,7 +69,7 @@ enum RemoteSignerFixtures {
         let content = object["content"] as? String ?? ""
         let createdAt = Timestamp(rawValue: (object["created_at"] as? Int).map(Int64.init) ?? 0)
         let tags = object["tags"] as? [[String]] ?? []
-        return UnsignedEvent(pubkey: author, createdAt: createdAt, kind: kind, rawTags: tags, content: content)
+        return UnsignedEvent(publicKey: author, createdAt: createdAt, kind: kind, rawTags: tags, content: content)
     }
 
     /// Polls until `transport` has recorded at least `count` sent events, returning them.

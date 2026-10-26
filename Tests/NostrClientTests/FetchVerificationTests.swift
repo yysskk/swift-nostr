@@ -56,7 +56,7 @@ struct FetchVerificationTests {
     ) throws -> Event {
         try signer.sign(
             UnsignedEvent(
-                pubkey: signer.publicKey, createdAt: createdAt, kind: kind, rawTags: tags,
+                publicKey: signer.publicKey, createdAt: createdAt, kind: kind, rawTags: tags,
                 content: content))
     }
 
@@ -70,10 +70,10 @@ struct FetchVerificationTests {
         content: String = ""
     ) throws -> Event {
         let unsigned = UnsignedEvent(
-            pubkey: pubkey, createdAt: createdAt, kind: kind, rawTags: tags, content: content)
+            publicKey: pubkey, createdAt: createdAt, kind: kind, rawTags: tags, content: content)
         return Event(
             id: try unsigned.computedID,
-            pubkey: pubkey,
+            publicKey: pubkey,
             createdAt: createdAt,
             kind: kind,
             tags: unsigned.tags,

@@ -10,7 +10,7 @@ struct FakeRemoteSignerTransportTests {
     private func event(id: EventID, content: String = "x") -> Event {
         Event(
             id: id,
-            pubkey: .fixture("author"),
+            publicKey: .fixture("author"),
             createdAt: Timestamp(rawValue: 0),
             kind: .nostrConnect,
             tags: [],

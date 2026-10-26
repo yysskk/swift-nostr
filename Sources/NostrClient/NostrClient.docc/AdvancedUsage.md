@@ -103,8 +103,8 @@ under the signer's public key and is never signed:
 
 ```swift
 let rumor = UnsignedEvent(
-    pubkey: myPubkey, kind: Event.Kind(rawValue: 30_999),
-    tags: [.pubkey(recipient)], content: payload
+    publicKey: myPubkey, kind: Event.Kind(rawValue: 30_999),
+    tags: [.publicKey(recipient)], content: payload
 )
 try await client.messages.sendGiftWrapped(rumor, to: recipient)
 ```
@@ -387,7 +387,7 @@ for await event in try await client.subscriptions.subscribe(filters: [filter]) {
 ``RelayConnection`` exposes the same building blocks: the stored
 ``RelayConnection/authenticationChallenge``, ``RelayConnection/authenticate(using:)`` /
 ``RelayConnection/authenticate(with:)`` for signing and sending the answer, and
-``RelayConnection/authenticatedPubkeys`` for the session's authenticated identities.
+``RelayConnection/authenticatedPublicKeys`` for the session's authenticated identities.
 
 ```swift
 let connection = RelayConnection(url: try RelayURL(string: "wss://relay.example.com"))
@@ -431,7 +431,7 @@ To author an event this library has no helper for, build an ``UnsignedEvent`` un
 ```swift
 guard let pubkey = await client.identity.publicKey else { return }
 let signed = try await client.identity.sign(
-    UnsignedEvent(pubkey: pubkey, kind: .textNote, content: "Signed by my bunker"))
+    UnsignedEvent(publicKey: pubkey, kind: .textNote, content: "Signed by my bunker"))
 try await client.events.publish(signed)
 ```
 
@@ -512,7 +512,7 @@ invite code, and update the pin list:
 
 ```swift
 try await client.groups.publishModeration(
-    .putUser(pubkey: newMemberPubkey, roles: ["moderator"]),
+    .putUser(publicKey: newMemberPubkey, roles: ["moderator"]),
     in: group,
     reason: "welcome aboard"
 )
@@ -534,7 +534,7 @@ signature are dropped before the pick:
 let state = try await client.groups.fetchState(for: group)
 print(state.metadata?.name ?? group.id)
 print("private:", state.metadata?.isPrivate ?? false)
-print("admins:", state.admins?.admins.map(\.pubkey) ?? [])
+print("admins:", state.admins?.admins.map(\.publicKey) ?? [])
 ```
 
 Never treat ``GroupState/members`` as exhaustive — relays may withhold or truncate the member
@@ -544,7 +544,7 @@ list. To check your own standing, derive it from the kind-9000/9001 moderation h
 ```swift
 if let pubkey = await client.identity.publicKey {
     var filter = Filter.groupTimeline(groupID: group.id, kinds: [.groupPutUser, .groupRemoveUser])
-    filter.pubkeyReferences = [pubkey]
+    filter.publicKeyReferences = [pubkey]
     let history = try await client.events.fetch(filters: [filter])
     switch Groups.membership(of: pubkey, in: history) {
     case .member(let roles):
@@ -616,7 +616,7 @@ every pubkey it mentions in `p` tags, with ``NostrRoutingAPI/publishGossip(_:str
 ```swift
 let signer = EventSigner(keyPair: keyPair)
 let alice = try PublicKey(npub: "npub1...")
-let note = try signer.signTextNote(content: "gm!", tags: [.pubkey(alice)])
+let note = try signer.signTextNote(content: "gm!", tags: [.publicKey(alice)])
 try await client.routing.publishGossip(note)
 ```
 
@@ -636,12 +636,12 @@ is the caller's job (use a Lightning wallet).
 guard let serviceURL = LNURL.payServiceURL(forLightningAddress: "alice@example.com") else { return }
 let (data, _) = try await URLSession.shared.data(from: serviceURL)
 let pay = try JSONDecoder().decode(LNURLPayResponse.self, from: data)
-guard pay.supportsZaps, let providerPubkey = pay.nostrPubkey else { return }
+guard pay.supportsZaps, let providerPubkey = pay.nostrPublicKey else { return }
 
 // 2. Sign a zap request (kind 9734) — note it is NOT published to relays.
 let signer = EventSigner(keyPair: keyPair)
 let zapRequest = try signer.signZapRequest(
-    recipientPubkey: try PublicKey(npub: "npub1..."),
+    recipientPublicKey: try PublicKey(npub: "npub1..."),
     relays: [try RelayURL(string: "wss://relay.example.com")],     // where the recipient's wallet should publish the receipt
     amountMillisats: 21_000,
     lnurl: LNURL.encode(serviceURL),
@@ -669,7 +669,7 @@ and `expectedAmountMillisats` fails against an invoice that names no amount. The
 commit to the zap request through its description hash; pass `requiringDescriptionHash: false` only
 for a provider known to omit it, accepting the loss of that binding.
 
-The ``EventSigner/signZapRequest(recipientPubkey:relays:amountMillisats:lnurl:eventID:eventCoordinate:comment:)``,
+The ``EventSigner/signZapRequest(recipientPublicKey:relays:amountMillisats:lnurl:eventID:eventCoordinate:comment:)``,
 ``LNURLPayResponse/fetchInvoice(amountMillisats:zapRequest:lnurl:urlSession:)``, ``Bolt11Invoice``,
 and ``ZapReceipt/validate(lnurlProviderPubkey:expectedAmountMillisats:requiringDescriptionHash:)`` APIs each work standalone,
 so you can adopt only the parts of the flow you need.
@@ -804,7 +804,7 @@ let keyPair = try KeyPair()
 let signer = EventSigner(keyPair: keyPair)
 
 let unsigned = UnsignedEvent(
-    pubkey: keyPair.publicKey,
+    publicKey: keyPair.publicKey,
     kind: .textNote,
     tags: [.hashtag("test")],
     content: "Manually signed"

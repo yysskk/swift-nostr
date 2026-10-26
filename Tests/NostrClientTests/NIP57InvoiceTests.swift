@@ -11,13 +11,14 @@ struct NIP57InvoiceTests {
     private func makePayResponse(min: Int64 = 1000, max: Int64 = 100_000_000) -> LNURLPayResponse {
         LNURLPayResponse(
             callback: "https://example.com/lnurl/cb", minSendable: min, maxSendable: max,
-            allowsNostr: true, nostrPubkey: PublicKey.fixture("np"))
+            allowsNostr: true, nostrPublicKey: PublicKey.fixture("np"))
     }
 
     private func makeZapRequest() throws -> Event {
         let signer = EventSigner(keyPair: try KeyPair())
         return try signer.signZapRequest(
-            recipientPubkey: PublicKey.fixture("rp"), relays: [RelayURL("wss://r.example.com")!], amountMillisats: 21000
+            recipientPublicKey: PublicKey.fixture("rp"), relays: [RelayURL("wss://r.example.com")!],
+            amountMillisats: 21000
         )
     }
 

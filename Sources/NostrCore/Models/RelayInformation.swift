@@ -29,12 +29,12 @@ public struct RelayInformation: Codable, Sendable, Hashable {
     /// The administrator's public key.
     ///
     /// Nil when the document omits it or carries a value that is not a canonical hex public key.
-    public var pubkey: PublicKey?
+    public var publicKey: PublicKey?
 
     /// The relay's own independent identity public key (the document's `self` field).
     ///
     /// Nil when the document omits it or carries a value that is not a canonical hex public key.
-    public var selfPubkey: PublicKey?
+    public var selfPublicKey: PublicKey?
 
     /// Administrator's contact (URI, e.g. `mailto:` or `https://`).
     public var contact: String?
@@ -80,8 +80,8 @@ public struct RelayInformation: Codable, Sendable, Hashable {
         case description
         case banner
         case icon
-        case pubkey
-        case selfPubkey = "self"
+        case publicKey = "pubkey"
+        case selfPublicKey = "self"
         case contact
         case supportedNIPs = "supported_nips"
         case software
@@ -103,8 +103,8 @@ public struct RelayInformation: Codable, Sendable, Hashable {
         description: String? = nil,
         banner: String? = nil,
         icon: String? = nil,
-        pubkey: PublicKey? = nil,
-        selfPubkey: PublicKey? = nil,
+        publicKey: PublicKey? = nil,
+        selfPublicKey: PublicKey? = nil,
         contact: String? = nil,
         supportedNIPs: [Int]? = nil,
         software: String? = nil,
@@ -123,8 +123,8 @@ public struct RelayInformation: Codable, Sendable, Hashable {
         self.description = description
         self.banner = banner
         self.icon = icon
-        self.pubkey = pubkey
-        self.selfPubkey = selfPubkey
+        self.publicKey = publicKey
+        self.selfPublicKey = selfPublicKey
         self.contact = contact
         self.supportedNIPs = supportedNIPs
         self.software = software
@@ -159,8 +159,8 @@ extension RelayInformation {
             description: try container.decodeIfPresent(String.self, forKey: .description),
             banner: try container.decodeIfPresent(String.self, forKey: .banner),
             icon: try container.decodeIfPresent(String.self, forKey: .icon),
-            pubkey: lenientPublicKey(.pubkey),
-            selfPubkey: lenientPublicKey(.selfPubkey),
+            publicKey: lenientPublicKey(.publicKey),
+            selfPublicKey: lenientPublicKey(.selfPublicKey),
             contact: try container.decodeIfPresent(String.self, forKey: .contact),
             supportedNIPs: try container.decodeIfPresent([Int].self, forKey: .supportedNIPs),
             software: try container.decodeIfPresent(String.self, forKey: .software),
@@ -204,7 +204,7 @@ extension RelayInformation {
         public var authRequired: Bool?
         /// Whether the relay requires payment to use.
         public var paymentRequired: Bool?
-        /// Whether writes are restricted (e.g. to paid or allow-listed pubkeys).
+        /// Whether writes are restricted (e.g. to paid or allow-listed public keys).
         public var restrictedWrites: Bool?
         /// How far in the past an event's `created_at` may be, relative to the relay's current
         /// time; older events are rejected.

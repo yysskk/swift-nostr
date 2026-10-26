@@ -18,7 +18,7 @@ public struct NostrRoutingAPI: NostrRelayRouting {
     /// - Returns: The relay list, or nil if none was found.
     public func fetchRelayList(for pubkey: PublicKey, timeout: Duration? = nil) async throws -> RelayListMetadata? {
         let events = try await client.fetch(
-            filters: [.relayListMetadata(pubkey: pubkey)], fromURLs: nil, timeout: timeout
+            filters: [.relayListMetadata(publicKey: pubkey)], fromURLs: nil, timeout: timeout
         )
         // Replaceable event: the newest list this pubkey actually signed. Taking the newest of
         // whatever arrived let any relay install a list for someone else by dating it far ahead.
@@ -48,7 +48,7 @@ public struct NostrRoutingAPI: NostrRelayRouting {
     ) async throws -> PublishedEvent {
         let event = try await client.signEvent { .relayListMetadata(pubkey: $0, relayList) }
         let result = try await client.pool.publish(event, strategy: strategy)
-        await client.relayListStore.store(relayList, createdAt: event.createdAt, for: event.pubkey)
+        await client.relayListStore.store(relayList, createdAt: event.createdAt, for: event.publicKey)
         return PublishedEvent(event: event, result: result)
     }
 
@@ -95,9 +95,9 @@ public struct NostrRoutingAPI: NostrRelayRouting {
     public func publishGossip(_ event: Event, strategy: PublishStrategy? = nil) async throws -> PublishResult {
         var targets: Set<RelayURL> = []
 
-        targets.formUnion(await writeRelays(for: event.pubkey))
+        targets.formUnion(await writeRelays(for: event.publicKey))
 
-        let referencedPubkeys = Set(event.referencedPubkeys)
+        let referencedPubkeys = Set(event.referencedPublicKeys)
         for pubkey in referencedPubkeys {
             if await cachedRelayList(for: pubkey) == nil {
                 _ = try? await fetchRelayList(for: pubkey)
@@ -124,7 +124,7 @@ public struct NostrRoutingAPI: NostrRelayRouting {
         timeout: Duration? = nil
     ) async throws -> DirectMessageRelayList? {
         let events = try await client.fetch(
-            filters: [.directMessageRelayList(pubkey: pubkey)], fromURLs: nil, timeout: timeout
+            filters: [.directMessageRelayList(publicKey: pubkey)], fromURLs: nil, timeout: timeout
         )
         // Replaceable event: the newest list this pubkey actually signed. This one decides where
         // their private messages are delivered, so an unverified copy would let a relay redirect
@@ -158,7 +158,7 @@ public struct NostrRoutingAPI: NostrRelayRouting {
     ) async throws -> PublishedEvent {
         let event = try await client.signEvent { .directMessageRelayList(pubkey: $0, relayList) }
         let result = try await client.pool.publish(event, strategy: strategy)
-        await client.dmRelayListStore.store(relayList, createdAt: event.createdAt, for: event.pubkey)
+        await client.dmRelayListStore.store(relayList, createdAt: event.createdAt, for: event.publicKey)
         return PublishedEvent(event: event, result: result)
     }
 

@@ -85,7 +85,7 @@ struct NIP23LongFormTests {
         // Parsing the emitted tags back preserves it in additionalTags, not elsewhere.
         let event = Event(
             id: EventID.fixture("id"),
-            pubkey: PublicKey(String(repeating: "a", count: 64))!,
+            publicKey: PublicKey(String(repeating: "a", count: 64))!,
             createdAt: Timestamp(rawValue: 1),
             kind: .longFormContent,
             tags: article.tags.map(\.rawArray),
@@ -148,7 +148,7 @@ struct NIP23LongFormTests {
         let signer = try makeSigner()
         let event = try signer.sign(
             UnsignedEvent(
-                pubkey: signer.publicKey, kind: .longFormContent,
+                publicKey: signer.publicKey, kind: .longFormContent,
                 rawTags: [["d", "d"], ["published_at", "9223372036854775807"]], content: ""))
 
         let article = try #require(LongFormContent(event: event))
@@ -161,7 +161,7 @@ struct NIP23LongFormTests {
         let signer = try makeSigner()
         let event = try signer.sign(
             UnsignedEvent(
-                pubkey: signer.publicKey, kind: .longFormContent,
+                publicKey: signer.publicKey, kind: .longFormContent,
                 rawTags: [["d", "d"], ["published_at", "1.5e9"]], content: ""))
 
         #expect(LongFormContent(event: event)?.publishedAt == nil)
@@ -229,7 +229,7 @@ struct NIP23LongFormTests {
     private func eventFrame(subscriptionID: String, event: Event) throws -> String {
         let eventDict: [String: Any] = [
             "id": event.id.hex,
-            "pubkey": event.pubkey.hex,
+            "pubkey": event.publicKey.hex,
             "created_at": event.createdAt.rawValue,
             "kind": event.kind.rawValue,
             "tags": event.tags,
@@ -258,7 +258,7 @@ struct NIP23LongFormTests {
             publishedAt: Timestamp(rawValue: 1_600_000_100)
         )
         let newerUnsigned = UnsignedEvent(
-            pubkey: signer.publicKey,
+            publicKey: signer.publicKey,
             createdAt: Timestamp(rawValue: older.createdAt.rawValue + 1000),
             kind: .longFormContent,
             tags: newerBase.tags,

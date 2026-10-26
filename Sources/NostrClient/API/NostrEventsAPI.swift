@@ -26,7 +26,7 @@ public struct NostrEventsAPI: NostrEventPublishing, NostrEventFetching {
         tags: [Tag] = [],
         strategy: PublishStrategy? = nil
     ) async throws -> PublishedEvent {
-        try await signAndPublish(strategy: strategy) { .textNote(pubkey: $0, content: content, tags: tags) }
+        try await signAndPublish(strategy: strategy) { .textNote(publicKey: $0, content: content, tags: tags) }
     }
 
     /// Publishes a reply to an event
@@ -83,9 +83,9 @@ public struct NostrEventsAPI: NostrEventPublishing, NostrEventFetching {
             }
 
             // Add p tag for the author we're replying to
-            tags.append(.pubkey(event.pubkey))
+            tags.append(.publicKey(event.publicKey))
 
-            return .textNote(pubkey: publicKey, content: content, tags: tags)
+            return .textNote(publicKey: publicKey, content: content, tags: tags)
         }
     }
 
@@ -107,7 +107,7 @@ public struct NostrEventsAPI: NostrEventPublishing, NostrEventFetching {
         content: String = "+",
         strategy: PublishStrategy? = nil
     ) async throws -> PublishedEvent {
-        try await signAndPublish(strategy: strategy) { .reaction(pubkey: $0, to: event, content: content) }
+        try await signAndPublish(strategy: strategy) { .reaction(publicKey: $0, to: event, content: content) }
     }
 
     /// Publishes a repost
@@ -123,7 +123,7 @@ public struct NostrEventsAPI: NostrEventPublishing, NostrEventFetching {
         relayURL: RelayURL? = nil,
         strategy: PublishStrategy? = nil
     ) async throws -> PublishedEvent {
-        try await signAndPublish(strategy: strategy) { try .repost(pubkey: $0, of: event, relayURL: relayURL) }
+        try await signAndPublish(strategy: strategy) { try .repost(publicKey: $0, of: event, relayURL: relayURL) }
     }
 
     /// Publishes a deletion request (kind 5, NIP-09) for events the signer authored.
@@ -135,7 +135,7 @@ public struct NostrEventsAPI: NostrEventPublishing, NostrEventFetching {
         strategy: PublishStrategy? = nil
     ) async throws -> PublishedEvent {
         try await signAndPublish(strategy: strategy) {
-            .deletion(pubkey: $0, eventIDs: eventIDs, reason: reason)
+            .deletion(publicKey: $0, eventIDs: eventIDs, reason: reason)
         }
     }
 
@@ -330,7 +330,7 @@ public struct NostrEventsAPI: NostrEventPublishing, NostrEventFetching {
     ///   ``RelayPoolConfig/queryTimeout``.
     public func fetchMetadata(pubkey: PublicKey, timeout: Duration? = nil) async throws -> UserMetadata? {
         let events = try await client.fetch(
-            filters: [.metadata(pubkeys: [pubkey])], fromURLs: nil, timeout: timeout
+            filters: [.metadata(publicKeys: [pubkey])], fromURLs: nil, timeout: timeout
         )
 
         guard let event = VerifiedEventSelection.newest(in: events, kind: .setMetadata, author: pubkey)

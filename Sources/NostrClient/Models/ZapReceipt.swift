@@ -164,7 +164,7 @@ extension ZapReceipt {
         requiringDescriptionHash: Bool = true
     ) throws {
         // 1. The receipt must claim to come from the provider's key.
-        guard event.pubkey == lnurlProviderPubkey else {
+        guard event.publicKey == lnurlProviderPubkey else {
             throw ValidationError.payeePubkeyMismatch
         }
 

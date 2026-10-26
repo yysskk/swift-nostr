@@ -16,7 +16,7 @@ extension Event {
     ///
     /// ```swift
     /// Tag.event(note.id, marker: .reply)  // ["e", "<id hex>", "", "reply"]
-    /// Tag.pubkey(alice, petname: "alice") // ["p", "<pubkey hex>", "", "alice"]
+    /// Tag.publicKey(alice, petname: "alice") // ["p", "<pubkey hex>", "", "alice"]
     /// Tag.hashtag("nostr")                // ["t", "nostr"]
     /// ```
     ///
@@ -47,7 +47,7 @@ extension Event {
             [name] + values
         }
 
-        /// The first value — the id, pubkey, or topic for single-value tags.
+        /// The first value — the id, public key, or topic for single-value tags.
         public var primaryValue: String? {
             values.first
         }
@@ -63,57 +63,57 @@ extension Tag {
         case mention
     }
 
-    /// An "e" tag referencing an event (NIP-10): `["e", id, relay, marker, pubkey]`.
+    /// An "e" tag referencing an event (NIP-10): `["e", id, relay, marker, publicKey]`.
     /// Skipped middle elements are padded with empty-string placeholders; the id and the
     /// author's public key are written as hex, and the relay URL in its canonical form.
     public static func event(
         _ id: EventID,
         relayURL: RelayURL? = nil,
         marker: EventMarker? = nil,
-        pubkey: PublicKey? = nil
+        publicKey: PublicKey? = nil
     ) -> Tag {
         var values = [id.hex]
         if let relayURL {
             values.append(relayURL.description)
-        } else if marker != nil || pubkey != nil {
+        } else if marker != nil || publicKey != nil {
             values.append("")
         }
         if let marker {
             values.append(marker.rawValue)
-        } else if pubkey != nil {
+        } else if publicKey != nil {
             values.append("")
         }
-        if let pubkey {
-            values.append(pubkey.hex)
+        if let publicKey {
+            values.append(publicKey.hex)
         }
         return Tag(name: "e", values: values)
     }
 
-    /// A "q" tag quoting another event (NIP-18): `["q", id, relay, pubkey]`.
+    /// A "q" tag quoting another event (NIP-18): `["q", id, relay, publicKey]`.
     /// Skipped middle elements are padded with empty-string placeholders; the id and the
     /// author's public key are written as hex, and the relay URL in its canonical form.
-    public static func quote(_ id: EventID, relayURL: RelayURL? = nil, pubkey: PublicKey? = nil) -> Tag {
+    public static func quote(_ id: EventID, relayURL: RelayURL? = nil, publicKey: PublicKey? = nil) -> Tag {
         var values = [id.hex]
         if let relayURL {
             values.append(relayURL.description)
-        } else if pubkey != nil {
+        } else if publicKey != nil {
             values.append("")
         }
-        if let pubkey {
-            values.append(pubkey.hex)
+        if let publicKey {
+            values.append(publicKey.hex)
         }
         return Tag(name: "q", values: values)
     }
 
-    /// A "p" tag referencing a public key: `["p", pubkey, relay, petname]`.
+    /// A "p" tag referencing a public key: `["p", publicKey, relay, petname]`.
     /// Skipped middle elements are padded with empty-string placeholders; the key is written
     /// as hex, and the relay URL in its canonical form.
-    public static func pubkey(
-        _ pubkey: PublicKey,
+    public static func publicKey(
+        _ publicKey: PublicKey,
         relayURL: RelayURL? = nil,
         petname: String? = nil
     ) -> Tag {
-        var values = [pubkey.hex]
+        var values = [publicKey.hex]
         if let relayURL {
             values.append(relayURL.description)
         } else if petname != nil {
@@ -126,11 +126,11 @@ extension Tag {
     }
 
     /// A "p" tag carrying trailing role names (NIP-29 kind-9000 put-user events and
-    /// kind-39001 admin lists): `["p", pubkey, role...]`. Unlike
-    /// ``pubkey(_:relayURL:petname:)``, index 1 here is a role, not a relay hint.
+    /// kind-39001 admin lists): `["p", publicKey, role...]`. Unlike
+    /// ``publicKey(_:relayURL:petname:)``, index 1 here is a role, not a relay hint.
     /// https://github.com/nostr-protocol/nips/blob/master/29.md
-    public static func pubkey(_ pubkey: PublicKey, roles: [String]) -> Tag {
-        Tag(name: "p", values: [pubkey.hex] + roles)
+    public static func publicKey(_ publicKey: PublicKey, roles: [String]) -> Tag {
+        Tag(name: "p", values: [publicKey.hex] + roles)
     }
 
     /// A "t" hashtag tag.
@@ -215,11 +215,11 @@ extension Tag {
     /// `["a", "kind:pubkey:identifier", relay?]`, with the relay URL in its canonical form.
     public static func address(
         kind: Event.Kind,
-        pubkey: PublicKey,
+        publicKey: PublicKey,
         identifier: String,
         relayURL: RelayURL? = nil
     ) -> Tag {
-        var values = ["\(kind.rawValue):\(pubkey.hex):\(identifier)"]
+        var values = ["\(kind.rawValue):\(publicKey.hex):\(identifier)"]
         if let relayURL {
             values.append(relayURL.description)
         }
@@ -340,7 +340,7 @@ extension Event {
     ///
     /// Tags come from whoever wrote the event, so a "p" tag whose value is not a canonical
     /// 64-digit lowercase hex public key is skipped rather than reported.
-    public var referencedPubkeys: [PublicKey] {
+    public var referencedPublicKeys: [PublicKey] {
         tags.compactMap { $0.count >= 2 && $0[0] == "p" ? PublicKey($0[1]) : nil }
     }
 

@@ -43,7 +43,7 @@ public struct GiftWrap: Sendable {
 
         // 2. Create seal (encrypt rumor to recipient, signed by the sender)
         let sealUnsigned = UnsignedEvent(
-            pubkey: try await signer.publicKey,
+            publicKey: try await signer.publicKey,
             createdAt: randomizedTimestamp(),
             kind: .seal,
             tags: [],
@@ -56,13 +56,13 @@ public struct GiftWrap: Sendable {
         // 3. Create gift wrap (encrypt seal with an ephemeral key, which hides the sender)
         let ephemeralSigner = EventSigner(keyPair: try KeyPair())
 
-        var wrapTags: [Tag] = [.pubkey(recipientPubkey)]
+        var wrapTags: [Tag] = [.publicKey(recipientPubkey)]
         if let expiration {
             wrapTags.append(.expiration(expiration))
         }
 
         let wrapUnsigned = UnsignedEvent(
-            pubkey: ephemeralSigner.publicKey,
+            publicKey: ephemeralSigner.publicKey,
             createdAt: randomizedTimestamp(),
             kind: .giftWrap,
             tags: wrapTags,
@@ -95,7 +95,7 @@ public struct GiftWrap: Sendable {
         }
 
         // 1. Open gift wrap to get seal
-        let sealJson = try await recipient.nip44Decrypt(giftWrap.content, from: giftWrap.pubkey)
+        let sealJson = try await recipient.nip44Decrypt(giftWrap.content, from: giftWrap.publicKey)
         let seal = try decodeSeal(sealJson)
 
         guard seal.kind == .seal else {
@@ -108,20 +108,20 @@ public struct GiftWrap: Sendable {
         }
 
         // 2. Open seal to get rumor
-        let rumorJson = try await recipient.nip44Decrypt(seal.content, from: seal.pubkey)
+        let rumorJson = try await recipient.nip44Decrypt(seal.content, from: seal.publicKey)
         let rumor = try decodeRumor(rumorJson)
 
         // NIP-17: "Clients MUST verify if pubkey of the kind:13 is the same pubkey on the kind:14,
         // otherwise any sender can impersonate others by simply changing the pubkey on kind:14."
         // The seal's signature proves only who sealed it; the rumor inside is unsigned by design,
         // so without this the author it names is whatever the sealer chose to write.
-        guard rumor.pubkey == seal.pubkey else {
+        guard rumor.publicKey == seal.publicKey else {
             throw NostrError.verificationFailed
         }
 
         // 3. Return the unwrapped message
         return UnwrappedMessage(
-            senderPubkey: seal.pubkey,
+            senderPubkey: seal.publicKey,
             event: rumor
         )
     }
@@ -132,7 +132,7 @@ public struct GiftWrap: Sendable {
     private static func createRumor(from event: Event) -> Rumor {
         Rumor(
             id: event.id,
-            pubkey: event.pubkey,
+            pubkey: event.publicKey,
             createdAt: event.createdAt,
             kind: event.kind,
             tags: event.tags,
@@ -163,7 +163,7 @@ public struct GiftWrap: Sendable {
         // Rebuilt through `UnsignedEvent` so the id comes from the same canonical NIP-01
         // serialization that signing and rumor construction use, rather than a second copy of it.
         let unsigned = UnsignedEvent(
-            pubkey: rumor.pubkey,
+            publicKey: rumor.pubkey,
             createdAt: rumor.createdAt,
             kind: rumor.kind,
             rawTags: rumor.tags,
@@ -177,7 +177,7 @@ public struct GiftWrap: Sendable {
         // Convert rumor back to Event (without a signature since it's a rumor)
         return Event(
             id: rumor.id,
-            pubkey: rumor.pubkey,
+            publicKey: rumor.pubkey,
             createdAt: rumor.createdAt,
             kind: rumor.kind,
             tags: rumor.tags,

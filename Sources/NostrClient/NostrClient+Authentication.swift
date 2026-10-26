@@ -57,7 +57,7 @@ extension NostrClient {
     /// - Throws: ``NostrError/signerNotSet`` when no signer is configured.
     func clientAuthenticationEvent(relayURL: RelayURL, challenge: String) async throws -> Event {
         let unsigned = UnsignedEvent(
-            pubkey: try requiredPublicKey(),
+            publicKey: try requiredPublicKey(),
             kind: .clientAuthentication,
             tags: [.relay(relayURL), .challenge(challenge)],
             content: ""

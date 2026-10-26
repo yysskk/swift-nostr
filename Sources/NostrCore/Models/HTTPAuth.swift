@@ -70,7 +70,7 @@ public enum HTTPAuth {
             tags.append(.payload(sha256: Data(SHA256.hash(data: payload)).hexEncodedString()))
         }
         let unsigned = UnsignedEvent(
-            pubkey: try await signer.publicKey,
+            publicKey: try await signer.publicKey,
             createdAt: createdAt,
             kind: .httpAuth,
             tags: tags,
@@ -171,7 +171,7 @@ extension HTTPAuth {
     /// "u"-tag match against the request URL (including query parameters), the
     /// case-insensitive "method"-tag match, and — when `payload` is given — a
     /// "payload" tag matching the body's SHA-256. On success the caller can
-    /// trust ``Event/pubkey`` as the authenticated identity.
+    /// trust ``Event/publicKey`` as the authenticated identity.
     ///
     /// > Note: NIP-98 has no nonce, so within the tolerance window a captured
     /// > header replays verbatim — validation alone cannot tell a resent

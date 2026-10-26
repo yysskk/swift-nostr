@@ -146,7 +146,7 @@ struct NIP51SetTests {
         let signer = EventSigner(keyPair: try KeyPair())
         let event = try signer.sign(
             UnsignedEvent(
-                pubkey: signer.publicKey, kind: .bookmarkSet, tags: [.hashtag("nostr")], content: ""
+                publicKey: signer.publicKey, kind: .bookmarkSet, tags: [.hashtag("nostr")], content: ""
             )
         )
         #expect(throws: (any Error).self) {

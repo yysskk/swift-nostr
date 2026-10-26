@@ -108,7 +108,7 @@ struct RelayConnectionSocketTests {
 
         let event = Event(
             id: try EventID(hex: String(repeating: "d", count: 64)),
-            pubkey: try PublicKey(hex: String(repeating: "b", count: 64)),
+            publicKey: try PublicKey(hex: String(repeating: "b", count: 64)),
             createdAt: Timestamp(rawValue: 1_700_000_000),
             kind: 1,
             tags: [],

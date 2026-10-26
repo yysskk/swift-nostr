@@ -33,14 +33,14 @@ struct FilterTests {
         #expect(filter.eventReferences == [note, reply])
     }
 
-    @Test("Filter with pubkey references")
-    func filterWithPubkeyReferences() {
+    @Test("Filter with public key references")
+    func filterWithPublicKeyReferences() {
         let filter = Filter(
             kinds: [1],
-            pubkeyReferences: [alice]
+            publicKeyReferences: [alice]
         )
 
-        #expect(filter.pubkeyReferences == [alice])
+        #expect(filter.publicKeyReferences == [alice])
     }
 
     @Test("Filter with time range")
@@ -58,7 +58,7 @@ struct FilterTests {
 
     @Test("User notes convenience filter")
     func userNotesFilter() {
-        let filter = Filter.userNotes(pubkey: alice, limit: 25)
+        let filter = Filter.userNotes(publicKey: alice, limit: 25)
 
         #expect(filter.authors == [alice])
         #expect(filter.kinds == [1])
@@ -67,7 +67,7 @@ struct FilterTests {
 
     @Test("Metadata convenience filter")
     func metadataFilter() {
-        let filter = Filter.metadata(pubkeys: [alice, bob])
+        let filter = Filter.metadata(publicKeys: [alice, bob])
 
         #expect(filter.authors == [alice, bob])
         #expect(filter.kinds == [0])
@@ -84,9 +84,9 @@ struct FilterTests {
 
     @Test("Mentions convenience filter")
     func mentionsFilter() {
-        let filter = Filter.mentions(pubkey: alice)
+        let filter = Filter.mentions(publicKey: alice)
 
-        #expect(filter.pubkeyReferences == [alice])
+        #expect(filter.publicKeyReferences == [alice])
         #expect(filter.kinds == [1])
     }
 
@@ -137,7 +137,7 @@ struct FilterTests {
         #expect(filter.authors == [alice])
         #expect(filter.kinds == [1, 7])
         #expect(filter.eventReferences == [note])
-        #expect(filter.pubkeyReferences == [bob])
+        #expect(filter.publicKeyReferences == [bob])
         #expect(filter.limit == 50)
     }
 
@@ -155,12 +155,12 @@ struct FilterTests {
     @Test("Profile list filters take public keys and encode them as hex authors")
     func profileListFilters() throws {
         let filters: [(Filter, Event.Kind, Int?)] = [
-            (.contactList(pubkey: alice), .contacts, 1),
-            (.relayListMetadata(pubkey: alice), .relayListMetadata, 1),
-            (.directMessageRelayList(pubkey: alice), .directMessageRelayList, 1),
-            (.contactList(pubkeys: [alice]), .contacts, nil),
-            (.relayListMetadata(pubkeys: [alice]), .relayListMetadata, nil),
-            (.directMessageRelayList(pubkeys: [alice]), .directMessageRelayList, nil),
+            (.contactList(publicKey: alice), .contacts, 1),
+            (.relayListMetadata(publicKey: alice), .relayListMetadata, 1),
+            (.directMessageRelayList(publicKey: alice), .directMessageRelayList, 1),
+            (.contactList(publicKeys: [alice]), .contacts, nil),
+            (.relayListMetadata(publicKeys: [alice]), .relayListMetadata, nil),
+            (.directMessageRelayList(publicKeys: [alice]), .directMessageRelayList, nil),
         ]
 
         for (filter, kind, limit) in filters {

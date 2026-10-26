@@ -260,12 +260,12 @@ public actor WalletConnection {
         // wallet that sees it late does not pay an invoice nobody is listening for anymore.
         let expiration = Timestamp.now.advanced(by: config.requestTimeout + .seconds(10))
         let tags: [Tag] = [
-            .pubkey(walletPubkey),
+            .publicKey(walletPubkey),
             Tag(name: "encryption", values: [scheme.rawValue]),
             .expiration(expiration),
         ]
         let unsigned = UnsignedEvent(
-            pubkey: clientPubkey, kind: .walletConnectRequest, tags: tags, content: content)
+            publicKey: clientPubkey, kind: .walletConnectRequest, tags: tags, content: content)
         do {
             return try signer.sign(unsigned)
         } catch {
@@ -279,7 +279,7 @@ public actor WalletConnection {
         // The relay filter already restricts authors, but enforce it here too as defense in depth —
         // and require the event to say what it was signed to say, so nothing downstream reads a
         // payload whose author has not actually vouched for it.
-        guard event.pubkey == walletPubkey, (try? event.verify()) == true else { return }
+        guard event.publicKey == walletPubkey, (try? event.verify()) == true else { return }
         switch event.kind {
         case .walletConnectResponse:
             await handleResponse(event)
@@ -403,7 +403,7 @@ public actor WalletConnection {
         Filter(
             authors: [walletPubkey],
             kinds: [.walletConnectResponse, .walletConnectNotification, .walletConnectNotificationLegacy],
-            pubkeyReferences: [clientPubkey])
+            publicKeyReferences: [clientPubkey])
     }
 
     private var infoFilter: Filter {

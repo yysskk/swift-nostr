@@ -57,20 +57,20 @@ struct TagTests {
             Event.Tag.event(id1, relayURL: relay, marker: .root).rawArray == [
                 "e", id1.hex, "wss://r.example", "root",
             ])
-        #expect(Event.Tag.event(id1, pubkey: pk1).rawArray == ["e", id1.hex, "", "", pk1.hex])
+        #expect(Event.Tag.event(id1, publicKey: pk1).rawArray == ["e", id1.hex, "", "", pk1.hex])
         #expect(
-            Event.Tag.event(id1, marker: .mention, pubkey: pk1).rawArray == [
+            Event.Tag.event(id1, marker: .mention, publicKey: pk1).rawArray == [
                 "e", id1.hex, "", "mention", pk1.hex,
             ])
     }
 
     @Test("pubkey tag pads skipped relay before petname")
     func pubkeyTagPadsRelay() {
-        #expect(Event.Tag.pubkey(pk1).rawArray == ["p", pk1.hex])
-        #expect(Event.Tag.pubkey(pk1, relayURL: relay).rawArray == ["p", pk1.hex, "wss://r.example"])
-        #expect(Event.Tag.pubkey(pk1, petname: "alice").rawArray == ["p", pk1.hex, "", "alice"])
+        #expect(Event.Tag.publicKey(pk1).rawArray == ["p", pk1.hex])
+        #expect(Event.Tag.publicKey(pk1, relayURL: relay).rawArray == ["p", pk1.hex, "wss://r.example"])
+        #expect(Event.Tag.publicKey(pk1, petname: "alice").rawArray == ["p", pk1.hex, "", "alice"])
         #expect(
-            Event.Tag.pubkey(pk1, relayURL: relay, petname: "alice").rawArray == [
+            Event.Tag.publicKey(pk1, relayURL: relay, petname: "alice").rawArray == [
                 "p", pk1.hex, "wss://r.example", "alice",
             ])
     }
@@ -80,9 +80,9 @@ struct TagTests {
         let spelled = try RelayURL(string: "WSS://R.Example:443/")
         #expect(Event.Tag.event(id1, relayURL: spelled).rawArray == ["e", id1.hex, "wss://r.example"])
         #expect(Event.Tag.quote(id1, relayURL: spelled).rawArray == ["q", id1.hex, "wss://r.example"])
-        #expect(Event.Tag.pubkey(pk1, relayURL: spelled).rawArray == ["p", pk1.hex, "wss://r.example"])
+        #expect(Event.Tag.publicKey(pk1, relayURL: spelled).rawArray == ["p", pk1.hex, "wss://r.example"])
         #expect(
-            Event.Tag.address(kind: .longFormContent, pubkey: pk1, identifier: "a", relayURL: spelled).rawArray == [
+            Event.Tag.address(kind: .longFormContent, publicKey: pk1, identifier: "a", relayURL: spelled).rawArray == [
                 "a", "30023:\(pk1.hex):a", "wss://r.example",
             ])
         #expect(Event.Tag.relay(spelled).rawArray == ["relay", "wss://r.example"])
@@ -97,7 +97,7 @@ struct TagTests {
             Contact(pubkey: pk1, relayURL: relay, petname: "alice"),
         ]
         for contact in contacts {
-            let tag = Event.Tag.pubkey(contact.pubkey, relayURL: contact.relayURL, petname: contact.petname)
+            let tag = Event.Tag.publicKey(contact.pubkey, relayURL: contact.relayURL, petname: contact.petname)
             #expect(tag == contact.tag)
         }
     }
@@ -133,7 +133,7 @@ struct TagTests {
     @Test("UnsignedEvent stores tags in raw wire form")
     func unsignedEventStoresRawWireForm() {
         let unsigned = UnsignedEvent(
-            pubkey: PublicKey.fixture("pk"),
+            publicKey: PublicKey.fixture("pk"),
             kind: .textNote,
             tags: [.hashtag("nostr"), .event(id1, marker: .reply)],
             content: "hi"
@@ -144,21 +144,21 @@ struct TagTests {
     @Test("UnsignedEvent rawTags initializer keeps arrays untouched")
     func unsignedEventRawTagsUntouched() {
         let raw = [["e", id1.hex, "wss://r.example", "root"], ["custom", "x", "y"]]
-        let unsigned = UnsignedEvent(pubkey: PublicKey.fixture("pk"), kind: 1, rawTags: raw, content: "hi")
+        let unsigned = UnsignedEvent(publicKey: PublicKey.fixture("pk"), kind: 1, rawTags: raw, content: "hi")
         #expect(unsigned.tags == raw)
     }
 
     @Test("Tag-built and raw-built events hash identically")
     func tagAndRawBuiltEventsHashIdentically() throws {
         let viaTags = UnsignedEvent(
-            pubkey: PublicKey.fixture("pk"),
+            publicKey: PublicKey.fixture("pk"),
             createdAt: Timestamp(rawValue: 1_700_000_000),
             kind: .textNote,
-            tags: [.event(id1, marker: .reply), .pubkey(pk2)],
+            tags: [.event(id1, marker: .reply), .publicKey(pk2)],
             content: "hi"
         )
         let viaRaw = UnsignedEvent(
-            pubkey: PublicKey.fixture("pk"),
+            publicKey: PublicKey.fixture("pk"),
             createdAt: Timestamp(rawValue: 1_700_000_000),
             kind: 1,
             rawTags: [["e", id1.hex, "", "reply"], ["p", pk2.hex]],
@@ -180,7 +180,7 @@ struct TagTests {
     private func makeEvent(tags: [[String]]) -> Event {
         Event(
             id: EventID.fixture("id"),
-            pubkey: PublicKey.fixture("pk"),
+            publicKey: PublicKey.fixture("pk"),
             createdAt: Timestamp(rawValue: 1_700_000_000),
             kind: 1,
             tags: tags,
@@ -216,7 +216,7 @@ struct TagTests {
             ["e", id1.hex], ["e", id2.hex, "wss://r.example"], ["p", pk1.hex], ["e"], ["p", pk2.hex],
         ])
         #expect(event.referencedEventIDs == [id1, id2])
-        #expect(event.referencedPubkeys == [pk1, pk2])
+        #expect(event.referencedPublicKeys == [pk1, pk2])
     }
 
     /// Tags are written by whoever authored the event, so a value that is not a canonical id or
@@ -228,15 +228,15 @@ struct TagTests {
             ["p", "pk1"], ["p", String(pk1.hex.dropLast())], ["p", pk2.hex],
         ])
         #expect(event.referencedEventIDs == [id2])
-        #expect(event.referencedPubkeys == [pk2])
+        #expect(event.referencedPublicKeys == [pk2])
     }
 
     @Test("quote and address tags write ids and keys as hex")
     func quoteAndAddressTags() {
         #expect(Event.Tag.quote(id1).rawArray == ["q", id1.hex])
-        #expect(Event.Tag.quote(id1, pubkey: pk1).rawArray == ["q", id1.hex, "", pk1.hex])
+        #expect(Event.Tag.quote(id1, publicKey: pk1).rawArray == ["q", id1.hex, "", pk1.hex])
         #expect(
-            Event.Tag.address(kind: .longFormContent, pubkey: pk1, identifier: "post").rawArray
+            Event.Tag.address(kind: .longFormContent, publicKey: pk1, identifier: "post").rawArray
                 == ["a", "30023:\(pk1.hex):post"])
     }
 }

@@ -101,14 +101,14 @@ public actor RelayConnection {
     /// re-established.
     public internal(set) var authenticationChallenge: String?
 
-    /// The pubkeys this connection has successfully authenticated (NIP-42).
+    /// The public keys this connection has successfully authenticated (NIP-42).
     ///
-    /// A pubkey is added when the relay acknowledges its AUTH event with OK
+    /// A public key is added when the relay acknowledges its AUTH event with OK
     /// `true`. Authentication only lasts for the current WebSocket session, so
     /// the set is emptied whenever the connection is torn down or re-established.
-    /// Multiple pubkeys can be authenticated on one connection by calling
+    /// Multiple public keys can be authenticated on one connection by calling
     /// ``authenticate(with:)`` once per identity.
-    public private(set) var authenticatedPubkeys: Set<PublicKey> = []
+    public private(set) var authenticatedPublicKeys: Set<PublicKey> = []
 
     /// The error from the most recent automatic NIP-42 authentication attempt driven
     /// by the ``AuthenticationResponder``, or nil when none has failed.
@@ -120,7 +120,7 @@ public actor RelayConnection {
     /// are not recorded here.
     public private(set) var lastAuthenticationError: NostrError?
 
-    /// Pubkeys of in-flight AUTH events keyed by event id, so the receive loop
+    /// Public keys of in-flight AUTH events keyed by event id, so the receive loop
     /// can mark them authenticated the moment the relay's OK arrives. An entry
     /// lives only as long as its ``authenticate(with:)`` call: a failed or
     /// cancelled call removes it, so a late OK after a reported failure cannot
@@ -145,9 +145,9 @@ public actor RelayConnection {
     /// receive loop when an AUTH round-trip concludes.
     private var authenticationWaiters: [UUID: AsyncThrowingStream<Void, any Error>.Continuation] = [:]
 
-    /// Whether at least one pubkey is authenticated on this connection (NIP-42).
+    /// Whether at least one public key is authenticated on this connection (NIP-42).
     public var isAuthenticated: Bool {
-        !authenticatedPubkeys.isEmpty
+        !authenticatedPublicKeys.isEmpty
     }
 
     /// The number of callers currently parked in ``waitForAuthentication()`` (for tests).
@@ -389,14 +389,14 @@ public actor RelayConnection {
         }
     }
 
-    /// Clears all NIP-42 session state. Challenges, authenticated pubkeys, and
+    /// Clears all NIP-42 session state. Challenges, authenticated public keys, and
     /// auth-pending subscriptions are only valid for a single WebSocket
     /// session, so this runs on every teardown and before every (re)connection
     /// attempt. Waiters blocked on an authentication are failed: their session
     /// is gone, and any re-authentication belongs to the next one.
     private func resetAuthenticationState() {
         authenticationChallenge = nil
-        authenticatedPubkeys.removeAll()
+        authenticatedPublicKeys.removeAll()
         lastAuthenticationError = nil
         pendingAuthentications.removeAll()
         subscriptionsAwaitingAuthentication.removeAll()
@@ -408,10 +408,10 @@ public actor RelayConnection {
     }
 
     /// Applies the outcome of an AUTH round-trip observed by the receive loop:
-    /// a success records the pubkey, wakes ``waitForAuthentication()`` callers,
+    /// a success records the public key, wakes ``waitForAuthentication()`` callers,
     /// and re-requests subscriptions the relay closed with `auth-required:`; a
     /// rejection fails the waiters with the relay's status string.
-    func settleAuthentication(pubkey: PublicKey, accepted: Bool, message: String) {
+    func settleAuthentication(publicKey: PublicKey, accepted: Bool, message: String) {
         let waiters = authenticationWaiters.values
         authenticationWaiters.removeAll()
 
@@ -422,7 +422,7 @@ public actor RelayConnection {
             return
         }
 
-        authenticatedPubkeys.insert(pubkey)
+        authenticatedPublicKeys.insert(publicKey)
         lastAuthenticationError = nil
         for waiter in waiters {
             waiter.finish()
@@ -615,7 +615,7 @@ public actor RelayConnection {
     /// signs the event from the stored ``authenticationChallenge``. Use this
     /// overload when the event is produced elsewhere, e.g. by a remote signer.
     ///
-    /// On success the event's pubkey is added to ``authenticatedPubkeys`` and
+    /// On success the event's public key is added to ``authenticatedPublicKeys`` and
     /// the relay treats it as authenticated for the rest of the session.
     ///
     /// - Parameter event: A signed ``Event/Kind/clientAuthentication`` event
@@ -633,9 +633,9 @@ public actor RelayConnection {
             throw NostrError.notConnected
         }
 
-        // Recorded before sending so the receive loop can mark the pubkey as
+        // Recorded before sending so the receive loop can mark the public key as
         // authenticated the moment the OK arrives while this call is in flight.
-        pendingAuthentications[event.id] = event.pubkey
+        pendingAuthentications[event.id] = event.publicKey
 
         do {
             try await sendAndAwaitOK(.auth(event), eventID: event.id)
@@ -674,7 +674,7 @@ public actor RelayConnection {
     /// responder after the relay has demanded authentication needs no extra step.
     ///
     /// Automatic authentication is best-effort: outcomes are observable through
-    /// ``authenticatedPubkeys``, ``lastAuthenticationError``, and the relay's OK
+    /// ``authenticatedPublicKeys``, ``lastAuthenticationError``, and the relay's OK
     /// in ``messages()``, and a failed attempt is not retried until the relay
     /// issues another challenge.
     public func setAuthenticationResponder(_ responder: AuthenticationResponder?) {

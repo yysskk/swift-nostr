@@ -128,7 +128,7 @@ struct NIP17Tests {
         )
 
         // The gift wrap pubkey should NOT be Alice's pubkey (it's ephemeral)
-        #expect(wrapped.pubkey != alice.publicKey)
+        #expect(wrapped.publicKey != alice.publicKey)
     }
 
     // MARK: - Direct Message Tests
@@ -261,7 +261,7 @@ struct NIP17Tests {
         let alice = try KeyPair()
         let bob = try KeyPair()
         let rumor = try UnsignedEvent(
-            pubkey: alice.publicKey, kind: .privateDirectMessage,
+            publicKey: alice.publicKey, kind: .privateDirectMessage,
             rawTags: [["p", bob.publicKey.hex.uppercased()]], content: "hi"
         ).asRumor()
         let giftWrap = try await GiftWrap.wrap(
@@ -277,7 +277,7 @@ struct NIP17Tests {
         let alice = try KeyPair()
         let bob = try KeyPair()
         let rumor = try UnsignedEvent(
-            pubkey: alice.publicKey, kind: .privateDirectMessage,
+            publicKey: alice.publicKey, kind: .privateDirectMessage,
             rawTags: [["p", bob.publicKey.hex], ["e", "not-an-id", "", "reply"]], content: "hi"
         ).asRumor()
         let giftWrap = try await GiftWrap.wrap(
@@ -322,7 +322,7 @@ struct NIP17Tests {
         let alice = try KeyPair()
 
         let unsigned = UnsignedEvent(
-            pubkey: alice.publicKey,
+            publicKey: alice.publicKey,
             createdAt: Timestamp(rawValue: 1_700_000_000),
             kind: .privateDirectMessage,
             tags: [["p", alice.publicKey.hex]],

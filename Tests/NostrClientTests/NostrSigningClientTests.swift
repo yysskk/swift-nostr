@@ -22,12 +22,12 @@ private struct MockRemoteSigner: NostrSigning {
         try EventSigner(keyPair: keyPair).sign(event)
     }
 
-    func nip44Encrypt(_ plaintext: String, to recipientPubkey: PublicKey) async throws -> String {
-        try EventSigner(keyPair: keyPair).nip44Encrypt(plaintext, to: recipientPubkey)
+    func nip44Encrypt(_ plaintext: String, to recipientPublicKey: PublicKey) async throws -> String {
+        try EventSigner(keyPair: keyPair).nip44Encrypt(plaintext, to: recipientPublicKey)
     }
 
-    func nip44Decrypt(_ ciphertext: String, from senderPubkey: PublicKey) async throws -> String {
-        try EventSigner(keyPair: keyPair).nip44Decrypt(ciphertext, from: senderPubkey)
+    func nip44Decrypt(_ ciphertext: String, from senderPublicKey: PublicKey) async throws -> String {
+        try EventSigner(keyPair: keyPair).nip44Decrypt(ciphertext, from: senderPublicKey)
     }
 }
 
@@ -52,7 +52,7 @@ struct NostrSigningClientTests {
     }
 
     private func unsignedNote(pubkey: PublicKey, content: String) -> UnsignedEvent {
-        UnsignedEvent(pubkey: pubkey, kind: .textNote, content: content)
+        UnsignedEvent(publicKey: pubkey, kind: .textNote, content: content)
     }
 
     // MARK: - Setting a remote signer
@@ -79,7 +79,7 @@ struct NostrSigningClientTests {
 
         let signed = try await client.identity.sign(unsignedNote(pubkey: keyPair.publicKey, content: "hello"))
 
-        #expect(signed.pubkey == keyPair.publicKey)
+        #expect(signed.publicKey == keyPair.publicKey)
         #expect(signed.kind == .textNote)
         #expect(signed.content == "hello")
         #expect(try signed.verify())
@@ -93,7 +93,7 @@ struct NostrSigningClientTests {
 
         let signed = try await client.identity.sign(unsignedNote(pubkey: keyPair.publicKey, content: "hi"))
 
-        #expect(signed.pubkey == keyPair.publicKey)
+        #expect(signed.publicKey == keyPair.publicKey)
         #expect(signed.content == "hi")
         #expect(try signed.verify())
     }
@@ -165,7 +165,7 @@ struct NostrSigningClientTests {
         }
 
         #expect(published.event.kind == .textNote)
-        #expect(published.event.pubkey == keyPair.publicKey)
+        #expect(published.event.publicKey == keyPair.publicKey)
         #expect(published.event.content == "signed by my bunker")
         #expect(try published.event.verify())
         await client.relays.disconnect()
@@ -205,8 +205,8 @@ struct NostrSigningClientTests {
 
         let list = NostrList(
             kind: .muteList,
-            publicItems: [.pubkey(.fixture("public"))],
-            privateItems: [.pubkey(.fixture("private"))]
+            publicItems: [.publicKey(.fixture("public"))],
+            privateItems: [.publicKey(.fixture("private"))]
         )
 
         let published = try await PublishAckSupport.acknowledgingPublishes(on: socket) {
@@ -259,7 +259,7 @@ struct NostrSigningClientTests {
         let sent = try NIP42TestSupport.sentAuthEvent(in: mock)
 
         #expect(sent.kind == .clientAuthentication)
-        #expect(sent.pubkey == keyPair.publicKey)
+        #expect(sent.publicKey == keyPair.publicKey)
         #expect(sent.firstTagValue(named: "relay") == relayURL.description)
         #expect(sent.firstTagValue(named: "challenge") == "remote-challenge")
         #expect(try sent.verify())
@@ -287,7 +287,7 @@ struct NostrSigningClientTests {
         try await pollUntil { mock.sentTextFrames.contains { $0.hasPrefix("[\"AUTH\"") } }
         let sent = try NIP42TestSupport.sentAuthEvent(in: mock)
         #expect(sent.kind == .clientAuthentication)
-        #expect(sent.pubkey == keyPair.publicKey)
+        #expect(sent.publicKey == keyPair.publicKey)
         #expect(sent.firstTagValue(named: "challenge") == "manual-challenge")
         #expect(try sent.verify())
 

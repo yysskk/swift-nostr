@@ -63,7 +63,7 @@ struct RemoteSignerNostrConnectFlowTests {
         try await waitForSubscription(transport)
         let subscribed = await transport.subscriptions.values.first?.first
         #expect(subscribed?.authors == nil)
-        #expect(subscribed?.pubkeyReferences == [client.publicKey])
+        #expect(subscribed?.publicKeyReferences == [client.publicKey])
 
         // The signer accepts by echoing the invitation secret as the response result.
         try await transport.deliver(

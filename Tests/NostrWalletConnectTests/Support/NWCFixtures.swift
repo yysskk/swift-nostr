@@ -52,7 +52,7 @@ enum NWCFixtures {
     ) throws -> Event {
         try EventSigner(keyPair: wallet).sign(
             UnsignedEvent(
-                pubkey: wallet.publicKey, createdAt: Timestamp(rawValue: createdAt), kind: kind, rawTags: tags,
+                publicKey: wallet.publicKey, createdAt: Timestamp(rawValue: createdAt), kind: kind, rawTags: tags,
                 content: content))
     }
 

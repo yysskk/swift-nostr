@@ -56,7 +56,7 @@ extension UnsignedEvent {
         newTags.append(ots.tag.rawArray)
 
         return UnsignedEvent(
-            pubkey: pubkey,
+            publicKey: publicKey,
             createdAt: createdAt,
             kind: kind,
             rawTags: newTags,

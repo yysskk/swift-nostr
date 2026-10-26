@@ -12,17 +12,17 @@ private func stateEvent(
 ) throws -> Event {
     try signer.sign(
         UnsignedEvent(
-            pubkey: signer.publicKey, createdAt: createdAt, kind: kind, tags: tags, content: ""))
+            publicKey: signer.publicKey, createdAt: createdAt, kind: kind, tags: tags, content: ""))
 }
 
 /// One (kind, parser) pair per relay-generated state model, so the shared validation
 /// paths are exercised uniformly across all five parsers.
 private let stateParsers: [(kind: Event.Kind, parse: @Sendable (Event, PublicKey?) throws -> Void)] = [
-    (.groupMetadata, { _ = try Groups.Metadata(event: $0, relayPubkey: $1) }),
-    (.groupAdmins, { _ = try Groups.AdminList(event: $0, relayPubkey: $1) }),
-    (.groupMembers, { _ = try Groups.MemberList(event: $0, relayPubkey: $1) }),
-    (.groupRoles, { _ = try Groups.RoleList(event: $0, relayPubkey: $1) }),
-    (.groupPinList, { _ = try Groups.PinList(event: $0, relayPubkey: $1) }),
+    (.groupMetadata, { _ = try Groups.Metadata(event: $0, relayPublicKey: $1) }),
+    (.groupAdmins, { _ = try Groups.AdminList(event: $0, relayPublicKey: $1) }),
+    (.groupMembers, { _ = try Groups.MemberList(event: $0, relayPublicKey: $1) }),
+    (.groupRoles, { _ = try Groups.RoleList(event: $0, relayPublicKey: $1) }),
+    (.groupPinList, { _ = try Groups.PinList(event: $0, relayPublicKey: $1) }),
 ]
 
 @Suite("NIP-29 Group State")
@@ -164,7 +164,7 @@ struct NIP29GroupStateTests {
         // the parsers never verify one.
         let event = Event(
             id: try EventID(hex: String(repeating: "0", count: 64)),
-            pubkey: try PublicKey(hex: String(repeating: "b", count: 64)),
+            publicKey: try PublicKey(hex: String(repeating: "b", count: 64)),
             createdAt: Timestamp(rawValue: 1_700_000_000),
             kind: .groupMetadata,
             tags: [
@@ -209,8 +209,8 @@ struct NIP29GroupStateTests {
         let list = Groups.AdminList(
             groupID: "abcdef",
             admins: [
-                Groups.Admin(pubkey: ceo, roles: ["ceo", "admin"]),
-                Groups.Admin(pubkey: greeter),
+                Groups.Admin(publicKey: ceo, roles: ["ceo", "admin"]),
+                Groups.Admin(publicKey: greeter),
             ]
         )
 
@@ -288,7 +288,7 @@ struct NIP29GroupStateTests {
             tags: [.identifier("abcdef")] + malformed.map { Event.Tag(name: "p", values: [$0, "ceo"]) }
                 + [["p", member.hex, "admin"]],
             signer: relay)
-        #expect(try Groups.AdminList(event: admins).admins == [Groups.Admin(pubkey: member, roles: ["admin"])])
+        #expect(try Groups.AdminList(event: admins).admins == [Groups.Admin(publicKey: member, roles: ["admin"])])
 
         let members = try stateEvent(
             kind: .groupMembers,
@@ -328,8 +328,8 @@ struct NIP29GroupStateTests {
         }
     }
 
-    @Test("every parser pins the author when a relay pubkey is given")
-    func relayPubkeyCheck() throws {
+    @Test("every parser pins the author when a relay public key is given")
+    func relayPublicKeyCheck() throws {
         let relay = EventSigner(keyPair: try KeyPair())
         let impostor = EventSigner(keyPair: try KeyPair())
 
@@ -384,7 +384,7 @@ struct NIP29GroupMembershipTests {
         tags: [[String]]
     ) -> Event {
         Event(
-            id: id, pubkey: PublicKey.fixture("admin"), createdAt: createdAt, kind: kind, tags: tags, content: "",
+            id: id, publicKey: PublicKey.fixture("admin"), createdAt: createdAt, kind: kind, tags: tags, content: "",
             signature: nil)
     }
 
@@ -400,7 +400,7 @@ struct NIP29GroupMembershipTests {
             tags: [["h", "abcdef"], ["p", member.hex]])
     }
 
-    @Test("membership is nil when no moderation event targets the pubkey")
+    @Test("membership is nil when no moderation event targets the public key")
     func noRelevantEvents() {
         #expect(Groups.membership(of: member, in: [Event]()) == nil)
     }
@@ -449,8 +449,8 @@ struct NIP29GroupMembershipTests {
         #expect(Groups.membership(of: member, in: [put, removal]) == .removed)
     }
 
-    @Test("moderation events targeting other pubkeys are ignored")
-    func otherPubkeysIgnored() {
+    @Test("moderation events targeting other public keys are ignored")
+    func otherPublicKeysIgnored() {
         let other = PublicKey.fixture("other")
         let events = [
             putUser(id: paddedID(1), createdAt: Timestamp(rawValue: 1_700_000_000), roles: ["member"]),
@@ -479,7 +479,7 @@ struct NIP29GroupMembershipTests {
     }
 
     @Test("a put-user event with several p tags applies the matching one")
-    func multiplePubkeyTags() {
+    func multiplePublicKeyTags() {
         let other = PublicKey.fixture("other")
         let event = moderation(
             id: paddedID(1), kind: .groupPutUser, createdAt: Timestamp(rawValue: 1_700_000_000),

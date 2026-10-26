@@ -24,9 +24,9 @@ extension RelayConnection {
                             switch relayMessage {
                             case .ok(let eventID, let accepted, let message):
                                 // Settle a pending NIP-42 authentication for this event id.
-                                if let pubkey = pendingAuthentications.removeValue(forKey: eventID) {
+                                if let publicKey = pendingAuthentications.removeValue(forKey: eventID) {
                                     settleAuthentication(
-                                        pubkey: pubkey, accepted: accepted, message: message)
+                                        publicKey: publicKey, accepted: accepted, message: message)
                                 }
                                 for waiter in removeAllPublishWaiters(eventID: eventID) {
                                     if accepted {

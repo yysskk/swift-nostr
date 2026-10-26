@@ -39,7 +39,7 @@ struct NIP40ExpirationTests {
     @Test("Event.expiration is nil for a non-integer value")
     func eventExpirationInvalid() {
         let event = Event(
-            id: EventID.fixture("x"), pubkey: PublicKey.fixture("p"), createdAt: Timestamp(rawValue: 0),
+            id: EventID.fixture("x"), publicKey: PublicKey.fixture("p"), createdAt: Timestamp(rawValue: 0),
             kind: .textNote, tags: [["expiration", "soon"]], content: "", signature: nil
         )
         #expect(event.expiration == nil)

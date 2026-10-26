@@ -45,7 +45,7 @@ public struct EventSigner: Sendable {
 
         return Event(
             id: try EventID(data: Data(hash)),
-            pubkey: unsignedEvent.pubkey,
+            publicKey: unsignedEvent.publicKey,
             createdAt: unsignedEvent.createdAt,
             kind: unsignedEvent.kind,
             tags: unsignedEvent.tags,
@@ -54,32 +54,32 @@ public struct EventSigner: Sendable {
         )
     }
 
-    /// Encrypts `plaintext` to `recipientPubkey` with NIP-44 v2, as this signer's identity.
+    /// Encrypts `plaintext` to `recipientPublicKey` with NIP-44 v2, as this signer's identity.
     /// - Parameters:
     ///   - plaintext: The message to encrypt.
-    ///   - recipientPubkey: The recipient's public key.
+    ///   - recipientPublicKey: The recipient's public key.
     /// - Returns: The base64-encoded NIP-44 payload.
-    public func nip44Encrypt(_ plaintext: String, to recipientPubkey: PublicKey) throws -> String {
-        try SealedMessage.seal(plaintext, for: recipientPubkey, using: keyPair).payload
+    public func nip44Encrypt(_ plaintext: String, to recipientPublicKey: PublicKey) throws -> String {
+        try SealedMessage.seal(plaintext, for: recipientPublicKey, using: keyPair).payload
     }
 
-    /// Decrypts a NIP-44 v2 payload from `senderPubkey` addressed to this signer's identity.
+    /// Decrypts a NIP-44 v2 payload from `senderPublicKey` addressed to this signer's identity.
     /// - Parameters:
     ///   - ciphertext: The base64-encoded NIP-44 payload.
-    ///   - senderPubkey: The sender's public key.
+    ///   - senderPublicKey: The sender's public key.
     /// - Returns: The decrypted plaintext.
-    public func nip44Decrypt(_ ciphertext: String, from senderPubkey: PublicKey) throws -> String {
-        try SealedMessage(payload: ciphertext).open(from: senderPubkey, using: keyPair)
+    public func nip44Decrypt(_ ciphertext: String, from senderPublicKey: PublicKey) throws -> String {
+        try SealedMessage(payload: ciphertext).open(from: senderPublicKey, using: keyPair)
     }
 
     /// Creates and signs a text note (kind 1)
     public func signTextNote(content: String, tags: [Tag] = []) throws -> Event {
-        try sign(.textNote(pubkey: keyPair.publicKey, content: content, tags: tags))
+        try sign(.textNote(publicKey: keyPair.publicKey, content: content, tags: tags))
     }
 
     /// Creates and signs a reaction event (kind 7)
     public func signReaction(to event: Event, content: String = "+") throws -> Event {
-        try sign(.reaction(pubkey: keyPair.publicKey, to: event, content: content))
+        try sign(.reaction(publicKey: keyPair.publicKey, to: event, content: content))
     }
 
     /// Creates and signs a repost event (kind 6)
@@ -87,12 +87,12 @@ public struct EventSigner: Sendable {
     ///   - event: The event being reposted; it is embedded in the content and referenced by an `e` tag.
     ///   - relayURL: The relay where the reposted event can be found, recorded in the `e` tag.
     public func signRepost(of event: Event, relayURL: RelayURL? = nil) throws -> Event {
-        try sign(.repost(pubkey: keyPair.publicKey, of: event, relayURL: relayURL))
+        try sign(.repost(publicKey: keyPair.publicKey, of: event, relayURL: relayURL))
     }
 
     /// Creates and signs a delete event (kind 5) requesting deletion of `eventIDs`, one `e` tag each.
     public func signDeletion(eventIDs: [EventID], reason: String = "") throws -> Event {
-        try sign(.deletion(pubkey: keyPair.publicKey, eventIDs: eventIDs, reason: reason))
+        try sign(.deletion(publicKey: keyPair.publicKey, eventIDs: eventIDs, reason: reason))
     }
 
     /// Creates and signs a client authentication event (kind 22242, NIP-42)
@@ -107,7 +107,7 @@ public struct EventSigner: Sendable {
     ///   - relayURL: The URL of the relay being authenticated to.
     ///   - challenge: The challenge string received in the relay's AUTH message.
     public func signClientAuthentication(relayURL: RelayURL, challenge: String) throws -> Event {
-        try sign(.clientAuthentication(pubkey: keyPair.publicKey, relayURL: relayURL, challenge: challenge))
+        try sign(.clientAuthentication(publicKey: keyPair.publicKey, relayURL: relayURL, challenge: challenge))
     }
 
     /// Creates and signs a zap request event (kind 9734, NIP-57).
@@ -117,7 +117,7 @@ public struct EventSigner: Sendable {
     /// which returns a Lightning invoice and later publishes the matching kind-9735 zap receipt.
     /// https://github.com/nostr-protocol/nips/blob/master/57.md
     /// - Parameters:
-    ///   - recipientPubkey: The public key being zapped (the `p` tag, required).
+    ///   - recipientPublicKey: The public key being zapped (the `p` tag, required).
     ///   - relays: Relays the recipient's wallet should publish the zap receipt to (the `relays`
     ///     tag, in canonical form; required — must contain at least one relay).
     ///   - amountMillisats: The amount in millisatoshis (the `amount` tag). Recommended.
@@ -127,7 +127,7 @@ public struct EventSigner: Sendable {
     ///   - eventCoordinate: An event coordinate when zapping an addressable event (the `a` tag).
     ///   - comment: An optional message sent with the payment (the event content).
     public func signZapRequest(
-        recipientPubkey: PublicKey,
+        recipientPublicKey: PublicKey,
         relays: [RelayURL],
         amountMillisats: Int64? = nil,
         lnurl: String? = nil,
@@ -143,7 +143,7 @@ public struct EventSigner: Sendable {
 
         var tags: [Tag] = [
             Tag(name: "relays", values: relays.map(\.description)),
-            .pubkey(recipientPubkey),
+            .publicKey(recipientPublicKey),
         ]
         if let amountMillisats {
             tags.append(Tag(name: "amount", values: [String(amountMillisats)]))
@@ -158,7 +158,7 @@ public struct EventSigner: Sendable {
             tags.append(Tag(name: "a", values: [eventCoordinate]))
         }
 
-        return try sign(UnsignedEvent(pubkey: keyPair.publicKey, kind: .zapRequest, tags: tags, content: comment))
+        return try sign(UnsignedEvent(publicKey: keyPair.publicKey, kind: .zapRequest, tags: tags, content: comment))
     }
 }
 
@@ -182,14 +182,14 @@ extension EventSigner {
 // MARK: - Event Verification
 extension Event {
     /// Verifies the event's id and signature.
-    /// - Returns: Whether ``signature`` is a valid Schnorr signature by ``pubkey`` over ``id``.
+    /// - Returns: Whether ``signature`` is a valid Schnorr signature by ``publicKey`` over ``id``.
     /// - Throws: ``NostrError/invalidEventID`` if ``id`` is not the hash of the event's other
     ///   fields; ``NostrError/invalidSignature`` if the event is an unsigned rumor (``signature``
     ///   is `nil`) or the signature bytes cannot be parsed.
     public func verify() throws -> Bool {
         // Reconstruct the unsigned event
         let unsigned = UnsignedEvent(
-            pubkey: pubkey,
+            publicKey: publicKey,
             createdAt: createdAt,
             kind: kind,
             rawTags: tags,
@@ -213,7 +213,7 @@ extension Event {
         // `secp256k1_xonly_pubkey_parse`, which reads 32 bytes unconditionally and neither checks
         // nor reports the length. `PublicKey` and `Signature` only ever hold 32 and 64 bytes, so
         // the lengths are guaranteed by the types rather than checked here.
-        let xonlyKey = P256K.Schnorr.XonlyKey(dataRepresentation: pubkey.data, keyParity: 0)
+        let xonlyKey = P256K.Schnorr.XonlyKey(dataRepresentation: publicKey.data, keyParity: 0)
         let schnorrSignature = try P256K.Schnorr.SchnorrSignature(dataRepresentation: signature.data)
 
         return xonlyKey.isValidSignature(schnorrSignature, for: hash)

@@ -33,8 +33,8 @@ print(mnemonic.phrase, derived.publicKey.npub)
 Public keys, event ids, and signatures are value types — ``PublicKey``, ``EventID``, and ``Signature`` — that hold exactly one spelling: canonical lowercase hex, which is also how they encode to JSON. Parsing anything else (uppercase, the wrong length, non-hex) throws, and ``PublicKey/npub`` / ``EventID/note`` give the NIP-19 forms:
 
 ```swift
-let pubkey = try PublicKey(npub: "npub1...")
-print(pubkey.hex, pubkey.npub)
+let publicKey = try PublicKey(npub: "npub1...")
+print(publicKey.hex, publicKey.npub)
 let id = try EventID(hex: "4cd665db042864ee600ee976d6cfcc7c5ce743859462f94a347cd970d88a5f3b")
 print(id.note)
 ```
@@ -60,8 +60,8 @@ let reaction = try signer.signReaction(to: note, content: "🤙")
 // Or build any event yourself. Tags that reference an event or a key take the typed value.
 let custom = try signer.sign(
     UnsignedEvent(
-        pubkey: keyPair.publicKey, kind: .textNote,
-        tags: [.event(note.id, marker: .reply), .pubkey(note.pubkey)], content: "gm")
+        publicKey: keyPair.publicKey, kind: .textNote,
+        tags: [.event(note.id, marker: .reply), .publicKey(note.publicKey)], content: "gm")
 )
 
 let isValid = try note.verify()
@@ -79,12 +79,12 @@ request.httpBody = body
 try await request.setNostrAuthorization(signer: signer)  // any NostrSigning
 ```
 
-A server (or any verifier) runs the full NIP-98 check chain with ``HTTPAuth/validate(authorization:url:method:payload:tolerance:now:)`` and trusts the returned event's ``Event/pubkey`` as the authenticated identity:
+A server (or any verifier) runs the full NIP-98 check chain with ``HTTPAuth/validate(authorization:url:method:payload:tolerance:now:)`` and trusts the returned event's ``Event/publicKey`` as the authenticated identity:
 
 ```swift
 let event = try HTTPAuth.validate(
     authorization: authorizationHeader, url: requestURL, method: "POST", payload: body)
-let authenticatedPubkey = event.pubkey
+let authenticatedPublicKey = event.publicKey
 ```
 
 ## Join and Post to a Relay-based Group
@@ -103,10 +103,10 @@ let message = try await Groups.contentEvent(
 )
 ```
 
-The relay answers with the group's state as relay-signed kind-39xxx events, which carry the group id in a "d" tag instead (user-sent events use "h"). Parse them with ``Groups/Metadata`` and its siblings, pinning the author to the relay's pubkey so an impostor's event is rejected:
+The relay answers with the group's state as relay-signed kind-39xxx events, which carry the group id in a "d" tag instead (user-sent events use "h"). Parse them with ``Groups/Metadata`` and its siblings, pinning the author to the relay's public key so an impostor's event is rejected:
 
 ```swift
-let metadata = try Groups.Metadata(event: stateEvent, relayPubkey: relayPubkey)
+let metadata = try Groups.Metadata(event: stateEvent, relayPublicKey: relayPublicKey)
 print(metadata.name ?? metadata.groupID, metadata.isPrivate ? "private" : "public")
 ```
 
@@ -123,7 +123,7 @@ try await relay.connect()
 try await relay.send(.event(note))
 
 try await relay.subscribe(
-    subscriptionID: "sub1", filters: [Filter(authors: [pubkey], kinds: [.textNote], limit: 20)])
+    subscriptionID: "sub1", filters: [Filter(authors: [publicKey], kinds: [.textNote], limit: 20)])
 for await message in await relay.messages() {
     if case .event(_, let event) = message {
         print(event.content)

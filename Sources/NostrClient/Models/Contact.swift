@@ -27,7 +27,7 @@ public struct Contact: Codable, Hashable, Sendable {
     /// The `p` tag for a NIP-02 contact list: `["p", pubkey, relayURL, petname]`, with an empty
     /// relay placeholder when only a petname is set.
     public var tag: Tag {
-        .pubkey(pubkey, relayURL: relayURL, petname: petname)
+        .publicKey(pubkey, relayURL: relayURL, petname: petname)
     }
 
     /// Creates a contact from a "p" tag.

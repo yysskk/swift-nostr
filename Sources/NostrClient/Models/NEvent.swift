@@ -37,7 +37,7 @@ public struct NEvent: Sendable, Hashable {
 
     /// Builds an `nevent` reference from a known event, capturing its id, author, and kind.
     public init(event: Event, relays: [RelayURL] = []) throws {
-        try self.init(eventID: event.id, relays: relays, author: event.pubkey, kind: event.kind.rawValue)
+        try self.init(eventID: event.id, relays: relays, author: event.publicKey, kind: event.kind.rawValue)
     }
 
     init(tlvData: Data) throws {

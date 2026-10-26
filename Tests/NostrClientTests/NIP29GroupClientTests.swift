@@ -22,12 +22,12 @@ private struct FakeRemoteSigner: NostrSigning {
         try EventSigner(keyPair: keyPair).sign(event)
     }
 
-    func nip44Encrypt(_ plaintext: String, to recipientPubkey: PublicKey) async throws -> String {
-        try EventSigner(keyPair: keyPair).nip44Encrypt(plaintext, to: recipientPubkey)
+    func nip44Encrypt(_ plaintext: String, to recipientPublicKey: PublicKey) async throws -> String {
+        try EventSigner(keyPair: keyPair).nip44Encrypt(plaintext, to: recipientPublicKey)
     }
 
-    func nip44Decrypt(_ ciphertext: String, from senderPubkey: PublicKey) async throws -> String {
-        try EventSigner(keyPair: keyPair).nip44Decrypt(ciphertext, from: senderPubkey)
+    func nip44Decrypt(_ ciphertext: String, from senderPublicKey: PublicKey) async throws -> String {
+        try EventSigner(keyPair: keyPair).nip44Decrypt(ciphertext, from: senderPublicKey)
     }
 }
 
@@ -108,7 +108,7 @@ struct NIP29GroupClientTests {
     ) throws -> Event {
         try signer.sign(
             UnsignedEvent(
-                pubkey: signer.publicKey,
+                publicKey: signer.publicKey,
                 createdAt: createdAt,
                 kind: kind,
                 tags: [.identifier(groupID)] + fieldTags,
@@ -227,7 +227,7 @@ struct NIP29GroupClientTests {
         let group = GroupReference(relayURL: groupRelayURL, id: groupID)
         let moderationTask = Task {
             try await client.groups.publishModeration(
-                .putUser(pubkey: member, roles: ["moderator"]),
+                .putUser(publicKey: member, roles: ["moderator"]),
                 in: group,
                 reason: "promoting"
             )
@@ -236,7 +236,7 @@ struct NIP29GroupClientTests {
         _ = try await moderationTask.value
 
         #expect(sent.kind == .groupPutUser)
-        #expect(sent.structuredTags == [.group(groupID), .pubkey(member, roles: ["moderator"])])
+        #expect(sent.structuredTags == [.group(groupID), .publicKey(member, roles: ["moderator"])])
         #expect(sent.content == "promoting")
         await client.relays.disconnect()
     }
@@ -271,7 +271,7 @@ struct NIP29GroupClientTests {
         _ = try await joinTask.value
 
         #expect(sent.kind == .groupJoinRequest)
-        #expect(sent.pubkey == keyPair.publicKey)
+        #expect(sent.publicKey == keyPair.publicKey)
         #expect(sent.firstTagValue(named: "code") == "welcome")
         #expect(try sent.verify())
         await client.relays.disconnect()
@@ -370,7 +370,7 @@ struct NIP29GroupClientTests {
             kind: .groupMetadata, fieldTags: [Event.Tag(name: "name", values: ["Pizza Lovers"])],
             createdAt: Timestamp(rawValue: 1_700_000_000), signer: relaySigner)
         let admins = try stateEvent(
-            kind: .groupAdmins, fieldTags: [.pubkey(admin, roles: ["ceo"])],
+            kind: .groupAdmins, fieldTags: [.publicKey(admin, roles: ["ceo"])],
             createdAt: Timestamp(rawValue: 1_700_000_001), signer: relaySigner)
         let roles = try stateEvent(
             kind: .groupRoles, fieldTags: [.role("ceo", description: "the boss")],
@@ -383,7 +383,7 @@ struct NIP29GroupClientTests {
         }
 
         #expect(state.metadata?.name == "Pizza Lovers")
-        #expect(state.admins?.admins == [Groups.Admin(pubkey: admin, roles: ["ceo"])])
+        #expect(state.admins?.admins == [Groups.Admin(publicKey: admin, roles: ["ceo"])])
         #expect(state.roles?.roles == [Groups.Role(name: "ceo", description: "the boss")])
         #expect(state.members == nil)
         #expect(state.pins == nil)

@@ -188,7 +188,7 @@ struct DirectMessageRelayListFilterTests {
 
     @Test("DM relay list filter for single pubkey")
     func filterSinglePubkey() {
-        let filter = Filter.directMessageRelayList(pubkey: .fixture("abc123"))
+        let filter = Filter.directMessageRelayList(publicKey: .fixture("abc123"))
         #expect(filter.authors == [.fixture("abc123")])
         #expect(filter.kinds == [10050])
         #expect(filter.limit == 1)
@@ -196,7 +196,7 @@ struct DirectMessageRelayListFilterTests {
 
     @Test("DM relay list filter for multiple pubkeys")
     func filterMultiplePubkeys() {
-        let filter = Filter.directMessageRelayList(pubkeys: [.fixture("abc123"), .fixture("def456")])
+        let filter = Filter.directMessageRelayList(publicKeys: [.fixture("abc123"), .fixture("def456")])
         #expect(filter.authors == [.fixture("abc123"), .fixture("def456")])
         #expect(filter.kinds == [10050])
         #expect(filter.limit == nil)

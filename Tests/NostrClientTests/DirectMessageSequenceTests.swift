@@ -17,11 +17,11 @@ private struct UnreachableSigner: NostrSigning {
         throw NostrError.timeout
     }
 
-    func nip44Encrypt(_ plaintext: String, to recipientPubkey: PublicKey) async throws -> String {
+    func nip44Encrypt(_ plaintext: String, to recipientPublicKey: PublicKey) async throws -> String {
         throw NostrError.timeout
     }
 
-    func nip44Decrypt(_ ciphertext: String, from senderPubkey: PublicKey) async throws -> String {
+    func nip44Decrypt(_ ciphertext: String, from senderPublicKey: PublicKey) async throws -> String {
         throw NostrError.timeout
     }
 }

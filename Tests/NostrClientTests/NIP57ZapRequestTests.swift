@@ -14,7 +14,7 @@ struct NIP57ZapRequestTests {
     func signZapRequest() throws {
         let signer = EventSigner(keyPair: try KeyPair())
         let event = try signer.signZapRequest(
-            recipientPubkey: .fixture("recipient"),
+            recipientPublicKey: .fixture("recipient"),
             relays: [RelayURL("wss://relay1.example.com")!, RelayURL("wss://relay2.example.com")!],
             amountMillisats: 21000,
             lnurl: "lnurl1example",
@@ -22,7 +22,7 @@ struct NIP57ZapRequestTests {
 
         #expect(event.kind == .zapRequest)
         #expect(event.content == "great post")
-        #expect(event.referencedPubkeys == [.fixture("recipient")])
+        #expect(event.referencedPublicKeys == [.fixture("recipient")])
         #expect(event.firstTagValue(named: "amount") == "21000")
         #expect(event.firstTagValue(named: "lnurl") == "lnurl1example")
         #expect(
@@ -36,7 +36,7 @@ struct NIP57ZapRequestTests {
     func zapRequestWithEvent() throws {
         let signer = EventSigner(keyPair: try KeyPair())
         let event = try signer.signZapRequest(
-            recipientPubkey: .fixture("recipient"), relays: [RelayURL("wss://r.example.com")!],
+            recipientPublicKey: .fixture("recipient"), relays: [RelayURL("wss://r.example.com")!],
             eventID: .fixture("note"))
         #expect(event.referencedEventIDs == [.fixture("note")])
     }
@@ -45,7 +45,7 @@ struct NIP57ZapRequestTests {
     func zapRequestMinimal() throws {
         let signer = EventSigner(keyPair: try KeyPair())
         let event = try signer.signZapRequest(
-            recipientPubkey: .fixture("recipient"), relays: [RelayURL("wss://r.example.com")!])
+            recipientPublicKey: .fixture("recipient"), relays: [RelayURL("wss://r.example.com")!])
 
         #expect(event.firstTagValue(named: "amount") == nil)
         #expect(event.firstTagValue(named: "lnurl") == nil)
@@ -57,7 +57,7 @@ struct NIP57ZapRequestTests {
     func zapRequestRelaysAreCanonical() throws {
         let signer = EventSigner(keyPair: try KeyPair())
         let event = try signer.signZapRequest(
-            recipientPubkey: .fixture("recipient"), relays: [try RelayURL(string: "WSS://R.Example.com:443/")])
+            recipientPublicKey: .fixture("recipient"), relays: [try RelayURL(string: "WSS://R.Example.com:443/")])
 
         #expect(event.tags(named: "relays").first?.values == ["wss://r.example.com"])
     }
@@ -66,7 +66,7 @@ struct NIP57ZapRequestTests {
     func zapRequestRequiresRelay() throws {
         let signer = EventSigner(keyPair: try KeyPair())
         #expect(throws: NostrError.invalidData) {
-            _ = try signer.signZapRequest(recipientPubkey: .fixture("recipient"), relays: [])
+            _ = try signer.signZapRequest(recipientPublicKey: .fixture("recipient"), relays: [])
         }
     }
 
@@ -74,7 +74,7 @@ struct NIP57ZapRequestTests {
     func zapRequestWithCoordinate() throws {
         let signer = EventSigner(keyPair: try KeyPair())
         let event = try signer.signZapRequest(
-            recipientPubkey: .fixture("recipient"), relays: [RelayURL("wss://r.example.com")!],
+            recipientPublicKey: .fixture("recipient"), relays: [RelayURL("wss://r.example.com")!],
             eventCoordinate: "30023:author:identifier")
         #expect(event.firstTagValue(named: "a") == "30023:author:identifier")
     }
@@ -167,11 +167,12 @@ struct NIP57ZapRequestTests {
         let signer = EventSigner(keyPair: try KeyPair())
         // A "+" in the comment exercises the strict query-value encoding.
         let zap = try signer.signZapRequest(
-            recipientPubkey: .fixture("recipient"), relays: [RelayURL("wss://r.example.com")!], amountMillisats: 21000,
+            recipientPublicKey: .fixture("recipient"), relays: [RelayURL("wss://r.example.com")!],
+            amountMillisats: 21000,
             comment: "tipping 1 + 1 sats")
         let response = LNURLPayResponse(
             callback: "https://example.com/cb", minSendable: 1000, maxSendable: 100_000,
-            allowsNostr: true, nostrPubkey: .fixture("provider"))
+            allowsNostr: true, nostrPublicKey: .fixture("provider"))
 
         let url = try #require(
             response.invoiceRequestURL(amountMillisats: 21000, zapRequest: zap, lnurl: "lnurl1xyz"))

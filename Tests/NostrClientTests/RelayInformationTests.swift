@@ -104,8 +104,8 @@ struct RelayInformationTests {
 
         #expect(info.name == "Test Relay")
         #expect(info.description == "A test relay")
-        #expect(info.pubkey == admin)
-        #expect(info.selfPubkey == relay)
+        #expect(info.publicKey == admin)
+        #expect(info.selfPublicKey == relay)
         #expect(info.contact == "mailto:admin@example.com")
         #expect(info.supportedNIPs == [1, 2, 11])
         #expect(info.software == "https://example.com/relay")
@@ -123,7 +123,7 @@ struct RelayInformationTests {
     @Test(
         "Malformed pubkey and self values decode as nil without failing the document",
         arguments: [#""abc123""#, #""\#(String(repeating: "A", count: 64))""#, "42", "null"])
-    func decodeMalformedPubkeysLeniently(value: String) throws {
+    func decodeMalformedPublicKeysLeniently(value: String) throws {
         let json = Data(
             #"""
             {
@@ -137,8 +137,8 @@ struct RelayInformationTests {
 
         let info = try JSONDecoder().decode(RelayInformation.self, from: json)
 
-        #expect(info.pubkey == nil)
-        #expect(info.selfPubkey == nil)
+        #expect(info.publicKey == nil)
+        #expect(info.selfPublicKey == nil)
         #expect(info.name == "Test Relay")
         #expect(info.supportedNIPs == [1, 11])
         #expect(info.limitation?.authRequired == true)
@@ -147,7 +147,7 @@ struct RelayInformationTests {
     @Test("Public keys encode as their hex strings")
     func encodePublicKeysAsHex() throws {
         let admin = PublicKey.fixture("admin")
-        let info = RelayInformation(name: "Test Relay", pubkey: admin, selfPubkey: admin)
+        let info = RelayInformation(name: "Test Relay", publicKey: admin, selfPublicKey: admin)
 
         let object = try #require(
             JSONSerialization.jsonObject(with: JSONEncoder().encode(info)) as? [String: Any])
@@ -404,7 +404,7 @@ struct RelayInformationTests {
     @Test("Encoding uses snake_case keys")
     func encodingUsesSnakeCaseKeys() throws {
         let info = RelayInformation(
-            selfPubkey: PublicKey.fixture("abc"),
+            selfPublicKey: PublicKey.fixture("abc"),
             supportedNIPs: [1],
             termsOfService: "https://example.com/tos",
             relayCountries: ["US"],

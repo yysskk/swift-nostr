@@ -17,24 +17,24 @@ public protocol NostrSigning: Sendable {
     var publicKey: PublicKey { get async throws }
 
     /// Signs `event`, returning the complete signed event.
-    /// - Parameter event: The unsigned event to sign. Its `pubkey` should be this signer's
+    /// - Parameter event: The unsigned event to sign. Its `publicKey` should be this signer's
     ///   ``publicKey``.
     /// - Returns: The signed ``Event``.
     func sign(_ event: UnsignedEvent) async throws -> Event
 
-    /// Encrypts `plaintext` to `recipientPubkey` with NIP-44 as this signer's identity.
+    /// Encrypts `plaintext` to `recipientPublicKey` with NIP-44 as this signer's identity.
     /// - Parameters:
     ///   - plaintext: The message to encrypt.
-    ///   - recipientPubkey: The recipient's public key.
+    ///   - recipientPublicKey: The recipient's public key.
     /// - Returns: The NIP-44 payload.
-    func nip44Encrypt(_ plaintext: String, to recipientPubkey: PublicKey) async throws -> String
+    func nip44Encrypt(_ plaintext: String, to recipientPublicKey: PublicKey) async throws -> String
 
-    /// Decrypts a NIP-44 payload from `senderPubkey` addressed to this signer's identity.
+    /// Decrypts a NIP-44 payload from `senderPublicKey` addressed to this signer's identity.
     /// - Parameters:
     ///   - ciphertext: The NIP-44 payload.
-    ///   - senderPubkey: The sender's public key.
+    ///   - senderPublicKey: The sender's public key.
     /// - Returns: The decrypted plaintext.
-    func nip44Decrypt(_ ciphertext: String, from senderPubkey: PublicKey) async throws -> String
+    func nip44Decrypt(_ ciphertext: String, from senderPublicKey: PublicKey) async throws -> String
 }
 
 extension EventSigner: NostrSigning {}

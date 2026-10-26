@@ -73,7 +73,7 @@ public struct NostrSubscriptionsAPI: NostrSubscribing {
 
     /// Subscribes to a user's timeline.
     public func userTimeline(pubkey: PublicKey, limit: Int = 100) async throws -> SubscriptionSequence {
-        try await subscribe(filters: [.userNotes(pubkey: pubkey, limit: limit)])
+        try await subscribe(filters: [.userNotes(publicKey: pubkey, limit: limit)])
     }
 
     /// Subscribes to the global feed.
@@ -83,11 +83,11 @@ public struct NostrSubscriptionsAPI: NostrSubscribing {
 
     /// Subscribes to mentions of a user.
     public func mentions(pubkey: PublicKey, limit: Int = 100) async throws -> SubscriptionSequence {
-        try await subscribe(filters: [.mentions(pubkey: pubkey, limit: limit)])
+        try await subscribe(filters: [.mentions(publicKey: pubkey, limit: limit)])
     }
 
     /// Subscribes to metadata updates for a list of pubkeys.
     public func metadata(pubkeys: [PublicKey]) async throws -> SubscriptionSequence {
-        try await subscribe(filters: [.metadata(pubkeys: pubkeys)])
+        try await subscribe(filters: [.metadata(publicKeys: pubkeys)])
     }
 }

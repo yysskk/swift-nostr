@@ -7,14 +7,14 @@ extension Groups {
     ///
     /// Sending an action asks the relay to apply it: the relay checks the author's role
     /// permissions and answers with an OK message. Build the event for an action with
-    /// ``Groups/moderationEvent(_:groupID:previous:reason:pubkey:createdAt:)`` and parse
+    /// ``Groups/moderationEvent(_:groupID:previous:reason:publicKey:createdAt:)`` and parse
     /// received ones with ``Groups/ModerationRequest``.
     /// https://github.com/nostr-protocol/nips/blob/master/29.md
     public enum ModerationAction: Sendable, Hashable {
-        /// kind 9000 — adds `pubkey` to the group and/or replaces their role names.
-        case putUser(pubkey: PublicKey, roles: [String])
-        /// kind 9001 — removes `pubkey` from the group.
-        case removeUser(pubkey: PublicKey)
+        /// kind 9000 — adds `publicKey` to the group and/or replaces their role names.
+        case putUser(publicKey: PublicKey, roles: [String])
+        /// kind 9001 — removes `publicKey` from the group.
+        case removeUser(publicKey: PublicKey)
         /// kind 9002 — replaces the group's metadata with `Metadata`'s ``Metadata/fieldTags``
         /// (the embedded ``Metadata/groupID`` is not emitted; the event's "h" tag carries the
         /// group).
@@ -55,10 +55,10 @@ extension Groups {
         /// The action-specific tags, emitted between the "h" tag and any "previous" tag.
         fileprivate var actionTags: [Tag] {
             switch self {
-            case .putUser(let pubkey, let roles):
-                return [.pubkey(pubkey, roles: roles)]
-            case .removeUser(let pubkey):
-                return [.pubkey(pubkey, roles: [])]
+            case .putUser(let publicKey, let roles):
+                return [.publicKey(publicKey, roles: roles)]
+            case .removeUser(let publicKey):
+                return [.publicKey(publicKey, roles: [])]
             case .editMetadata(let metadata):
                 return metadata.fieldTags
             case .deleteEvent(let id):
@@ -83,8 +83,8 @@ extension Groups {
     /// Builds an unsigned NIP-29 moderation event.
     ///
     /// The event's first tag is the group's "h" tag, followed by the action's tags —
-    /// `["p", pubkey, role...]` for ``ModerationAction/putUser(pubkey:roles:)``,
-    /// `["p", pubkey]` for ``ModerationAction/removeUser(pubkey:)``, the metadata's
+    /// `["p", publicKey, role...]` for ``ModerationAction/putUser(publicKey:roles:)``,
+    /// `["p", publicKey]` for ``ModerationAction/removeUser(publicKey:)``, the metadata's
     /// ``Metadata/fieldTags`` for ``ModerationAction/editMetadata(_:)``, `["e", id]` for
     /// ``ModerationAction/deleteEvent(id:)``, `["code", code]` for
     /// ``ModerationAction/createInvite(code:)``, the "e"/"a" tags in pin order for
@@ -99,7 +99,7 @@ extension Groups {
     ///     ``previousReferences(from:excludingAuthor:maxCount:)``. Omitted when empty.
     ///   - reason: An optional human-readable reason for the action; becomes the event
     ///     content ("" when nil).
-    ///   - pubkey: The acting admin's public key.
+    ///   - publicKey: The acting admin's public key.
     ///   - createdAt: The event timestamp. Defaults to now.
     /// - Returns: The unsigned moderation event of ``ModerationAction/kind``.
     public static func moderationEvent(
@@ -107,7 +107,7 @@ extension Groups {
         groupID: String,
         previous: [String] = [],
         reason: String? = nil,
-        pubkey: PublicKey,
+        publicKey: PublicKey,
         createdAt: Timestamp = .now
     ) -> UnsignedEvent {
         var tags: [Tag] = [.group(groupID)]
@@ -116,7 +116,7 @@ extension Groups {
             tags.append(.previous(previous))
         }
         return UnsignedEvent(
-            pubkey: pubkey,
+            publicKey: publicKey,
             createdAt: createdAt,
             kind: action.kind,
             tags: tags,
@@ -126,7 +126,7 @@ extension Groups {
 
     /// Builds and signs a NIP-29 moderation event.
     ///
-    /// See ``moderationEvent(_:groupID:previous:reason:pubkey:createdAt:)`` for the event
+    /// See ``moderationEvent(_:groupID:previous:reason:publicKey:createdAt:)`` for the event
     /// layout; the author is resolved from `signer`.
     ///
     /// - Returns: The signed moderation event of ``ModerationAction/kind``.
@@ -145,7 +145,7 @@ extension Groups {
                 groupID: groupID,
                 previous: previous,
                 reason: reason,
-                pubkey: try await signer.publicKey,
+                publicKey: try await signer.publicKey,
                 createdAt: createdAt
             )
         )
@@ -199,16 +199,16 @@ extension Groups {
             switch event.kind {
             case .groupPutUser:
                 guard let target = event.tags(named: "p").first,
-                    let pubkey = target.primaryValue.flatMap(PublicKey.init)
+                    let publicKey = target.primaryValue.flatMap(PublicKey.init)
                 else {
                     throw ValidationError.missingTag(name: "p", kind: event.kind)
                 }
-                action = .putUser(pubkey: pubkey, roles: Array(target.values.dropFirst()))
+                action = .putUser(publicKey: publicKey, roles: Array(target.values.dropFirst()))
             case .groupRemoveUser:
-                guard let pubkey = event.firstTagValue(named: "p").flatMap(PublicKey.init) else {
+                guard let publicKey = event.firstTagValue(named: "p").flatMap(PublicKey.init) else {
                     throw ValidationError.missingTag(name: "p", kind: event.kind)
                 }
-                action = .removeUser(pubkey: pubkey)
+                action = .removeUser(publicKey: publicKey)
             case .groupEditMetadata:
                 action = .editMetadata(
                     Metadata(
