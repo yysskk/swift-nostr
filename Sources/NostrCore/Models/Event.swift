@@ -232,14 +232,10 @@ extension Event {
         /// https://github.com/nostr-protocol/nips/blob/master/98.md
         public static let httpAuth = Kind(rawValue: 27235)
         public static let nostrConnect = Kind(rawValue: 24133)
-        public static let categorizedPeopleList = Kind(rawValue: 30000)
+        /// A NIP-51 follow set: a categorized set of profiles.
+        public static let followSet = Kind(rawValue: 30000)
         /// The legacy NIP-51 categorized bookmarks kind, superseded by bookmark sets (30003).
         public static let categorizedBookmarkList = Kind(rawValue: 30001)
-        /// A NIP-51 follow set: a categorized set of profiles.
-        ///
-        /// Shares raw value 30000 with ``categorizedPeopleList`` — the standard-list and set
-        /// names refer to the same addressable kind.
-        public static let followSet = Kind(rawValue: 30000)
         /// A NIP-51 relay set: a categorized set of relays.
         public static let relaySet = Kind(rawValue: 30002)
         /// A NIP-51 bookmark set: a categorized set of bookmarked events, articles, hashtags, URLs.
