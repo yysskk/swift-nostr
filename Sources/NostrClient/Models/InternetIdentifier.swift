@@ -239,8 +239,9 @@ extension String {
     }
 
     /// Verifies this string as an internet identifier against an expected pubkey
-    public func verifyAsInternetIdentifier(expectedPubkey: PublicKey) async throws -> InternetIdentifier.VerificationResult
-    {
+    public func verifyAsInternetIdentifier(
+        expectedPubkey: PublicKey
+    ) async throws -> InternetIdentifier.VerificationResult {
         try await InternetIdentifier.verify(self, expectedPubkey: expectedPubkey)
     }
 }
