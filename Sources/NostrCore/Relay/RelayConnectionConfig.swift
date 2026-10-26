@@ -11,6 +11,10 @@ public struct RelayConnectionConfig: Sendable {
     /// How long a publish waits for the relay's OK response.
     public var publishAckTimeout: Duration
 
+    /// How long ``RelayConnection/count(filters:timeout:)`` waits for the relay's COUNT response
+    /// when the call doesn't pass its own timeout.
+    public var queryTimeout: Duration
+
     /// The interval between keepalive pings.
     /// Liveness is detected by periodic WebSocket pings instead of an idle timeout,
     /// so a relay that simply has no messages to deliver is never torn down.
@@ -39,6 +43,7 @@ public struct RelayConnectionConfig: Sendable {
     ///   - connectionTimeout: How long opening the connection may take.
     ///   - sendTimeout: How long sending a single WebSocket frame may take.
     ///   - publishAckTimeout: How long a publish waits for the relay's OK response.
+    ///   - queryTimeout: How long a count waits for the relay's response without its own timeout.
     ///   - pingInterval: The interval between keepalive pings.
     ///   - autoReconnect: Whether to reconnect automatically on failure.
     ///   - maxReconnectAttempts: The maximum number of reconnection attempts, or 0 for unlimited.
@@ -49,6 +54,7 @@ public struct RelayConnectionConfig: Sendable {
         connectionTimeout: Duration = .seconds(10),
         sendTimeout: Duration = .seconds(10),
         publishAckTimeout: Duration = .seconds(30),
+        queryTimeout: Duration = .seconds(10),
         pingInterval: Duration = .seconds(30),
         autoReconnect: Bool = true,
         maxReconnectAttempts: Int = 0,
@@ -59,6 +65,7 @@ public struct RelayConnectionConfig: Sendable {
         self.connectionTimeout = connectionTimeout
         self.sendTimeout = sendTimeout
         self.publishAckTimeout = publishAckTimeout
+        self.queryTimeout = queryTimeout
         self.pingInterval = pingInterval
         self.autoReconnect = autoReconnect
         self.maxReconnectAttempts = maxReconnectAttempts

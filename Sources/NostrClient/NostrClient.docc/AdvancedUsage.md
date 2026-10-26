@@ -683,6 +683,7 @@ let config = RelayConnectionConfig(
     connectionTimeout: .seconds(10),
     sendTimeout: .seconds(10),
     publishAckTimeout: .seconds(30),
+    queryTimeout: .seconds(10),
     pingInterval: .seconds(30),
     autoReconnect: true,
     maxReconnectAttempts: 10,
@@ -702,9 +703,17 @@ by `connectionTimeout`.
 ```swift
 let poolConfig = RelayPoolConfig(
     maxDeduplicationCacheSize: 10000,
-    deduplicationCacheTTL: .seconds(300)
+    deduplicationCacheTTL: .seconds(300),
+    queryTimeout: .seconds(10)
 )
 let client = NostrClient(config: poolConfig)
+```
+
+``RelayPoolConfig/queryTimeout`` is how long a one-shot fetch or count waits for relays to
+finish when the call passes no `timeout:`; pass one to override it for a single call:
+
+```swift
+let events = try await client.events.fetch(filters: [filter], timeout: .seconds(5))
 ```
 
 ### Publish Strategies

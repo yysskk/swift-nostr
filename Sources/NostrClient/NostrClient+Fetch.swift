@@ -8,19 +8,21 @@ import NostrCore
 extension NostrClient {
     /// Fetches events matching `filters`, waiting for every targeted relay to send EOSE or for
     /// `timeout`, whichever comes first. Takes pre-validated canonical URLs; nil fetches from
-    /// the whole pool.
+    /// the whole pool. A nil `timeout` resolves to the pool's ``RelayPoolConfig/queryTimeout``
+    /// here, so the public wrappers just forward the caller's optional.
     ///
     /// Backs ``NostrEventsAPI/fetch(filters:to:timeout:)``.
     func fetch(
         filters: [Filter],
         toURLs relayURLs: Set<RelayURL>?,
-        timeout: TimeInterval
+        timeout: Duration?
     ) async throws -> [Event] {
+        let timeout = timeout ?? pool.config.queryTimeout
         let subscription = try await subscribe(filters: filters, toURLs: relayURLs)
 
         let timeoutTask = Task {
             do {
-                try await Task.sleep(for: .seconds(timeout))
+                try await Task.sleep(for: timeout)
                 await subscription.close()
             } catch {
                 // Cancelled because fetch finished first: nothing to do.

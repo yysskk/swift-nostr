@@ -163,14 +163,14 @@ public struct NostrGroupsAPI: NostrGroupManaging {
     /// - Parameters:
     ///   - group: The group to query; its relay is added to the pool and connected on demand.
     ///   - authorPubkey: The relay pubkey to validate against, overriding `group.relayPubkey`.
-    ///   - timeout: How long to wait for the relay's EOSE (default: 10 seconds).
+    ///   - timeout: How long to wait for relays to finish; `nil` uses ``RelayPoolConfig/queryTimeout``.
     /// - Returns: The parsed metadata, or nil when the relay returned no usable event.
     /// - Throws: ``Groups/ValidationError`` when the winning event does not parse,
     ///   plus anything the connection or fetch throws.
     public func fetchMetadata(
         for group: GroupReference,
         authorPubkey: PublicKey? = nil,
-        timeout: TimeInterval = 10
+        timeout: Duration? = nil
     ) async throws -> Groups.Metadata? {
         let relayURL = try await ensureRelay(group)
         let author = authorPubkey ?? group.relayPubkey
@@ -195,14 +195,14 @@ public struct NostrGroupsAPI: NostrGroupManaging {
     /// - Parameters:
     ///   - group: The group to query; its relay is added to the pool and connected on demand.
     ///   - authorPubkey: The relay pubkey to validate against, overriding `group.relayPubkey`.
-    ///   - timeout: How long to wait for the relay's EOSE (default: 10 seconds).
+    ///   - timeout: How long to wait for relays to finish; `nil` uses ``RelayPoolConfig/queryTimeout``.
     /// - Returns: The snapshot, with a nil field per kind the relay did not answer for.
     /// - Throws: ``Groups/ValidationError`` when a winning event does not parse,
     ///   plus anything the connection or fetch throws.
     public func fetchState(
         for group: GroupReference,
         authorPubkey: PublicKey? = nil,
-        timeout: TimeInterval = 10
+        timeout: Duration? = nil
     ) async throws -> GroupState {
         let relayURL = try await ensureRelay(group)
         let author = authorPubkey ?? group.relayPubkey
@@ -274,11 +274,11 @@ public struct NostrGroupsAPI: NostrGroupManaging {
     ///
     /// - Parameters:
     ///   - pubkey: The list's author; nil (the default) fetches the current user's list.
-    ///   - timeout: How long to wait for the relays' EOSE (default: 10 seconds).
+    ///   - timeout: How long to wait for relays to finish; `nil` uses ``RelayPoolConfig/queryTimeout``.
     /// - Returns: The typed list, or nil if none was found.
     public func fetchSimpleGroupList(
         for pubkey: PublicKey? = nil,
-        timeout: TimeInterval = 10
+        timeout: Duration? = nil
     ) async throws -> SimpleGroupList? {
         guard let list = try await client.lists.fetch(kind: .simpleGroupList, for: pubkey, timeout: timeout) else {
             return nil

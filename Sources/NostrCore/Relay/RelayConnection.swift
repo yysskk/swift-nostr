@@ -791,13 +791,16 @@ public actor RelayConnection {
     /// Relays that do not implement NIP-45 usually never reply; the call then fails with
     /// ``NostrError/timeout`` after `timeout`. A CLOSED for the COUNT subscription fails
     /// fast with ``NostrError/relayError(_:)``.
+    /// - Parameter timeout: How long to wait for the relay to answer; `nil` uses
+    ///   ``RelayConnectionConfig/queryTimeout``.
     /// - Throws: ``NostrError/notConnected`` when not connected or torn down while waiting.
     /// https://github.com/nostr-protocol/nips/blob/master/45.md
-    public func count(filters: [Filter], timeout: TimeInterval = 10) async throws -> EventCount {
+    public func count(filters: [Filter], timeout: Duration? = nil) async throws -> EventCount {
         guard state == .connected else {
             throw NostrError.notConnected
         }
 
+        let timeout = timeout ?? config.queryTimeout
         let subscriptionID = "count-" + String(UUID().uuidString.prefix(12))
         let (stream, continuation) = AsyncThrowingStream<EventCount, any Error>.makeStream()
         pendingCountWaiters[subscriptionID] = continuation
@@ -822,7 +825,7 @@ public actor RelayConnection {
             }
 
             group.addTask {
-                try await Task.sleep(for: .seconds(timeout))
+                try await Task.sleep(for: timeout)
                 throw NostrError.timeout
             }
 

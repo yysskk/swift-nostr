@@ -258,8 +258,8 @@ let scoped = try await client.events.fetch(filters: [filter], to: [relay])
 ### Event Counts (NIP-45)
 
 COUNT queries every relay and reports how many events match the filters. Relays without
-NIP-45 usually never reply and are dropped after `timeout` (default 10s); a CLOSED for the
-count fails fast.
+NIP-45 usually never reply and are dropped after `timeout` (a `Duration`; `nil`, the default,
+uses `RelayPoolConfig.queryTimeout`, 10 seconds); a CLOSED for the count fails fast.
 
 ```swift
 // Max count across relays (each relay's count is a lower bound):
@@ -1361,7 +1361,8 @@ Manages connections to multiple Nostr relays (actor).
 ```swift
 let config = RelayPoolConfig(
     maxDeduplicationCacheSize: 10000,
-    deduplicationCacheTTL: .seconds(300)
+    deduplicationCacheTTL: .seconds(300),
+    queryTimeout: .seconds(10)   // one-shot fetch/count wait when the call passes no timeout
 )
 ```
 
@@ -1412,6 +1413,7 @@ let config = RelayConnectionConfig(
     connectionTimeout: .seconds(10),     // also bounds keepalive pong waits
     sendTimeout: .seconds(10),           // per WebSocket frame send
     publishAckTimeout: .seconds(30),     // wait for the relay's OK
+    queryTimeout: .seconds(10),          // count(filters:) wait when the call passes no timeout
     pingInterval: .seconds(30),          // between keepalive pings
     autoReconnect: true,
     maxReconnectAttempts: 10,

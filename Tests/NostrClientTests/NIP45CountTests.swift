@@ -98,8 +98,31 @@ struct NIP45CountTests {
         try await connection.connect()
 
         await #expect(throws: NostrError.timeout) {
-            try await connection.count(filters: [Filter(kinds: [.textNote])], timeout: 0.2)
+            try await connection.count(filters: [Filter(kinds: [.textNote])], timeout: .milliseconds(200))
         }
+        await connection.disconnect()
+    }
+
+    @Test("count without a timeout times out after the connection's queryTimeout")
+    func countWithoutTimeoutUsesQueryTimeout() async throws {
+        let config = RelayConnectionConfig(
+            connectionTimeout: .seconds(1), queryTimeout: .milliseconds(50), pingInterval: .seconds(60),
+            autoReconnect: false)
+        let mock = MockWebSocketSession()
+        let connection = RelayConnection(
+            url: relayURL,
+            webSocketFactory: MockWebSocketSessionFactory(makeSession: { mock }),
+            config: config
+        )
+        try await connection.connect()
+
+        let start = ContinuousClock.now
+        await #expect(throws: NostrError.timeout) {
+            try await connection.count(filters: [Filter(kinds: [.textNote])])
+        }
+        let elapsed = ContinuousClock.now - start
+        #expect(elapsed >= .milliseconds(40))
+        #expect(elapsed < .seconds(5))
         await connection.disconnect()
     }
 
@@ -266,7 +289,7 @@ struct NIP45CountTests {
 
         // Relay A answers; relay B never replies and times out. The pool tolerates the
         // partial failure and returns only the relay that answered.
-        let task = Task { try await pool.count(filters: [Filter(kinds: [.textNote])], timeout: 0.3) }
+        let task = Task { try await pool.count(filters: [Filter(kinds: [.textNote])], timeout: .milliseconds(300)) }
 
         try await pollUntil { mockA.sentTextFrames.contains { $0.hasPrefix("[\"COUNT\"") } }
         let subA = try subscriptionID(fromCountFrame: countFrames(in: mockA)[0])
@@ -297,8 +320,48 @@ struct NIP45CountTests {
 
         // Neither relay replies; every per-relay count times out, so the pool surfaces the error.
         await #expect(throws: NostrError.timeout) {
-            try await pool.count(filters: [Filter(kinds: [.textNote])], timeout: 0.2)
+            try await pool.count(filters: [Filter(kinds: [.textNote])], timeout: .milliseconds(200))
         }
+        await pool.disconnectAll()
+    }
+
+    @Test("the pool count without a timeout uses the pool's queryTimeout, not the relay's")
+    func poolCountUsesPoolQueryTimeout() async throws {
+        let mock = MockWebSocketSession()
+        let relayConfig = RelayConnectionConfig(
+            connectionTimeout: .seconds(1), queryTimeout: .seconds(30), pingInterval: .seconds(60),
+            autoReconnect: false)
+        let pool = RelayPool(
+            config: RelayPoolConfig(defaultRelayConfig: relayConfig, queryTimeout: .milliseconds(50)),
+            webSocketFactory: MockWebSocketSessionFactory(makeSession: { mock })
+        )
+        let connection = await pool.addRelay(relayURL)
+        try await connection.connect()
+
+        // The relay never replies: the pool's 50 ms governs, not the connection's 30 s.
+        let start = ContinuousClock.now
+        await #expect(throws: NostrError.timeout) {
+            try await pool.count(filters: [Filter(kinds: [.textNote])])
+        }
+        #expect(ContinuousClock.now - start < .seconds(5))
+        await pool.disconnectAll()
+    }
+
+    @Test("an explicit pool count timeout overrides the pool's queryTimeout")
+    func poolCountExplicitTimeoutOverridesQueryTimeout() async throws {
+        let mock = MockWebSocketSession()
+        let pool = RelayPool(
+            config: RelayPoolConfig(defaultRelayConfig: noReconnectConfig, queryTimeout: .seconds(30)),
+            webSocketFactory: MockWebSocketSessionFactory(makeSession: { mock })
+        )
+        let connection = await pool.addRelay(relayURL)
+        try await connection.connect()
+
+        let start = ContinuousClock.now
+        await #expect(throws: NostrError.timeout) {
+            try await pool.count(filters: [Filter(kinds: [.textNote])], timeout: .milliseconds(50))
+        }
+        #expect(ContinuousClock.now - start < .seconds(5))
         await pool.disconnectAll()
     }
 
