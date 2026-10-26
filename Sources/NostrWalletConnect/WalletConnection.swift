@@ -231,8 +231,7 @@ public actor WalletConnection {
             throw WalletConnectError.responseDecodingFailed
         }
         if let error = response.error {
-            throw WalletConnectError.walletError(
-                code: WalletConnectErrorCode(rawValue: error.code), message: error.message)
+            throw WalletConnectError.walletError(code: error.code, message: error.message)
         }
         guard let result = response.result else {
             throw WalletConnectError.missingResult
@@ -346,11 +345,10 @@ public actor WalletConnection {
 
             // A reply naming another command answers a different request; folding it in would let
             // a body of the wrong shape satisfy this one whenever it happened to decode.
-            if let received = Self.resultType(of: content), received != request.method.rawValue {
+            if let received = Self.resultType(of: content), received != request.method {
                 if request.expected == 1 {
                     return .failed(
-                        WalletConnectError.unexpectedResultType(
-                            expected: request.method.rawValue, received: received))
+                        WalletConnectError.unexpectedResultType(expected: request.method, received: received))
                 }
                 return request.receivedCount >= request.expected ? .resolved(request.collected) : .pending
             }
@@ -366,9 +364,9 @@ public actor WalletConnection {
     /// a `get_balance` body satisfy a `pay_invoice` whenever the shapes happened to decode. An
     /// unparseable body keeps its old path — it is reported as a decoding failure downstream, which
     /// says more than silently discarding it here would.
-    private static func resultType(of content: String) -> String? {
+    private static func resultType(of content: String) -> WalletConnectMethod? {
         struct ResultTypeOnly: Decodable {
-            let resultType: String
+            let resultType: WalletConnectMethod
 
             enum CodingKeys: String, CodingKey {
                 case resultType = "result_type"

@@ -169,10 +169,29 @@ struct MultiPayMatchingTests {
                 requestID: request.id, client: client, wallet: wallet))
 
         await #expect(
-            throws: WalletConnectError.unexpectedResultType(
-                expected: "pay_invoice", received: "get_balance")
+            throws: WalletConnectError.unexpectedResultType(expected: .payInvoice, received: .getBalance)
         ) {
             _ = try await payment.value
+        }
+    }
+
+    @Test("a result_type this package has no constant for is reported as a typed method")
+    func singleResponseUnknownResultTypeIsReported() async throws {
+        let (connection, transport, client, wallet) = try makeConnection(timeout: .seconds(2))
+
+        let balance = Task { try await connection.fetchBalance() }
+
+        let request = try await NWCFixtures.waitForSentEvents(transport, count: 1)[0]
+        await transport.emit(
+            try NWCFixtures.response(
+                resultJSON: #"{"result_type":"future_method","result":{"balance":100}}"#,
+                requestID: request.id, client: client, wallet: wallet))
+
+        await #expect(
+            throws: WalletConnectError.unexpectedResultType(
+                expected: .getBalance, received: WalletConnectMethod(rawValue: "future_method"))
+        ) {
+            _ = try await balance.value
         }
     }
 

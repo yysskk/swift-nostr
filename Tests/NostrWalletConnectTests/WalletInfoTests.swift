@@ -18,13 +18,14 @@ struct WalletInfoTests {
             signature: nil)
     }
 
-    @Test("parses supported and unknown methods from the content")
+    @Test("keeps every advertised method token, recognized or not, in order")
     func parsesMethods() throws {
-        let event = infoEvent(content: "pay_invoice get_balance make_invoice future_method")
+        let event = infoEvent(content: "pay_invoice get_balance future_method  make_invoice")
         let info = try #require(WalletInfo(infoEvent: event))
-        #expect(info.methods == [.payInvoice, .getBalance, .makeInvoice])
-        #expect(info.unknownMethods == ["future_method"])
+        let futureMethod = WalletConnectMethod(rawValue: "future_method")
+        #expect(info.methods == [.payInvoice, .getBalance, futureMethod, .makeInvoice])
         #expect(info.supports(.payInvoice))
+        #expect(info.supports(futureMethod))
         #expect(!info.supports(.payKeysend))
     }
 

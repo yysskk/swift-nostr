@@ -24,7 +24,7 @@ public enum WalletConnectError: Error, LocalizedError, Sendable, Equatable {
     case missingResult
 
     /// The wallet answered with a `result_type` naming a different command than the one requested.
-    case unexpectedResultType(expected: String, received: String)
+    case unexpectedResultType(expected: WalletConnectMethod, received: WalletConnectMethod)
 
     /// The wallet encrypted its response with a scheme this package does not implement.
     case unsupportedEncryption(String)
@@ -60,56 +60,49 @@ public enum WalletConnectError: Error, LocalizedError, Sendable, Equatable {
 
 /// A NIP-47 error code.
 ///
-/// The standard codes are modeled as cases; any code a wallet sends that is not in the spec is
-/// preserved verbatim as ``unknown(_:)``. The non-failable `init(rawValue:)` (unknown codes fall
-/// back to ``unknown(_:)``) satisfies `RawRepresentable`'s failable requirement.
+/// The set is open-ended: the codes NIP-47 defines are available as static constants, and any code
+/// a wallet sends — including one a future revision adds — is preserved verbatim through
+/// ``init(rawValue:)``. The value encodes to and from JSON as a bare string.
 /// https://github.com/nostr-protocol/nips/blob/master/47.md
-public enum WalletConnectErrorCode: RawRepresentable, Sendable, Equatable {
-    public typealias RawValue = String
+public struct WalletConnectErrorCode: RawRepresentable, Codable, Sendable, Hashable, CustomStringConvertible {
+    /// The wire code string.
+    public let rawValue: String
 
-    case rateLimited
-    case notImplemented
-    case insufficientBalance
-    case quotaExceeded
-    case restricted
-    case unauthorized
-    case `internal`
-    case unsupportedEncryption
-    case paymentFailed
-    case other
-    case unknown(String)
-
-    /// Maps a wire code string to a case, preserving unrecognized codes as ``unknown(_:)``.
     public init(rawValue: String) {
-        switch rawValue {
-        case "RATE_LIMITED": self = .rateLimited
-        case "NOT_IMPLEMENTED": self = .notImplemented
-        case "INSUFFICIENT_BALANCE": self = .insufficientBalance
-        case "QUOTA_EXCEEDED": self = .quotaExceeded
-        case "RESTRICTED": self = .restricted
-        case "UNAUTHORIZED": self = .unauthorized
-        case "INTERNAL": self = .internal
-        case "UNSUPPORTED_ENCRYPTION": self = .unsupportedEncryption
-        case "PAYMENT_FAILED": self = .paymentFailed
-        case "OTHER": self = .other
-        default: self = .unknown(rawValue)
-        }
+        self.rawValue = rawValue
     }
 
-    /// The wire code string for this case.
-    public var rawValue: String {
-        switch self {
-        case .rateLimited: return "RATE_LIMITED"
-        case .notImplemented: return "NOT_IMPLEMENTED"
-        case .insufficientBalance: return "INSUFFICIENT_BALANCE"
-        case .quotaExceeded: return "QUOTA_EXCEEDED"
-        case .restricted: return "RESTRICTED"
-        case .unauthorized: return "UNAUTHORIZED"
-        case .internal: return "INTERNAL"
-        case .unsupportedEncryption: return "UNSUPPORTED_ENCRYPTION"
-        case .paymentFailed: return "PAYMENT_FAILED"
-        case .other: return "OTHER"
-        case .unknown(let raw): return raw
-        }
+    public init(from decoder: any Decoder) throws {
+        self.init(rawValue: try decoder.singleValueContainer().decode(String.self))
     }
+
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
+
+    public var description: String {
+        rawValue
+    }
+
+    /// The client is sending commands too fast (`RATE_LIMITED`).
+    public static let rateLimited = WalletConnectErrorCode(rawValue: "RATE_LIMITED")
+    /// The command is not known or is intentionally not implemented (`NOT_IMPLEMENTED`).
+    public static let notImplemented = WalletConnectErrorCode(rawValue: "NOT_IMPLEMENTED")
+    /// The wallet does not have enough funds (`INSUFFICIENT_BALANCE`).
+    public static let insufficientBalance = WalletConnectErrorCode(rawValue: "INSUFFICIENT_BALANCE")
+    /// The wallet has exceeded its spending quota (`QUOTA_EXCEEDED`).
+    public static let quotaExceeded = WalletConnectErrorCode(rawValue: "QUOTA_EXCEEDED")
+    /// This public key is not allowed to do this operation (`RESTRICTED`).
+    public static let restricted = WalletConnectErrorCode(rawValue: "RESTRICTED")
+    /// This public key has no wallet connected (`UNAUTHORIZED`).
+    public static let unauthorized = WalletConnectErrorCode(rawValue: "UNAUTHORIZED")
+    /// An internal wallet error (`INTERNAL`).
+    public static let `internal` = WalletConnectErrorCode(rawValue: "INTERNAL")
+    /// The wallet does not support the request's encryption scheme (`UNSUPPORTED_ENCRYPTION`).
+    public static let unsupportedEncryption = WalletConnectErrorCode(rawValue: "UNSUPPORTED_ENCRYPTION")
+    /// The payment failed, e.g. no route was found (`PAYMENT_FAILED`).
+    public static let paymentFailed = WalletConnectErrorCode(rawValue: "PAYMENT_FAILED")
+    /// Any other error (`OTHER`).
+    public static let other = WalletConnectErrorCode(rawValue: "OTHER")
 }
