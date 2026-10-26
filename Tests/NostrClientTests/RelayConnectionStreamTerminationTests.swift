@@ -73,7 +73,7 @@ struct RelayConnectionStreamTerminationTests {
 
     private func makeConnection(
         dispenser: SocketDispenser,
-        maxReconnectAttempts: Int,
+        maximumReconnectAttempts: Int,
         autoReconnect: Bool = true,
         initialReconnectDelay: Duration = .milliseconds(1)
     ) -> RelayConnection {
@@ -84,7 +84,7 @@ struct RelayConnectionStreamTerminationTests {
                 connectionTimeout: .seconds(1),
                 pingInterval: .seconds(60),
                 autoReconnect: autoReconnect,
-                maxReconnectAttempts: maxReconnectAttempts,
+                maximumReconnectAttempts: maximumReconnectAttempts,
                 initialReconnectDelay: initialReconnectDelay
             )
         )
@@ -108,7 +108,7 @@ struct RelayConnectionStreamTerminationTests {
         let dispenser = SocketDispenser { index in
             MockWebSocketSession(pingError: index == 0 ? nil : URLError(.cannotConnectToHost))
         }
-        let connection = makeConnection(dispenser: dispenser, maxReconnectAttempts: 1)
+        let connection = makeConnection(dispenser: dispenser, maximumReconnectAttempts: 1)
         try await connection.connect()
 
         let finished = consume(await connection.messages())
@@ -123,7 +123,7 @@ struct RelayConnectionStreamTerminationTests {
     func streamFinishesOnDropWithoutAutoReconnect() async throws {
         let dispenser = SocketDispenser { _ in MockWebSocketSession() }
         let connection = makeConnection(
-            dispenser: dispenser, maxReconnectAttempts: 0, autoReconnect: false)
+            dispenser: dispenser, maximumReconnectAttempts: 0, autoReconnect: false)
         try await connection.connect()
 
         let finished = consume(await connection.messages())
@@ -140,7 +140,7 @@ struct RelayConnectionStreamTerminationTests {
         let dispenser = SocketDispenser { _ in MockWebSocketSession() }
         // A long backoff parks the reconnect task, leaving no receive loop alive.
         let connection = makeConnection(
-            dispenser: dispenser, maxReconnectAttempts: 0, initialReconnectDelay: .seconds(60))
+            dispenser: dispenser, maximumReconnectAttempts: 0, initialReconnectDelay: .seconds(60))
         try await connection.connect()
 
         let finished = consume(await connection.messages())
@@ -158,7 +158,7 @@ struct RelayConnectionStreamTerminationTests {
     @Test("messages() finishes on disconnect() when never connected")
     func streamFinishesOnDisconnectWhenNeverConnected() async throws {
         let dispenser = SocketDispenser { _ in MockWebSocketSession() }
-        let connection = makeConnection(dispenser: dispenser, maxReconnectAttempts: 0)
+        let connection = makeConnection(dispenser: dispenser, maximumReconnectAttempts: 0)
 
         let finished = consume(await connection.messages())
 
@@ -169,7 +169,7 @@ struct RelayConnectionStreamTerminationTests {
     @Test("messages() finishes on disconnect() while connected")
     func streamFinishesOnDisconnectWhileConnected() async throws {
         let dispenser = SocketDispenser { _ in MockWebSocketSession() }
-        let connection = makeConnection(dispenser: dispenser, maxReconnectAttempts: 0)
+        let connection = makeConnection(dispenser: dispenser, maximumReconnectAttempts: 0)
         try await connection.connect()
 
         let finished = consume(await connection.messages())
@@ -183,7 +183,7 @@ struct RelayConnectionStreamTerminationTests {
     @Test("messages() survives a successful auto-reconnect")
     func streamSurvivesSuccessfulReconnect() async throws {
         let dispenser = SocketDispenser { _ in MockWebSocketSession() }
-        let connection = makeConnection(dispenser: dispenser, maxReconnectAttempts: 0)
+        let connection = makeConnection(dispenser: dispenser, maximumReconnectAttempts: 0)
         try await connection.connect()
 
         let received = Flag()
@@ -213,7 +213,7 @@ struct RelayConnectionStreamTerminationTests {
     @Test("stateChanges() stays open across disconnect and reconnect")
     func stateStreamStaysOpenAcrossDisconnectAndConnect() async throws {
         let dispenser = SocketDispenser { _ in MockWebSocketSession() }
-        let connection = makeConnection(dispenser: dispenser, maxReconnectAttempts: 0)
+        let connection = makeConnection(dispenser: dispenser, maximumReconnectAttempts: 0)
 
         let states = StateLog()
         let stream = await connection.stateChanges()

@@ -150,8 +150,8 @@ struct NIP57ZapRequestTests {
         let response = try JSONDecoder().decode(LNURLPayResponse.self, from: Data(json.utf8))
 
         #expect(response.callback == "https://example.com/lnurl/cb")
-        #expect(response.minSendable == 1000)
-        #expect(response.maxSendable == 100_000_000)
+        #expect(response.minimumSendable == 1000)
+        #expect(response.maximumSendable == 100_000_000)
         #expect(response.commentAllowed == 255)
         #expect(response.supportsZaps)
     }
@@ -175,7 +175,7 @@ struct NIP57ZapRequestTests {
                 amountMillisats: 21000,
                 comment: "tipping 1 + 1 sats"))
         let response = LNURLPayResponse(
-            callback: "https://example.com/cb", minSendable: 1000, maxSendable: 100_000,
+            callback: "https://example.com/cb", minimumSendable: 1000, maximumSendable: 100_000,
             allowsNostr: true, nostrPublicKey: .fixture("provider"))
 
         let url = try #require(

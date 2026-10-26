@@ -185,21 +185,21 @@ extension RelayInformation {
     public struct Limitation: Codable, Sendable, Hashable {
         /// Maximum length, in bytes, of any incoming JSON message the relay accepts
         /// (REQ, EVENT, CLOSE, AUTH, COUNT — not only events).
-        public var maxMessageLength: Int?
+        public var maximumMessageLength: Int?
         /// Maximum number of concurrent subscriptions allowed on one connection.
-        public var maxSubscriptions: Int?
+        public var maximumSubscriptions: Int?
         /// Maximum number of filters allowed in a single subscription.
-        public var maxFilters: Int?
+        public var maximumFilters: Int?
         /// Maximum value the relay honors for a filter's `limit`.
-        public var maxLimit: Int?
+        public var maximumLimit: Int?
         /// Maximum length of a subscription id.
-        public var maxSubidLength: Int?
+        public var maximumSubscriptionIDLength: Int?
         /// Maximum number of tags allowed on an event.
-        public var maxEventTags: Int?
+        public var maximumEventTags: Int?
         /// Maximum length, in bytes, of an event's `content` field.
-        public var maxContentLength: Int?
+        public var maximumContentLength: Int?
         /// Minimum NIP-13 proof-of-work difficulty the relay requires to accept an event.
-        public var minPowDifficulty: Int?
+        public var minimumProofOfWorkDifficulty: Int?
         /// Whether the relay requires NIP-42 authentication before serving requests.
         public var authRequired: Bool?
         /// Whether the relay requires payment to use.
@@ -216,14 +216,14 @@ extension RelayInformation {
         public var defaultLimit: Int?
 
         enum CodingKeys: String, CodingKey {
-            case maxMessageLength = "max_message_length"
-            case maxSubscriptions = "max_subscriptions"
-            case maxFilters = "max_filters"
-            case maxLimit = "max_limit"
-            case maxSubidLength = "max_subid_length"
-            case maxEventTags = "max_event_tags"
-            case maxContentLength = "max_content_length"
-            case minPowDifficulty = "min_pow_difficulty"
+            case maximumMessageLength = "max_message_length"
+            case maximumSubscriptions = "max_subscriptions"
+            case maximumFilters = "max_filters"
+            case maximumLimit = "max_limit"
+            case maximumSubscriptionIDLength = "max_subid_length"
+            case maximumEventTags = "max_event_tags"
+            case maximumContentLength = "max_content_length"
+            case minimumProofOfWorkDifficulty = "min_pow_difficulty"
             case authRequired = "auth_required"
             case paymentRequired = "payment_required"
             case restrictedWrites = "restricted_writes"
@@ -233,14 +233,14 @@ extension RelayInformation {
         }
 
         public init(
-            maxMessageLength: Int? = nil,
-            maxSubscriptions: Int? = nil,
-            maxFilters: Int? = nil,
-            maxLimit: Int? = nil,
-            maxSubidLength: Int? = nil,
-            maxEventTags: Int? = nil,
-            maxContentLength: Int? = nil,
-            minPowDifficulty: Int? = nil,
+            maximumMessageLength: Int? = nil,
+            maximumSubscriptions: Int? = nil,
+            maximumFilters: Int? = nil,
+            maximumLimit: Int? = nil,
+            maximumSubscriptionIDLength: Int? = nil,
+            maximumEventTags: Int? = nil,
+            maximumContentLength: Int? = nil,
+            minimumProofOfWorkDifficulty: Int? = nil,
             authRequired: Bool? = nil,
             paymentRequired: Bool? = nil,
             restrictedWrites: Bool? = nil,
@@ -248,14 +248,14 @@ extension RelayInformation {
             createdAtUpperLimit: Duration? = nil,
             defaultLimit: Int? = nil
         ) {
-            self.maxMessageLength = maxMessageLength
-            self.maxSubscriptions = maxSubscriptions
-            self.maxFilters = maxFilters
-            self.maxLimit = maxLimit
-            self.maxSubidLength = maxSubidLength
-            self.maxEventTags = maxEventTags
-            self.maxContentLength = maxContentLength
-            self.minPowDifficulty = minPowDifficulty
+            self.maximumMessageLength = maximumMessageLength
+            self.maximumSubscriptions = maximumSubscriptions
+            self.maximumFilters = maximumFilters
+            self.maximumLimit = maximumLimit
+            self.maximumSubscriptionIDLength = maximumSubscriptionIDLength
+            self.maximumEventTags = maximumEventTags
+            self.maximumContentLength = maximumContentLength
+            self.minimumProofOfWorkDifficulty = minimumProofOfWorkDifficulty
             self.authRequired = authRequired
             self.paymentRequired = paymentRequired
             self.restrictedWrites = restrictedWrites
@@ -272,14 +272,16 @@ extension RelayInformation {
                 try container.decodeIfPresent(Int64.self, forKey: key).map(Duration.seconds)
             }
             self.init(
-                maxMessageLength: try container.decodeIfPresent(Int.self, forKey: .maxMessageLength),
-                maxSubscriptions: try container.decodeIfPresent(Int.self, forKey: .maxSubscriptions),
-                maxFilters: try container.decodeIfPresent(Int.self, forKey: .maxFilters),
-                maxLimit: try container.decodeIfPresent(Int.self, forKey: .maxLimit),
-                maxSubidLength: try container.decodeIfPresent(Int.self, forKey: .maxSubidLength),
-                maxEventTags: try container.decodeIfPresent(Int.self, forKey: .maxEventTags),
-                maxContentLength: try container.decodeIfPresent(Int.self, forKey: .maxContentLength),
-                minPowDifficulty: try container.decodeIfPresent(Int.self, forKey: .minPowDifficulty),
+                maximumMessageLength: try container.decodeIfPresent(Int.self, forKey: .maximumMessageLength),
+                maximumSubscriptions: try container.decodeIfPresent(Int.self, forKey: .maximumSubscriptions),
+                maximumFilters: try container.decodeIfPresent(Int.self, forKey: .maximumFilters),
+                maximumLimit: try container.decodeIfPresent(Int.self, forKey: .maximumLimit),
+                maximumSubscriptionIDLength: try container.decodeIfPresent(
+                    Int.self, forKey: .maximumSubscriptionIDLength),
+                maximumEventTags: try container.decodeIfPresent(Int.self, forKey: .maximumEventTags),
+                maximumContentLength: try container.decodeIfPresent(Int.self, forKey: .maximumContentLength),
+                minimumProofOfWorkDifficulty: try container.decodeIfPresent(
+                    Int.self, forKey: .minimumProofOfWorkDifficulty),
                 authRequired: try container.decodeIfPresent(Bool.self, forKey: .authRequired),
                 paymentRequired: try container.decodeIfPresent(Bool.self, forKey: .paymentRequired),
                 restrictedWrites: try container.decodeIfPresent(Bool.self, forKey: .restrictedWrites),
@@ -292,14 +294,14 @@ extension RelayInformation {
         /// toward zero.
         public func encode(to encoder: any Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encodeIfPresent(maxMessageLength, forKey: .maxMessageLength)
-            try container.encodeIfPresent(maxSubscriptions, forKey: .maxSubscriptions)
-            try container.encodeIfPresent(maxFilters, forKey: .maxFilters)
-            try container.encodeIfPresent(maxLimit, forKey: .maxLimit)
-            try container.encodeIfPresent(maxSubidLength, forKey: .maxSubidLength)
-            try container.encodeIfPresent(maxEventTags, forKey: .maxEventTags)
-            try container.encodeIfPresent(maxContentLength, forKey: .maxContentLength)
-            try container.encodeIfPresent(minPowDifficulty, forKey: .minPowDifficulty)
+            try container.encodeIfPresent(maximumMessageLength, forKey: .maximumMessageLength)
+            try container.encodeIfPresent(maximumSubscriptions, forKey: .maximumSubscriptions)
+            try container.encodeIfPresent(maximumFilters, forKey: .maximumFilters)
+            try container.encodeIfPresent(maximumLimit, forKey: .maximumLimit)
+            try container.encodeIfPresent(maximumSubscriptionIDLength, forKey: .maximumSubscriptionIDLength)
+            try container.encodeIfPresent(maximumEventTags, forKey: .maximumEventTags)
+            try container.encodeIfPresent(maximumContentLength, forKey: .maximumContentLength)
+            try container.encodeIfPresent(minimumProofOfWorkDifficulty, forKey: .minimumProofOfWorkDifficulty)
             try container.encodeIfPresent(authRequired, forKey: .authRequired)
             try container.encodeIfPresent(paymentRequired, forKey: .paymentRequired)
             try container.encodeIfPresent(restrictedWrites, forKey: .restrictedWrites)

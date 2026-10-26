@@ -345,7 +345,7 @@ over HTTP before or after connecting:
 let info = try await RelayInformation.fetch(from: try RelayURL(string: "wss://relay.example.com"))
 print(info.name ?? "unknown")
 print(info.supportedNIPs ?? [])
-print(info.limitation?.maxSubscriptions ?? 0)
+print(info.limitation?.maximumSubscriptions ?? 0)
 print(info.limitation?.authRequired ?? false)
 ```
 
@@ -512,7 +512,7 @@ round-trips the invite code.
 ``NostrGroupsAPI/timeline(_:kinds:since:limit:)`` follows the group's content —
 events carrying its "h" tag — from its relay. Keep the events you see: the spec asks each
 message to reference a few recent timeline events in a "previous" tag so an out-of-context
-rebroadcast is detectable, and `Groups.previousReferences(from:excludingAuthor:maxCount:)`
+rebroadcast is detectable, and `Groups.previousReferences(from:excludingAuthor:maximumCount:)`
 samples them for you. Check inbound events' references against what you have seen with
 `Groups.unknownPreviousReferences(of:knownEventIDs:)`:
 
@@ -720,9 +720,9 @@ let config = RelayConnectionConfig(
     queryTimeout: .seconds(10),
     pingInterval: .seconds(30),
     autoReconnect: true,
-    maxReconnectAttempts: 10,
+    maximumReconnectAttempts: 10,
     initialReconnectDelay: .seconds(1),
-    maxReconnectDelay: .seconds(60),
+    maximumReconnectDelay: .seconds(60),
     reconnectBackoffMultiplier: 2
 )
 await client.relays.add(try RelayURL(string: "wss://relay.example.com"), config: config)
@@ -736,7 +736,7 @@ by `connectionTimeout`.
 
 ```swift
 let poolConfig = RelayPoolConfig(
-    maxDeduplicationCacheSize: 10000,
+    maximumDeduplicationCacheSize: 10000,
     deduplicationCacheTTL: .seconds(300),
     queryTimeout: .seconds(10)
 )
@@ -878,7 +878,7 @@ await client.relays.clearDeduplicationCache()
 ```
 
 ``RelayPoolConfig`` configures how much is remembered:
-``RelayPoolConfig/maxDeduplicationCacheSize`` bounds the entries across all subscriptions and
+``RelayPoolConfig/maximumDeduplicationCacheSize`` bounds the entries across all subscriptions and
 is enforced as events arrive, evicting the oldest, and
 ``RelayPoolConfig/deduplicationCacheTTL`` bounds how long an entry survives. Dropping an entry
 only risks delivering a duplicate later, never losing an event.

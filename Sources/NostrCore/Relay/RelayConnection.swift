@@ -875,7 +875,7 @@ public actor RelayConnection {
     /// session arrives, rather than finishing on the spot.
     ///
     /// It finishes when the connection is torn down for good: on ``disconnect()``, when
-    /// auto-reconnect gives up after ``RelayConnectionConfig/maxReconnectAttempts`` failed
+    /// auto-reconnect gives up after ``RelayConnectionConfig/maximumReconnectAttempts`` failed
     /// attempts, or when the connection drops with ``RelayConnectionConfig/autoReconnect``
     /// disabled. With the default configuration (unlimited reconnect attempts) only an explicit
     /// ``disconnect()`` finishes it. Streams open at that point end; a stream taken afterwards

@@ -36,8 +36,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **One-shot fetches and counts take their default timeout from configuration**:
   `RelayPoolConfig.queryTimeout` is how long a fetch or count through `NostrClient` or `RelayPool`
   waits for relays (EOSE, or COUNT) when the call passes no timeout, and
-  `RelayConnectionConfig.queryTimeout` does the same for `RelayConnection.count(filters:timeout:)`.
-  Both default to 10 seconds.
+  `RelayConnectionConfig.queryTimeout` does the same for
+  `RelayConnection.countEvents(matching:timeout:)`. Both default to 10 seconds.
 - **`EventTemplate` describes an event before it is signed**: its `kind`, `tags`, `content`, and
   `createdAt` — everything but the public key, id, and signature — as mutable properties, so a
   template can be adjusted before signing. Static factories build the NostrCore events:
@@ -97,6 +97,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Bounds are spelled `maximum` and `minimum`** (breaking): the remaining `max` and `min` names
+  now match `minimumReconnectDelay`, `maximumLogN`, and `minimumDifficulty`.
+  `RelayConnectionConfig.maxReconnectAttempts` and `maxReconnectDelay` are
+  `maximumReconnectAttempts` and `maximumReconnectDelay`, and
+  `RelayPoolConfig.maxDeduplicationCacheSize` is `maximumDeduplicationCacheSize`, in their
+  initializers too. `RelayInformation.Limitation`'s `maxMessageLength`, `maxSubscriptions`,
+  `maxFilters`, `maxLimit`, `maxEventTags`, and `maxContentLength` are `maximumMessageLength`,
+  `maximumSubscriptions`, `maximumFilters`, `maximumLimit`, `maximumEventTags`, and
+  `maximumContentLength`; `maxSubidLength` is `maximumSubscriptionIDLength` and
+  `minPowDifficulty` is `minimumProofOfWorkDifficulty`. `LNURLPayResponse.minSendable` and
+  `maxSendable` are `minimumSendable` and `maximumSendable`, and
+  `LNURLPayResponse.InvoiceError.amountOutOfRange(min:max:)` is
+  `amountOutOfRange(minimum:maximum:)`. `Groups.previousReferences(from:excludingAuthor:maxCount:)`
+  and its `using:` overload take `maximumCount:`. The NIP-11 and LUD-06 JSON keys are unchanged.
 - **`Event.Kind.categorizedPeopleList` is removed** (breaking): it was a second name for kind 30000.
   Use `followSet`, the NIP-51 name for that kind.
 - **`PublishedEvent` no longer forwards `Event` properties** (breaking): the dynamic member lookup
@@ -335,7 +349,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Relay results are keyed by `RelayURL`** (breaking): `PublishResult.statuses` is
   `[RelayURL: PublishRelayStatus]`, `acceptedRelays` / `failedRelays` / `pendingRelays` are
   `Set<RelayURL>`, and `status(for:)` takes a `RelayURL` (it took a string and returned nil for an
-  invalid one). `RelayPool.count(filters:to:timeout:)` returns `[RelayURL: EventCount]`;
+  invalid one). `RelayPool.countEvents(matching:from:timeout:)` returns `[RelayURL: EventCount]`;
   `SubscriptionSequence.expectedRelays` and the direct-message sequences' are `Set<RelayURL>`; every
   `SubscriptionEvent` case and its `relayURL` carry a `RelayURL`; and
   `routing.connectDirectMessageInboxRelays()` returns `Set<RelayURL>`.

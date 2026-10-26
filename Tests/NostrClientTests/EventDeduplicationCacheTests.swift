@@ -10,8 +10,8 @@ struct EventDeduplicationCacheTests {
 
     private let now = ContinuousClock.now
 
-    private func makeCache(maxSize: Int = 10, ttl: Duration = .seconds(300)) -> EventDeduplicationCache {
-        EventDeduplicationCache(maxSize: maxSize, ttl: ttl)
+    private func makeCache(maximumSize: Int = 10, ttl: Duration = .seconds(300)) -> EventDeduplicationCache {
+        EventDeduplicationCache(maximumSize: maximumSize, ttl: ttl)
     }
 
     // MARK: - Per-subscription scope
@@ -89,7 +89,7 @@ struct EventDeduplicationCacheTests {
 
     @Test("recording past the limit evicts the oldest entry immediately")
     func recordingPastTheLimitEvictsTheOldestEntry() {
-        var cache = makeCache(maxSize: 1)
+        var cache = makeCache(maximumSize: 1)
 
         _ = cache.record(eventID: .fixture("older"), subscriptionID: "sub_1", now: now)
         _ = cache.record(eventID: .fixture("newer"), subscriptionID: "sub_2", now: now + .seconds(1))
@@ -110,7 +110,7 @@ struct EventDeduplicationCacheTests {
 
     @Test("the count never exceeds the limit over many recordings")
     func theCountNeverExceedsTheLimitOverManyRecordings() {
-        var cache = makeCache(maxSize: 10)
+        var cache = makeCache(maximumSize: 10)
 
         for index in 0..<100 {
             let isNew = cache.record(
@@ -131,7 +131,7 @@ struct EventDeduplicationCacheTests {
 
     @Test("a maximum size of zero turns deduplication off")
     func aMaximumSizeOfZeroTurnsDeduplicationOff() {
-        var cache = makeCache(maxSize: 0)
+        var cache = makeCache(maximumSize: 0)
 
         let first = cache.record(eventID: .fixture("event"), subscriptionID: "sub_1", now: now)
         let repeated = cache.record(eventID: .fixture("event"), subscriptionID: "sub_1", now: now)
@@ -144,9 +144,9 @@ struct EventDeduplicationCacheTests {
 
     @Test("a negative maximum size is clamped to zero")
     func aNegativeMaximumSizeIsClampedToZero() {
-        let cache = makeCache(maxSize: -1)
+        let cache = makeCache(maximumSize: -1)
 
-        #expect(cache.maxSize == 0)
+        #expect(cache.maximumSize == 0)
     }
 
     // MARK: - Expiry

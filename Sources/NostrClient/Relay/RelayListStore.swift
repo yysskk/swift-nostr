@@ -16,8 +16,8 @@ actor RelayListStore {
     private var cache = ReplaceableCache<RelayListMetadata>()
     private let connector: RelayConnector
 
-    init(pool: RelayPool, policy: GossipRelayPolicy = .addAndConnect, maxRelaysPerResolve: Int = 8) {
-        self.connector = RelayConnector(pool: pool, policy: policy, maxRelaysPerResolve: maxRelaysPerResolve)
+    init(pool: RelayPool, policy: GossipRelayPolicy = .addAndConnect, maximumRelaysPerResolve: Int = 8) {
+        self.connector = RelayConnector(pool: pool, policy: policy, maximumRelaysPerResolve: maximumRelaysPerResolve)
     }
 
     /// Stores a relay list if it is newer than the cached one (replaceable-event semantics: newer wins).

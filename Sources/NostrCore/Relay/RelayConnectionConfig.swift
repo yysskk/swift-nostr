@@ -11,8 +11,8 @@ public struct RelayConnectionConfig: Sendable {
     /// How long a publish waits for the relay's OK response.
     public var publishAckTimeout: Duration
 
-    /// How long ``RelayConnection/count(filters:timeout:)`` waits for the relay's COUNT response
-    /// when the call doesn't pass its own timeout.
+    /// How long ``RelayConnection/countEvents(matching:timeout:)`` waits for the relay's COUNT
+    /// response when the call doesn't pass its own timeout.
     public var queryTimeout: Duration
 
     /// The interval between keepalive pings.
@@ -24,13 +24,13 @@ public struct RelayConnectionConfig: Sendable {
     public var autoReconnect: Bool
 
     /// Maximum number of reconnection attempts (0 = unlimited)
-    public var maxReconnectAttempts: Int
+    public var maximumReconnectAttempts: Int
 
     /// The delay before the first reconnection attempt.
     public var initialReconnectDelay: Duration
 
     /// The longest delay between reconnection attempts.
-    public var maxReconnectDelay: Duration
+    public var maximumReconnectDelay: Duration
 
     /// Multiplier for exponential backoff
     public var reconnectBackoffMultiplier: Double
@@ -46,9 +46,10 @@ public struct RelayConnectionConfig: Sendable {
     ///   - queryTimeout: How long a count waits for the relay's response without its own timeout.
     ///   - pingInterval: The interval between keepalive pings.
     ///   - autoReconnect: Whether to reconnect automatically on failure.
-    ///   - maxReconnectAttempts: The maximum number of reconnection attempts, or 0 for unlimited.
+    ///   - maximumReconnectAttempts: The maximum number of reconnection attempts, or 0 for
+    ///     unlimited.
     ///   - initialReconnectDelay: The delay before the first reconnection attempt.
-    ///   - maxReconnectDelay: The longest delay between reconnection attempts.
+    ///   - maximumReconnectDelay: The longest delay between reconnection attempts.
     ///   - reconnectBackoffMultiplier: The factor each reconnect delay grows by.
     public init(
         connectionTimeout: Duration = .seconds(10),
@@ -57,9 +58,9 @@ public struct RelayConnectionConfig: Sendable {
         queryTimeout: Duration = .seconds(10),
         pingInterval: Duration = .seconds(30),
         autoReconnect: Bool = true,
-        maxReconnectAttempts: Int = 0,
+        maximumReconnectAttempts: Int = 0,
         initialReconnectDelay: Duration = .seconds(1),
-        maxReconnectDelay: Duration = .seconds(60),
+        maximumReconnectDelay: Duration = .seconds(60),
         reconnectBackoffMultiplier: Double = 2.0
     ) {
         self.connectionTimeout = connectionTimeout
@@ -68,9 +69,9 @@ public struct RelayConnectionConfig: Sendable {
         self.queryTimeout = queryTimeout
         self.pingInterval = pingInterval
         self.autoReconnect = autoReconnect
-        self.maxReconnectAttempts = maxReconnectAttempts
+        self.maximumReconnectAttempts = maximumReconnectAttempts
         self.initialReconnectDelay = initialReconnectDelay
-        self.maxReconnectDelay = maxReconnectDelay
+        self.maximumReconnectDelay = maximumReconnectDelay
         self.reconnectBackoffMultiplier = reconnectBackoffMultiplier
     }
 
@@ -96,8 +97,8 @@ extension RelayConnectionConfig {
     }
 
     /// The ceiling for reconnect delays, never below the initial delay.
-    var resolvedMaxReconnectDelay: Duration {
-        max(maxReconnectDelay, resolvedInitialReconnectDelay)
+    var resolvedMaximumReconnectDelay: Duration {
+        max(maximumReconnectDelay, resolvedInitialReconnectDelay)
     }
 
     /// The backoff multiplier, floored at 1 so a delay can hold steady but never shrink.
@@ -114,13 +115,13 @@ extension RelayConnectionConfig {
     /// against the ceiling in floating point first and only multiplied exactly when it stays below.
     func nextReconnectDelay(after delay: Duration) -> Duration {
         let multiplier = resolvedBackoffMultiplier
-        let ceiling = resolvedMaxReconnectDelay
+        let ceiling = resolvedMaximumReconnectDelay
         guard delay.timeInterval * multiplier < ceiling.timeInterval else { return ceiling }
         return boundedReconnectDelay(delay * multiplier)
     }
 
     /// Applies `delay` to the ceiling, keeping every wait inside the configured bounds.
     func boundedReconnectDelay(_ delay: Duration) -> Duration {
-        min(max(delay, Self.minimumReconnectDelay), resolvedMaxReconnectDelay)
+        min(max(delay, Self.minimumReconnectDelay), resolvedMaximumReconnectDelay)
     }
 }

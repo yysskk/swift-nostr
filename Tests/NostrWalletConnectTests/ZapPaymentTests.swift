@@ -10,8 +10,8 @@ struct ZapPaymentTests {
     private func payResponse() -> LNURLPayResponse {
         LNURLPayResponse(
             callback: "https://example.com/lnurl/callback",
-            minSendable: 1000,
-            maxSendable: 1_000_000_000,
+            minimumSendable: 1000,
+            maximumSendable: 1_000_000_000,
             allowsNostr: true,
             nostrPublicKey: PublicKey.fixture("0"))
     }
@@ -112,7 +112,7 @@ struct ZapPaymentTests {
         await #expect(throws: LNURLPayResponse.InvoiceError.self) {
             _ = try await connection.payZap(
                 lnurlPay: payResponse(),
-                amountMillisats: 1,  // below minSendable
+                amountMillisats: 1,  // below minimumSendable
                 zapRequest: zapRequest,
                 urlSession: MockURLProtocol.makeSession())
         }

@@ -37,18 +37,18 @@ public enum Groups {
     /// Samples timeline references for a "previous" tag from recently seen group events.
     ///
     /// Forwards to
-    /// ``previousReferences(from:excludingAuthor:maxCount:using:)`` with the system
+    /// ``previousReferences(from:excludingAuthor:maximumCount:using:)`` with the system
     /// random number generator; the spec recommends carrying at least 3 references.
     ///
-    /// - Returns: Up to `maxCount` distinct references from the newest 50 of `events`.
+    /// - Returns: Up to `maximumCount` distinct references from the newest 50 of `events`.
     public static func previousReferences(
         from events: some Sequence<Event>,
         excludingAuthor publicKey: PublicKey? = nil,
-        maxCount: Int = 3
+        maximumCount: Int = 3
     ) -> [String] {
         var generator = SystemRandomNumberGenerator()
         return previousReferences(
-            from: events, excludingAuthor: publicKey, maxCount: maxCount, using: &generator)
+            from: events, excludingAuthor: publicKey, maximumCount: maximumCount, using: &generator)
     }
 
     /// Samples timeline references for a "previous" tag, with injectable randomness.
@@ -57,8 +57,8 @@ public enum Groups {
     /// 1. Order `events` by `createdAt` descending, breaking ties by `id` ascending.
     /// 2. Take the first 50 — the window the spec samples from — then drop events authored
     ///    by `publicKey`.
-    /// 3. Sample `min(maxCount, remaining)` distinct events uniformly without replacement
-    ///    (a partial Fisher–Yates shuffle driven by `generator`); a negative `maxCount` is
+    /// 3. Sample `min(maximumCount, remaining)` distinct events uniformly without replacement
+    ///    (a partial Fisher–Yates shuffle driven by `generator`); a negative `maximumCount` is
     ///    treated as 0.
     /// 4. Map each sampled event to ``previousReference(forEventID:)``.
     ///
@@ -69,14 +69,14 @@ public enum Groups {
     ///   - events: Recently seen group events, in any order.
     ///   - publicKey: An author whose events are never referenced — pass the sender's own
     ///     public key. Nil excludes nothing.
-    ///   - maxCount: The maximum number of references; the spec recommends at least 3.
+    ///   - maximumCount: The maximum number of references; the spec recommends at least 3.
     ///   - generator: The source of randomness; inject a seeded generator for
     ///     reproducible sampling.
     /// - Returns: The sampled references, e.g. for ``Event/Tag/previous(_:)``.
     public static func previousReferences(
         from events: some Sequence<Event>,
         excludingAuthor publicKey: PublicKey? = nil,
-        maxCount: Int = 3,
+        maximumCount: Int = 3,
         using generator: inout some RandomNumberGenerator
     ) -> [String] {
         let window =
@@ -89,7 +89,7 @@ public enum Groups {
             }
             .prefix(50)
         var candidates = window.filter { $0.publicKey != publicKey }
-        let count = min(max(maxCount, 0), candidates.count)
+        let count = min(max(maximumCount, 0), candidates.count)
         var references: [String] = []
         references.reserveCapacity(count)
         for index in 0..<count {

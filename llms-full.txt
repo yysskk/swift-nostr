@@ -1335,14 +1335,14 @@ let promote = try await signer.sign(
 
 ```swift
 Groups.previousReference(forEventID: id)  // first 8 hex chars of an EventID
-Groups.previousReferences(from: recentEvents, excludingAuthor: myPublicKey, maxCount: 3)  // PublicKey?
+Groups.previousReferences(from: recentEvents, excludingAuthor: myPublicKey, maximumCount: 3)  // PublicKey?
     // random sample over the newest 50 events, for a trailing "previous" tag (spec: carry >= 3)
 Groups.previousReferences(of: event)      // the references an event carries ([] when absent)
 Groups.unknownPreviousReferences(of: event, knownEventIDs: seenIDs)  // some Sequence<EventID>
     // references matching no known id — non-empty means the timeline may be forged
 ```
 
-A deterministic overload `previousReferences(from:excludingAuthor:maxCount:using:)` takes an
+A deterministic overload `previousReferences(from:excludingAuthor:maximumCount:using:)` takes an
 `inout RandomNumberGenerator` for reproducible sampling.
 
 ### Relay-Generated State (kinds 39000-39005)
@@ -1569,7 +1569,7 @@ Manages connections to multiple Nostr relays (actor).
 
 ```swift
 let config = RelayPoolConfig(
-    maxDeduplicationCacheSize: 10000,
+    maximumDeduplicationCacheSize: 10000,
     deduplicationCacheTTL: .seconds(300),
     queryTimeout: .seconds(10)   // one-shot fetch/count wait when the call passes no timeout
 )
@@ -1608,7 +1608,7 @@ relay's own error (`RelayRejection` or `RelayConnection.Error`) is thrown instea
 
 Event deduplication is per subscription: copies of one event arriving from several relays
 collapse into a single delivery, an event matching two subscriptions is delivered to both,
-and `unsubscribe` discards that subscription's cache. `maxDeduplicationCacheSize` bounds the
+and `unsubscribe` discards that subscription's cache. `maximumDeduplicationCacheSize` bounds the
 entries across all subscriptions and is enforced as events arrive, evicting the oldest.
 
 ## RelayConnection
@@ -1631,12 +1631,12 @@ let config = RelayConnectionConfig(
     connectionTimeout: .seconds(10),     // also bounds keepalive pong waits
     sendTimeout: .seconds(10),           // per WebSocket frame send
     publishAckTimeout: .seconds(30),     // wait for the relay's OK
-    queryTimeout: .seconds(10),          // count(filters:) wait when the call passes no timeout
+    queryTimeout: .seconds(10),          // countEvents(matching:) wait when the call passes no timeout
     pingInterval: .seconds(30),          // between keepalive pings
     autoReconnect: true,
-    maxReconnectAttempts: 10,
+    maximumReconnectAttempts: 10,
     initialReconnectDelay: .seconds(1),  // floored at RelayConnectionConfig.minimumReconnectDelay (100 ms)
-    maxReconnectDelay: .seconds(60),
+    maximumReconnectDelay: .seconds(60),
     reconnectBackoffMultiplier: 2
 )
 ```

@@ -221,8 +221,8 @@ extension NostrGroupManaging {
     /// (kind 9). The event's first tag is the group's "h" tag, followed by `tags`, then a "previous"
     /// tag when `previous` is non-empty. Timeline references stay a caller-supplied parameter —
     /// sample them from recently seen group events with
-    /// ``Groups/previousReferences(from:excludingAuthor:maxCount:)``; nothing is fetched behind your
-    /// back.
+    /// ``Groups/previousReferences(from:excludingAuthor:maximumCount:)``; nothing is fetched behind
+    /// your back.
     /// - Parameters:
     ///   - content: The event content.
     ///   - kind: The content kind (default: ``Event/Kind/chatMessage``).
@@ -256,7 +256,7 @@ extension NostrGroupManaging {
     ///
     /// See ``Groups/ModerationAction`` for the actions and their tag layouts. Timeline references
     /// stay a caller-supplied parameter — sample them with
-    /// ``Groups/previousReferences(from:excludingAuthor:maxCount:)``.
+    /// ``Groups/previousReferences(from:excludingAuthor:maximumCount:)``.
     /// - Parameters:
     ///   - action: The moderation action to request.
     ///   - group: The group to moderate; its relay is added to the pool and connected on demand.

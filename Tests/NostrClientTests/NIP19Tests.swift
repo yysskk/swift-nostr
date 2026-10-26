@@ -182,10 +182,10 @@ struct NIP19Tests {
         // Values above Int32.max only fit in `Int` on 64-bit platforms; on 32-bit
         // targets (e.g. watchOS), `Int.max` == `Int32.max` < `UInt32.max`, so
         // `Int(exactly:)` returns `nil` and this boundary is unreachable there.
-        guard let maxKind = Int(exactly: UInt32.max) else { return }
-        #expect(try TLV.validatedKind(maxKind) == maxKind)
-        #expect(throws: NIP19Entity.Error.kindOutOfRange(maxKind + 1)) {
-            _ = try TLV.validatedKind(maxKind + 1)
+        guard let maximumKind = Int(exactly: UInt32.max) else { return }
+        #expect(try TLV.validatedKind(maximumKind) == maximumKind)
+        #expect(throws: NIP19Entity.Error.kindOutOfRange(maximumKind + 1)) {
+            _ = try TLV.validatedKind(maximumKind + 1)
         }
     }
 

@@ -71,8 +71,8 @@ struct LNURLTests {
         let response = try JSONDecoder().decode(LNURLPayResponse.self, from: Data(json.utf8))
 
         #expect(response.callback == "https://example.com/lnurl/cb")
-        #expect(response.minSendable == 1000)
-        #expect(response.maxSendable == 100_000_000)
+        #expect(response.minimumSendable == 1000)
+        #expect(response.maximumSendable == 100_000_000)
         #expect(response.nostrPublicKey?.hex == "3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d")
         #expect(response.supportsZaps)
     }
@@ -124,8 +124,8 @@ struct LNURLTests {
     func invoiceRequestURLCarriesParameters() throws {
         let response = LNURLPayResponse(
             callback: "https://example.com/lnurl/cb",
-            minSendable: 1000,
-            maxSendable: 100_000_000,
+            minimumSendable: 1000,
+            maximumSendable: 100_000_000,
             allowsNostr: true,
             nostrPublicKey: .fixture("provider")
         )
