@@ -26,15 +26,15 @@ struct FetchVerificationTests {
         guard let frame = socket.sentTextFrames.first(where: { $0.hasPrefix("[\"REQ\"") }),
             let data = frame.data(using: .utf8),
             let array = try JSONSerialization.jsonObject(with: data) as? [Any],
-            let subscriptionId = array.count >= 2 ? array[1] as? String : nil
+            let subscriptionID = array.count >= 2 ? array[1] as? String : nil
         else {
             throw NostrError.invalidMessageFormat
         }
         for event in events {
             let json = String(decoding: try JSONEncoder().encode(event), as: UTF8.self)
-            socket.deliver(.string("[\"EVENT\",\"\(subscriptionId)\",\(json)]"))
+            socket.deliver(.string("[\"EVENT\",\"\(subscriptionID)\",\(json)]"))
         }
-        socket.deliver(.string("[\"EOSE\",\"\(subscriptionId)\"]"))
+        socket.deliver(.string("[\"EOSE\",\"\(subscriptionID)\"]"))
         return try await task.value
     }
 

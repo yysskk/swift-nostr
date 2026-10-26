@@ -9,7 +9,7 @@ import Testing
 @Suite("Filter Wire Serialization Tests")
 struct FilterSerializationTests {
     private func serializedFilter(_ filter: Filter) throws -> [String: Any] {
-        let json = try ClientMessage.request(subscriptionId: "sub", filters: [filter]).serialize()
+        let json = try ClientMessage.request(subscriptionID: "sub", filters: [filter]).serialize()
         let array = try #require(
             JSONSerialization.jsonObject(with: Data(json.utf8)) as? [Any]
         )
@@ -93,7 +93,7 @@ struct FilterSerializationTests {
         var filter = Filter(kinds: [1111])
         filter.addTagQuery("K", values: ["30023"])
 
-        let json = try ClientMessage.count(subscriptionId: "sub", filters: [filter]).serialize()
+        let json = try ClientMessage.count(subscriptionID: "sub", filters: [filter]).serialize()
         let array = try #require(JSONSerialization.jsonObject(with: Data(json.utf8)) as? [Any])
         let dictionary = try #require(array.last as? [String: Any])
 

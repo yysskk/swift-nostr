@@ -39,17 +39,17 @@ extension NostrClient {
             continuation.finish()
         }
 
-        let subscriptionId = opened.id
+        let subscriptionID = opened.id
         continuation.onTermination = { [weak self] _ in
-            Task { await self?.closeSubscription(id: subscriptionId) }
+            Task { await self?.closeSubscription(id: subscriptionID) }
         }
 
         return SubscriptionSequence(
-            id: subscriptionId,
+            id: subscriptionID,
             expectedRelays: opened.expectedRelays,
             stream: stream,
             onClose: { [weak self] in
-                await self?.closeSubscription(id: subscriptionId)
+                await self?.closeSubscription(id: subscriptionID)
             }
         )
     }
@@ -62,17 +62,17 @@ extension NostrClient {
         handler: @escaping @Sendable (SubscriptionEvent) -> Void
     ) async throws -> (id: String, expectedRelays: Set<RelayURL>) {
         subscriptionCounter += 1
-        let subscriptionId = "sub_\(subscriptionCounter)"
+        let subscriptionID = "sub_\(subscriptionCounter)"
 
-        openSubscriptions[subscriptionId] = SubscriptionState(
-            id: subscriptionId,
+        openSubscriptions[subscriptionID] = SubscriptionState(
+            id: subscriptionID,
             filters: filters,
             handler: handler
         )
 
         do {
             let expectedRelayURLs = try await pool.subscribeWithRelayContext(
-                subscriptionId: subscriptionId,
+                subscriptionID: subscriptionID,
                 filters: filters,
                 to: relayURLs
             ) { [weak self] relayMessage in
@@ -80,14 +80,14 @@ extension NostrClient {
                 await self.handleMessage(
                     relayMessage.message,
                     from: relayMessage.relayURL,
-                    subscriptionId: subscriptionId
+                    subscriptionID: subscriptionID
                 )
             }
-            return (subscriptionId, expectedRelayURLs)
+            return (subscriptionID, expectedRelayURLs)
         } catch {
-            openSubscriptions.removeValue(forKey: subscriptionId)
+            openSubscriptions.removeValue(forKey: subscriptionID)
             // Drop the pool-side handler and message tasks registered before the failure.
-            await pool.unsubscribe(subscriptionId: subscriptionId)
+            await pool.unsubscribe(subscriptionID: subscriptionID)
             throw error
         }
     }
@@ -96,11 +96,11 @@ extension NostrClient {
     /// No-op for unknown IDs, so the re-entrant call triggered by finishing the
     /// continuation (onTermination → close) cannot send a second CLOSE.
     ///
-    /// Backs ``NostrSubscriptionsAPI/unsubscribe(subscriptionId:)``.
-    func closeSubscription(id subscriptionId: String) async {
-        guard let subscription = openSubscriptions.removeValue(forKey: subscriptionId) else { return }
+    /// Backs ``NostrSubscriptionsAPI/unsubscribe(subscriptionID:)``.
+    func closeSubscription(id subscriptionID: String) async {
+        guard let subscription = openSubscriptions.removeValue(forKey: subscriptionID) else { return }
         subscription.continuation?.finish()
-        await pool.unsubscribe(subscriptionId: subscriptionId)
+        await pool.unsubscribe(subscriptionID: subscriptionID)
     }
 
     /// Closes every open subscription.
@@ -108,9 +108,9 @@ extension NostrClient {
     func closeAllSubscriptions() async {
         let active = openSubscriptions
         openSubscriptions.removeAll()
-        for (subscriptionId, subscription) in active {
+        for (subscriptionID, subscription) in active {
             subscription.continuation?.finish()
-            await pool.unsubscribe(subscriptionId: subscriptionId)
+            await pool.unsubscribe(subscriptionID: subscriptionID)
         }
     }
 
@@ -130,8 +130,8 @@ extension NostrClient {
         await pool.disconnectAll()
     }
 
-    private func handleMessage(_ message: RelayMessage, from relayURL: RelayURL, subscriptionId: String) {
-        guard let subscription = openSubscriptions[subscriptionId] else { return }
+    private func handleMessage(_ message: RelayMessage, from relayURL: RelayURL, subscriptionID: String) {
+        guard let subscription = openSubscriptions[subscriptionID] else { return }
 
         switch message {
         case .event(_, let event):

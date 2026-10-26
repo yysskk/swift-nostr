@@ -197,7 +197,7 @@ struct RelayPoolRoutingTests {
         await pool.addRelay(urlB)
 
         await #expect(throws: NostrError.relayError("Failed to subscribe on any relay")) {
-            try await pool.subscribe(subscriptionId: "sub", filters: [Filter()]) { _ in }
+            try await pool.subscribe(subscriptionID: "sub", filters: [Filter()]) { _ in }
         }
         #expect(await pool.subscriptionHandlerCount == 0)
         #expect(await pool.subscriptionTaskCount == 0)

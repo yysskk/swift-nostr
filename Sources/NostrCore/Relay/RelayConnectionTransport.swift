@@ -61,7 +61,7 @@ public actor RelayConnectionTransport: RelayTransport {
     public func subscribe(id: String, filters: [Filter]) async throws {
         var subscribed = 0
         for relay in relays {
-            if (try? await relay.subscribe(subscriptionId: id, filters: filters)) != nil {
+            if (try? await relay.subscribe(subscriptionID: id, filters: filters)) != nil {
                 subscribed += 1
             }
         }
@@ -70,7 +70,7 @@ public actor RelayConnectionTransport: RelayTransport {
 
     public func unsubscribe(id: String) async {
         for relay in relays {
-            try? await relay.unsubscribe(subscriptionId: id)
+            try? await relay.unsubscribe(subscriptionID: id)
         }
     }
 

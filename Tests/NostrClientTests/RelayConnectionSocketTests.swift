@@ -33,9 +33,9 @@ struct RelayConnectionSocketTests {
         throw NostrError.timeout
     }
 
-    private static func eventFrame(subscriptionId: String, eventId: String) -> String {
+    private static func eventFrame(subscriptionID: String, eventID: String) -> String {
         let eventDict: [String: Any] = [
-            "id": eventId,
+            "id": eventID,
             "pubkey": String(repeating: "b", count: 64),
             "created_at": 1_700_000_000,
             "kind": 1,
@@ -43,7 +43,7 @@ struct RelayConnectionSocketTests {
             "content": "hello",
             "sig": String(repeating: "c", count: 128),
         ]
-        let array: [Any] = ["EVENT", subscriptionId, eventDict]
+        let array: [Any] = ["EVENT", subscriptionID, eventDict]
         let data = try! JSONSerialization.data(withJSONObject: array)
         return String(data: data, encoding: .utf8)!
     }
@@ -74,7 +74,7 @@ struct RelayConnectionSocketTests {
         let (connection, mock) = makeConnection()
         try await connection.connect()
 
-        try await connection.subscribe(subscriptionId: "sub-1", filters: [Filter(kinds: [1])])
+        try await connection.subscribe(subscriptionID: "sub-1", filters: [Filter(kinds: [1])])
 
         #expect(mock.sentTextFrames.contains { $0.contains("\"REQ\"") && $0.contains("sub-1") })
         await connection.disconnect()
@@ -86,17 +86,17 @@ struct RelayConnectionSocketTests {
         try await connection.connect()
 
         let stream = await connection.messages()
-        mock.deliver(.string(Self.eventFrame(subscriptionId: "sub-1", eventId: String(repeating: "a", count: 64))))
+        mock.deliver(.string(Self.eventFrame(subscriptionID: "sub-1", eventID: String(repeating: "a", count: 64))))
 
         var iterator = stream.makeAsyncIterator()
         let received = await iterator.next()
 
-        guard case .event(let subscriptionId, _) = received else {
+        guard case .event(let subscriptionID, _) = received else {
             Issue.record("expected an event message, got \(String(describing: received))")
             await connection.disconnect()
             return
         }
-        #expect(subscriptionId == "sub-1")
+        #expect(subscriptionID == "sub-1")
         await connection.disconnect()
     }
 

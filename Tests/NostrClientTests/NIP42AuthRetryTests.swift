@@ -213,7 +213,7 @@ struct NIP42AuthRetryTests {
         await connection.setAuthenticationResponder(makeResponder(signer: signer))
         try await connection.connect()
 
-        try await connection.subscribe(subscriptionId: "sub-1", filters: [Filter(kinds: [4])])
+        try await connection.subscribe(subscriptionID: "sub-1", filters: [Filter(kinds: [4])])
         #expect(requestFrames(in: mock).count == 1)
 
         mock.deliver(.string(#"["CLOSED","sub-1","auth-required: we can't serve DMs to unauthenticated users"]"#))
@@ -233,7 +233,7 @@ struct NIP42AuthRetryTests {
         await connection.setAuthenticationResponder(makeResponder(signer: signer))
         try await connection.connect()
 
-        try await connection.subscribe(subscriptionId: "sub-1", filters: [Filter(kinds: [4])])
+        try await connection.subscribe(subscriptionID: "sub-1", filters: [Filter(kinds: [4])])
         mock.deliver(.string(#"["CLOSED","sub-1","error: shutting down idle subscription"]"#))
         mock.deliver(.string(#"["AUTH","challengestringhere"]"#))
 
@@ -251,7 +251,7 @@ struct NIP42AuthRetryTests {
         await connection.setAuthenticationResponder(makeResponder(signer: signer))
         try await connection.connect()
 
-        try await connection.subscribe(subscriptionId: "sub-1", filters: [Filter(kinds: [4])])
+        try await connection.subscribe(subscriptionID: "sub-1", filters: [Filter(kinds: [4])])
 
         // Iterate messages() to know the CLOSED frame has been processed — the
         // yield happens after the receive loop marked the subscription — so the
@@ -261,7 +261,7 @@ struct NIP42AuthRetryTests {
         var iterator = messages.makeAsyncIterator()
         _ = await iterator.next()
 
-        try await connection.unsubscribe(subscriptionId: "sub-1")
+        try await connection.unsubscribe(subscriptionID: "sub-1")
 
         mock.deliver(.string(#"["AUTH","challengestringhere"]"#))
         try await NIP42TestSupport.acknowledgeAuth(on: connection, mock: mock)

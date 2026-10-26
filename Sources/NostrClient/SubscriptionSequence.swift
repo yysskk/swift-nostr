@@ -29,7 +29,7 @@ import NostrCore
 public struct SubscriptionSequence: AsyncSequence, Sendable {
     public typealias Element = SubscriptionEvent
 
-    /// The subscription ID, usable with ``NostrSubscriptionsAPI/unsubscribe(subscriptionId:)``.
+    /// The subscription ID, usable with ``NostrSubscriptionsAPI/unsubscribe(subscriptionID:)``.
     public let id: String
 
     /// The relays that accepted the REQ. EOSE completion is measured against
@@ -70,7 +70,7 @@ public struct SubscriptionSequence: AsyncSequence, Sendable {
 
         let base: SubscriptionSequence
 
-        /// The subscription ID, usable with ``NostrSubscriptionsAPI/unsubscribe(subscriptionId:)``.
+        /// The subscription ID, usable with ``NostrSubscriptionsAPI/unsubscribe(subscriptionID:)``.
         public var id: String { base.id }
 
         /// The relays that accepted the REQ.

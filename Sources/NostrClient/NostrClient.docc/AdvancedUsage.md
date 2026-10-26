@@ -772,13 +772,13 @@ let connection = RelayConnection(url: try RelayURL(string: "wss://relay.example.
 await connection.connect()
 
 try await connection.subscribe(
-    subscriptionId: "sub1",
+    subscriptionID: "sub1",
     filters: [Filter(kinds: [1], limit: 10)]
 )
 
 for await message in await connection.messages() {
     switch message {
-    case .event(let subId, let event):
+    case .event(_, let event):
         print("Event: \(event.content)")
     case .endOfStoredEvents:
         print("EOSE")

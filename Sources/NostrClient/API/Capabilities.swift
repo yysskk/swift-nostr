@@ -172,7 +172,7 @@ public protocol NostrSubscribing: Sendable {
         bufferingPolicy: AsyncStream<SubscriptionEvent>.Continuation.BufferingPolicy
     ) async throws -> SubscriptionSequence.Events
     /// Closes one subscription.
-    func unsubscribe(subscriptionId: String) async
+    func unsubscribe(subscriptionID: String) async
     /// Closes every open subscription.
     func unsubscribeAll() async
 

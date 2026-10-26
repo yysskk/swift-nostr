@@ -215,6 +215,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `HTTPAuth.ValidationError.timestampOutOfTolerance(createdAt:)` carries the event's `Timestamp`.
 - **NIP-40 expirations are `Timestamp`** (breaking): `Tag.expiration(_:)` takes one,
   `Event.expiration` returns one, and `Event.isExpired(asOf:)` compares against one (default `.now`).
+- **`subscriptionId` is spelled `subscriptionID`** (breaking): the acronym is now cased the same way
+  as `groupID`, `eventID`, and `computedID` throughout. This renames the associated values of
+  `ClientMessage.request`, `close`, and `count` and of `RelayMessage.event`, `endOfStoredEvents`,
+  `closed`, and `count`, and the parameters of `RelayConnection.subscribe(subscriptionID:filters:)`,
+  `unsubscribe(subscriptionID:)`, `RelayPool.unsubscribe(subscriptionID:)`, and
+  `NostrSubscriptionsAPI.unsubscribe(subscriptionID:)`. The wire format is unchanged.
 
 ## [0.8.0] - 2026-10-25
 

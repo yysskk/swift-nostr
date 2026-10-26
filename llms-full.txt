@@ -236,7 +236,7 @@ for await item in subscription {
 
 // subscription.id / subscription.expectedRelays (Set<RelayURL>) are available;
 // close explicitly with await subscription.close(), or:
-await client.subscriptions.unsubscribe(subscriptionId: subscription.id)
+await client.subscriptions.unsubscribe(subscriptionID: subscription.id)
 await client.subscriptions.unsubscribeAll()
 ```
 
@@ -521,7 +521,7 @@ All cases expose `relayURL` property to identify the source relay.
 A live subscription as an `AsyncSequence` of `SubscriptionEvent` (struct: Sendable).
 Returned by `subscribe(filters:to:bufferingPolicy:)` and the convenience subscriptions.
 
-- `id: String` -- subscription ID (usable with `unsubscribe(subscriptionId:)`)
+- `id: String` -- subscription ID (usable with `unsubscribe(subscriptionID:)`)
 - `expectedRelays: Set<RelayURL>` -- relays that accepted the REQ
 - `close() async` -- sends CLOSE and ends iteration (idempotent)
 - `events: SubscriptionSequence.Events` -- view yielding only `Event` payloads
@@ -542,13 +542,13 @@ Messages received from relay (NIP-01) (enum: Sendable).
 
 ### Cases
 
-- `.event(subscriptionId: String, event: Event)`
-- `.endOfStoredEvents(subscriptionId: String)`
+- `.event(subscriptionID: String, event: Event)`
+- `.endOfStoredEvents(subscriptionID: String)`
 - `.notice(message: String)`
 - `.ok(eventID: EventID, accepted: Bool, message: String)` -- an `OK` whose id is not canonical hex fails to parse (`invalidMessageFormat`)
 - `.auth(challenge: String)` -- NIP-42
-- `.closed(subscriptionId: String, message: String)`
-- `.count(subscriptionId: String, count: Int, approximate: Bool?)` -- NIP-45
+- `.closed(subscriptionID: String, message: String)`
+- `.count(subscriptionID: String, count: Int, approximate: Bool?)` -- NIP-45
 - `.unknown(type: String, rawData: String)`
 
 ### Parsing
@@ -564,10 +564,10 @@ Messages sent to relay (NIP-01) (enum: Sendable).
 ### Cases
 
 - `.event(Event)` -- publish event
-- `.request(subscriptionId: String, filters: [Filter])` -- subscribe
-- `.close(subscriptionId: String)` -- unsubscribe
+- `.request(subscriptionID: String, filters: [Filter])` -- subscribe
+- `.close(subscriptionID: String)` -- unsubscribe
 - `.auth(Event)` -- authentication (NIP-42)
-- `.count(subscriptionId: String, filters: [Filter])` -- event count request (NIP-45)
+- `.count(subscriptionID: String, filters: [Filter])` -- event count request (NIP-45)
 
 ```swift
 let json = clientMessage.serialize()  // JSON array string
@@ -975,7 +975,7 @@ the author. Lists are replaceable, so edit the fetched current list to avoid dro
 // Build and publish (replaces the current list of this kind)
 var list = NostrList(
     kind: .bookmarkList,
-    publicItems: [.event(noteId), .reference("https://example.com")],
+    publicItems: [.event(noteID), .reference("https://example.com")],
     privateItems: [.hashtag("private-topic")]
 )
 try await client.lists.publish(list)
@@ -1021,7 +1021,7 @@ let set = try NostrListSet(
     kind: .bookmarkSet,
     identifier: "reading",
     title: "Reading list",
-    publicItems: [.event(noteId), .reference("https://example.com")],
+    publicItems: [.event(noteID), .reference("https://example.com")],
     privateItems: [.hashtag("private-topic")]
 )
 try await client.lists.publishSet(set)
@@ -1358,8 +1358,8 @@ await pool.removeRelay(relay)
 let pooled = await pool.relay(for: relay)  // RelayConnection?
 try await pool.connectAll()      // tolerates partial failures
 await pool.disconnectAll()
-try await pool.subscribe(subscriptionId: "sub1", filters: [filter]) { message in }
-try await pool.unsubscribe(subscriptionId: "sub1")
+try await pool.subscribe(subscriptionID: "sub1", filters: [filter]) { message in }
+try await pool.unsubscribe(subscriptionID: "sub1")
 try await pool.publish(signedEvent)
 try await pool.publish(signedEvent, to: [relay])  // targeted; PublishResult keyed by RelayURL
 try await pool.count(filters: [filter])   // [RelayURL: EventCount], per relay (NIP-45)
@@ -1410,8 +1410,8 @@ let config = RelayConnectionConfig(
 ```swift
 await connection.connect()
 await connection.disconnect()
-try await connection.subscribe(subscriptionId: "sub1", filters: [filter]) { message in }
-try await connection.unsubscribe(subscriptionId: "sub1")
+try await connection.subscribe(subscriptionID: "sub1", filters: [filter]) { message in }
+try await connection.unsubscribe(subscriptionID: "sub1")
 try await connection.publish(signedEvent)
 try await connection.count(filters: [filter])         // EventCount from this relay (NIP-45)
 try await connection.authenticate(using: signer)      // answer the stored challenge (NIP-42)

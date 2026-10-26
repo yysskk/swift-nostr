@@ -56,7 +56,7 @@ struct NIP01VectorTests {
         let rawTags: [[String]]
         let content: String
         let expectedSerialization: String
-        let expectedId: String
+        let expectedID: String
 
         var testDescription: String { label }
     }
@@ -73,7 +73,7 @@ struct NIP01VectorTests {
             expectedSerialization:
                 #"[0,"79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798","#
                 + #"1700000000,1,[],"hello world"]"#,
-            expectedId: "6db73c0791345150952b66916ca160efb6aef7734b982dda3d818360a1b60ee1"
+            expectedID: "6db73c0791345150952b66916ca160efb6aef7734b982dda3d818360a1b60ee1"
         ),
         // A2: empty content — the shortest serialization an event can have.
         SerializationVector(
@@ -86,7 +86,7 @@ struct NIP01VectorTests {
             expectedSerialization:
                 #"[0,"79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798","#
                 + #"1700000000,1,[],""]"#,
-            expectedId: "1868e8ad4ca66b7a9bb6ddaaecde6e5cc5d11682e87abb650a6ce8853854ef05"
+            expectedID: "1868e8ad4ca66b7a9bb6ddaaecde6e5cc5d11682e87abb650a6ce8853854ef05"
         ),
         // A3: all seven escapes NIP-01 mandates, in the content: quote, backslash,
         // line break, carriage return, tab, backspace, and form feed.
@@ -100,7 +100,7 @@ struct NIP01VectorTests {
             expectedSerialization:
                 #"[0,"79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798","#
                 + #"1700000000,1,[],"quote:\" backslash:\\ newline:\n return:\r tab:\t backspace:\b formfeed:\f"]"#,
-            expectedId: "21dd099446a06e6f3ca9011458b62bf895810f8ff217a7dc596c76a7e7b3cddc"
+            expectedID: "21dd099446a06e6f3ca9011458b62bf895810f8ff217a7dc596c76a7e7b3cddc"
         ),
         // A4: the same escaping inside tag values — tags are ordinary JSON strings, so a
         // serializer that only escapes the content produces a different id here.
@@ -115,7 +115,7 @@ struct NIP01VectorTests {
                 #"[0,"79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798","#
                 + #"1700000000,1,[["t","multi\nline\tvalue"],["title","a \"quoted\" \\ title"],["x","\r\b\f"]],"#
                 + #""escapes in tags"]"#,
-            expectedId: "915df4ad7c71e4bc25a52d1685265aae1af14f91ec0e4ab8223bd5b8c5186704"
+            expectedID: "915df4ad7c71e4bc25a52d1685265aae1af14f91ec0e4ab8223bd5b8c5186704"
         ),
         // A5: forward slashes stay verbatim. Escaping them as `\/` is valid JSON and is what
         // Foundation does by default, so this pins the `.withoutEscapingSlashes` behaviour —
@@ -131,7 +131,7 @@ struct NIP01VectorTests {
                 #"[0,"79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798","#
                 + #"1700000000,1,[["r","wss://relay.example.com/"],["proxy","https://example.com/a/b?c=d#e"]],"#
                 + #""read https://example.com/path/to/page?q=1&x=/y and a/b"]"#,
-            expectedId: "0a78af0227d63a7ac63665dfdbbdb984eeee4fefd9f08c47c49d16667aadf71d"
+            expectedID: "0a78af0227d63a7ac63665dfdbbdb984eeee4fefd9f08c47c49d16667aadf71d"
         ),
         // A6: four multi-element tags, including NIP-10 markers and the empty-string
         // placeholder for a skipped relay hint. Tag order and inner order must be preserved.
@@ -163,7 +163,7 @@ struct NIP01VectorTests {
                 + #"2222222222","","reply"],["p","dff1d77f2a671c5f36183726db2341be58feae1da2deced843240f7b502ba659"#
                 + #"","wss://relay.example.com"],["a","30023:79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f28"#
                 + #"15b16f81798:my-article","wss://relay.example.com"]],"reply with markers"]"#,
-            expectedId: "396e2037b00e5beff06704a113ee7957cc9e1d2c0daa706504de77579f0cf2c4"
+            expectedID: "396e2037b00e5beff06704a113ee7957cc9e1d2c0daa706504de77579f0cf2c4"
         ),
         // A7: a kind-0 profile whose content is itself JSON — its quotes and backslashes are
         // escaped a second time, and the content must not be re-encoded as a nested object.
@@ -179,7 +179,7 @@ struct NIP01VectorTests {
                 #"[0,"79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798","#
                 + #"1700000000,0,[],"{\"name\":\"fiatjaf\",\"about\":\"nostr \\\"author\\\"\","#
                 + #"\"picture\":\"https://example.com/p.jpg\"}"]"#,
-            expectedId: "4e8e56d27f6882577b1f205d48dd6832e264c227ab526156cff6c97fc89f4cd8"
+            expectedID: "4e8e56d27f6882577b1f205d48dd6832e264c227ab526156cff6c97fc89f4cd8"
         ),
         // A8: a far-future timestamp that overflows Int32, with an addressable kind. Pins that
         // created_at is emitted as a bare integer and never as a float or a quoted string.
@@ -193,7 +193,7 @@ struct NIP01VectorTests {
             expectedSerialization:
                 #"[0,"79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798","#
                 + #"253402300799,30023,[["d","nip01-kat"],["published_at","253402300799"]],"far-future long-form"]"#,
-            expectedId: "27a20b59dc93c5f1893b9a0b5fc4daf818879a17bb591fd4c94be19b609f0011"
+            expectedID: "27a20b59dc93c5f1893b9a0b5fc4daf818879a17bb591fd4c94be19b609f0011"
         ),
         // A9: a five-digit kind, serialized as a bare integer.
         SerializationVector(
@@ -206,7 +206,7 @@ struct NIP01VectorTests {
             expectedSerialization:
                 #"[0,"79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798","#
                 + #"1700000000,65535,[],"large kind"]"#,
-            expectedId: "66913b9eefae064e13cd27eec93389727795a2fcb8f3c404ffe9358c410e4075"
+            expectedID: "66913b9eefae064e13cd27eec93389727795a2fcb8f3c404ffe9358c410e4075"
         ),
     ]
 
@@ -317,7 +317,7 @@ struct NIP01VectorTests {
         let serialized = try unsigned.serializedForHashing()
 
         #expect(String(decoding: serialized, as: UTF8.self) == vector.expectedSerialization)
-        #expect(try unsigned.computedID.hex == vector.expectedId)
+        #expect(try unsigned.computedID.hex == vector.expectedID)
     }
 
     /// Non-ASCII text is emitted as raw UTF-8, never as `\uXXXX` escapes, and surrogate
@@ -401,7 +401,7 @@ struct NIP01VectorTests {
     /// place the event is internally inconsistent, and ``Event/verify()`` must reject it
     /// before it ever reaches the signature check.
     @Test("tampering with content breaks the event id")
-    func tamperingWithContentBreaksEventId() throws {
+    func tamperingWithContentBreaksEventID() throws {
         let vector = Self.signatureVectors[0]
         let tamperedContent = vector.content + "!"
         let tamperedUnsigned = UnsignedEvent(

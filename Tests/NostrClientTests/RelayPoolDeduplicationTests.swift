@@ -45,21 +45,21 @@ struct RelayPoolDeduplicationTests {
         try EventSigner(keyPair: try KeyPair()).signTextNote(content: content)
     }
 
-    /// A canned `["EVENT", subscriptionId, {...}]` relay frame for `event`.
-    private func eventFrame(subscriptionId: String, event: Event) throws -> String {
+    /// A canned `["EVENT", subscriptionID, {...}]` relay frame for `event`.
+    private func eventFrame(subscriptionID: String, event: Event) throws -> String {
         let json = String(decoding: try JSONEncoder().encode(event), as: UTF8.self)
-        return "[\"EVENT\",\"\(subscriptionId)\",\(json)]"
+        return "[\"EVENT\",\"\(subscriptionID)\",\(json)]"
     }
 
-    /// Subscribes `subscriptionId` on the whole pool and returns the events it delivers.
+    /// Subscribes `subscriptionID` on the whole pool and returns the events it delivers.
     /// Waits for every socket's REQ so later frames cannot race the listeners.
     private func subscribe(
         _ pool: RelayPool,
-        subscriptionId: String,
+        subscriptionID: String,
         sockets: [MockWebSocketSession]
     ) async throws -> EventCollector {
         let collector = EventCollector()
-        try await pool.subscribe(subscriptionId: subscriptionId, filters: [Filter()]) { message in
+        try await pool.subscribe(subscriptionID: subscriptionID, filters: [Filter()]) { message in
             collector.record(message)
         }
         for socket in sockets {
@@ -76,13 +76,13 @@ struct RelayPoolDeduplicationTests {
     func eventMatchingTwoSubscriptionsReachesBoth() async throws {
         let (pool, sockets) = try await makeConnectedPool(relayURLs: [urlA])
         let socket = sockets[0]
-        let first = try await subscribe(pool, subscriptionId: "sub_1", sockets: sockets)
-        let second = try await subscribe(pool, subscriptionId: "sub_2", sockets: sockets)
+        let first = try await subscribe(pool, subscriptionID: "sub_1", sockets: sockets)
+        let second = try await subscribe(pool, subscriptionID: "sub_2", sockets: sockets)
 
         // One relay answering both REQs with the same event.
         let event = try makeEvent(content: "matches both filters")
-        socket.deliver(.string(try eventFrame(subscriptionId: "sub_1", event: event)))
-        socket.deliver(.string(try eventFrame(subscriptionId: "sub_2", event: event)))
+        socket.deliver(.string(try eventFrame(subscriptionID: "sub_1", event: event)))
+        socket.deliver(.string(try eventFrame(subscriptionID: "sub_2", event: event)))
 
         try await NIP42TestSupport.pollUntil { first.recorded == [event] }
         try await NIP42TestSupport.pollUntil { second.recorded == [event] }
@@ -96,17 +96,17 @@ struct RelayPoolDeduplicationTests {
     @Test("copies of one event from two relays collapse into a single delivery")
     func duplicateCopiesAcrossRelaysCollapse() async throws {
         let (pool, sockets) = try await makeConnectedPool(relayURLs: [urlA, urlB])
-        let collector = try await subscribe(pool, subscriptionId: "sub_1", sockets: sockets)
+        let collector = try await subscribe(pool, subscriptionID: "sub_1", sockets: sockets)
 
         let event = try makeEvent(content: "stored on both relays")
-        sockets[0].deliver(.string(try eventFrame(subscriptionId: "sub_1", event: event)))
+        sockets[0].deliver(.string(try eventFrame(subscriptionID: "sub_1", event: event)))
         try await NIP42TestSupport.pollUntil { collector.recorded == [event] }
 
         // The second relay's copy, followed by a distinct event on the same socket: frames
         // arrive in order, so seeing the sentinel proves the duplicate was already handled.
         let sentinel = try makeEvent(content: "sentinel")
-        sockets[1].deliver(.string(try eventFrame(subscriptionId: "sub_1", event: event)))
-        sockets[1].deliver(.string(try eventFrame(subscriptionId: "sub_1", event: sentinel)))
+        sockets[1].deliver(.string(try eventFrame(subscriptionID: "sub_1", event: event)))
+        sockets[1].deliver(.string(try eventFrame(subscriptionID: "sub_1", event: sentinel)))
 
         try await NIP42TestSupport.pollUntil { collector.recorded.count == 2 }
         #expect(collector.recorded == [event, sentinel])
@@ -121,16 +121,16 @@ struct RelayPoolDeduplicationTests {
     func unsubscribeDiscardsOwnCacheOnly() async throws {
         let (pool, sockets) = try await makeConnectedPool(relayURLs: [urlA])
         let socket = sockets[0]
-        let first = try await subscribe(pool, subscriptionId: "sub_1", sockets: sockets)
-        let second = try await subscribe(pool, subscriptionId: "sub_2", sockets: sockets)
+        let first = try await subscribe(pool, subscriptionID: "sub_1", sockets: sockets)
+        let second = try await subscribe(pool, subscriptionID: "sub_2", sockets: sockets)
 
         let event = try makeEvent(content: "seen by both subscriptions")
-        socket.deliver(.string(try eventFrame(subscriptionId: "sub_1", event: event)))
-        socket.deliver(.string(try eventFrame(subscriptionId: "sub_2", event: event)))
+        socket.deliver(.string(try eventFrame(subscriptionID: "sub_1", event: event)))
+        socket.deliver(.string(try eventFrame(subscriptionID: "sub_2", event: event)))
         try await NIP42TestSupport.pollUntil { first.recorded == [event] }
         try await NIP42TestSupport.pollUntil { second.recorded == [event] }
 
-        await pool.unsubscribe(subscriptionId: "sub_1")
+        await pool.unsubscribe(subscriptionID: "sub_1")
         #expect(await pool.deduplicationCacheSize(forSubscription: "sub_1") == 0)
         #expect(await pool.deduplicationCacheSize(forSubscription: "sub_2") == 1)
         #expect(await pool.deduplicationCacheSize == 1)
@@ -144,13 +144,13 @@ struct RelayPoolDeduplicationTests {
         let socket = sockets[0]
         let event = try makeEvent(content: "delivered to both subscriptions in turn")
 
-        let first = try await subscribe(pool, subscriptionId: "sub_1", sockets: sockets)
-        socket.deliver(.string(try eventFrame(subscriptionId: "sub_1", event: event)))
+        let first = try await subscribe(pool, subscriptionID: "sub_1", sockets: sockets)
+        socket.deliver(.string(try eventFrame(subscriptionID: "sub_1", event: event)))
         try await NIP42TestSupport.pollUntil { first.recorded == [event] }
-        await pool.unsubscribe(subscriptionId: "sub_1")
+        await pool.unsubscribe(subscriptionID: "sub_1")
 
-        let second = try await subscribe(pool, subscriptionId: "sub_1", sockets: sockets)
-        socket.deliver(.string(try eventFrame(subscriptionId: "sub_1", event: event)))
+        let second = try await subscribe(pool, subscriptionID: "sub_1", sockets: sockets)
+        socket.deliver(.string(try eventFrame(subscriptionID: "sub_1", event: event)))
         try await NIP42TestSupport.pollUntil { second.recorded == [event] }
 
         await pool.disconnectAll()
@@ -160,10 +160,10 @@ struct RelayPoolDeduplicationTests {
     func sweepExpiresEntriesPastTheTTL() async throws {
         let (pool, sockets) = try await makeConnectedPool(relayURLs: [urlA], deduplicationCacheTTL: 300)
         let socket = sockets[0]
-        let collector = try await subscribe(pool, subscriptionId: "sub_1", sockets: sockets)
+        let collector = try await subscribe(pool, subscriptionID: "sub_1", sockets: sockets)
 
         let event = try makeEvent(content: "cached until the TTL passes")
-        socket.deliver(.string(try eventFrame(subscriptionId: "sub_1", event: event)))
+        socket.deliver(.string(try eventFrame(subscriptionID: "sub_1", event: event)))
         try await NIP42TestSupport.pollUntil { collector.recorded == [event] }
 
         // A sweep inside the TTL keeps the entry; one past it clears the subscription.
@@ -180,16 +180,16 @@ struct RelayPoolDeduplicationTests {
     func sizeLimitHoldsAsEventsArrive() async throws {
         let (pool, sockets) = try await makeConnectedPool(relayURLs: [urlA], maxDeduplicationCacheSize: 1)
         let socket = sockets[0]
-        let first = try await subscribe(pool, subscriptionId: "sub_1", sockets: sockets)
-        let second = try await subscribe(pool, subscriptionId: "sub_2", sockets: sockets)
+        let first = try await subscribe(pool, subscriptionID: "sub_1", sockets: sockets)
+        let second = try await subscribe(pool, subscriptionID: "sub_2", sockets: sockets)
 
         // One event per subscription, delivered in a known order. No sweep runs in between:
         // the cache is trimmed as each event is recorded.
         let older = try makeEvent(content: "recorded first")
-        socket.deliver(.string(try eventFrame(subscriptionId: "sub_1", event: older)))
+        socket.deliver(.string(try eventFrame(subscriptionID: "sub_1", event: older)))
         try await NIP42TestSupport.pollUntil { first.recorded == [older] }
         let newer = try makeEvent(content: "recorded second")
-        socket.deliver(.string(try eventFrame(subscriptionId: "sub_2", event: newer)))
+        socket.deliver(.string(try eventFrame(subscriptionID: "sub_2", event: newer)))
         try await NIP42TestSupport.pollUntil { second.recorded == [newer] }
 
         #expect(await pool.deduplicationCacheSize == 1)
@@ -203,12 +203,12 @@ struct RelayPoolDeduplicationTests {
     func clearEmptiesEveryCache() async throws {
         let (pool, sockets) = try await makeConnectedPool(relayURLs: [urlA])
         let socket = sockets[0]
-        let first = try await subscribe(pool, subscriptionId: "sub_1", sockets: sockets)
-        let second = try await subscribe(pool, subscriptionId: "sub_2", sockets: sockets)
+        let first = try await subscribe(pool, subscriptionID: "sub_1", sockets: sockets)
+        let second = try await subscribe(pool, subscriptionID: "sub_2", sockets: sockets)
 
         let event = try makeEvent(content: "cached under two subscriptions")
-        socket.deliver(.string(try eventFrame(subscriptionId: "sub_1", event: event)))
-        socket.deliver(.string(try eventFrame(subscriptionId: "sub_2", event: event)))
+        socket.deliver(.string(try eventFrame(subscriptionID: "sub_1", event: event)))
+        socket.deliver(.string(try eventFrame(subscriptionID: "sub_2", event: event)))
         try await NIP42TestSupport.pollUntil { first.recorded == [event] }
         try await NIP42TestSupport.pollUntil { second.recorded == [event] }
 

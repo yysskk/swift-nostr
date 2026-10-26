@@ -21,7 +21,7 @@ struct EventDeduplicationCache {
 
     /// One recorded delivery.
     private struct Entry {
-        let subscriptionId: String
+        let subscriptionID: String
         let eventID: EventID
         let recordedAt: Date
     }
@@ -52,35 +52,35 @@ struct EventDeduplicationCache {
         entries.count - oldestIndex
     }
 
-    /// The number of entries held for `subscriptionId`.
-    func count(forSubscription subscriptionId: String) -> Int {
-        seenEventIDs[subscriptionId]?.count ?? 0
+    /// The number of entries held for `subscriptionID`.
+    func count(forSubscription subscriptionID: String) -> Int {
+        seenEventIDs[subscriptionID]?.count ?? 0
     }
 
-    /// Records that `subscriptionId` has seen `eventID`, returning whether it is new to that
+    /// Records that `subscriptionID` has seen `eventID`, returning whether it is new to that
     /// subscription — that is, whether this copy should be delivered.
     ///
     /// Recording beyond ``maxSize`` evicts as many of the oldest entries as it takes to stay
     /// within the limit, so the bound holds on return.
-    mutating func record(eventID: EventID, subscriptionId: String, now: Date = Date()) -> Bool {
-        guard seenEventIDs[subscriptionId]?.contains(eventID) != true else { return false }
-        seenEventIDs[subscriptionId, default: []].insert(eventID)
-        entries.append(Entry(subscriptionId: subscriptionId, eventID: eventID, recordedAt: now))
+    mutating func record(eventID: EventID, subscriptionID: String, now: Date = Date()) -> Bool {
+        guard seenEventIDs[subscriptionID]?.contains(eventID) != true else { return false }
+        seenEventIDs[subscriptionID, default: []].insert(eventID)
+        entries.append(Entry(subscriptionID: subscriptionID, eventID: eventID, recordedAt: now))
         while count > maxSize {
             removeOldest()
         }
         return true
     }
 
-    /// Forgets everything `subscriptionId` has seen, so an event recorded for it again is new.
+    /// Forgets everything `subscriptionID` has seen, so an event recorded for it again is new.
     ///
     /// Sweeping the subscription out of `entries` costs a pass over the cache, traded for
     /// keeping the two stores in step: subscriptions end far less often than events arrive, and
     /// leaving its entries behind as tombstones would make every ``count`` a sum instead of a
     /// subtraction.
-    mutating func removeSubscription(_ subscriptionId: String) {
-        guard seenEventIDs.removeValue(forKey: subscriptionId) != nil else { return }
-        entries = entries[oldestIndex...].filter { $0.subscriptionId != subscriptionId }
+    mutating func removeSubscription(_ subscriptionID: String) {
+        guard seenEventIDs.removeValue(forKey: subscriptionID) != nil else { return }
+        entries = entries[oldestIndex...].filter { $0.subscriptionID != subscriptionID }
         oldestIndex = 0
     }
 
@@ -103,9 +103,9 @@ struct EventDeduplicationCache {
     private mutating func removeOldest() {
         let oldest = entries[oldestIndex]
         oldestIndex += 1
-        seenEventIDs[oldest.subscriptionId]?.remove(oldest.eventID)
-        if seenEventIDs[oldest.subscriptionId]?.isEmpty == true {
-            seenEventIDs.removeValue(forKey: oldest.subscriptionId)
+        seenEventIDs[oldest.subscriptionID]?.remove(oldest.eventID)
+        if seenEventIDs[oldest.subscriptionID]?.isEmpty == true {
+            seenEventIDs.removeValue(forKey: oldest.subscriptionID)
         }
         compact()
     }

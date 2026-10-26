@@ -165,7 +165,7 @@ struct SubscriptionSequenceTests {
         await client.relays.disconnect()
     }
 
-    @Test("unsubscribe(subscriptionId:) finishes the stream")
+    @Test("unsubscribe(subscriptionID:) finishes the stream")
     func unsubscribeFinishesStream() async throws {
         let (client, _) = try await makeConnectedClient()
         let subscription = try await client.subscriptions.subscribe(filters: [Filter()])
@@ -176,7 +176,7 @@ struct SubscriptionSequenceTests {
         }
 
         try await Task.sleep(for: .milliseconds(50))
-        await client.subscriptions.unsubscribe(subscriptionId: subscription.id)
+        await client.subscriptions.unsubscribe(subscriptionID: subscription.id)
 
         let finished = await consumer.value
         #expect(finished)

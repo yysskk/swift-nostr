@@ -9,11 +9,11 @@ import Testing
 struct NIP27ContentReferenceTests {
     // Canonical NIP-19 spec vectors, reused from the NIP-19/NIP-21 suites.
     let pubkeyHex = "3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d"
-    let eventIdHex = "5c83da77af1dec6d7289834998ad7aafbd9e2191396d75ec3cc27f5a77226f36"
+    let eventIDHex = "5c83da77af1dec6d7289834998ad7aafbd9e2191396d75ec3cc27f5a77226f36"
     let npubVector = "npub180cvv07tjdrrgpa0j7j7tmnyl2yr6yr7l8j4s3evf6u64th6gkwsyjh6w6"
     let npubPubkeyHex = "3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d"
     let noteVector = "note1fntxtkcy9pjwucqwa9mddn7v03wwwsu9j330jj350nvhpky2tuaspk6nqc"
-    let noteIdHex = "4cd665db042864ee600ee976d6cfcc7c5ce743859462f94a347cd970d88a5f3b"
+    let noteIDHex = "4cd665db042864ee600ee976d6cfcc7c5ce743859462f94a347cd970d88a5f3b"
 
     // MARK: - references(in:)
 
@@ -50,7 +50,7 @@ struct NIP27ContentReferenceTests {
         let references = NostrContentReference.references(in: content)
         #expect(references.count == 2)
         #expect(references[0].entity == .npub(PublicKey(npubPubkeyHex)!))
-        #expect(references[1].entity == .note(EventID(noteIdHex)!))
+        #expect(references[1].entity == .note(EventID(noteIDHex)!))
     }
 
     @Test("trailing punctuation is excluded from the match")
@@ -59,7 +59,7 @@ struct NIP27ContentReferenceTests {
         let references = NostrContentReference.references(in: content)
         #expect(references.count == 1)
         #expect(references[0].text == "nostr:\(noteVector)")
-        #expect(references[0].entity == .note(EventID(noteIdHex)!))
+        #expect(references[0].entity == .note(EventID(noteIDHex)!))
     }
 
     @Test("a letter before the scheme is not a word boundary and is not matched")
@@ -125,20 +125,20 @@ struct NIP27ContentReferenceTests {
     func noteMapsToQuoteTag() {
         let content = "nostr:\(noteVector)"
         let reference = NostrContentReference.references(in: content).first
-        #expect(reference?.tag.rawArray == ["q", noteIdHex])
+        #expect(reference?.tag.rawArray == ["q", noteIDHex])
     }
 
     @Test("an nevent with author maps to a q tag with relay and pubkey")
     func neventMapsToQuoteTagWithRelayAndPubkey() throws {
         let event = try NEvent(
-            eventID: EventID(eventIdHex)!,
+            eventID: EventID(eventIDHex)!,
             relays: [RelayURL("wss://relay.example.com")!],
             author: PublicKey(pubkeyHex)!,
             kind: 1
         )
         let uri = try NIP19Entity.nevent(event).nostrURI
         let reference = try #require(NostrContentReference.references(in: uri).first)
-        #expect(reference.tag.rawArray == ["q", eventIdHex, "wss://relay.example.com", pubkeyHex])
+        #expect(reference.tag.rawArray == ["q", eventIDHex, "wss://relay.example.com", pubkeyHex])
     }
 
     @Test("an naddr maps to an a tag with its coordinate and relay hint")
@@ -172,7 +172,7 @@ struct NIP27ContentReferenceTests {
     func tagsKeepDistinctReferences() {
         let content = "nostr:\(noteVector) then nostr:\(npubVector)"
         let tags = NostrContentReference.tags(for: content)
-        #expect(tags.map(\.rawArray) == [["q", noteIdHex], ["p", npubPubkeyHex]])
+        #expect(tags.map(\.rawArray) == [["q", noteIDHex], ["p", npubPubkeyHex]])
     }
 
     // MARK: - Tag.quote padding
@@ -185,7 +185,7 @@ struct NIP27ContentReferenceTests {
     }
 
     @Test("Tag.quote with only an id emits a two-element tag")
-    func quoteTagIdOnly() {
+    func quoteTagIDOnly() {
         let id = EventID.fixture("id")
         #expect(Event.Tag.quote(id).rawArray == ["q", id.hex])
     }

@@ -45,21 +45,21 @@ extension RelayConnection {
                                 if let responder = authenticationResponder, shouldAnswerChallenge {
                                     respondToChallenge(challenge, with: responder)
                                 }
-                            case .closed(let subscriptionId, let message):
+                            case .closed(let subscriptionID, let message):
                                 // A subscription the relay closed pending authentication is
                                 // re-requested once an AUTH round-trip succeeds (NIP-42).
                                 if RelayResponsePrefix(message: message) == .authRequired,
-                                    subscriptions[subscriptionId] != nil
+                                    subscriptions[subscriptionID] != nil
                                 {
-                                    subscriptionsAwaitingAuthentication.insert(subscriptionId)
+                                    subscriptionsAwaitingAuthentication.insert(subscriptionID)
                                 }
                                 // A relay lacking NIP-45 often answers a COUNT with CLOSED;
                                 // fail the waiter fast rather than let it time out.
-                                if let waiter = pendingCountWaiters.removeValue(forKey: subscriptionId) {
+                                if let waiter = pendingCountWaiters.removeValue(forKey: subscriptionID) {
                                     waiter.finish(throwing: NostrError.relayError(message))
                                 }
-                            case .count(let subscriptionId, let count, let approximate):
-                                if let waiter = pendingCountWaiters.removeValue(forKey: subscriptionId) {
+                            case .count(let subscriptionID, let count, let approximate):
+                                if let waiter = pendingCountWaiters.removeValue(forKey: subscriptionID) {
                                     waiter.yield(EventCount(value: count, isApproximate: approximate ?? false))
                                     waiter.finish()
                                 }
