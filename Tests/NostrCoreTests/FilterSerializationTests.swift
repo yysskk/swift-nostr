@@ -70,8 +70,8 @@ struct FilterSerializationTests {
             kinds: [1],
             eventReferences: [referencedEvent],
             pubkeyReferences: [referencedPubkey],
-            since: now,
-            until: now + 60,
+            since: Timestamp(rawValue: now),
+            until: Timestamp(rawValue: now + 60),
             limit: 10
         )
 
@@ -112,7 +112,7 @@ struct FilterSerializationTests {
         let array = try #require(JSONSerialization.jsonObject(with: Data(json.utf8)) as? [Any])
         let dictionary = try #require(array.last as? [String: Any])
 
-        #expect(dictionary["created_at"] as? Int64 == event.createdAt)
+        #expect(dictionary["created_at"] as? Int64 == event.createdAt.rawValue)
         #expect(dictionary["createdAt"] == nil)
     }
 }

@@ -42,7 +42,7 @@ enum RemoteSignerFixtures {
         return Event(
             id: .fixture("resp-\(requestID)"),
             pubkey: signer.publicKey,
-            createdAt: 0,
+            createdAt: Timestamp(rawValue: 0),
             kind: .nostrConnect,
             tags: [["p", client.publicKey.hex]],
             content: sealed.payload,
@@ -67,7 +67,7 @@ enum RemoteSignerFixtures {
         }
         let kind = Event.Kind(rawValue: object["kind"] as? Int ?? 0)
         let content = object["content"] as? String ?? ""
-        let createdAt = (object["created_at"] as? Int).map(Int64.init) ?? 0
+        let createdAt = Timestamp(rawValue: (object["created_at"] as? Int).map(Int64.init) ?? 0)
         let tags = object["tags"] as? [[String]] ?? []
         return UnsignedEvent(pubkey: author, createdAt: createdAt, kind: kind, rawTags: tags, content: content)
     }

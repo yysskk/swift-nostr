@@ -323,7 +323,7 @@ struct NIP17Tests {
 
         let unsigned = UnsignedEvent(
             pubkey: alice.publicKey,
-            createdAt: 1_700_000_000,
+            createdAt: Timestamp(rawValue: 1_700_000_000),
             kind: .privateDirectMessage,
             tags: [["p", alice.publicKey.hex]],
             content: "id derivation check"

@@ -152,14 +152,14 @@ struct TagTests {
     func tagAndRawBuiltEventsHashIdentically() throws {
         let viaTags = UnsignedEvent(
             pubkey: PublicKey.fixture("pk"),
-            createdAt: 1_700_000_000,
+            createdAt: Timestamp(rawValue: 1_700_000_000),
             kind: .textNote,
             tags: [.event(id1, marker: .reply), .pubkey(pk2)],
             content: "hi"
         )
         let viaRaw = UnsignedEvent(
             pubkey: PublicKey.fixture("pk"),
-            createdAt: 1_700_000_000,
+            createdAt: Timestamp(rawValue: 1_700_000_000),
             kind: 1,
             rawTags: [["e", id1.hex, "", "reply"], ["p", pk2.hex]],
             content: "hi"
@@ -181,7 +181,7 @@ struct TagTests {
         Event(
             id: EventID.fixture("id"),
             pubkey: PublicKey.fixture("pk"),
-            createdAt: 1_700_000_000,
+            createdAt: Timestamp(rawValue: 1_700_000_000),
             kind: 1,
             tags: tags,
             content: "",

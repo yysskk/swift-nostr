@@ -27,7 +27,7 @@ struct EventTests {
         let pubkey = "a".padding(toLength: 64, withPad: "0", startingAt: 0)
         let unsigned = UnsignedEvent(
             pubkey: try PublicKey(hex: pubkey),
-            createdAt: 1_234_567_890,
+            createdAt: Timestamp(rawValue: 1_234_567_890),
             kind: 1,
             tags: [["p", "test"]],
             content: "test content"

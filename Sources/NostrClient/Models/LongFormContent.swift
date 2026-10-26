@@ -80,7 +80,7 @@ public struct LongFormContent: Sendable, Hashable {
                 imageURL = value
             case "published_at":
                 if let value, let seconds = Int64(value) {
-                    publishedAt = UnixTimestamp.date(fromSeconds: seconds)
+                    publishedAt = Timestamp(rawValue: seconds).date
                 }
             case "t":
                 if let value {
@@ -116,7 +116,7 @@ public struct LongFormContent: Sendable, Hashable {
             tags.append(["image", imageURL])
         }
         if let publishedAt {
-            tags.append(["published_at", String(UnixTimestamp.seconds(from: publishedAt))])
+            tags.append(["published_at", Timestamp(publishedAt).description])
         }
         for hashtag in hashtags {
             tags.append(["t", hashtag])

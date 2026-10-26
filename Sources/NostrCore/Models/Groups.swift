@@ -42,7 +42,7 @@ public enum Groups {
         inviteCode: String? = nil,
         reason: String? = nil,
         pubkey: PublicKey,
-        createdAt: Date = Date()
+        createdAt: Timestamp = .now
     ) -> UnsignedEvent {
         var tags: [Tag] = [.group(groupID)]
         if let inviteCode {
@@ -50,7 +50,7 @@ public enum Groups {
         }
         return UnsignedEvent(
             pubkey: pubkey,
-            createdAt: Int64(createdAt.timeIntervalSince1970),
+            createdAt: createdAt,
             kind: .groupJoinRequest,
             tags: tags,
             content: reason ?? ""
@@ -68,7 +68,7 @@ public enum Groups {
         groupID: String,
         inviteCode: String? = nil,
         reason: String? = nil,
-        createdAt: Date = Date(),
+        createdAt: Timestamp = .now,
         signer: some NostrSigning
     ) async throws -> Event {
         try await signer.sign(
@@ -97,11 +97,11 @@ public enum Groups {
         groupID: String,
         reason: String? = nil,
         pubkey: PublicKey,
-        createdAt: Date = Date()
+        createdAt: Timestamp = .now
     ) -> UnsignedEvent {
         UnsignedEvent(
             pubkey: pubkey,
-            createdAt: Int64(createdAt.timeIntervalSince1970),
+            createdAt: createdAt,
             kind: .groupLeaveRequest,
             tags: [.group(groupID)],
             content: reason ?? ""
@@ -118,7 +118,7 @@ public enum Groups {
     public static func leaveRequest(
         groupID: String,
         reason: String? = nil,
-        createdAt: Date = Date(),
+        createdAt: Timestamp = .now,
         signer: some NostrSigning
     ) async throws -> Event {
         try await signer.sign(
@@ -157,7 +157,7 @@ public enum Groups {
         tags: [Tag] = [],
         previous: [String] = [],
         pubkey: PublicKey,
-        createdAt: Date = Date()
+        createdAt: Timestamp = .now
     ) -> UnsignedEvent {
         var allTags: [Tag] = [.group(groupID)]
         allTags.append(contentsOf: tags)
@@ -166,7 +166,7 @@ public enum Groups {
         }
         return UnsignedEvent(
             pubkey: pubkey,
-            createdAt: Int64(createdAt.timeIntervalSince1970),
+            createdAt: createdAt,
             kind: kind,
             tags: allTags,
             content: content
@@ -186,7 +186,7 @@ public enum Groups {
         content: String,
         tags: [Tag] = [],
         previous: [String] = [],
-        createdAt: Date = Date(),
+        createdAt: Timestamp = .now,
         signer: some NostrSigning
     ) async throws -> Event {
         try await signer.sign(

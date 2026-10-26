@@ -22,7 +22,7 @@ private struct SeededGenerator: RandomNumberGenerator {
 private func makeEvent(
     id: EventID = EventID(String(repeating: "a", count: 64))!,
     pubkey: PublicKey = .fixture("pk"),
-    createdAt: Int64 = 1_700_000_000,
+    createdAt: Timestamp = Timestamp(rawValue: 1_700_000_000),
     kind: Event.Kind = .chatMessage,
     tags: [[String]] = []
 ) -> Event {
@@ -45,7 +45,7 @@ private func timelineFixture() -> [Event] {
         makeEvent(
             id: paddedID(index),
             pubkey: .fixture(index.isMultiple(of: 2) ? "author-even" : "author-odd"),
-            createdAt: 1_700_000_000 + Int64(index)
+            createdAt: Timestamp(rawValue: 1_700_000_000 + Int64(index))
         )
     }
 }
@@ -122,7 +122,7 @@ struct NIP29GroupKindAndTagTests {
 
 @Suite("NIP-29 Group Event Builders")
 struct NIP29GroupEventBuilderTests {
-    let createdAt = Date(timeIntervalSince1970: 1_700_000_000)
+    let createdAt = Timestamp(rawValue: 1_700_000_000)
 
     // MARK: Join Requests
 
@@ -138,7 +138,7 @@ struct NIP29GroupEventBuilderTests {
 
         #expect(unsigned.kind == .groupJoinRequest)
         #expect(unsigned.pubkey == PublicKey.fixture("author"))
-        #expect(unsigned.createdAt == 1_700_000_000)
+        #expect(unsigned.createdAt.rawValue == 1_700_000_000)
         #expect(unsigned.tags == [["h", "abcdef"], ["code", "invite123"]])
         #expect(unsigned.content == "let me in")
     }
@@ -149,6 +149,31 @@ struct NIP29GroupEventBuilderTests {
 
         #expect(unsigned.tags == [["h", "abcdef"]])
         #expect(unsigned.content.isEmpty)
+    }
+
+    /// Converting a `Date` that is infinite or beyond `Int64` used to trap inside the builders.
+    @Test(
+        "builders take an extreme timestamp without trapping",
+        arguments: [
+            Timestamp(rawValue: Int64.max), Timestamp(rawValue: Int64.min),
+            Timestamp(Date(timeIntervalSince1970: .infinity)), Timestamp(Date(timeIntervalSince1970: 1e300)),
+        ]
+    )
+    func extremeTimestamps(createdAt: Timestamp) async throws {
+        let author = PublicKey.fixture("author")
+        let join = Groups.joinRequest(groupID: "abcdef", pubkey: author, createdAt: createdAt)
+        let leave = Groups.leaveRequest(groupID: "abcdef", pubkey: author, createdAt: createdAt)
+        let content = Groups.contentEvent(
+            groupID: "abcdef", kind: .chatMessage, content: "gm", pubkey: author, createdAt: createdAt)
+
+        #expect(join.createdAt == createdAt)
+        #expect(leave.createdAt == createdAt)
+        #expect(content.createdAt == createdAt)
+
+        let signed = try await Groups.joinRequest(
+            groupID: "abcdef", createdAt: createdAt, signer: EventSigner(keyPair: try KeyPair()))
+        #expect(signed.createdAt == createdAt)
+        #expect(try signed.verify())
     }
 
     @Test("a signed join request verifies and keeps the unsigned layout")
@@ -165,7 +190,7 @@ struct NIP29GroupEventBuilderTests {
 
         #expect(event.kind == .groupJoinRequest)
         #expect(event.pubkey == signer.publicKey)
-        #expect(event.createdAt == 1_700_000_000)
+        #expect(event.createdAt.rawValue == 1_700_000_000)
         #expect(event.tags == [["h", "abcdef"], ["code", "invite123"]])
         #expect(event.content == "let me in")
         #expect(try event.verify())
@@ -184,7 +209,7 @@ struct NIP29GroupEventBuilderTests {
 
         #expect(unsigned.kind == .groupLeaveRequest)
         #expect(unsigned.pubkey == PublicKey.fixture("author"))
-        #expect(unsigned.createdAt == 1_700_000_000)
+        #expect(unsigned.createdAt.rawValue == 1_700_000_000)
         #expect(unsigned.tags == [["h", "abcdef"]])
         #expect(unsigned.content == "goodbye")
         #expect(Groups.leaveRequest(groupID: "abcdef", pubkey: PublicKey.fixture("author")).content.isEmpty)
@@ -259,7 +284,7 @@ struct NIP29GroupEventBuilderTests {
 
         #expect(event.kind == .chatMessage)
         #expect(event.pubkey == signer.publicKey)
-        #expect(event.createdAt == 1_700_000_000)
+        #expect(event.createdAt.rawValue == 1_700_000_000)
         #expect(event.tags == [["h", "abcdef"]])
         #expect(event.content == "hello")
         #expect(try event.verify())
@@ -270,11 +295,11 @@ struct NIP29GroupEventBuilderTests {
     @Test("groupTimeline filters on the h tag with the given kinds, since, and limit")
     func groupTimelineFields() {
         let filter = Filter.groupTimeline(
-            groupID: "abcdef", kinds: [.chatMessage, .thread], since: 1_700_000_000, limit: 20)
+            groupID: "abcdef", kinds: [.chatMessage, .thread], since: Timestamp(rawValue: 1_700_000_000), limit: 20)
 
         #expect(filter.tagQuery("h") == ["abcdef"])
         #expect(filter.kinds == [.chatMessage, .thread])
-        #expect(filter.since == 1_700_000_000)
+        #expect(filter.since == Timestamp(rawValue: 1_700_000_000))
         #expect(filter.limit == 20)
     }
 

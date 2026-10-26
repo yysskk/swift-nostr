@@ -41,17 +41,17 @@ struct NIP01VectorTests {
     static let pubkey2 = "dff1d77f2a671c5f36183726db2341be58feae1da2deced843240f7b502ba659"
 
     /// A fixed, arbitrary `created_at`.
-    static let timestamp: Int64 = 1_700_000_000
+    static let timestamp = Timestamp(rawValue: 1_700_000_000)
 
     /// 9999-12-31T23:59:59Z: past the Int32 range, so a 32-bit truncation shows up as a broken id.
-    static let farFutureTimestamp: Int64 = 253_402_300_799
+    static let farFutureTimestamp = Timestamp(rawValue: 253_402_300_799)
 
     /// One canonical-serialization vector: the event fields, the exact bytes they must
     /// serialize to, and the resulting event id.
     struct SerializationVector: CustomTestStringConvertible {
         let label: String
         let pubkey: String
-        let createdAt: Int64
+        let createdAt: Timestamp
         let kind: Event.Kind
         let rawTags: [[String]]
         let content: String
@@ -219,7 +219,7 @@ struct NIP01VectorTests {
         /// can be regenerated. Never used by the tests — verification needs only the pubkey.
         let secretKey: String
         let pubkey: String
-        let createdAt: Int64
+        let createdAt: Timestamp
         let kind: Event.Kind
         let rawTags: [[String]]
         let content: String

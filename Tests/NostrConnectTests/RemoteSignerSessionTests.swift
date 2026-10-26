@@ -165,7 +165,7 @@ struct RemoteSignerSessionTests {
         let json = "{\"id\":\"\(request.id)\",\"result\":\"pong\"}"
         let sealed = try SealedMessage.seal(json, for: client.publicKey, using: impostor)
         let forged = Event(
-            id: .fixture("forged"), pubkey: impostor.publicKey, createdAt: 0, kind: .nostrConnect,
+            id: .fixture("forged"), pubkey: impostor.publicKey, createdAt: Timestamp(rawValue: 0), kind: .nostrConnect,
             tags: [["p", client.publicKey.hex]], content: sealed.payload, signature: nil)
         await transport.deliver(forged)
 

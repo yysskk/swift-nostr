@@ -183,11 +183,11 @@ extension Tag {
 
     /// An "expiration" tag marking when relays should stop serving the event (NIP-40).
     ///
-    /// The value is the Unix timestamp in whole seconds; sub-second precision is dropped.
-    /// After this moment a relay should no longer return the event and may delete it.
+    /// The value is the timestamp's decimal seconds. After this moment a relay should no longer
+    /// return the event and may delete it.
     /// https://github.com/nostr-protocol/nips/blob/master/40.md
-    public static func expiration(_ date: Date) -> Tag {
-        Tag(name: "expiration", values: [String(UnixTimestamp.seconds(from: date))])
+    public static func expiration(_ timestamp: Timestamp) -> Tag {
+        Tag(name: "expiration", values: [timestamp.description])
     }
 
     /// A "k" tag denoting the kind of a referenced event, e.g. on a NIP-25 reaction
@@ -348,18 +348,18 @@ extension Event {
     ///
     /// After this time, relays should stop serving the event and may delete it.
     /// Returns nil when there is no `expiration` tag or its value is not an integer.
-    public var expiration: Date? {
+    public var expiration: Timestamp? {
         guard let value = firstTagValue(named: "expiration"), let seconds = Int64(value) else {
             return nil
         }
-        return UnixTimestamp.date(fromSeconds: seconds)
+        return Timestamp(rawValue: seconds)
     }
 
-    /// Whether the event has a NIP-40 ``expiration`` at or before `date` (default: now).
+    /// Whether the event has a NIP-40 ``expiration`` at or before `timestamp` (default: now).
     ///
     /// An event without an `expiration` tag never expires, so this returns false.
-    public func isExpired(asOf date: Date = Date()) -> Bool {
+    public func isExpired(asOf timestamp: Timestamp = .now) -> Bool {
         guard let expiration else { return false }
-        return expiration <= date
+        return expiration <= timestamp
     }
 }

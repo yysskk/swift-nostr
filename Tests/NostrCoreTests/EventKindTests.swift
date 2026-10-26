@@ -64,7 +64,7 @@ struct EventKindTests {
         let event = Event(
             id: EventID.fixture("id"),
             pubkey: PublicKey.fixture("pk"),
-            createdAt: 1_700_000_000,
+            createdAt: Timestamp(rawValue: 1_700_000_000),
             kind: .textNote,
             tags: [],
             content: "hi",

@@ -344,7 +344,7 @@ NIP-01 Nostr Event (struct: Codable, Identifiable, Hashable, Sendable).
 
 - `id: EventID` -- sha256 of the NIP-01 serialization
 - `pubkey: PublicKey` -- author's public key
-- `createdAt: Int64` -- unix timestamp in seconds
+- `createdAt: Timestamp` -- creation time in whole Unix seconds, `created_at` on the wire
 - `kind: Event.Kind` -- event kind (RawRepresentable struct, encodes as bare integer)
 - `tags: [[String]]` -- array of tag arrays (raw NIP-01 wire form)
 - `content: String` -- arbitrary string content
@@ -376,6 +376,7 @@ Tag.inviteCode("A7fjq2")         // ["code", "A7fjq2"] (NIP-29 kinds 9009/9021)
 Tag.role("mod", description: "kicks")  // ["role", name, description?] (NIP-29 kind 39003)
 Tag.pubkey(pk, roles: ["admin"]) // ["p", pk, role...] (NIP-29; index 1 is a role, not a relay hint)
 Tag.simpleGroup(id: "abcdef", relayURL: try RelayURL(string: "wss://g"), name: "Cool")  // ["group", ...] (NIP-51 kind 10009)
+Tag.expiration(Timestamp(rawValue: 1_700_000_000))  // ["expiration", "1700000000"] (NIP-40)
 Tag(rawArray: ["custom", "x"])   // failable, nil for []
 tag.rawArray                     // [String] wire form
 // Raw escape hatch when you hold [[String]]:
@@ -390,6 +391,8 @@ event.tags(named: "e")          // [Tag]
 event.firstTagValue(named: "subject")  // String?
 event.referencedEventIDs        // [EventID] from "e" tags; malformed values are skipped
 event.referencedPubkeys         // [PublicKey] from "p" tags; malformed values are skipped
+event.expiration                // Timestamp? from the NIP-40 "expiration" tag
+event.isExpired(asOf: .now)     // true at or after the expiration; false without one
 ```
 
 ### Event.Kind
@@ -471,8 +474,8 @@ NIP-01 Subscription Filter (struct: Codable, Sendable, Hashable).
 - `kinds: [Event.Kind]?` -- event kinds to match
 - `eventReferences: [EventID]?` -- #e tag references
 - `pubkeyReferences: [PublicKey]?` -- #p tag references
-- `since: Int64?` -- unix timestamp lower bound
-- `until: Int64?` -- unix timestamp upper bound
+- `since: Timestamp?` -- earliest `created_at` to match, inclusive
+- `until: Timestamp?` -- latest `created_at` to match, inclusive
 - `limit: Int?` -- max events to return
 - `search: String?` -- free-text search query (NIP-50); unsupported relays may ignore it
 
@@ -495,7 +498,7 @@ Filter.mentions(pubkey: pk)
 Filter.globalFeed(limit: 100)
 Filter.contactList(pubkey: pk)   // also relayListMetadata(pubkey:), directMessageRelayList(pubkey:), and pubkeys: variants
 Filter.search("nostr", kinds: [.textNote], limit: 20)  // NIP-50 full-text search
-Filter.groupTimeline(groupID: "abcdef", kinds: [.chatMessage], limit: 50)  // NIP-29 "#h" timeline
+Filter.groupTimeline(groupID: "abcdef", kinds: [.chatMessage], since: .now, limit: 50)  // NIP-29 "#h" timeline
 Filter.groupState(groupID: "abcdef")  // NIP-29 kind-39xxx state by "#d" (all five kinds by default)
 ```
 
@@ -656,6 +659,22 @@ let pk = try PublicKey(data: data)
 let id = try EventID(note: "note1...")
 let sig = try Signature(hex: "...")
 let parsed = EventID(someString)   // nil unless canonical hex
+```
+
+## Timestamp
+
+Whole seconds since the Unix epoch (struct: RawRepresentable, Sendable, Hashable, Comparable, Codable,
+CustomStringConvertible). `rawValue: Int64` is the number exactly as on the wire, so decoding and
+re-encoding never changes an event or its id; the JSON encoding is a bare integer and decoding a
+non-integer fails. `description` is the decimal seconds. Used by `Event.createdAt`,
+`UnsignedEvent.createdAt`, `Filter.since`/`until`, `Tag.expiration`, `Event.expiration`,
+`isExpired(asOf:)`, and the `createdAt:` parameters of `Groups` and `HTTPAuth` (default `.now`).
+
+```swift
+let ts = Timestamp(rawValue: 1_700_000_000)  // kept as is, any Int64
+let fromDate = Timestamp(someDate)           // truncated toward zero, clamped to ±2^53 (inf/NaN safe)
+let now = Timestamp.now
+let date = ts.date                           // clamped to ±2^53, never traps
 ```
 
 ## EncryptedPrivateKey

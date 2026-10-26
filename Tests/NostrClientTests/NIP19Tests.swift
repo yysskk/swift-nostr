@@ -281,7 +281,7 @@ struct NIP19Tests {
         Event(
             id: eventID,
             pubkey: pubkey,
-            createdAt: 0,
+            createdAt: Timestamp(rawValue: 0),
             kind: kind,
             tags: tags,
             content: "",

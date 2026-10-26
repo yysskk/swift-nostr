@@ -103,7 +103,7 @@ struct NIP29GroupClientTests {
     private func stateEvent(
         kind: Event.Kind,
         fieldTags: [Event.Tag],
-        createdAt: Int64,
+        createdAt: Timestamp,
         signer: EventSigner
     ) throws -> Event {
         try signer.sign(
@@ -286,10 +286,10 @@ struct NIP29GroupClientTests {
         let relaySigner = EventSigner(keyPair: try KeyPair())
         let stale = try stateEvent(
             kind: .groupMetadata, fieldTags: [Event.Tag(name: "name", values: ["Old"])],
-            createdAt: 1_700_000_000, signer: relaySigner)
+            createdAt: Timestamp(rawValue: 1_700_000_000), signer: relaySigner)
         let newer = try stateEvent(
             kind: .groupMetadata, fieldTags: [Event.Tag(name: "name", values: ["New"])],
-            createdAt: 1_700_000_100, signer: relaySigner)
+            createdAt: Timestamp(rawValue: 1_700_000_100), signer: relaySigner)
 
         let group = GroupReference(relayURL: groupRelayURL, id: groupID)
         let metadata = try await answering(socket, with: [stale, newer]) {
@@ -311,10 +311,10 @@ struct NIP29GroupClientTests {
         let impostorSigner = EventSigner(keyPair: try KeyPair())
         let genuine = try stateEvent(
             kind: .groupMetadata, fieldTags: [Event.Tag(name: "name", values: ["Genuine"])],
-            createdAt: 1_700_000_000, signer: relaySigner)
+            createdAt: Timestamp(rawValue: 1_700_000_000), signer: relaySigner)
         let impostor = try stateEvent(
             kind: .groupMetadata, fieldTags: [Event.Tag(name: "name", values: ["Impostor"])],
-            createdAt: 1_700_000_100, signer: impostorSigner)
+            createdAt: Timestamp(rawValue: 1_700_000_100), signer: impostorSigner)
 
         // The expected author carried by the reference itself.
         let (client, socket) = makeClient()
@@ -346,10 +346,10 @@ struct NIP29GroupClientTests {
         let impostorSigner = EventSigner(keyPair: try KeyPair())
         let genuine = try stateEvent(
             kind: .groupMetadata, fieldTags: [Event.Tag(name: "name", values: ["Genuine"])],
-            createdAt: 1_700_000_000, signer: relaySigner)
+            createdAt: Timestamp(rawValue: 1_700_000_000), signer: relaySigner)
         let impostor = try stateEvent(
             kind: .groupMetadata, fieldTags: [Event.Tag(name: "name", values: ["Impostor"])],
-            createdAt: 1_700_000_100, signer: impostorSigner)
+            createdAt: Timestamp(rawValue: 1_700_000_100), signer: impostorSigner)
 
         let group = GroupReference(relayURL: groupRelayURL, id: groupID)
         let metadata = try await answering(socket, with: [genuine, impostor]) {
@@ -368,13 +368,13 @@ struct NIP29GroupClientTests {
         let admin = try KeyPair().publicKey
         let metadata = try stateEvent(
             kind: .groupMetadata, fieldTags: [Event.Tag(name: "name", values: ["Pizza Lovers"])],
-            createdAt: 1_700_000_000, signer: relaySigner)
+            createdAt: Timestamp(rawValue: 1_700_000_000), signer: relaySigner)
         let admins = try stateEvent(
             kind: .groupAdmins, fieldTags: [.pubkey(admin, roles: ["ceo"])],
-            createdAt: 1_700_000_001, signer: relaySigner)
+            createdAt: Timestamp(rawValue: 1_700_000_001), signer: relaySigner)
         let roles = try stateEvent(
             kind: .groupRoles, fieldTags: [.role("ceo", description: "the boss")],
-            createdAt: 1_700_000_002, signer: relaySigner)
+            createdAt: Timestamp(rawValue: 1_700_000_002), signer: relaySigner)
 
         let group = GroupReference(
             relayURL: groupRelayURL, id: groupID, relayPubkey: relaySigner.publicKey)

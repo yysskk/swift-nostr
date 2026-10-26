@@ -131,7 +131,7 @@ extension RemoteSigner {
             "kind": event.kind.rawValue,
             "content": event.content,
             "tags": event.tags,
-            "created_at": event.createdAt,
+            "created_at": event.createdAt.rawValue,
         ]
         guard
             let data = try? JSONSerialization.data(

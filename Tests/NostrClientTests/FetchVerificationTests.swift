@@ -50,7 +50,7 @@ struct FetchVerificationTests {
     private func signed(
         _ signer: EventSigner,
         kind: Event.Kind,
-        createdAt: Int64,
+        createdAt: Timestamp,
         tags: [[String]] = [],
         content: String = ""
     ) throws -> Event {
@@ -65,7 +65,7 @@ struct FetchVerificationTests {
     private func forged(
         claiming pubkey: PublicKey,
         kind: Event.Kind,
-        createdAt: Int64,
+        createdAt: Timestamp,
         tags: [[String]] = [],
         content: String = ""
     ) throws -> Event {
@@ -93,11 +93,11 @@ struct FetchVerificationTests {
         let victim = EventSigner(keyPair: try KeyPair())
 
         let real = try signed(
-            victim, kind: .directMessageRelayList, createdAt: 1_700_000_000,
+            victim, kind: .directMessageRelayList, createdAt: Timestamp(rawValue: 1_700_000_000),
             tags: [["relay", "wss://real.example.com"]])
         let forgery = try forged(
             claiming: victim.publicKey, kind: .directMessageRelayList,
-            createdAt: 2_000_000_000,  // far ahead, so "newest wins" would pick it
+            createdAt: Timestamp(rawValue: 2_000_000_000),  // far ahead, so "newest wins" would pick it
             tags: [["relay", "wss://attacker.example.com"]])
 
         let list = try await answering(socket, with: [real, forgery]) {
@@ -116,7 +116,7 @@ struct FetchVerificationTests {
 
         // Genuinely signed — but by somebody else.
         let strangersList = try signed(
-            stranger, kind: .directMessageRelayList, createdAt: 2_000_000_000,
+            stranger, kind: .directMessageRelayList, createdAt: Timestamp(rawValue: 2_000_000_000),
             tags: [["relay", "wss://attacker.example.com"]])
 
         let list = try await answering(socket, with: [strangersList]) {
@@ -135,10 +135,10 @@ struct FetchVerificationTests {
         let victim = EventSigner(keyPair: try KeyPair())
 
         let real = try signed(
-            victim, kind: .relayListMetadata, createdAt: 1_700_000_000,
+            victim, kind: .relayListMetadata, createdAt: Timestamp(rawValue: 1_700_000_000),
             tags: [["r", "wss://real.example.com"]])
         let forgery = try forged(
-            claiming: victim.publicKey, kind: .relayListMetadata, createdAt: 2_000_000_000,
+            claiming: victim.publicKey, kind: .relayListMetadata, createdAt: Timestamp(rawValue: 2_000_000_000),
             tags: [["r", "wss://attacker.example.com"]])
 
         let list = try await answering(socket, with: [real, forgery]) {
@@ -157,12 +157,12 @@ struct FetchVerificationTests {
         let victim = EventSigner(keyPair: try KeyPair())
 
         let forgery = try forged(
-            claiming: victim.publicKey, kind: .setMetadata, createdAt: 2_000_000_000,
+            claiming: victim.publicKey, kind: .setMetadata, createdAt: Timestamp(rawValue: 2_000_000_000),
             content: #"{"name":"attacker","lud16":"attacker@example.com"}"#)
         let stale = try signed(
-            victim, kind: .setMetadata, createdAt: 1_700_000_000, content: #"{"name":"old"}"#)
+            victim, kind: .setMetadata, createdAt: Timestamp(rawValue: 1_700_000_000), content: #"{"name":"old"}"#)
         let current = try signed(
-            victim, kind: .setMetadata, createdAt: 1_800_000_000, content: #"{"name":"current"}"#)
+            victim, kind: .setMetadata, createdAt: Timestamp(rawValue: 1_800_000_000), content: #"{"name":"current"}"#)
 
         // The forgery arrives first and is the newest by timestamp: both old selections favoured it.
         let metadata = try await answering(socket, with: [forgery, stale, current]) {
@@ -181,7 +181,8 @@ struct FetchVerificationTests {
     func fetchEventRejectsSubstitute() async throws {
         let (client, socket) = try await makeClient()
         let signer = EventSigner(keyPair: try KeyPair())
-        let substitute = try signed(signer, kind: .textNote, createdAt: 1_700_000_000, content: "not it")
+        let substitute = try signed(
+            signer, kind: .textNote, createdAt: Timestamp(rawValue: 1_700_000_000), content: "not it")
         let requestedID = try EventID(hex: String(repeating: "cd", count: 32))
 
         let event = try await answering(socket, with: [substitute]) {
@@ -196,7 +197,8 @@ struct FetchVerificationTests {
     func fetchEventReturnsRequested() async throws {
         let (client, socket) = try await makeClient()
         let signer = EventSigner(keyPair: try KeyPair())
-        let wanted = try signed(signer, kind: .textNote, createdAt: 1_700_000_000, content: "the one")
+        let wanted = try signed(
+            signer, kind: .textNote, createdAt: Timestamp(rawValue: 1_700_000_000), content: "the one")
 
         let event = try await answering(socket, with: [wanted]) {
             try await client.events.fetchEvent(id: wanted.id)
@@ -217,7 +219,7 @@ struct FetchVerificationTests {
         for index in 0..<6 {
             candidates.append(
                 try signed(
-                    signer, kind: .setMetadata, createdAt: 1_700_000_000,
+                    signer, kind: .setMetadata, createdAt: Timestamp(rawValue: 1_700_000_000),
                     content: #"{"name":"n\#(index)"}"#))
         }
         let expected = candidates.map(\.id).min()
@@ -234,9 +236,9 @@ struct FetchVerificationTests {
     func addressableSelectionMatchesIdentifier() throws {
         let signer = EventSigner(keyPair: try KeyPair())
         let wanted = try signed(
-            signer, kind: .longFormContent, createdAt: 1_700_000_000, tags: [["d", "wanted"]])
+            signer, kind: .longFormContent, createdAt: Timestamp(rawValue: 1_700_000_000), tags: [["d", "wanted"]])
         let other = try signed(
-            signer, kind: .longFormContent, createdAt: 2_000_000_000, tags: [["d", "other"]])
+            signer, kind: .longFormContent, createdAt: Timestamp(rawValue: 2_000_000_000), tags: [["d", "other"]])
 
         let picked = VerifiedEventSelection.newest(
             in: [other, wanted], kind: .longFormContent, author: signer.publicKey,

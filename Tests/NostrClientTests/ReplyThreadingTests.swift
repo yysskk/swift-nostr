@@ -29,7 +29,7 @@ struct ReplyThreadingTests {
         let parent = try signer.sign(
             UnsignedEvent(
                 pubkey: signer.publicKey,
-                createdAt: 1_700_000_000,
+                createdAt: Timestamp(rawValue: 1_700_000_000),
                 kind: .textNote,
                 rawTags: parentTags,
                 content: "parent"
