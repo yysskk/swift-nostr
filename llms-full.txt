@@ -104,7 +104,14 @@ Swift forbids default arguments on protocol requirements. `NostrEventPublishing`
 `countEvents(matching:from:timeout:)`, every parameter spelled out — and provide the `publish*` /
 `fetch*` helpers and the short forms (`publish(_:)`, `fetch(filters:)`, …) with their defaults in
 protocol extensions, so a stub implements four methods and a call through the protocol is as short
-as one through `client.events`. The other protocols still spell out every parameter of every
+as one through `client.events`. `NostrSubscribing` (`subscribe(filters:to:bufferingPolicy:)`,
+`unsubscribe(subscriptionID:)`, `unsubscribeAll()`), `NostrRelayManaging` (`add(_:config:)`,
+`remove(_:)`, `connect()`, `disconnect()`, `connections`, `connectedRelayCount()`, `relay(for:)`,
+`clearDeduplicationCache()`), and `NostrIdentityProviding` (both `setSigner(_:)` overloads,
+`publicKey`, `sign(_:)`, NIP-44, and NIP-42 authentication) follow the same pattern: `events(filters:)`,
+the feeds, `add(_:)`, `connect(to:)`, `relayCount`, `setPrivateKey(_:)`, `setNsec(_:)`, and the short
+forms come from their extensions; a stub returns a `SubscriptionSequence(id:expectedRelays:stream:onClose:)`
+over its own `AsyncStream`. The other protocols still spell out every parameter of every
 requirement; the concrete namespaces supply the defaults, and calls through those protocols pass the
 full argument list. `NostrRelayManaging` deliberately omits `pool`: the pool carries publish,
 subscribe, and count too, so it stays on the concrete `NostrRelaysAPI`.

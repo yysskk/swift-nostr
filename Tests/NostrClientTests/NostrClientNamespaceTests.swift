@@ -67,8 +67,17 @@ struct NostrClientNamespaceTests {
         let keyPair = try KeyPair()
 
         #expect(await identity.publicKey == nil)
-        try await identity.setPrivateKey(keyPair.privateKeyHex)
+        try await identity.setPrivateKey(try KeyPair().privateKeyHex)
+        try await identity.setNsec(try keyPair.nsec)
+        #expect(await identity.publicKey == keyPair.publicKey)
 
+        // Malformed keys throw before anything is installed, leaving the current signer in place.
+        await #expect(throws: NostrError.invalidHex) {
+            try await identity.setPrivateKey("not hex")
+        }
+        await #expect(throws: NostrError.unknownPrefix("npub")) {
+            try await identity.setNsec(keyPair.publicKey.npub)
+        }
         #expect(await identity.publicKey == keyPair.publicKey)
         #expect(await identity.authenticationMode == .automatic)
 
@@ -95,6 +104,10 @@ struct NostrClientNamespaceTests {
 
         await relays.add([RelayURL("wss://relay1.example.com")!, RelayURL("wss://relay2.example.com")!])
         #expect(await relays.relayCount == 2)
+        // Re-adding a relay under another spelling keeps the existing connection.
+        let existing = await relays.relay(for: RelayURL("wss://relay2.example.com")!)
+        #expect(await relays.add(RelayURL("WSS://Relay2.example.com:443/")!) === existing)
+        #expect(await relays.relayCount == 2)
         #expect(await relays.connectedRelayCount() == 0)
         #expect(await relays.relay(for: RelayURL("wss://relay1.example.com")!) != nil)
 
@@ -108,11 +121,9 @@ struct NostrClientNamespaceTests {
         let (client, _) = try await ConnectedClientFixture.make()
         let subscriptions: any NostrSubscribing = client.subscriptions
 
-        let subscription = try await subscriptions.subscribe(
-            filters: [Filter(kinds: [.textNote], limit: 1)],
-            to: nil,
-            bufferingPolicy: .unbounded
-        )
+        // The short forms live in a protocol extension that carries the defaults, so a call
+        // through the existential is as short as one through the namespace.
+        let subscription = try await subscriptions.subscribe(filters: [Filter(kinds: [.textNote], limit: 1)])
         #expect(await client.activeSubscriptionCount == 1)
 
         await subscriptions.unsubscribe(subscriptionID: subscription.id)

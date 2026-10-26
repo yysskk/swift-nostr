@@ -8,6 +8,10 @@ import NostrCore
 /// ``pool`` exposes the underlying ``RelayPool`` for the per-relay work this namespace does not
 /// wrap (per-relay publish results, NIP-45 counts per relay, individual ``RelayConnection``
 /// state).
+///
+/// Implements the ``NostrRelayManaging`` primitives; ``NostrRelayManaging/add(_:)-(RelayURL)``,
+/// ``NostrRelayManaging/add(_:)-(Sequence<RelayURL>)``, ``NostrRelayManaging/connect(to:)``, and
+/// ``NostrRelayManaging/relayCount`` come from the protocol's extension.
 public struct NostrRelaysAPI: NostrRelayManaging {
     let client: NostrClient
 
@@ -23,18 +27,18 @@ public struct NostrRelaysAPI: NostrRelayManaging {
 
     // MARK: - Membership
 
-    /// Adds a relay, optionally with a per-relay connection configuration.
+    /// Adds a relay with a per-relay connection configuration, or the pool's default (nil).
     ///
     /// Relay URLs compare by their canonical form, so re-adding the same relay under a different
     /// spelling returns the existing connection (its `config` is ignored).
+    /// - Parameters:
+    ///   - url: The relay to add.
+    ///   - config: The relay's connection configuration, or nil for the pool config's
+    ///     ``RelayPoolConfig/defaultRelayConfig``.
+    /// - Returns: The relay's connection in the pool.
     @discardableResult
-    public func add(_ url: RelayURL, config: RelayConnectionConfig? = nil) async -> RelayConnection {
+    public func add(_ url: RelayURL, config: RelayConnectionConfig?) async -> RelayConnection {
         await client.pool.addRelay(url, config: config)
-    }
-
-    /// Adds multiple relays, each with the pool's default connection configuration.
-    public func add(_ urls: some Sequence<RelayURL>) async {
-        await client.pool.addRelays(Array(urls))
     }
 
     /// Removes a relay from the pool, disconnecting it; removing an absent relay is a no-op.
@@ -45,24 +49,10 @@ public struct NostrRelaysAPI: NostrRelayManaging {
     // MARK: - Connection lifecycle
 
     /// Connects to all relays in the pool.
-    public func connect() async throws {
-        _ = try await client.pool.connectAll()
-    }
-
-    /// Adds the given relays and connects to all relays in the pool —
-    /// the one-step form of `add(_:)` followed by `connect()`.
-    ///
-    /// ```swift
-    /// try await client.relays.connect(to: [
-    ///     RelayURL(string: "wss://relay.example.com"),
-    ///     RelayURL(string: "wss://relay2.example.com"),
-    /// ])
-    /// ```
     /// - Throws: ``NostrError/connectionFailed(_:)`` if every relay in the pool fails to
     ///   connect; partial connection failures are tolerated.
-    public func connect(to urls: some Sequence<RelayURL>) async throws {
-        await add(urls)
-        try await connect()
+    public func connect() async throws {
+        _ = try await client.pool.connectAll()
     }
 
     /// Disconnects from all relays, ending every open subscription.
@@ -81,11 +71,6 @@ public struct NostrRelaysAPI: NostrRelayManaging {
     /// Every relay connection in the pool, in no guaranteed order.
     public var connections: [RelayConnection] {
         get async { await client.pool.connections }
-    }
-
-    /// The number of relays in the pool, connected or not.
-    public var relayCount: Int {
-        get async { await client.pool.relayCount }
     }
 
     /// The number of relays currently connected.

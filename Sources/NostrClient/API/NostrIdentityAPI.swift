@@ -3,6 +3,9 @@ import NostrCore
 
 /// The signer the client authors events with, and the NIP-42 authentication that proves it
 /// to relays. Reached as ``NostrClient/identity``.
+///
+/// Implements the ``NostrIdentityProviding`` primitives; ``NostrIdentityProviding/setPrivateKey(_:)``
+/// and ``NostrIdentityProviding/setNsec(_:)`` come from the protocol's extension.
 public struct NostrIdentityAPI: NostrIdentityProviding {
     let client: NostrClient
 
@@ -29,16 +32,6 @@ public struct NostrIdentityAPI: NostrIdentityProviding {
     /// signer also starts answering NIP-42 AUTH challenges with it on every relay in the pool.
     public func setSigner(_ signer: any NostrSigning) async throws {
         try await client.install(signer)
-    }
-
-    /// Sets the signer from a private key hex string. See ``setSigner(_:)-(EventSigner)``.
-    public func setPrivateKey(_ privateKeyHex: String) async throws {
-        await client.install(try EventSigner(privateKeyHex: privateKeyHex))
-    }
-
-    /// Sets the signer from an nsec. See ``setSigner(_:)-(EventSigner)``.
-    public func setNsec(_ nsec: String) async throws {
-        await client.install(try EventSigner(nsec: nsec))
     }
 
     /// The public key events are authored under, or nil when no signer is set.
