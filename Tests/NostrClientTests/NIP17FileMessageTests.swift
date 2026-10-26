@@ -219,14 +219,14 @@ struct NIP17FileMessageTests {
         let sender = try KeyPair()
         let recipient = try KeyPair()
         let encrypted = try EncryptedFile.encrypt(Data("x".utf8))
-        let expiry = Date(timeIntervalSince1970: 1_700_000_000)
+        let expiry = Timestamp(rawValue: 1_700_000_000)
 
         let builder = DirectMessageBuilder(signer: EventSigner(keyPair: sender))
         let result = try await builder.createFileMessageWithSelfCopy(
             url: "u", mimeType: "image/png", encryption: encrypted,
             to: recipient.publicKey, expiration: expiry)
 
-        #expect(result.recipientGiftWrap.expiration == Timestamp(expiry))
+        #expect(result.recipientGiftWrap.expiration == expiry)
         let file = try await DirectMessageParser(signer: EventSigner(keyPair: recipient)).parseFileMessage(
             result.recipientGiftWrap)
         #expect(file.expiresAt == expiry)

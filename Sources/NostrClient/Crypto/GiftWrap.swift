@@ -35,7 +35,7 @@ public struct GiftWrap: Sendable {
         event: Event,
         signer: any NostrSigning,
         recipientPubkey: PublicKey,
-        expiration: Date? = nil
+        expiration: Timestamp? = nil
     ) async throws -> Event {
         // 1. Create rumor (unsigned event JSON)
         let rumor = createRumor(from: event)
@@ -58,7 +58,7 @@ public struct GiftWrap: Sendable {
 
         var wrapTags: [Tag] = [.pubkey(recipientPubkey)]
         if let expiration {
-            wrapTags.append(.expiration(Timestamp(expiration)))
+            wrapTags.append(.expiration(expiration))
         }
 
         let wrapUnsigned = UnsignedEvent(

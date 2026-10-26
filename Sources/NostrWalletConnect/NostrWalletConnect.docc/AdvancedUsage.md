@@ -77,11 +77,14 @@ print("\(balance.balance) msat")
 ## Listing Transactions
 
 ``WalletConnection/listTransactions(_:)`` returns matching ``WalletConnectTransaction`` values,
-newest first. Filter by time window, direction, paid/unpaid, and paginate with `limit` / `offset`:
+newest first. Filter by time window (`from` / `until`, each a `Timestamp`), direction,
+paid/unpaid, and paginate with `limit` / `offset`. A transaction's `createdAt`, `expiresAt`, and
+`settledAt` are `Timestamp` values too:
 
 ```swift
+let lastWeek = Timestamp(Date().addingTimeInterval(-7 * 24 * 60 * 60))
 let outgoing = try await connection.listTransactions(
-    ListTransactionsParams(limit: 50, type: .outgoing))
+    ListTransactionsParams(from: lastWeek, limit: 50, type: .outgoing))
 for tx in outgoing {
     print("\(tx.type) \(tx.amount) msat — \(tx.state ?? "?")")
 }

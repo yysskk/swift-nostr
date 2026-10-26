@@ -46,7 +46,7 @@ public struct NostrMessagesAPI: NostrMessaging {
         to recipientPubkey: PublicKey,
         subject: String? = nil,
         replyTo: EventID? = nil,
-        expiration: Date? = nil,
+        expiration: Timestamp? = nil,
         strategy: PublishStrategy? = nil
     ) async throws -> SendDirectMessageResult {
         let result = try await client.withSigner { signer, _ in
@@ -78,7 +78,7 @@ public struct NostrMessagesAPI: NostrMessaging {
     public func react(
         to message: DirectMessage,
         reaction: String = "+",
-        expiration: Date? = nil,
+        expiration: Timestamp? = nil,
         strategy: PublishStrategy? = nil
     ) async throws -> SendDirectMessageResult {
         let result = try await client.withSigner { signer, _ in
@@ -121,7 +121,7 @@ public struct NostrMessagesAPI: NostrMessaging {
         dimensions: String? = nil,
         blurhash: String? = nil,
         to recipientPubkey: PublicKey,
-        expiration: Date? = nil,
+        expiration: Timestamp? = nil,
         strategy: PublishStrategy? = nil
     ) async throws -> SendDirectMessageResult {
         let result = try await client.withSigner { signer, _ in
@@ -163,7 +163,7 @@ public struct NostrMessagesAPI: NostrMessaging {
     public func sendGiftWrapped(
         _ rumor: UnsignedEvent,
         to recipientPubkey: PublicKey,
-        expiration: Date? = nil,
+        expiration: Timestamp? = nil,
         strategy: PublishStrategy? = nil
     ) async throws -> SendDirectMessageResult {
         let result = try await client.withSigner { signer, publicKey in

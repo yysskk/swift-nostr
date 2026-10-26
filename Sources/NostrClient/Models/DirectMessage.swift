@@ -19,8 +19,9 @@ public struct DirectMessage: Sendable, Identifiable, Hashable {
     /// The message content
     public let content: String
 
-    /// The timestamp when the message was created
-    public let createdAt: Date
+    /// When the message was created: the rumor's `created_at`, which the sender sets and the gift
+    /// wrap does not randomize.
+    public let createdAt: Timestamp
 
     /// Optional subject/title for the conversation
     public let subject: String?
@@ -30,7 +31,7 @@ public struct DirectMessage: Sendable, Identifiable, Hashable {
 
     /// Optional NIP-40 expiration carried on the gift wrap. After this time the relay
     /// stops serving the message; clients can hide it to honor a disappearing message.
-    public let expiresAt: Date?
+    public let expiresAt: Timestamp?
 
     /// Creates a direct message from its parsed parts.
     public init(
@@ -38,10 +39,10 @@ public struct DirectMessage: Sendable, Identifiable, Hashable {
         senderPubkey: PublicKey,
         recipientPubkey: PublicKey,
         content: String,
-        createdAt: Date,
+        createdAt: Timestamp,
         subject: String? = nil,
         replyTo: EventID? = nil,
-        expiresAt: Date? = nil
+        expiresAt: Timestamp? = nil
     ) {
         self.rumorID = rumorID
         self.senderPubkey = senderPubkey

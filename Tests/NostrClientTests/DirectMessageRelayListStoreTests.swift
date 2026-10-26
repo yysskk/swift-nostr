@@ -18,16 +18,19 @@ struct DirectMessageRelayListStoreTests {
         let pubkey = PublicKey.fixture("pubkey1")
 
         await store.store(
-            DirectMessageRelayList(relays: [RelayURL("wss://a.example.com")!]), createdAt: 100, for: pubkey)
+            DirectMessageRelayList(relays: [RelayURL("wss://a.example.com")!]), createdAt: Timestamp(rawValue: 100),
+            for: pubkey)
         // older → ignored
         await store.store(
-            DirectMessageRelayList(relays: [RelayURL("wss://b.example.com")!]), createdAt: 50, for: pubkey)
+            DirectMessageRelayList(relays: [RelayURL("wss://b.example.com")!]), createdAt: Timestamp(rawValue: 50),
+            for: pubkey)
         var cached = await store.cachedList(for: pubkey)
         #expect(cached?.relays == [RelayURL("wss://a.example.com")!])
 
         // newer → wins
         await store.store(
-            DirectMessageRelayList(relays: [RelayURL("wss://c.example.com")!]), createdAt: 200, for: pubkey)
+            DirectMessageRelayList(relays: [RelayURL("wss://c.example.com")!]), createdAt: Timestamp(rawValue: 200),
+            for: pubkey)
         cached = await store.cachedList(for: pubkey)
         #expect(cached?.relays == [RelayURL("wss://c.example.com")!])
     }
@@ -38,9 +41,11 @@ struct DirectMessageRelayListStoreTests {
         let pubkey = PublicKey.fixture("pubkey1")
 
         await store.store(
-            DirectMessageRelayList(relays: [RelayURL("wss://a.example.com")!]), createdAt: 100, for: pubkey)
+            DirectMessageRelayList(relays: [RelayURL("wss://a.example.com")!]), createdAt: Timestamp(rawValue: 100),
+            for: pubkey)
         await store.store(
-            DirectMessageRelayList(relays: [RelayURL("wss://b.example.com")!]), createdAt: 100, for: pubkey)
+            DirectMessageRelayList(relays: [RelayURL("wss://b.example.com")!]), createdAt: Timestamp(rawValue: 100),
+            for: pubkey)
 
         let cached = await store.cachedList(for: pubkey)
         #expect(cached?.relays == [RelayURL("wss://a.example.com")!])
@@ -53,7 +58,7 @@ struct DirectMessageRelayListStoreTests {
 
         await store.store(
             DirectMessageRelayList(relays: [RelayURL("wss://inbox.example.com")!, RelayURL("wss://dm.example.com")!]),
-            createdAt: 1,
+            createdAt: Timestamp(rawValue: 1),
             for: pubkey
         )
 
@@ -77,7 +82,7 @@ struct DirectMessageRelayListStoreTests {
         let store = makeStore()
         let pubkey = PublicKey.fixture("pubkey1")
 
-        await store.store(DirectMessageRelayList(relays: []), createdAt: 1, for: pubkey)
+        await store.store(DirectMessageRelayList(relays: []), createdAt: Timestamp(rawValue: 1), for: pubkey)
 
         // A peer advertising an empty list is "resolved" but routes nowhere, so the
         // caller falls back to the full pool rather than refetching.
@@ -111,7 +116,9 @@ struct DirectMessageRelayListStoreTests {
         let store = makeStore()
         let pubkey = PublicKey.fixture("pubkey1")
 
-        await store.store(DirectMessageRelayList(relays: [RelayURL("wss://a.example.com")!]), createdAt: 1, for: pubkey)
+        await store.store(
+            DirectMessageRelayList(relays: [RelayURL("wss://a.example.com")!]), createdAt: Timestamp(rawValue: 1),
+            for: pubkey)
         #expect(await store.isResolved(for: pubkey) == true)
     }
 
@@ -121,7 +128,9 @@ struct DirectMessageRelayListStoreTests {
         let pubkey = PublicKey.fixture("pubkey1")
 
         await store.markNoList(for: pubkey)
-        await store.store(DirectMessageRelayList(relays: [RelayURL("wss://a.example.com")!]), createdAt: 1, for: pubkey)
+        await store.store(
+            DirectMessageRelayList(relays: [RelayURL("wss://a.example.com")!]), createdAt: Timestamp(rawValue: 1),
+            for: pubkey)
 
         #expect(await store.cachedList(for: pubkey)?.relays == [RelayURL("wss://a.example.com")!])
         #expect(await store.isResolved(for: pubkey) == true)
@@ -167,18 +176,18 @@ struct ReplaceableCacheTests {
     @Test("Newer value wins")
     func newerWins() {
         var cache = ReplaceableCache<String>()
-        cache.store("a", createdAt: 100, for: .fixture("k"))
-        cache.store("b", createdAt: 50, for: .fixture("k"))  // older → ignored
+        cache.store("a", createdAt: Timestamp(rawValue: 100), for: .fixture("k"))
+        cache.store("b", createdAt: Timestamp(rawValue: 50), for: .fixture("k"))  // older → ignored
         #expect(cache.value(for: .fixture("k")) == "a")
-        cache.store("c", createdAt: 200, for: .fixture("k"))  // newer → wins
+        cache.store("c", createdAt: Timestamp(rawValue: 200), for: .fixture("k"))  // newer → wins
         #expect(cache.value(for: .fixture("k")) == "c")
     }
 
     @Test("Equal createdAt keeps existing value and returns it")
     func equalKeepsExisting() {
         var cache = ReplaceableCache<String>()
-        cache.store("a", createdAt: 100, for: .fixture("k"))
-        let effective = cache.store("b", createdAt: 100, for: .fixture("k"))
+        cache.store("a", createdAt: Timestamp(rawValue: 100), for: .fixture("k"))
+        let effective = cache.store("b", createdAt: Timestamp(rawValue: 100), for: .fixture("k"))
         #expect(effective == "a")
         #expect(cache.value(for: .fixture("k")) == "a")
     }
@@ -192,8 +201,8 @@ struct ReplaceableCacheTests {
     @Test("Keys are independent")
     func keysIndependent() {
         var cache = ReplaceableCache<String>()
-        cache.store("a", createdAt: 1, for: .fixture("k1"))
-        cache.store("b", createdAt: 1, for: .fixture("k2"))
+        cache.store("a", createdAt: Timestamp(rawValue: 1), for: .fixture("k1"))
+        cache.store("b", createdAt: Timestamp(rawValue: 1), for: .fixture("k2"))
         #expect(cache.value(for: .fixture("k1")) == "a")
         #expect(cache.value(for: .fixture("k2")) == "b")
     }

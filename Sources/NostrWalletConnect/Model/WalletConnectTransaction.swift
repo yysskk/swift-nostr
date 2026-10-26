@@ -1,4 +1,5 @@
 import Foundation
+import NostrCore
 
 /// A NIP-47 transaction object, returned by `make_invoice`, `lookup_invoice`, and
 /// `list_transactions`.
@@ -25,12 +26,12 @@ public struct WalletConnectTransaction: Codable, Sendable, Hashable {
     public let amount: Int64
     /// The fees paid in millisatoshis.
     public let feesPaid: Int64?
-    /// Creation time as a Unix timestamp (seconds).
-    public let createdAt: Int64?
-    /// Expiry time as a Unix timestamp (seconds).
-    public let expiresAt: Int64?
-    /// Settlement time as a Unix timestamp (seconds).
-    public let settledAt: Int64?
+    /// When the transaction was created (`created_at`).
+    public let createdAt: Timestamp?
+    /// When the invoice expires (`expires_at`).
+    public let expiresAt: Timestamp?
+    /// When the transaction settled (`settled_at`), if it has.
+    public let settledAt: Timestamp?
     /// Application-defined metadata.
     public let metadata: [String: JSONValue]?
 
@@ -50,11 +51,12 @@ public struct WalletConnectTransaction: Codable, Sendable, Hashable {
         case metadata
     }
 
+    /// Creates a transaction from its fields; every time encodes as integer Unix seconds.
     public init(
         type: String, state: String? = nil, invoice: String? = nil, description: String? = nil,
         descriptionHash: String? = nil, preimage: String? = nil, paymentHash: String? = nil,
-        amount: Int64, feesPaid: Int64? = nil, createdAt: Int64? = nil, expiresAt: Int64? = nil,
-        settledAt: Int64? = nil, metadata: [String: JSONValue]? = nil
+        amount: Int64, feesPaid: Int64? = nil, createdAt: Timestamp? = nil,
+        expiresAt: Timestamp? = nil, settledAt: Timestamp? = nil, metadata: [String: JSONValue]? = nil
     ) {
         self.type = type
         self.state = state

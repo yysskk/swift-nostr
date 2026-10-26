@@ -73,7 +73,7 @@ struct GiftWrappedRumorDeliveryTests {
         let sender = try KeyPair(privateKeyHex: senderKey)
         let recipient = try KeyPair()
         await client.dmRelayListStore.store(
-            DirectMessageRelayList(relays: [inboxURL]), createdAt: 1, for: recipient.publicKey)
+            DirectMessageRelayList(relays: [inboxURL]), createdAt: Timestamp(rawValue: 1), for: recipient.publicKey)
         // The sender advertised no list, so the self-copy falls back to the whole pool.
         await client.dmRelayListStore.markNoList(for: sender.publicKey)
         let rumor = makeRumor(pubkey: sender.publicKey, recipient: recipient.publicKey)
@@ -101,15 +101,15 @@ struct GiftWrappedRumorDeliveryTests {
         let recipient = try KeyPair()
         await client.dmRelayListStore.markNoList(for: recipient.publicKey)
         await client.dmRelayListStore.markNoList(for: sender.publicKey)
-        let expiry = Date(timeIntervalSince1970: 2_000_000_000)
+        let expiry = Timestamp(rawValue: 2_000_000_000)
         let rumor = makeRumor(pubkey: sender.publicKey, recipient: recipient.publicKey)
 
         let result = try await PublishAckSupport.acknowledgingPublishes(2, on: socket) {
             try await client.messages.sendGiftWrapped(rumor, to: recipient.publicKey, expiration: expiry)
         }
 
-        #expect(result.recipientGiftWrap.expiration == Timestamp(expiry))
-        #expect(result.selfGiftWrap.expiration == Timestamp(expiry))
+        #expect(result.recipientGiftWrap.expiration == expiry)
+        #expect(result.selfGiftWrap.expiration == expiry)
         #expect(result.rumor.expiration == nil)
         await client.relays.disconnect()
     }

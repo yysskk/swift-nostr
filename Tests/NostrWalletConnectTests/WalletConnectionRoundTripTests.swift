@@ -55,6 +55,29 @@ struct WalletConnectionRoundTripTests {
         _ = try await result
     }
 
+    @Test("the request expires shortly after the response timeout")
+    func requestExpiration() async throws {
+        let (connection, transport, client, wallet) = try makeConnection(timeout: 2)
+        let before = Timestamp.now
+
+        async let result = connection.payInvoice("lnbc1")
+        let request = try await NWCFixtures.waitForSentEvents(transport, count: 1)[0]
+        let after = Timestamp.now
+
+        // The timeout plus ten seconds of slack, counted from when the request was built.
+        let expiration = try #require(request.expiration)
+        #expect(expiration > after)
+        #expect(expiration.rawValue >= before.rawValue + 12)
+        #expect(expiration.rawValue <= after.rawValue + 12)
+        #expect(!request.isExpired())
+
+        let response = try NWCFixtures.response(
+            resultJSON: #"{"result_type":"pay_invoice","result":{"preimage":"aa"}}"#,
+            requestID: request.id, client: client, wallet: wallet)
+        await transport.emit(response)
+        _ = try await result
+    }
+
     @Test("concurrent commands correlate responses by the e tag")
     func concurrentCorrelation() async throws {
         let (connection, transport, client, wallet) = try makeConnection()

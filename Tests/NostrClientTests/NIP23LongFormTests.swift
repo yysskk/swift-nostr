@@ -27,7 +27,7 @@ struct NIP23LongFormTests {
             title: "Hello",
             summary: "A summary",
             imageURL: "https://example.com/cover.png",
-            publishedAt: Date(timeIntervalSince1970: 1_700_000_000),
+            publishedAt: Timestamp(rawValue: 1_700_000_000),
             hashtags: ["nostr", "swift"],
             content: "# Body"
         )
@@ -55,7 +55,7 @@ struct NIP23LongFormTests {
             title: "Title",
             summary: "Summary",
             imageURL: "https://example.com/i.png",
-            publishedAt: Date(timeIntervalSince1970: 1_699_000_000),
+            publishedAt: Timestamp(rawValue: 1_699_000_000),
             hashtags: ["a", "b"],
             content: "Body text"
         )
@@ -66,7 +66,7 @@ struct NIP23LongFormTests {
         #expect(parsed.title == "Title")
         #expect(parsed.summary == "Summary")
         #expect(parsed.imageURL == "https://example.com/i.png")
-        #expect(parsed.publishedAt == Date(timeIntervalSince1970: 1_699_000_000))
+        #expect(parsed.publishedAt == Timestamp(rawValue: 1_699_000_000))
         #expect(parsed.hashtags == ["a", "b"])
         #expect(parsed.content == "Body text")
     }
@@ -123,15 +123,17 @@ struct NIP23LongFormTests {
 
     @Test("publishedAt is auto-filled when nil")
     func publishedAtAutoFilled() throws {
+        let before = Timestamp.now
         let event = try makeSigner().signLongFormContent(LongFormContent(identifier: "d"))
-        let publishedTag: Event.Tag? = event.tags(named: "published_at").first
-        #expect(publishedTag != nil)
-        #expect(LongFormContent(event: event)?.publishedAt != nil)
+        let after = Timestamp.now
+        let publishedAt = try #require(LongFormContent(event: event)?.publishedAt)
+        #expect(publishedAt >= before)
+        #expect(publishedAt <= after)
     }
 
     @Test("publishedAt is preserved when set")
     func publishedAtPreserved() throws {
-        let published = Date(timeIntervalSince1970: 1_650_000_000)
+        let published = Timestamp(rawValue: 1_650_000_000)
         let event = try makeSigner().signLongFormContent(
             LongFormContent(identifier: "d", publishedAt: published)
         )
@@ -140,6 +142,30 @@ struct NIP23LongFormTests {
     }
 
     // MARK: - naddr
+
+    @Test("a published_at beyond Date's range round-trips exactly")
+    func publishedAtBeyondDateRoundTrips() throws {
+        let signer = try makeSigner()
+        let event = try signer.sign(
+            UnsignedEvent(
+                pubkey: signer.publicKey, kind: .longFormContent,
+                rawTags: [["d", "d"], ["published_at", "9223372036854775807"]], content: ""))
+
+        let article = try #require(LongFormContent(event: event))
+        #expect(article.publishedAt == Timestamp(rawValue: .max))
+        #expect(article.toTags().contains(["published_at", "9223372036854775807"]))
+    }
+
+    @Test("a published_at that is not an integer is ignored")
+    func malformedPublishedAtIgnored() throws {
+        let signer = try makeSigner()
+        let event = try signer.sign(
+            UnsignedEvent(
+                pubkey: signer.publicKey, kind: .longFormContent,
+                rawTags: [["d", "d"], ["published_at", "1.5e9"]], content: ""))
+
+        #expect(LongFormContent(event: event)?.publishedAt == nil)
+    }
 
     @Test("naddr round-trips through bech32 and matches NAddr(event:)")
     func naddrRoundTrips() throws {
@@ -222,14 +248,14 @@ struct NIP23LongFormTests {
             LongFormContent(
                 identifier: "same-d",
                 title: "Old",
-                publishedAt: Date(timeIntervalSince1970: 1_600_000_000)
+                publishedAt: Timestamp(rawValue: 1_600_000_000)
             )
         )
         // A distinct newer event for the same identifier (later createdAt wins).
         let newerBase = LongFormContent(
             identifier: "same-d",
             title: "New",
-            publishedAt: Date(timeIntervalSince1970: 1_600_000_100)
+            publishedAt: Timestamp(rawValue: 1_600_000_100)
         )
         let newerUnsigned = UnsignedEvent(
             pubkey: signer.publicKey,
