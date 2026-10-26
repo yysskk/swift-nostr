@@ -8,7 +8,7 @@ import Testing
 struct Bolt11InvoiceTests {
     // The canonical BOLT-11 test vectors share this payment hash and creation timestamp.
     private let paymentHashHex = "0001020304050607080900010203040506070809000102030405060708090102"
-    private let timestamp = Date(timeIntervalSince1970: 1_496_314_658)
+    private let timestamp = Timestamp(rawValue: 1_496_314_658)
 
     // The description committed to by the `h` field in the 20m vectors.
     private let descriptionHashSource =

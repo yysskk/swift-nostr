@@ -53,7 +53,7 @@ struct DirectMessageRoutingTests {
             DirectMessageRelayList(relays: [
                 RelayURL("wss://inbox.example.com")!, RelayURL("wss://absent.example.com")!,
             ]),
-            createdAt: 1,
+            createdAt: Timestamp(rawValue: 1),
             for: recipient
         )
 
@@ -78,7 +78,7 @@ struct DirectMessageRoutingTests {
         // The recipient advertised a kind 10050 with no relays; routing resolves to nothing,
         // so the caller falls back to the full pool.
         await client.dmRelayListStore.store(
-            DirectMessageRelayList(relays: []), createdAt: 1, for: recipient
+            DirectMessageRelayList(relays: []), createdAt: Timestamp(rawValue: 1), for: recipient
         )
 
         let targets = await client.routing.connectedInboxRelays(for: recipient)

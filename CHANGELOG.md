@@ -215,12 +215,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `HTTPAuth.ValidationError.timestampOutOfTolerance(createdAt:)` carries the event's `Timestamp`.
 - **NIP-40 expirations are `Timestamp`** (breaking): `Tag.expiration(_:)` takes one,
   `Event.expiration` returns one, and `Event.isExpired(asOf:)` compares against one (default `.now`).
+  So does every `expiration:` parameter that was `Date?` — `client.messages.send`, `react`,
+  `sendFile`, and `sendGiftWrapped`, the `NostrMessaging` requirements, the `DirectMessageBuilder`
+  methods, and `GiftWrap.wrap`.
 - **`subscriptionId` is spelled `subscriptionID`** (breaking): the acronym is now cased the same way
   as `groupID`, `eventID`, and `computedID` throughout. This renames the associated values of
   `ClientMessage.request`, `close`, and `count` and of `RelayMessage.event`, `endOfStoredEvents`,
   `closed`, and `count`, and the parameters of `RelayConnection.subscribe(subscriptionID:filters:)`,
   `unsubscribe(subscriptionID:)`, `RelayPool.unsubscribe(subscriptionID:)`, and
   `NostrSubscriptionsAPI.unsubscribe(subscriptionID:)`. The wire format is unchanged.
+- **Direct message times are `Timestamp`** (breaking): `createdAt` and `expiresAt` on
+  `DirectMessage`, `DirectMessageReaction`, and `DirectMessageFile`, and their initializers, were
+  `Date`. They carry the rumor's `created_at` and the gift wrap's `expiration` exactly as received.
+- **Other protocol times are `Timestamp`** (breaking): `LongFormContent.publishedAt` (`published_at`
+  is now kept exactly rather than clamped), the `since:` of `client.groups.timeline` and its
+  `NostrGroupManaging` requirement, and `Bolt11Invoice.timestamp` were `Date`; NIP-47
+  `WalletConnectTransaction.createdAt`, `expiresAt`, and `settledAt` and `ListTransactionsParams.from`
+  and `until` were `Int64`. The NIP-47 JSON is unchanged.
 
 ## [0.8.0] - 2026-10-25
 

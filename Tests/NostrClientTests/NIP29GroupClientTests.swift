@@ -404,7 +404,7 @@ struct NIP29GroupClientTests {
         let subscription = try await client.groups.timeline(
             group,
             kinds: [.chatMessage],
-            since: Date(timeIntervalSince1970: 1_700_000_000),
+            since: Timestamp(rawValue: 1_700_000_000),
             limit: 50
         )
         try await NIP42TestSupport.pollUntil { socket.sentTextFrames.contains { $0.hasPrefix("[\"REQ\"") } }

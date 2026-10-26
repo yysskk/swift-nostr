@@ -18,8 +18,9 @@ public struct LongFormContent: Sendable, Hashable {
     /// A cover image URL for the article (`image` tag).
     public var imageURL: String?
 
-    /// When the article was first published (`published_at` tag, Unix seconds).
-    public var publishedAt: Date?
+    /// When the article was first published (`published_at` tag). Editing an article keeps this
+    /// value while the event's `created_at` moves forward.
+    public var publishedAt: Timestamp?
 
     /// The article's hashtags (`t` tags).
     public var hashtags: [String]
@@ -37,7 +38,7 @@ public struct LongFormContent: Sendable, Hashable {
         title: String? = nil,
         summary: String? = nil,
         imageURL: String? = nil,
-        publishedAt: Date? = nil,
+        publishedAt: Timestamp? = nil,
         hashtags: [String] = [],
         additionalTags: [[String]] = [],
         content: String = ""
@@ -62,7 +63,7 @@ public struct LongFormContent: Sendable, Hashable {
         var title: String?
         var summary: String?
         var imageURL: String?
-        var publishedAt: Date?
+        var publishedAt: Timestamp?
         var hashtags: [String] = []
         var additionalTags: [[String]] = []
 
@@ -80,7 +81,7 @@ public struct LongFormContent: Sendable, Hashable {
                 imageURL = value
             case "published_at":
                 if let value, let seconds = Int64(value) {
-                    publishedAt = Timestamp(rawValue: seconds).date
+                    publishedAt = Timestamp(rawValue: seconds)
                 }
             case "t":
                 if let value {
@@ -116,7 +117,7 @@ public struct LongFormContent: Sendable, Hashable {
             tags.append(["image", imageURL])
         }
         if let publishedAt {
-            tags.append(["published_at", Timestamp(publishedAt).description])
+            tags.append(["published_at", publishedAt.description])
         }
         for hashtag in hashtags {
             tags.append(["t", hashtag])

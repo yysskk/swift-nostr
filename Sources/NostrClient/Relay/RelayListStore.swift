@@ -24,7 +24,7 @@ actor RelayListStore {
     /// An equal `createdAt` keeps the existing entry.
     /// - Returns: The effective (possibly pre-existing) list.
     @discardableResult
-    func store(_ list: RelayListMetadata, createdAt: Int64, for pubkey: PublicKey) -> RelayListMetadata {
+    func store(_ list: RelayListMetadata, createdAt: Timestamp, for pubkey: PublicKey) -> RelayListMetadata {
         cache.store(list, createdAt: createdAt, for: pubkey)
     }
 
@@ -35,7 +35,7 @@ actor RelayListStore {
         guard let list = event.relayListMetadata else {
             return nil
         }
-        return store(list, createdAt: event.createdAt.rawValue, for: event.pubkey)
+        return store(list, createdAt: event.createdAt, for: event.pubkey)
     }
 
     /// Returns the cached relay list for a pubkey, if any.

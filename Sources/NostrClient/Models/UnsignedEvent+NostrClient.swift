@@ -66,7 +66,7 @@ extension UnsignedEvent {
     ) -> UnsignedEvent {
         var article = article
         if article.publishedAt == nil {
-            article.publishedAt = Date()
+            article.publishedAt = .now
         }
         return UnsignedEvent(
             pubkey: pubkey,

@@ -12,8 +12,8 @@ public struct Bolt11Invoice: Sendable, Hashable {
     /// The amount in millisatoshis, or nil for an amountless invoice.
     public let amountMillisats: Int64?
 
-    /// The time the invoice was created.
-    public let timestamp: Date
+    /// When the invoice was created: the 35-bit Unix-seconds timestamp at the start of its data part.
+    public let timestamp: Timestamp
 
     /// The payment hash (the `p` field, 32 bytes), if present.
     public let paymentHash: Data?
@@ -54,8 +54,8 @@ public struct Bolt11Invoice: Sendable, Hashable {
         guard words.count >= Self.timestampWordCount + Self.signatureWordCount else {
             return nil
         }
-        self.timestamp = Date(
-            timeIntervalSince1970: TimeInterval(Self.integer(from: words[0..<Self.timestampWordCount])))
+        // 35 bits always fit in an Int64.
+        self.timestamp = Timestamp(rawValue: Int64(Self.integer(from: words[0..<Self.timestampWordCount])))
 
         var paymentHash: Data?
         var descriptionHash: Data?

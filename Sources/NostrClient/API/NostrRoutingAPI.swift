@@ -27,7 +27,7 @@ public struct NostrRoutingAPI: NostrRelayRouting {
         else {
             return nil
         }
-        await client.relayListStore.store(list, createdAt: newest.createdAt.rawValue, for: pubkey)
+        await client.relayListStore.store(list, createdAt: newest.createdAt, for: pubkey)
         return list
     }
 
@@ -46,7 +46,7 @@ public struct NostrRoutingAPI: NostrRelayRouting {
     ) async throws -> PublishedEvent {
         let event = try await client.signEvent { .relayListMetadata(pubkey: $0, relayList) }
         let result = try await client.pool.publish(event, strategy: strategy)
-        await client.relayListStore.store(relayList, createdAt: event.createdAt.rawValue, for: event.pubkey)
+        await client.relayListStore.store(relayList, createdAt: event.createdAt, for: event.pubkey)
         return PublishedEvent(event: event, result: result)
     }
 
@@ -133,7 +133,7 @@ public struct NostrRoutingAPI: NostrRelayRouting {
         else {
             return nil
         }
-        await client.dmRelayListStore.store(list, createdAt: newest.createdAt.rawValue, for: pubkey)
+        await client.dmRelayListStore.store(list, createdAt: newest.createdAt, for: pubkey)
         return list
     }
 
@@ -154,7 +154,7 @@ public struct NostrRoutingAPI: NostrRelayRouting {
     ) async throws -> PublishedEvent {
         let event = try await client.signEvent { .directMessageRelayList(pubkey: $0, relayList) }
         let result = try await client.pool.publish(event, strategy: strategy)
-        await client.dmRelayListStore.store(relayList, createdAt: event.createdAt.rawValue, for: event.pubkey)
+        await client.dmRelayListStore.store(relayList, createdAt: event.createdAt, for: event.pubkey)
         return PublishedEvent(event: event, result: result)
     }
 

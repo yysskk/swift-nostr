@@ -245,13 +245,13 @@ public protocol NostrMessaging: Sendable {
         to recipientPubkey: PublicKey,
         subject: String?,
         replyTo: EventID?,
-        expiration: Date?,
+        expiration: Timestamp?,
         strategy: PublishStrategy?
     ) async throws -> SendDirectMessageResult
     /// Sends a NIP-25 reaction to a received message.
     @discardableResult
     func react(
-        to message: DirectMessage, reaction: String, expiration: Date?, strategy: PublishStrategy?
+        to message: DirectMessage, reaction: String, expiration: Timestamp?, strategy: PublishStrategy?
     ) async throws -> SendDirectMessageResult
     /// Sends a kind-15 encrypted file message.
     @discardableResult
@@ -263,13 +263,13 @@ public protocol NostrMessaging: Sendable {
         dimensions: String?,
         blurhash: String?,
         to recipientPubkey: PublicKey,
-        expiration: Date?,
+        expiration: Timestamp?,
         strategy: PublishStrategy?
     ) async throws -> SendDirectMessageResult
     /// Sends a rumor of any kind gift-wrapped, routed like a direct message.
     @discardableResult
     func sendGiftWrapped(
-        _ rumor: UnsignedEvent, to recipientPubkey: PublicKey, expiration: Date?, strategy: PublishStrategy?
+        _ rumor: UnsignedEvent, to recipientPubkey: PublicKey, expiration: Timestamp?, strategy: PublishStrategy?
     ) async throws -> SendDirectMessageResult
 
     /// Unwraps a received gift wrap as a message.
@@ -334,7 +334,7 @@ public protocol NostrGroupManaging: Sendable {
     ) async throws -> GroupState
     /// Subscribes to a group's live timeline.
     func timeline(
-        _ group: GroupReference, kinds: [Event.Kind]?, since: Date?, limit: Int?
+        _ group: GroupReference, kinds: [Event.Kind]?, since: Timestamp?, limit: Int?
     ) async throws -> SubscriptionSequence
 
     /// Fetches the kind-10009 list of groups a user is in.

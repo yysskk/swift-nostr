@@ -252,14 +252,16 @@ public actor WalletConnection {
             throw WalletConnectError.requestEncodingFailed
         }
 
-        let expiration = Int64(Date().timeIntervalSince1970) + Int64(config.requestTimeout) + 10
-        let tags: [[String]] = [
-            ["p", walletPubkey.hex],
-            ["encryption", scheme.rawValue],
-            ["expiration", String(expiration)],
+        // The request expires shortly after this connection stops waiting for the response, so a
+        // wallet that sees it late does not pay an invoice nobody is listening for anymore.
+        let expiration = Timestamp(Date().addingTimeInterval(config.requestTimeout + 10))
+        let tags: [Tag] = [
+            .pubkey(walletPubkey),
+            Tag(name: "encryption", values: [scheme.rawValue]),
+            .expiration(expiration),
         ]
         let unsigned = UnsignedEvent(
-            pubkey: clientPubkey, kind: .walletConnectRequest, rawTags: tags, content: content)
+            pubkey: clientPubkey, kind: .walletConnectRequest, tags: tags, content: content)
         do {
             return try signer.sign(unsigned)
         } catch {

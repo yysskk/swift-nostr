@@ -40,8 +40,9 @@ struct WalletConnectResponseTests {
         #expect(tx.paymentHash == "aaaa")
         #expect(tx.amount == 21000)
         #expect(tx.feesPaid == 0)
-        #expect(tx.createdAt == 1_700_000_000)
-        #expect(tx.settledAt == 1_700_000_100)
+        #expect(tx.createdAt == Timestamp(rawValue: 1_700_000_000))
+        #expect(tx.expiresAt == Timestamp(rawValue: 1_700_003_600))
+        #expect(tx.settledAt == Timestamp(rawValue: 1_700_000_100))
         #expect(tx.metadata?["k"] == .string("v"))
     }
 
@@ -61,6 +62,31 @@ struct WalletConnectResponseTests {
         let result = try #require(response.result)
         #expect(result.preimage == "0011")
         #expect(result.feesPaid == 100)
+    }
+
+    @Test("a transaction encodes its times as integer Unix seconds under the NIP-47 keys")
+    func encodeTransactionTimes() throws {
+        let transaction = WalletConnectTransaction(
+            type: "incoming", amount: 21000, createdAt: Timestamp(rawValue: 1_700_000_000),
+            expiresAt: Timestamp(rawValue: 1_700_003_600), settledAt: Timestamp(rawValue: 1_700_000_100))
+        let data = try JSONEncoder().encode(transaction)
+        guard case .object(let object) = try JSONDecoder().decode(JSONValue.self, from: data) else {
+            Issue.record("a transaction should encode as a JSON object")
+            return
+        }
+        #expect(object["created_at"] == .int(1_700_000_000))
+        #expect(object["expires_at"] == .int(1_700_003_600))
+        #expect(object["settled_at"] == .int(1_700_000_100))
+        #expect(try JSONDecoder().decode(WalletConnectTransaction.self, from: data) == transaction)
+    }
+
+    @Test("a transaction without times leaves them nil")
+    func decodeTransactionWithoutTimes() throws {
+        let json = #"{"result_type":"lookup_invoice","result":{"type":"outgoing","amount":1}}"#
+        let tx = try #require(try decode(json, as: WalletConnectTransaction.self).result)
+        #expect(tx.createdAt == nil)
+        #expect(tx.expiresAt == nil)
+        #expect(tx.settledAt == nil)
     }
 
     @Test("decodes a list_transactions result")
