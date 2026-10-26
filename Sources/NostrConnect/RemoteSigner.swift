@@ -179,8 +179,9 @@ public actor RemoteSigner {
     /// bunker secret when the token carries one. Commands call this automatically; call it
     /// explicitly to surface connection errors up front. Calling it again after a successful
     /// handshake is a no-op.
-    /// - Throws: ``RemoteSignerError/connectionRejected(message:)`` if the signer declines,
-    ///   ``RemoteSignerError/timedOut`` if it does not answer in time, or a transport error.
+    /// - Throws: ``RemoteSignerError/connectionRejected(message:)`` if the signer declines or
+    ///   returns a secret other than the one sent, ``RemoteSignerError/timedOut`` if it does not
+    ///   answer in time, or a transport error.
     public func connect() async throws {
         try await ensureStarted()
         guard !didConnect else { return }

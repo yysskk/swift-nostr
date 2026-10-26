@@ -97,6 +97,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`RemoteSignerError.secretMismatch` is removed** (breaking): nothing threw it. A signer that
+  answers `connect` with a secret other than the one sent fails with `connectionRejected(message:)`.
 - **Bounds are spelled `maximum` and `minimum`** (breaking): the remaining `max` and `min` names
   now match `minimumReconnectDelay`, `maximumLogN`, and `minimumDifficulty`.
   `RelayConnectionConfig.maxReconnectAttempts` and `maxReconnectDelay` are
