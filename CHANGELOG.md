@@ -111,6 +111,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `LNURLPayResponse.InvoiceError.amountOutOfRange(min:max:)` is
   `amountOutOfRange(minimum:maximum:)`. `Groups.previousReferences(from:excludingAuthor:maxCount:)`
   and its `using:` overload take `maximumCount:`. The NIP-11 and LUD-06 JSON keys are unchanged.
+- **`Event.Kind.categorizedPeopleList` is removed** (breaking): it was a second name for kind 30000.
+  Use `followSet`, the NIP-51 name for that kind.
 - **`PublishedEvent` no longer forwards `Event` properties** (breaking): the dynamic member lookup
   is removed, so read them through `event` (`published.event.id`, `published.event.content`).
 - **Tag names are a typed `Tag.Name`** (breaking): `Tag.name` and `Tag(name:values:)` use
