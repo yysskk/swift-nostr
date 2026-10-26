@@ -173,7 +173,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `authenticationRejected(RelayRejection)` (each was `authenticationFailed(String)`), and
   `unsupportedFrame` (was `connectionFailed("Unsupported WebSocket frame")`).
   `RelayConnection.connect()` and `reconnect()` are `throws(RelayConnection.Error)`,
-  `lastAuthenticationError` is a `RelayConnection.Error?`, `RelayConnectionTransport` throws
+  `lastAuthenticationError` is an `(any Error)?` that usually holds a `RelayConnection.Error`, `RelayConnectionTransport` throws
   `RelayConnection.Error.notConnected` with typed throws, and `NostrIdentityAPI.authenticate(relayURL:)`
   throws `missingAuthenticationChallenge`. `NostrError.authenticationFailed` and `timeout` are
   removed; the pool keeps `NostrError` for its own failures.

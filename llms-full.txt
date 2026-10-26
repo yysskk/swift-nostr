@@ -1600,7 +1600,7 @@ Manages WebSocket connection to a single relay (actor).
 - `config: RelayConnectionConfig`
 - `authenticationChallenge: String?` -- latest NIP-42 AUTH challenge (session-scoped)
 - `authenticatedPublicKeys: Set<PublicKey>` / `isAuthenticated: Bool` -- NIP-42 session state
-- `lastAuthenticationError: RelayConnection.Error?` -- failure of the latest automatic NIP-42 answer
+- `lastAuthenticationError: (any Error)?` -- failure of the latest automatic NIP-42 answer (usually a `RelayConnection.Error`)
 
 ### Configuration
 

@@ -114,13 +114,16 @@ public actor RelayConnection {
     /// The error from the most recent automatic NIP-42 authentication attempt driven
     /// by the ``AuthenticationResponder``, or nil when none has failed.
     ///
+    /// Usually a ``RelayConnection/Error`` — ``RelayConnection/Error/authenticationRejected(_:)``
+    /// when the relay refused the AUTH event — but any failure of the attempt is recorded, so
+    /// it is never silently lost.
+    ///
     /// Cleared when an authentication later succeeds and whenever the session is torn
     /// down or re-established (challenges are per-session). A responder that returns
     /// nil declines the challenge and is not recorded as an error. Manual
     /// ``authenticate(with:)`` callers observe failures as thrown errors instead and
-    /// are not recorded here, and neither are failures other than a ``RelayConnection/Error``
-    /// (such as cancellation).
-    public private(set) var lastAuthenticationError: Error?
+    /// are not recorded here.
+    public private(set) var lastAuthenticationError: (any Swift.Error)?
 
     /// Public keys of in-flight AUTH events keyed by event id, so the receive loop
     /// can mark them authenticated the moment the relay's OK arrives. An entry
@@ -729,7 +732,7 @@ public actor RelayConnection {
                 // challenge) or the relay issued a new one while this attempt was
                 // suspended, a late failure must not resurrect a stale error — the
                 // field is scoped to the current session.
-                guard authenticationChallenge == challenge, let error = error as? Error else { return }
+                guard authenticationChallenge == challenge else { return }
                 lastAuthenticationError = error
             }
         }

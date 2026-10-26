@@ -194,8 +194,36 @@ struct NIP42AutomaticAuthenticationTests {
 
         try await pollUntil { await connection.lastAuthenticationError != nil }
         #expect(
-            await connection.lastAuthenticationError
+            await connection.lastAuthenticationError as? RelayConnection.Error
                 == .authenticationRejected(RelayRejection(prefix: .restricted, message: "not allowed")))
+        #expect(await connection.isAuthenticated == false)
+        await connection.disconnect()
+    }
+
+    @Test("an automatic authentication that is never acknowledged is recorded on lastAuthenticationError")
+    func unacknowledgedAuthenticationRecorded() async throws {
+        let mock = MockWebSocketSession()
+        let connection = RelayConnection(
+            url: relayURL,
+            webSocketFactory: MockWebSocketSessionFactory(makeSession: { mock }),
+            config: RelayConnectionConfig(
+                connectionTimeout: .seconds(1),
+                publishAckTimeout: .milliseconds(50),
+                pingInterval: .seconds(60),
+                autoReconnect: false
+            )
+        )
+        let signer = EventSigner(keyPair: try KeyPair())
+        await connection.setAuthenticationResponder { relayURL, challenge in
+            try? signer.sign(.clientAuthentication(relayURL: relayURL, challenge: challenge))
+        }
+        try await connection.connect()
+
+        // The relay never answers the AUTH event, so the attempt times out rather than being
+        // rejected — a failure that must still be recorded.
+        mock.deliver(.string(#"["AUTH","challengestringhere"]"#))
+        try await pollUntil { await connection.lastAuthenticationError != nil }
+        #expect(await connection.lastAuthenticationError as? RelayConnection.Error == .timedOut)
         #expect(await connection.isAuthenticated == false)
         await connection.disconnect()
     }
