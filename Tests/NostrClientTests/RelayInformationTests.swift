@@ -184,20 +184,49 @@ struct RelayInformationTests {
         let info = try JSONDecoder().decode(RelayInformation.self, from: json)
         let limitation = try #require(info.limitation)
 
-        #expect(limitation.maxMessageLength == 16384)
-        #expect(limitation.maxSubscriptions == 20)
-        #expect(limitation.maxFilters == 100)
-        #expect(limitation.maxLimit == 5000)
-        #expect(limitation.maxSubidLength == 100)
-        #expect(limitation.maxEventTags == 100)
-        #expect(limitation.maxContentLength == 8196)
-        #expect(limitation.minPowDifficulty == 30)
+        #expect(limitation.maximumMessageLength == 16384)
+        #expect(limitation.maximumSubscriptions == 20)
+        #expect(limitation.maximumFilters == 100)
+        #expect(limitation.maximumLimit == 5000)
+        #expect(limitation.maximumSubscriptionIDLength == 100)
+        #expect(limitation.maximumEventTags == 100)
+        #expect(limitation.maximumContentLength == 8196)
+        #expect(limitation.minimumProofOfWorkDifficulty == 30)
         #expect(limitation.authRequired == true)
         #expect(limitation.paymentRequired == false)
         #expect(limitation.restrictedWrites == true)
         #expect(limitation.createdAtLowerLimit == .seconds(31_536_000))
         #expect(limitation.createdAtUpperLimit == .seconds(3))
         #expect(limitation.defaultLimit == 500)
+    }
+
+    @Test("Encode limitation bounds under their NIP-11 keys")
+    func encodeLimitationKeys() throws {
+        let limitation = RelayInformation.Limitation(
+            maximumMessageLength: 16384,
+            maximumSubscriptions: 20,
+            maximumFilters: 100,
+            maximumLimit: 5000,
+            maximumSubscriptionIDLength: 64,
+            maximumEventTags: 2000,
+            maximumContentLength: 8196,
+            minimumProofOfWorkDifficulty: 30
+        )
+
+        let data = try JSONEncoder().encode(limitation)
+        let object = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Int])
+        #expect(
+            object == [
+                "max_message_length": 16384,
+                "max_subscriptions": 20,
+                "max_filters": 100,
+                "max_limit": 5000,
+                "max_subid_length": 64,
+                "max_event_tags": 2000,
+                "max_content_length": 8196,
+                "min_pow_difficulty": 30,
+            ])
+        #expect(try JSONDecoder().decode(RelayInformation.Limitation.self, from: data) == limitation)
     }
 
     @Test("created_at limits are relative offsets that round-trip as integer seconds")
@@ -374,7 +403,7 @@ struct RelayInformationTests {
 
         #expect(info.name == "Full Example Relay")
         #expect(info.supportedNIPs?.contains(11) == true)
-        #expect(info.limitation?.maxMessageLength == 16384)
+        #expect(info.limitation?.maximumMessageLength == 16384)
         #expect(info.fees?.admission?.first?.amount == 1000)
         #expect(info.retention?.first?.kinds?[0] == .single(0))
         #expect(info.retention?.first?.count == 1)
@@ -448,7 +477,7 @@ struct RelayInformationTests {
             name: "Test",
             supportedNIPs: [1, 11],
             limitation: RelayInformation.Limitation(
-                maxMessageLength: 16384,
+                maximumMessageLength: 16384,
                 authRequired: true
             ),
             fees: RelayInformation.Fees(

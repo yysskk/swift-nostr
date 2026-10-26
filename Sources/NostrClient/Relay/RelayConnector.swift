@@ -12,12 +12,12 @@ struct RelayConnector: Sendable {
 
     /// Maximum number of new relays to add+connect for a single resolve call.
     /// Bounds connection growth when routing across many users' relay lists.
-    private let maxRelaysPerResolve: Int
+    private let maximumRelaysPerResolve: Int
 
-    init(pool: RelayPool, policy: GossipRelayPolicy = .addAndConnect, maxRelaysPerResolve: Int = 8) {
+    init(pool: RelayPool, policy: GossipRelayPolicy = .addAndConnect, maximumRelaysPerResolve: Int = 8) {
         self.pool = pool
         self.policy = policy
-        self.maxRelaysPerResolve = maxRelaysPerResolve
+        self.maximumRelaysPerResolve = maximumRelaysPerResolve
     }
 
     /// Ensures the given relay URLs are present (and, for `.addAndConnect`, connected) in the pool,
@@ -31,7 +31,7 @@ struct RelayConnector: Sendable {
                 available.insert(url)
                 continue
             }
-            guard policy == .addAndConnect, added < maxRelaysPerResolve else { continue }
+            guard policy == .addAndConnect, added < maximumRelaysPerResolve else { continue }
             let connection = await pool.addRelay(url)
             added += 1
             // Best-effort: a dead outbox/inbox relay must not fail the whole operation.

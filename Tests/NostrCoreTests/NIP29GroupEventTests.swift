@@ -344,7 +344,7 @@ struct NIP29TimelineReferenceTests {
         var generator = SeededGenerator(seed: 1)
 
         let references = Groups.previousReferences(
-            from: timelineFixture().shuffled(), maxCount: 50, using: &generator)
+            from: timelineFixture().shuffled(), maximumCount: 50, using: &generator)
 
         #expect(references.count == 50)
         #expect(Set(references) == Set((10..<60).map(reference)))
@@ -355,7 +355,7 @@ struct NIP29TimelineReferenceTests {
         var generator = SeededGenerator(seed: 2)
 
         let references = Groups.previousReferences(
-            from: timelineFixture(), excludingAuthor: PublicKey.fixture("author-even"), maxCount: 50,
+            from: timelineFixture(), excludingAuthor: PublicKey.fixture("author-even"), maximumCount: 50,
             using: &generator)
 
         // The window is indices 10-59; only the 25 odd-authored events remain, and the
@@ -364,15 +364,15 @@ struct NIP29TimelineReferenceTests {
         #expect(Set(references) == Set((10..<60).filter { !$0.isMultiple(of: 2) }.map(reference)))
     }
 
-    @Test("returns min(maxCount, available) references and clamps maxCount to zero")
-    func maxCountClamping() {
+    @Test("returns min(maximumCount, available) references and clamps maximumCount to zero")
+    func maximumCountClamping() {
         var generator = SeededGenerator(seed: 3)
         let events = timelineFixture()
 
-        #expect(Groups.previousReferences(from: events, maxCount: 3, using: &generator).count == 3)
-        #expect(Groups.previousReferences(from: events, maxCount: 100, using: &generator).count == 50)
-        #expect(Groups.previousReferences(from: events, maxCount: 0, using: &generator).isEmpty)
-        #expect(Groups.previousReferences(from: events, maxCount: -1, using: &generator).isEmpty)
+        #expect(Groups.previousReferences(from: events, maximumCount: 3, using: &generator).count == 3)
+        #expect(Groups.previousReferences(from: events, maximumCount: 100, using: &generator).count == 50)
+        #expect(Groups.previousReferences(from: events, maximumCount: 0, using: &generator).isEmpty)
+        #expect(Groups.previousReferences(from: events, maximumCount: -1, using: &generator).isEmpty)
         #expect(Groups.previousReferences(from: [Event](), using: &generator).isEmpty)
     }
 
@@ -390,7 +390,7 @@ struct NIP29TimelineReferenceTests {
         var generator = SeededGenerator(seed: 4)
 
         let references = Groups.previousReferences(
-            from: timelineFixture(), maxCount: 10, using: &generator)
+            from: timelineFixture(), maximumCount: 10, using: &generator)
 
         #expect(references.count == 10)
         #expect(Set(references).count == references.count)
@@ -402,7 +402,7 @@ struct NIP29TimelineReferenceTests {
         var generator = SeededGenerator(seed: 5)
 
         let references = Groups.previousReferences(
-            from: events.reversed(), maxCount: 51, using: &generator)
+            from: events.reversed(), maximumCount: 51, using: &generator)
 
         #expect(Set(references) == Set((0..<50).map(reference)))
     }

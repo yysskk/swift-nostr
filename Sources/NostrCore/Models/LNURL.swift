@@ -84,10 +84,10 @@ public struct LNURLPayResponse: Decodable, Sendable, Hashable {
     public let callback: String
 
     /// Minimum payable amount in millisatoshis.
-    public let minSendable: Int64
+    public let minimumSendable: Int64
 
     /// Maximum payable amount in millisatoshis.
-    public let maxSendable: Int64
+    public let maximumSendable: Int64
 
     /// Whether the endpoint supports Nostr zaps.
     public let allowsNostr: Bool?
@@ -104,22 +104,24 @@ public struct LNURLPayResponse: Decodable, Sendable, Hashable {
     /// Creates a response from its fields, e.g. for tests or a cached endpoint.
     public init(
         callback: String,
-        minSendable: Int64,
-        maxSendable: Int64,
+        minimumSendable: Int64,
+        maximumSendable: Int64,
         allowsNostr: Bool? = nil,
         nostrPublicKey: PublicKey? = nil,
         commentAllowed: Int? = nil
     ) {
         self.callback = callback
-        self.minSendable = minSendable
-        self.maxSendable = maxSendable
+        self.minimumSendable = minimumSendable
+        self.maximumSendable = maximumSendable
         self.allowsNostr = allowsNostr
         self.nostrPublicKey = nostrPublicKey
         self.commentAllowed = commentAllowed
     }
 
     private enum CodingKeys: String, CodingKey {
-        case callback, minSendable, maxSendable, allowsNostr, commentAllowed
+        case callback, allowsNostr, commentAllowed
+        case minimumSendable = "minSendable"
+        case maximumSendable = "maxSendable"
         case nostrPublicKey = "nostrPubkey"
     }
 
@@ -132,8 +134,8 @@ public struct LNURLPayResponse: Decodable, Sendable, Hashable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.init(
             callback: try container.decode(String.self, forKey: .callback),
-            minSendable: try container.decode(Int64.self, forKey: .minSendable),
-            maxSendable: try container.decode(Int64.self, forKey: .maxSendable),
+            minimumSendable: try container.decode(Int64.self, forKey: .minimumSendable),
+            maximumSendable: try container.decode(Int64.self, forKey: .maximumSendable),
             allowsNostr: try container.decodeIfPresent(Bool.self, forKey: .allowsNostr),
             nostrPublicKey: (try? container.decodeIfPresent(String.self, forKey: .nostrPublicKey))?
                 .flatMap(PublicKey.init),
@@ -200,8 +202,9 @@ public struct LNURLInvoiceResponse: Decodable, Sendable, Hashable {
 extension LNURLPayResponse {
     /// Errors that can occur while fetching a Lightning invoice from the LNURL callback.
     public enum InvoiceError: Error, LocalizedError, Sendable, Equatable {
-        /// The amount is outside the endpoint's `minSendable...maxSendable` range (millisatoshis).
-        case amountOutOfRange(min: Int64, max: Int64)
+        /// The amount is outside the endpoint's `minimumSendable...maximumSendable` range
+        /// (millisatoshis).
+        case amountOutOfRange(minimum: Int64, maximum: Int64)
 
         /// The callback or zap request could not be encoded into an invoice request URL.
         case invalidCallbackURL
@@ -217,8 +220,8 @@ extension LNURLPayResponse {
 
         public var errorDescription: String? {
             switch self {
-            case .amountOutOfRange(let min, let max):
-                return "Amount is outside the endpoint's range (\(min)...\(max) msats)"
+            case .amountOutOfRange(let minimum, let maximum):
+                return "Amount is outside the endpoint's range (\(minimum)...\(maximum) msats)"
             case .invalidCallbackURL:
                 return "Could not build the invoice request URL"
             case .networkError(let message):
@@ -233,13 +236,14 @@ extension LNURLPayResponse {
 
     /// Fetches a Lightning invoice for a zap from this endpoint's callback.
     ///
-    /// Validates that `amountMillisats` is within `minSendable...maxSendable`, builds the request
-    /// with ``invoiceRequestURL(amountMillisats:zapRequest:lnurl:)``, sends a GET, and returns the
-    /// bolt11 invoice from the `{"pr": "<bolt11>"}` response. Pay the returned invoice to complete
-    /// the zap; the recipient's wallet then publishes the kind-9735 zap receipt.
+    /// Validates that `amountMillisats` is within `minimumSendable...maximumSendable`, builds the
+    /// request with ``invoiceRequestURL(amountMillisats:zapRequest:lnurl:)``, sends a GET, and
+    /// returns the bolt11 invoice from the `{"pr": "<bolt11>"}` response. Pay the returned invoice
+    /// to complete the zap; the recipient's wallet then publishes the kind-9735 zap receipt.
     /// https://github.com/nostr-protocol/nips/blob/master/57.md
     /// - Parameters:
-    ///   - amountMillisats: The amount in millisatoshis. Must be within `minSendable...maxSendable`.
+    ///   - amountMillisats: The amount in millisatoshis. Must be within
+    ///     `minimumSendable...maximumSendable`.
     ///   - zapRequest: The signed kind-9734 zap request.
     ///   - lnurl: The bech32 `lnurl`, forwarded as the `lnurl` parameter when provided.
     ///   - urlSession: The URL session to use (defaults to `.shared`).
@@ -252,10 +256,11 @@ extension LNURLPayResponse {
         lnurl: String? = nil,
         urlSession: URLSession = .shared
     ) async throws -> String {
-        // Explicit comparisons rather than `(minSendable...maxSendable).contains(_:)` — a malformed
-        // response with minSendable > maxSendable would trap when constructing the range.
-        guard amountMillisats >= minSendable, amountMillisats <= maxSendable else {
-            throw InvoiceError.amountOutOfRange(min: minSendable, max: maxSendable)
+        // Explicit comparisons rather than `(minimumSendable...maximumSendable).contains(_:)` — a
+        // malformed response with minimumSendable > maximumSendable would trap when constructing
+        // the range.
+        guard amountMillisats >= minimumSendable, amountMillisats <= maximumSendable else {
+            throw InvoiceError.amountOutOfRange(minimum: minimumSendable, maximum: maximumSendable)
         }
         guard
             let url = invoiceRequestURL(amountMillisats: amountMillisats, zapRequest: zapRequest, lnurl: lnurl)

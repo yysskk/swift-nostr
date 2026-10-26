@@ -83,7 +83,7 @@ struct ReconnectBackoffTests {
     @Test("the delay is capped at the configured maximum")
     func delayIsCapped() {
         let config = RelayConnectionConfig(
-            initialReconnectDelay: .seconds(1), maxReconnectDelay: .seconds(5), reconnectBackoffMultiplier: 10)
+            initialReconnectDelay: .seconds(1), maximumReconnectDelay: .seconds(5), reconnectBackoffMultiplier: 10)
 
         #expect(config.nextReconnectDelay(after: .seconds(1)) == .seconds(5))
         #expect(config.boundedReconnectDelay(.seconds(1_000)) == .seconds(5))
@@ -96,7 +96,7 @@ struct ReconnectBackoffTests {
         arguments: [Double.nan, .infinity, 1e300]
     )
     func extremeMultiplierIsAbsorbed(multiplier: Double) {
-        var config = RelayConnectionConfig(initialReconnectDelay: .seconds(1), maxReconnectDelay: .seconds(60))
+        var config = RelayConnectionConfig(initialReconnectDelay: .seconds(1), maximumReconnectDelay: .seconds(60))
         config.reconnectBackoffMultiplier = multiplier
 
         let next = config.nextReconnectDelay(after: .seconds(1))
@@ -105,11 +105,11 @@ struct ReconnectBackoffTests {
 
     /// A ceiling below the floor would otherwise clamp every delay back under the minimum.
     @Test("a maximum below the initial delay is raised to it")
-    func maxBelowInitialIsRaised() {
+    func maximumBelowInitialIsRaised() {
         var config = RelayConnectionConfig(initialReconnectDelay: .seconds(10))
-        config.maxReconnectDelay = .seconds(1)
+        config.maximumReconnectDelay = .seconds(1)
 
-        #expect(config.resolvedMaxReconnectDelay == .seconds(10))
+        #expect(config.resolvedMaximumReconnectDelay == .seconds(10))
         #expect(config.boundedReconnectDelay(.seconds(10)) == .seconds(10))
     }
 

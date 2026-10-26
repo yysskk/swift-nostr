@@ -34,7 +34,7 @@ extension RelayConnection {
         guard !isReconnecting else { return }
 
         // Check if we've exceeded max attempts
-        if config.maxReconnectAttempts > 0 && reconnectAttempts >= config.maxReconnectAttempts {
+        if config.maximumReconnectAttempts > 0 && reconnectAttempts >= config.maximumReconnectAttempts {
             // Terminal give-up: the receive loop kept the message streams
             // alive for this reconnect cycle, and no further attempt will be
             // scheduled, so nothing else can end them.

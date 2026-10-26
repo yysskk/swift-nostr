@@ -48,7 +48,7 @@ extension EventTemplate {
     ///   - content: The event content.
     ///   - tags: Additional tags, appended after the "h" tag in order.
     ///   - previous: Timeline references for a trailing "previous" tag, e.g. from
-    ///     ``Groups/previousReferences(from:excludingAuthor:maxCount:)``. Omitted when empty.
+    ///     ``Groups/previousReferences(from:excludingAuthor:maximumCount:)``. Omitted when empty.
     /// - Returns: The template for the group-scoped event.
     public static func groupContent(
         groupID: String,
@@ -82,7 +82,7 @@ extension EventTemplate {
     ///   - action: The moderation action to request.
     ///   - groupID: The group's id on its relay.
     ///   - previous: Timeline references for a trailing "previous" tag, e.g. from
-    ///     ``Groups/previousReferences(from:excludingAuthor:maxCount:)``. Omitted when empty.
+    ///     ``Groups/previousReferences(from:excludingAuthor:maximumCount:)``. Omitted when empty.
     ///   - reason: A human-readable reason for the action (the event content; "" when nil).
     /// - Returns: The template for the moderation event.
     public static func groupModeration(

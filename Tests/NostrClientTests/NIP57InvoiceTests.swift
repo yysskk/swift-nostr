@@ -8,9 +8,9 @@ import Testing
 @Suite("NIP-57 Invoice Retrieval Tests")
 struct NIP57InvoiceTests {
 
-    private func makePayResponse(min: Int64 = 1000, max: Int64 = 100_000_000) -> LNURLPayResponse {
+    private func makePayResponse(minimum: Int64 = 1000, maximum: Int64 = 100_000_000) -> LNURLPayResponse {
         LNURLPayResponse(
-            callback: "https://example.com/lnurl/cb", minSendable: min, maxSendable: max,
+            callback: "https://example.com/lnurl/cb", minimumSendable: minimum, maximumSendable: maximum,
             allowsNostr: true, nostrPublicKey: PublicKey.fixture("np"))
     }
 
@@ -51,25 +51,25 @@ struct NIP57InvoiceTests {
 
     // MARK: - Amount validation
 
-    @Test("fetchInvoice rejects an amount below minSendable before any network call")
+    @Test("fetchInvoice rejects an amount below minimumSendable before any network call")
     func fetchInvoiceAmountTooLow() async throws {
-        let pay = makePayResponse(min: 10_000, max: 100_000)
+        let pay = makePayResponse(minimum: 10_000, maximum: 100_000)
         let zap = try makeZapRequest()
 
         // A failing transport proves the range guard fires first: we get amountOutOfRange, not networkError.
-        await #expect(throws: LNURLPayResponse.InvoiceError.amountOutOfRange(min: 10_000, max: 100_000)) {
+        await #expect(throws: LNURLPayResponse.InvoiceError.amountOutOfRange(minimum: 10_000, maximum: 100_000)) {
             _ = try await withMockURLSession(response: .failure(URLError(.cannotConnectToHost))) { session in
                 try await pay.fetchInvoice(amountMillisats: 9_999, zapRequest: zap, urlSession: session)
             }
         }
     }
 
-    @Test("fetchInvoice rejects an amount above maxSendable")
+    @Test("fetchInvoice rejects an amount above maximumSendable")
     func fetchInvoiceAmountTooHigh() async throws {
-        let pay = makePayResponse(min: 10_000, max: 100_000)
+        let pay = makePayResponse(minimum: 10_000, maximum: 100_000)
         let zap = try makeZapRequest()
 
-        await #expect(throws: LNURLPayResponse.InvoiceError.amountOutOfRange(min: 10_000, max: 100_000)) {
+        await #expect(throws: LNURLPayResponse.InvoiceError.amountOutOfRange(minimum: 10_000, maximum: 100_000)) {
             _ = try await withMockURLSession(response: .failure(URLError(.cannotConnectToHost))) { session in
                 try await pay.fetchInvoice(amountMillisats: 100_001, zapRequest: zap, urlSession: session)
             }
@@ -78,11 +78,12 @@ struct NIP57InvoiceTests {
 
     @Test("fetchInvoice throws (not traps) when the endpoint advertises an inverted range")
     func fetchInvoiceInvertedRange() async throws {
-        // A malformed response with minSendable > maxSendable must not trap on a range literal.
-        let pay = makePayResponse(min: 100_000, max: 1000)
+        // A malformed response with minimumSendable > maximumSendable must not trap on a range
+        // literal.
+        let pay = makePayResponse(minimum: 100_000, maximum: 1000)
         let zap = try makeZapRequest()
 
-        await #expect(throws: LNURLPayResponse.InvoiceError.amountOutOfRange(min: 100_000, max: 1000)) {
+        await #expect(throws: LNURLPayResponse.InvoiceError.amountOutOfRange(minimum: 100_000, maximum: 1000)) {
             _ = try await withMockURLSession(response: .failure(URLError(.cannotConnectToHost))) { session in
                 try await pay.fetchInvoice(amountMillisats: 50_000, zapRequest: zap, urlSession: session)
             }

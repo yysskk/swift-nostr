@@ -22,7 +22,7 @@ struct RelayPoolDeduplicationTests {
     /// Relays connect one at a time so each pairs with a known socket.
     private func makeConnectedPool(
         relayURLs: [RelayURL],
-        maxDeduplicationCacheSize: Int = 10000,
+        maximumDeduplicationCacheSize: Int = 10000,
         deduplicationCacheTTL: Duration = .seconds(300)
     ) async throws -> (pool: RelayPool, sockets: [MockWebSocketSession]) {
         let sockets = relayURLs.map { _ in MockWebSocketSession() }
@@ -30,7 +30,7 @@ struct RelayPoolDeduplicationTests {
         let pool = RelayPool(
             config: RelayPoolConfig(
                 defaultRelayConfig: noReconnectConfig,
-                maxDeduplicationCacheSize: maxDeduplicationCacheSize,
+                maximumDeduplicationCacheSize: maximumDeduplicationCacheSize,
                 deduplicationCacheTTL: deduplicationCacheTTL
             ),
             webSocketFactory: MockWebSocketSessionFactory(makeSession: { sockets[counter.next()] })
@@ -184,7 +184,7 @@ struct RelayPoolDeduplicationTests {
 
     @Test("the size limit holds as events arrive, without waiting for a sweep")
     func sizeLimitHoldsAsEventsArrive() async throws {
-        let (pool, sockets) = try await makeConnectedPool(relayURLs: [urlA], maxDeduplicationCacheSize: 1)
+        let (pool, sockets) = try await makeConnectedPool(relayURLs: [urlA], maximumDeduplicationCacheSize: 1)
         let socket = sockets[0]
         let first = try await subscribe(pool, subscriptionID: "sub_1", sockets: sockets)
         let second = try await subscribe(pool, subscriptionID: "sub_2", sockets: sockets)

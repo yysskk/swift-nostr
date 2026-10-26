@@ -56,7 +56,7 @@ public actor RelayPool {
         self.config = config
         self.webSocketFactory = webSocketFactory
         self.eventCache = EventDeduplicationCache(
-            maxSize: config.maxDeduplicationCacheSize,
+            maximumSize: config.maximumDeduplicationCacheSize,
             ttl: config.deduplicationCacheTTL
         )
     }

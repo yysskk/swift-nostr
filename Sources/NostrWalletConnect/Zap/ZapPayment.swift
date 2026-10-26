@@ -38,7 +38,7 @@ extension WalletConnection {
     /// - Parameters:
     ///   - lnurlPay: The recipient's resolved LNURL-pay response.
     ///   - amountMillisats: The amount to zap, in millisatoshis. Must be within the endpoint's
-    ///     `minSendable...maxSendable` range.
+    ///     `minimumSendable...maximumSendable` range.
     ///   - zapRequest: The signed kind-9734 zap request.
     ///   - lnurl: The recipient's bech32 `lnurl`, forwarded to the callback when provided.
     ///   - urlSession: The URL session for the LNURL request (defaults to `.shared`).

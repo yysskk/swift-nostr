@@ -17,8 +17,8 @@ public struct SealedMessage: Sendable {
     public static let version: UInt8 = 2
 
     /// Minimum padded length
-    private static let minPlaintextSize = 1
-    private static let maxPlaintextSize = 65535
+    private static let minimumPlaintextSize = 1
+    private static let maximumPlaintextSize = 65535
     /// The length of a NIP-44 conversation key, the HKDF-Extract output the message keys expand from.
     private static let conversationKeyByteCount = 32
     /// The length of the per-message nonce NIP-44 expands the message keys over.
@@ -120,8 +120,8 @@ public struct SealedMessage: Sendable {
         // Measured rather than encoded first, so an out-of-range plaintext — the invalid vectors
         // reach 10 MB — is rejected without copying it or expanding the message keys.
         let unpaddedLen = plaintext.utf8.count
-        guard unpaddedLen >= minPlaintextSize,
-            unpaddedLen <= maxPlaintextSize
+        guard unpaddedLen >= minimumPlaintextSize,
+            unpaddedLen <= maximumPlaintextSize
         else {
             throw .invalidPlaintextLength(unpaddedLen)
         }
@@ -400,7 +400,7 @@ public struct SealedMessage: Sendable {
     private static func pad(_ plaintext: Data) -> Data {
         let unpaddedLen = plaintext.count
         precondition(
-            unpaddedLen >= minPlaintextSize && unpaddedLen <= maxPlaintextSize,
+            unpaddedLen >= minimumPlaintextSize && unpaddedLen <= maximumPlaintextSize,
             "A NIP-44 plaintext is 1 to 65535 bytes")
 
         // Calculate padded length
@@ -431,8 +431,8 @@ public struct SealedMessage: Sendable {
 
         let unpaddedLen = (Int(padded[0]) << 8) | Int(padded[1])
 
-        guard unpaddedLen >= minPlaintextSize,
-            unpaddedLen <= maxPlaintextSize,
+        guard unpaddedLen >= minimumPlaintextSize,
+            unpaddedLen <= maximumPlaintextSize,
             padded.count == 2 + calcPaddedLen(unpaddedLen)
         else {
             throw .invalidPadding

@@ -326,7 +326,7 @@ extension Tag {
     }
 
     /// A "previous" tag carrying NIP-29 timeline references (the first 8 characters of
-    /// recent event ids). See ``Groups/previousReferences(from:excludingAuthor:maxCount:)``.
+    /// recent event ids). See ``Groups/previousReferences(from:excludingAuthor:maximumCount:)``.
     /// https://github.com/nostr-protocol/nips/blob/master/29.md
     public static func previous(_ references: [String]) -> Tag {
         Tag(name: .previous, values: references)

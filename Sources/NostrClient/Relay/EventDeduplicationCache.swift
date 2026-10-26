@@ -9,12 +9,12 @@ import NostrCore
 /// history when it ends.
 ///
 /// Storage is bounded as entries are recorded, never only when swept, so the cache holds at
-/// most ``maxSize`` entries however many subscriptions are open. Both eviction and
+/// most ``maximumSize`` entries however many subscriptions are open. Both eviction and
 /// ``removeExpired(now:)`` take the oldest entries first; dropping one only risks delivering a
 /// duplicate later, never losing an event.
 struct EventDeduplicationCache {
     /// The maximum number of entries kept across every subscription.
-    let maxSize: Int
+    let maximumSize: Int
 
     /// How long an entry survives after it is recorded.
     let ttl: Duration
@@ -40,10 +40,10 @@ struct EventDeduplicationCache {
     /// ``compact()``.
     private var oldestIndex = 0
 
-    /// Creates a cache holding at most `maxSize` entries, each surviving for `ttl`.
-    /// A `maxSize` below 1 is clamped to 0, which turns deduplication off.
-    init(maxSize: Int, ttl: Duration) {
-        self.maxSize = max(0, maxSize)
+    /// Creates a cache holding at most `maximumSize` entries, each surviving for `ttl`.
+    /// A `maximumSize` below 1 is clamped to 0, which turns deduplication off.
+    init(maximumSize: Int, ttl: Duration) {
+        self.maximumSize = max(0, maximumSize)
         self.ttl = ttl
     }
 
@@ -60,13 +60,13 @@ struct EventDeduplicationCache {
     /// Records that `subscriptionID` has seen `eventID`, returning whether it is new to that
     /// subscription — that is, whether this copy should be delivered.
     ///
-    /// Recording beyond ``maxSize`` evicts as many of the oldest entries as it takes to stay
+    /// Recording beyond ``maximumSize`` evicts as many of the oldest entries as it takes to stay
     /// within the limit, so the bound holds on return.
     mutating func record(eventID: EventID, subscriptionID: String, now: ContinuousClock.Instant = .now) -> Bool {
         guard seenEventIDs[subscriptionID]?.contains(eventID) != true else { return false }
         seenEventIDs[subscriptionID, default: []].insert(eventID)
         entries.append(Entry(subscriptionID: subscriptionID, eventID: eventID, recordedAt: now))
-        while count > maxSize {
+        while count > maximumSize {
             removeOldest()
         }
         return true

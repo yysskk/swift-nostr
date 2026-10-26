@@ -14,9 +14,9 @@ struct RelayConnectionConfigTests {
         #expect(config.queryTimeout == .seconds(10))
         #expect(config.pingInterval == .seconds(30))
         #expect(config.autoReconnect == true)
-        #expect(config.maxReconnectAttempts == 0)
+        #expect(config.maximumReconnectAttempts == 0)
         #expect(config.initialReconnectDelay == .seconds(1))
-        #expect(config.maxReconnectDelay == .seconds(60))
+        #expect(config.maximumReconnectDelay == .seconds(60))
         #expect(config.reconnectBackoffMultiplier == 2.0)
         #expect(RelayConnectionConfig.minimumReconnectDelay == .milliseconds(100))
     }
