@@ -24,12 +24,12 @@ enum TLV {
     }
 
     /// Serializes records as `type | length | value`, concatenated.
-    /// Throws `.invalidTLV` if any value exceeds 255 bytes.
-    static func encode(_ records: [Record]) throws -> Data {
+    /// - Throws: ``NIP19Entity/Error/fieldTooLong(_:)`` if any value exceeds 255 bytes.
+    static func encode(_ records: [Record]) throws(NIP19Entity.Error) -> Data {
         var data = Data()
         for record in records {
             guard record.value.count <= 255 else {
-                throw NostrError.invalidTLV
+                throw .fieldTooLong(record.value.count)
             }
             data.append(record.type)
             data.append(UInt8(record.value.count))
@@ -39,21 +39,22 @@ enum TLV {
     }
 
     /// Parses a raw byte buffer into records. Unknown types are preserved so callers
-    /// can skip them. Throws `.invalidTLV` if a record is truncated.
-    static func decode(_ data: Data) throws -> [Record] {
+    /// can skip them.
+    /// - Throws: ``NIP19Entity/Error/malformedTLV`` if a record is truncated.
+    static func decode(_ data: Data) throws(NIP19Entity.Error) -> [Record] {
         let bytes = [UInt8](data)
         var records: [Record] = []
         var index = 0
         while index < bytes.count {
             guard index + 1 < bytes.count else {
-                throw NostrError.invalidTLV
+                throw .malformedTLV
             }
             let type = bytes[index]
             let length = Int(bytes[index + 1])
             let valueStart = index + 2
             let valueEnd = valueStart + length
             guard valueEnd <= bytes.count else {
-                throw NostrError.invalidTLV
+                throw .malformedTLV
             }
             records.append(Record(type: type, value: Data(bytes[valueStart..<valueEnd])))
             index = valueEnd
@@ -73,9 +74,10 @@ enum TLV {
     }
 
     /// Decodes a big-endian event kind, leniently accepting 1–4 bytes.
-    static func decodeKind(_ data: Data) throws -> Int {
+    /// - Throws: ``NIP19Entity/Error/invalidLength(_:)`` for any other length.
+    static func decodeKind(_ data: Data) throws(NIP19Entity.Error) -> Int {
         guard (1...4).contains(data.count) else {
-            throw NostrError.invalidTLV
+            throw .invalidLength(data.count)
         }
         var value: UInt32 = 0
         for byte in data {
@@ -84,64 +86,89 @@ enum TLV {
         return Int(value)
     }
 
-    /// The public key a 32-byte ``Kind/special`` or ``Kind/author`` record carries.
-    /// - Throws: ``NostrError/invalidNIP19Entity`` if the record does not hold exactly 32 bytes.
-    static func publicKey(_ record: Record) throws -> PublicKey {
-        guard let key = try? PublicKey(data: record.value) else {
-            throw NostrError.invalidNIP19Entity
+    /// The public key an `npub` payload or a ``Kind/special`` or ``Kind/author`` record carries.
+    /// - Throws: ``NIP19Entity/Error/invalidLength(_:)`` if `data` is not exactly 32 bytes.
+    static func publicKey(_ data: Data) throws(NIP19Entity.Error) -> PublicKey {
+        do throws(PublicKey.Error) {
+            return try PublicKey(data: data)
+        } catch {
+            throw .invalidLength(data.count)
         }
-        return key
     }
 
-    /// The event id a 32-byte ``Kind/special`` record carries.
-    /// - Throws: ``NostrError/invalidNIP19Entity`` if the record does not hold exactly 32 bytes.
-    static func eventID(_ record: Record) throws -> EventID {
-        guard let id = try? EventID(data: record.value) else {
-            throw NostrError.invalidNIP19Entity
+    /// The event id a `note` payload or a ``Kind/special`` record carries.
+    /// - Throws: ``NIP19Entity/Error/invalidLength(_:)`` if `data` is not exactly 32 bytes.
+    static func eventID(_ data: Data) throws(NIP19Entity.Error) -> EventID {
+        do throws(EventID.Error) {
+            return try EventID(data: data)
+        } catch {
+            throw .invalidLength(data.count)
         }
-        return id
     }
 
     /// Ensures each relay URL's canonical form fits within a single TLV record (255 bytes).
-    static func validatedRelays(_ relays: [RelayURL]) throws -> [RelayURL] {
+    /// - Throws: ``NIP19Entity/Error/fieldTooLong(_:)`` for a longer one.
+    static func validatedRelays(_ relays: [RelayURL]) throws(NIP19Entity.Error) -> [RelayURL] {
         for relay in relays where relay.description.utf8.count > 255 {
-            throw NostrError.invalidTLV
+            throw .fieldTooLong(relay.description.utf8.count)
         }
         return relays
     }
 
     /// Validates that an event kind fits in a 32-bit unsigned integer.
-    static func validatedKind(_ kind: Int) throws -> Int {
+    /// - Throws: ``NIP19Entity/Error/kindOutOfRange(_:)`` otherwise.
+    static func validatedKind(_ kind: Int) throws(NIP19Entity.Error) -> Int {
         // `UInt32(exactly:)` rejects negative values and values above `UInt32.max`
         // without relying on an `Int` literal that would overflow on 32-bit
         // platforms such as watchOS.
         guard UInt32(exactly: kind) != nil else {
-            throw NostrError.invalidNIP19Entity
+            throw .kindOutOfRange(kind)
         }
         return kind
     }
 
     // MARK: - Entity Round-Trip Helpers
 
+    /// Decodes a bech32 string, reporting a bech32 failure as a NIP-19 one.
+    /// - Throws: ``NIP19Entity/Error/invalidBech32(_:)`` if `string` is not valid bech32.
+    static func decodeBech32(_ string: String) throws(NIP19Entity.Error) -> (hrp: String, data: Data) {
+        do throws(Bech32.Error) {
+            return try Bech32.decode(string)
+        } catch {
+            throw .invalidBech32(error)
+        }
+    }
+
+    /// Encodes `data` as bech32, reporting a bech32 failure as a NIP-19 one.
+    /// - Throws: ``NIP19Entity/Error/invalidBech32(_:)`` if `hrp` is not lowercase printable
+    ///   ASCII, which never happens for the constant NIP-19 prefixes.
+    static func encodeBech32(hrp: String, data: Data) throws(NIP19Entity.Error) -> String {
+        do throws(Bech32.Error) {
+            return try Bech32.encode(hrp: hrp, data: data)
+        } catch {
+            throw .invalidBech32(error)
+        }
+    }
+
     /// Decodes a bech32 string into its TLV payload, verifying the human-readable prefix.
     /// Shared by the `nprofile`/`nevent`/`naddr` `init(bech32String:)` initializers.
-    static func payload(fromBech32 string: String, prefix: String) throws -> Data {
-        let (hrp, data) = try Bech32.decode(string)
+    /// - Throws: ``NIP19Entity/Error/invalidBech32(_:)`` if `string` is not valid bech32, or
+    ///   ``NIP19Entity/Error/unexpectedPrefix(_:)`` if its prefix is not `prefix`.
+    static func payload(fromBech32 string: String, prefix: String) throws(NIP19Entity.Error) -> Data {
+        let (hrp, data) = try decodeBech32(string)
         guard hrp == prefix else {
-            throw NostrError.unknownPrefix(hrp)
+            throw .unexpectedPrefix(hrp)
         }
         return data
     }
 
     /// Encodes records into a bech32 string with the given prefix.
-    ///
-    /// Throws ``NostrError/invalidTLV`` if a record value exceeds 255 bytes, or
-    /// ``Bech32/Error/invalidHumanReadablePart`` if `prefix` is not lowercase printable ASCII.
-    /// Neither happens for the entity `encoded` accessors: their initializers validate every
-    /// field and the prefixes are constant ASCII literals.
-    static func bech32(_ records: [Record], prefix: String) throws -> String {
+    /// - Throws: ``NIP19Entity/Error/fieldTooLong(_:)`` if a record value exceeds 255 bytes — for
+    ///   the entity `encoded` accessors only an `naddr` identifier can, as their initializers
+    ///   validate the relay hints.
+    static func bech32(_ records: [Record], prefix: String) throws(NIP19Entity.Error) -> String {
         let data = try encode(records)
-        return try Bech32.encode(hrp: prefix, data: data)
+        return try encodeBech32(hrp: prefix, data: data)
     }
 
     /// A ``Kind/special`` record carrying raw bytes (used for the `naddr` identifier).

@@ -379,9 +379,10 @@ public protocol NostrMessaging: Sendable {
     /// reaction (kind 7), or a file message (kind 15).
     /// - Parameter giftWrap: The gift-wrapped event.
     /// - Returns: The decrypted payload.
-    /// - Throws: ``NostrError/signerNotSet`` if no signer is set, ``NostrError/invalidData`` for any
-    ///   other inner kind or a malformed payload, or what ``GiftWrap/unwrap(giftWrap:recipient:)``
-    ///   throws for a gift wrap that does not open.
+    /// - Throws: ``NostrError/signerNotSet`` if no signer is set,
+    ///   ``DirectMessagePayload/Error/unexpectedKind(_:)`` for any other inner kind, another
+    ///   ``DirectMessagePayload/Error`` for a malformed payload, or what
+    ///   ``GiftWrap/unwrap(giftWrap:recipient:)`` throws for a gift wrap that does not open.
     func parsePayload(_ giftWrap: Event) async throws -> DirectMessagePayload
 
     /// Subscribes to the current user's gift-wrap stream on the whole pool, delivering each

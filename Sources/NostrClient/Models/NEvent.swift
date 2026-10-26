@@ -19,9 +19,12 @@ public struct NEvent: Sendable, Hashable {
     public let kind: Int?
 
     /// Creates an event reference.
-    /// - Throws: ``NostrError/invalidTLV`` if a relay hint's canonical form is longer than 255 bytes, or
-    ///   ``NostrError/invalidNIP19Entity`` if `kind` does not fit in a 32-bit unsigned integer.
-    public init(eventID: EventID, relays: [RelayURL] = [], author: PublicKey? = nil, kind: Int? = nil) throws {
+    /// - Throws: ``NIP19Entity/Error/fieldTooLong(_:)`` if a relay hint's canonical form is longer
+    ///   than 255 bytes, or ``NIP19Entity/Error/kindOutOfRange(_:)`` if `kind` does not fit in a
+    ///   32-bit unsigned integer.
+    public init(
+        eventID: EventID, relays: [RelayURL] = [], author: PublicKey? = nil, kind: Int? = nil
+    ) throws(NIP19Entity.Error) {
         self.eventID = eventID
         self.relays = try TLV.validatedRelays(relays)
         self.author = author
@@ -29,18 +32,25 @@ public struct NEvent: Sendable, Hashable {
     }
 
     /// Decodes an `nevent` bech32 string.
-    /// - Throws: ``NostrError/invalidNIP19Entity`` if the payload has no event id, or an event id or
-    ///   author that is not 32 bytes, besides the bech32 and TLV errors.
-    public init(bech32String: String) throws {
+    /// - Throws: ``NIP19Entity/Error/invalidBech32(_:)`` if the string is not valid bech32,
+    ///   ``NIP19Entity/Error/unexpectedPrefix(_:)`` if its prefix is not `nevent`,
+    ///   ``NIP19Entity/Error/malformedTLV`` if a record is truncated,
+    ///   ``NIP19Entity/Error/missingEventID`` if it has no event id, or
+    ///   ``NIP19Entity/Error/invalidLength(_:)`` if the event id or author is not 32 bytes or the
+    ///   kind is not 1–4 bytes.
+    public init(bech32String: String) throws(NIP19Entity.Error) {
         try self.init(tlvData: TLV.payload(fromBech32: bech32String, prefix: "nevent"))
     }
 
     /// Builds an `nevent` reference from a known event, capturing its id, author, and kind.
-    public init(event: Event, relays: [RelayURL] = []) throws {
+    /// - Throws: ``NIP19Entity/Error/fieldTooLong(_:)`` if a relay hint's canonical form is longer
+    ///   than 255 bytes, or ``NIP19Entity/Error/kindOutOfRange(_:)`` if the event's kind does not
+    ///   fit in a 32-bit unsigned integer.
+    public init(event: Event, relays: [RelayURL] = []) throws(NIP19Entity.Error) {
         try self.init(eventID: event.id, relays: relays, author: event.publicKey, kind: event.kind.rawValue)
     }
 
-    init(tlvData: Data) throws {
+    init(tlvData: Data) throws(NIP19Entity.Error) {
         var eventID: EventID?
         var relays: [RelayURL] = []
         var author: PublicKey?
@@ -48,13 +58,13 @@ public struct NEvent: Sendable, Hashable {
         for record in try TLV.decode(tlvData) {
             switch record.type {
             case TLV.Kind.special.rawValue:
-                eventID = try TLV.eventID(record)
+                eventID = try TLV.eventID(record.value)
             case TLV.Kind.relay.rawValue:
                 if let relay = TLV.relay(record) {
                     relays.append(relay)
                 }
             case TLV.Kind.author.rawValue:
-                author = try TLV.publicKey(record)
+                author = try TLV.publicKey(record.value)
             case TLV.Kind.kind.rawValue:
                 kind = try TLV.decodeKind(record.value)
             default:
@@ -62,7 +72,7 @@ public struct NEvent: Sendable, Hashable {
             }
         }
         guard let eventID else {
-            throw NostrError.invalidNIP19Entity
+            throw .missingEventID
         }
         self.eventID = eventID
         self.relays = relays
@@ -72,7 +82,7 @@ public struct NEvent: Sendable, Hashable {
 
     /// The canonical `nevent` bech32 string.
     public var encoded: String {
-        get throws {
+        get throws(NIP19Entity.Error) {
             var records = [TLV.specialRecord(eventID)] + TLV.relayRecords(relays)
             if let author {
                 records.append(TLV.authorRecord(author))

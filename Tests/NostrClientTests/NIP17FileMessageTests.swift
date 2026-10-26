@@ -25,20 +25,48 @@ struct NIP17FileMessageTests {
         #expect(decrypted == data)
     }
 
-    @Test("decrypt with the wrong key fails")
+    @Test("decrypt with the wrong key fails authentication")
     func decryptWrongKeyFails() throws {
         let encrypted = try EncryptedFile.encrypt(Data("secret".utf8))
-        #expect(throws: NostrError.decryptionFailed) {
+        #expect(throws: EncryptedFile.Error.authenticationFailed) {
             _ = try EncryptedFile.decrypt(
                 encrypted.ciphertext, key: Data(repeating: 0, count: 32), nonce: encrypted.nonce)
         }
     }
 
+    @Test("decrypt of a tampered blob fails authentication")
+    func decryptTamperedFails() throws {
+        let encrypted = try EncryptedFile.encrypt(Data("secret".utf8))
+        var tampered = encrypted.ciphertext
+        tampered[tampered.startIndex] ^= 0x01
+        #expect(throws: EncryptedFile.Error.authenticationFailed) {
+            _ = try EncryptedFile.decrypt(tampered, key: encrypted.key, nonce: encrypted.nonce)
+        }
+    }
+
     @Test("decrypt rejects a truncated blob")
     func decryptTruncatedFails() {
-        #expect(throws: NostrError.decryptionFailed) {
+        #expect(throws: EncryptedFile.Error.truncated) {
             _ = try EncryptedFile.decrypt(
                 Data([1, 2, 3]), key: Data(repeating: 0, count: 32), nonce: Data(repeating: 0, count: 12))
+        }
+    }
+
+    @Test("decrypt rejects a key that is not 32 bytes")
+    func decryptWrongKeyLengthFails() throws {
+        let encrypted = try EncryptedFile.encrypt(Data("secret".utf8))
+        #expect(throws: EncryptedFile.Error.invalidKeyLength(16)) {
+            _ = try EncryptedFile.decrypt(
+                encrypted.ciphertext, key: encrypted.key.prefix(16), nonce: encrypted.nonce)
+        }
+    }
+
+    @Test("decrypt rejects a nonce that is not 12 bytes")
+    func decryptWrongNonceLengthFails() throws {
+        let encrypted = try EncryptedFile.encrypt(Data("secret".utf8))
+        #expect(throws: EncryptedFile.Error.invalidNonceLength(16)) {
+            _ = try EncryptedFile.decrypt(
+                encrypted.ciphertext, key: encrypted.key, nonce: Data(repeating: 0, count: 16))
         }
     }
 
@@ -144,8 +172,12 @@ struct NIP17FileMessageTests {
             url: "u", mimeType: "image/png", encryption: encrypted, to: recipient.publicKey)
 
         let parser = DirectMessageParser(signer: EventSigner(keyPair: recipient))
-        await #expect(throws: NostrError.self) { try await parser.parseFileMessage(message.recipientGiftWrap) }
-        await #expect(throws: NostrError.self) { try await parser.parse(file.recipientGiftWrap) }
+        await #expect(throws: DirectMessagePayload.Error.unexpectedKind(.privateDirectMessage)) {
+            try await parser.parseFileMessage(message.recipientGiftWrap)
+        }
+        await #expect(throws: DirectMessagePayload.Error.unexpectedKind(.fileMessage)) {
+            try await parser.parse(file.recipientGiftWrap)
+        }
     }
 
     @Test("a file message without a decryption key is rejected")
@@ -162,7 +194,7 @@ struct NIP17FileMessageTests {
         let giftWrap = try await GiftWrap.wrap(
             event: rumor, signer: EventSigner(keyPair: sender), recipientPublicKey: recipient.publicKey)
 
-        await #expect(throws: NostrError.self) {
+        await #expect(throws: DirectMessagePayload.Error.invalidDecryptionKey) {
             try await DirectMessageParser(signer: EventSigner(keyPair: recipient)).parseFileMessage(giftWrap)
         }
     }
@@ -177,7 +209,21 @@ struct NIP17FileMessageTests {
             sender: sender, recipient: recipient, url: "https://files.example.com/1",
             key: Data(repeating: 0, count: 16), nonce: Data(repeating: 0, count: 12))
 
-        await #expect(throws: NostrError.self) {
+        await #expect(throws: DirectMessagePayload.Error.invalidDecryptionKey) {
+            try await DirectMessageParser(signer: EventSigner(keyPair: recipient)).parseFileMessage(giftWrap)
+        }
+    }
+
+    @Test("a file message with a wrong-length nonce is rejected")
+    func fileWithBadNonceLengthRejected() async throws {
+        let sender = try KeyPair()
+        let recipient = try KeyPair()
+
+        let giftWrap = try await Self.wrapFileRumor(
+            sender: sender, recipient: recipient, url: "https://files.example.com/1",
+            key: Data(repeating: 0, count: 32), nonce: Data(repeating: 0, count: 16))
+
+        await #expect(throws: DirectMessagePayload.Error.invalidDecryptionNonce) {
             try await DirectMessageParser(signer: EventSigner(keyPair: recipient)).parseFileMessage(giftWrap)
         }
     }
@@ -191,7 +237,7 @@ struct NIP17FileMessageTests {
             sender: sender, recipient: recipient, url: "",
             key: Data(repeating: 0, count: 32), nonce: Data(repeating: 0, count: 12))
 
-        await #expect(throws: NostrError.self) {
+        await #expect(throws: DirectMessagePayload.Error.missingFileURL) {
             try await DirectMessageParser(signer: EventSigner(keyPair: recipient)).parseFileMessage(giftWrap)
         }
     }

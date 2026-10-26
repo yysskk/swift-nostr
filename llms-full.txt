@@ -1032,6 +1032,11 @@ print(unwrapped.senderPublicKey)  // original sender
 print(unwrapped.event)         // original event
 ```
 
+`unwrap` throws `GiftWrap.Error` for an event it must reject: `unexpectedKind(Event.Kind)` (the wrap
+is not kind 1059 or its seal not kind 13), `invalidSealSignature`, `authorMismatch` (the rumor names
+another author than the seal), or `invalidRumorID` (the rumor's id is not its hash) — besides the
+seal's `Event.VerificationError` and what the recipient's signer throws when a layer does not open.
+
 ## DirectMessage
 
 NIP-17 Private Direct Message (struct: Sendable, Identifiable, Hashable).
@@ -1087,6 +1092,12 @@ let parser = DirectMessageParser(signer: EventSigner(keyPair: recipientKeyPair))
 let dm = try await parser.parse(giftWrapEvent)
 print(dm.content)
 ```
+
+A rumor that is not the payload being read, or is malformed, throws `DirectMessagePayload.Error`:
+`unexpectedKind(Event.Kind)`, `invalidRecipient` (a `p` tag that is not a hex key),
+`missingReactionTarget`, `missingFileURL`, `invalidDecryptionKey`, or `invalidDecryptionNonce`.
+The `client.messages` `parse`, `parseReaction`, and `parseFile` helpers throw `unexpectedKind` when
+the gift wrap carries another payload.
 
 ## Contact
 
@@ -1204,7 +1215,7 @@ let publicView = try NostrListSet(event: event)
 
 // Without a client: build the event with any signer, and decrypt the private items with the author's signer.
 let setEvent = try await signer.sign(EventTemplate.set(set, encryptingWith: signer))
-let opened = try await NostrListSet(event: setEvent, decryptingWith: signer)  // also throws invalidData without a d tag
+let opened = try await NostrListSet(event: setEvent, decryptingWith: signer)  // also throws NostrListSet.Error.missingIdentifier without a d tag
 ```
 
 ## LongFormContent
@@ -1359,6 +1370,10 @@ let fromNaddr = try GroupReference(naddr: naddr, inviteCode: "A7fjq2")  // kind 
 let link = try group.shareableString()  // naddr + "?invite=<code>", round-trips the code
 let coord = try group.naddr()           // throws without relayPublicKey
 ```
+
+These throw `GroupReference.Error`: `invalidCoordinate(NIP19Entity.Error)` (the string does not
+decode as an `naddr`), `unexpectedKind(Event.Kind)` (not kind 39000), `missingRelay` (no valid relay
+hint), or `unknownRelayPublicKey` (`naddr()` / `shareableString()` without `relayPublicKey`).
 
 ## GroupState
 
@@ -1649,15 +1664,24 @@ Both throw `Bech32.Error`: `invalidHumanReadablePart`, `mixedCase`, `missingSepa
 
 A NIP-19 bech32-encoded entity (enum: Sendable, Hashable). Cases: `npub(PublicKey)`, `nsec(String)` (hex private key), `note(EventID)`, `nprofile(NProfile)`, `nevent(NEvent)`, `naddr(NAddr)`.
 
-- `static func decode(_ bech32String: String) throws -> NIP19Entity` -- decode any bech32 entity; a key or id payload that is not 32 bytes throws `invalidNIP19Entity`
-- `var encoded: String { get throws }` -- canonical bech32 string
+- `static func decode(_ bech32String: String) throws(NIP19Entity.Error) -> NIP19Entity` -- decode any bech32 entity
+- `var encoded: String { get throws(NIP19Entity.Error) }` -- canonical bech32 string
 
 The TLV entities hold typed values: `NProfile(publicKey: PublicKey, relays:)`,
 `NEvent(eventID: EventID, relays:, author: PublicKey?, kind: Int?)` (or `NEvent(event:relays:)`), and
 `NAddr(identifier:author: PublicKey, kind:relays:)` (or `NAddr(event:relays:)`); each also has
 `init(bech32String:)` and `encoded`. Relay hints are `[RelayURL]`: decoding skips a TLV relay
 record that is not a valid relay URL, and encoding writes each hint in canonical form.
-- `init(nostrURI: String) throws` -- decode a NIP-21 `nostr:` URI (case-insensitive scheme, tolerates `nostr://`, rejects `nsec`)
+- `init(nostrURI: String) throws(NIP19Entity.Error)` -- decode a NIP-21 `nostr:` URI (case-insensitive scheme, tolerates `nostr://`, rejects `nsec`)
+
+Decoding, encoding, and the entity initializers throw `NIP19Entity.Error`: `invalidBech32(Bech32.Error)`,
+`unknownPrefix(String)` (not a NIP-19 prefix), `unexpectedPrefix(String)` (another entity's prefix
+given to `NProfile`/`NEvent`/`NAddr(bech32String:)`), `malformedTLV` (a truncated record),
+`missingPublicKey` / `missingEventID` / `missingIdentifier` / `missingAuthor` / `missingKind` (a
+required TLV record is absent), `invalidLength(Int)` (a key or id that is not 32 bytes, a kind that
+is not 1-4 bytes), `fieldTooLong(Int)` (over the 255 bytes a TLV record holds), `kindOutOfRange(Int)`,
+`invalidHex` (an `nsec` case holding non-hex), `missingNostrScheme`, and `privateKeyInURI` (an `nsec`
+in a `nostr:` URI).
 - `var nostrURI: String { get throws }` -- canonical `nostr:` URI (no `//`, throws for `nsec`)
 
 ```swift
@@ -1781,7 +1805,7 @@ for await challenge in await signer.authChallenges() {
 
 Error types (enum: Error, LocalizedError, Sendable, Equatable).
 
-Cases: `invalidEventID`, `signerNotSet`, `verificationFailed`, `serializationFailed`, `invalidData`, `connectionFailed(String)`, `notConnected`, `relayError(String)`, `noRelaysInPool`, `noMatchingRelays([RelayURL])`, `authenticationFailed(String)`, `cannotPublishAuthenticationEvent`, `timeout`, `unknownPrefix(String)`, `invalidTLV`, `invalidNIP19Entity`, `invalidNostrURI`, `decryptionFailed`.
+Cases: `signerNotSet`, `connectionFailed(String)`, `notConnected`, `relayError(String)`, `noRelaysInPool`, `noMatchingRelays([RelayURL])`, `authenticationFailed(String)`, `cannotPublishAuthenticationEvent`, `timeout`.
 
 ## Supported NIPs
 

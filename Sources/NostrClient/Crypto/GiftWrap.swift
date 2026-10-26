@@ -82,18 +82,19 @@ public struct GiftWrap: Sendable {
     ///   - giftWrap: The gift-wrapped event
     ///   - recipient: The recipient's signer, local or remote
     /// - Returns: The unwrapped message containing sender and original event
-    /// - Throws: ``NostrError/invalidData`` if the layers are not the expected kinds,
-    ///   ``NostrError/verificationFailed`` if the seal's signature does not verify or the rumor
-    ///   claims a different author, ``Event/VerificationError`` if the seal's id does not match its
-    ///   contents or it is unsigned, ``NostrError/invalidEventID`` if the rumor's id is not the
-    ///   hash of its contents, or what `recipient` throws when a NIP-44 layer does not open
-    ///   (``SealedMessage/Error`` for a local signer).
+    /// - Throws: ``GiftWrap/Error/unexpectedKind(_:)`` if the wrap is not kind 1059 or its seal is
+    ///   not kind 13, ``GiftWrap/Error/invalidSealSignature`` if the seal's signature does not
+    ///   verify, ``Event/VerificationError`` if the seal's id does not match its contents or it is
+    ///   unsigned, ``GiftWrap/Error/invalidRumorID`` if the rumor's id is not the hash of its
+    ///   contents, ``GiftWrap/Error/authorMismatch`` if the rumor claims a different author than
+    ///   the seal, a `DecodingError` if a layer is not an event, or what `recipient` throws when a
+    ///   NIP-44 layer does not open (``SealedMessage/Error`` for a local signer).
     public static func unwrap(
         giftWrap: Event,
         recipient: any NostrSigning
     ) async throws -> UnwrappedMessage {
         guard giftWrap.kind == .giftWrap else {
-            throw NostrError.invalidData
+            throw Error.unexpectedKind(giftWrap.kind)
         }
 
         // 1. Open gift wrap to get seal
@@ -101,12 +102,12 @@ public struct GiftWrap: Sendable {
         let seal = try decodeSeal(sealJson)
 
         guard seal.kind == .seal else {
-            throw NostrError.invalidData
+            throw Error.unexpectedKind(seal.kind)
         }
 
         // Verify seal signature
         guard try seal.verify() else {
-            throw NostrError.verificationFailed
+            throw Error.invalidSealSignature
         }
 
         // 2. Open seal to get rumor
@@ -118,7 +119,7 @@ public struct GiftWrap: Sendable {
         // The seal's signature proves only who sealed it; the rumor inside is unsigned by design,
         // so without this the author it names is whatever the sealer chose to write.
         guard rumor.publicKey == seal.publicKey else {
-            throw NostrError.verificationFailed
+            throw Error.authorMismatch
         }
 
         // 3. Return the unwrapped message
@@ -144,12 +145,8 @@ public struct GiftWrap: Sendable {
 
     /// Encodes a rumor to JSON string
     private static func encodeRumor(_ rumor: Rumor) throws -> String {
-        let encoder = JSONEncoder()
-        let data = try encoder.encode(rumor)
-        guard let json = String(data: data, encoding: .utf8) else {
-            throw NostrError.serializationFailed
-        }
-        return json
+        let data = try JSONEncoder().encode(rumor)
+        return String(decoding: data, as: UTF8.self)
     }
 
     /// Decodes a rumor from JSON string, checking that its id is the hash of its own contents.
@@ -173,7 +170,7 @@ public struct GiftWrap: Sendable {
         )
 
         guard rumor.id == (try unsigned.computedID) else {
-            throw NostrError.invalidEventID
+            throw Error.invalidRumorID
         }
 
         // Convert rumor back to Event (without a signature since it's a rumor)
@@ -190,12 +187,8 @@ public struct GiftWrap: Sendable {
 
     /// Encodes a seal to JSON string
     private static func encodeSeal(_ seal: Event) throws -> String {
-        let encoder = JSONEncoder()
-        let data = try encoder.encode(seal)
-        guard let json = String(data: data, encoding: .utf8) else {
-            throw NostrError.serializationFailed
-        }
-        return json
+        let data = try JSONEncoder().encode(seal)
+        return String(decoding: data, as: UTF8.self)
     }
 
     /// Decodes a seal from JSON string
@@ -210,6 +203,33 @@ public struct GiftWrap: Sendable {
         let window: Duration = .seconds(2 * 24 * 60 * 60)
         let offset = Int64.random(in: 0...window.components.seconds)
         return Timestamp.now.advanced(by: .seconds(-offset))
+    }
+
+    /// An error unwrapping a NIP-59 gift wrap.
+    public enum Error: Swift.Error, LocalizedError, Sendable, Equatable {
+        /// A layer is not the kind it must be: the wrap kind 1059, or the seal inside it kind 13
+        /// (payload: the kind found).
+        case unexpectedKind(Event.Kind)
+        /// The seal's signature does not verify against its author.
+        case invalidSealSignature
+        /// The rumor names a different author than the seal that carries it, which would let a
+        /// sender impersonate someone else.
+        case authorMismatch
+        /// The rumor's id is not the hash of its contents.
+        case invalidRumorID
+
+        public var errorDescription: String? {
+            switch self {
+            case .unexpectedKind(let kind):
+                return "Unexpected kind \(kind.rawValue) in a gift wrap"
+            case .invalidSealSignature:
+                return "The gift wrap's seal signature does not verify"
+            case .authorMismatch:
+                return "The gift wrap's rumor names a different author than its seal"
+            case .invalidRumorID:
+                return "The gift wrap's rumor id does not match its contents"
+            }
+        }
     }
 }
 

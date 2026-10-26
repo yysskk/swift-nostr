@@ -39,7 +39,7 @@ struct GroupReferenceTests {
     @Test("an naddr of any other kind is rejected")
     func rejectsWrongKind() throws {
         let naddr = try groupNAddr(kind: 30023)
-        #expect(throws: NostrError.invalidNIP19Entity) {
+        #expect(throws: GroupReference.Error.unexpectedKind(.longFormContent)) {
             _ = try GroupReference(naddr: naddr)
         }
     }
@@ -52,12 +52,20 @@ struct GroupReferenceTests {
 
     @Test("an naddr without a valid relay hint is rejected")
     func rejectsMissingRelayHints() throws {
-        #expect(throws: NostrError.invalidNIP19Entity) {
+        #expect(throws: GroupReference.Error.missingRelay) {
             _ = try GroupReference(naddr: self.groupNAddr(relays: []))
         }
         let malformedOnly = try rawGroupNAddr(relays: ["", "https://groups.example.com"])
-        #expect(throws: NostrError.invalidNIP19Entity) {
+        #expect(throws: GroupReference.Error.missingRelay) {
             _ = try GroupReference(naddrString: malformedOnly)
+        }
+    }
+
+    @Test("a share link that is not an naddr is rejected as an invalid coordinate")
+    func rejectsUndecodableCoordinate() throws {
+        let nprofile = try NProfile(publicKey: relayPublicKey).encoded
+        #expect(throws: GroupReference.Error.invalidCoordinate(.unexpectedPrefix("nprofile"))) {
+            _ = try GroupReference(naddrString: nprofile + "?invite=A7fjq2")
         }
     }
 
@@ -111,10 +119,10 @@ struct GroupReferenceTests {
     @Test("naddr() requires the relay public key")
     func naddrRequiresRelayPublicKey() throws {
         let reference = GroupReference(relayURL: RelayURL("wss://groups.example.com")!, id: "abcdef")
-        #expect(throws: NostrError.invalidNIP19Entity) {
+        #expect(throws: GroupReference.Error.unknownRelayPublicKey) {
             _ = try reference.naddr()
         }
-        #expect(throws: NostrError.invalidNIP19Entity) {
+        #expect(throws: GroupReference.Error.unknownRelayPublicKey) {
             _ = try reference.shareableString()
         }
     }

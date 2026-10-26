@@ -36,16 +36,16 @@ struct NIP51SetTests {
 
     // MARK: - init validation
 
-    @Test("init throws for a non-addressable kind")
+    @Test("init throws invalidKind for a non-addressable kind")
     func initRejectsNonAddressableKind() {
-        #expect(throws: (any Error).self) {
+        #expect(throws: NostrListSet.Error.invalidKind(.textNote)) {
             try NostrListSet(kind: .textNote, identifier: "d")
         }
     }
 
-    @Test("init throws for an empty identifier")
+    @Test("init throws missingIdentifier for an empty identifier")
     func initRejectsEmptyIdentifier() {
-        #expect(throws: (any Error).self) {
+        #expect(throws: NostrListSet.Error.missingIdentifier) {
             try NostrListSet(kind: .bookmarkSet, identifier: "")
         }
     }
@@ -182,33 +182,33 @@ struct NIP51SetTests {
         }
     }
 
-    @Test("init(event:decryptingWith:) throws invalidData when there is no d tag, before decrypting")
+    @Test("init(event:decryptingWith:) throws missingIdentifier when there is no d tag, before decrypting")
     func decryptingInitRequiresIdentifier() async throws {
         let signer = EventSigner(keyPair: try KeyPair())
         let content = try signer.nip44Encrypt(#"[["t","secret"]]"#, to: signer.publicKey)
         let event = try await signer.sign(
             EventTemplate(kind: .bookmarkSet, tags: [.hashtag("nostr")], content: content))
 
-        await #expect(throws: NostrError.invalidData) {
+        await #expect(throws: NostrListSet.Error.missingIdentifier) {
             try await NostrListSet(event: event, decryptingWith: FailingSigner())
         }
     }
 
-    @Test("Content that decrypts to something other than a tag array throws decryptionFailed")
+    @Test("Content that decrypts to something other than a tag array throws malformedPrivateItems")
     func nonTagArrayContentThrows() async throws {
         let signer = EventSigner(keyPair: try KeyPair())
         let content = try signer.nip44Encrypt(#"{"not":"a tag array"}"#, to: signer.publicKey)
         let event = try await signer.sign(
             EventTemplate(kind: .bookmarkSet, tags: [.identifier("reading")], content: content))
 
-        await #expect(throws: NostrError.decryptionFailed) {
+        await #expect(throws: NostrListSet.Error.malformedPrivateItems) {
             try await NostrListSet(event: event, decryptingWith: signer)
         }
     }
 
     // MARK: - init(event:)
 
-    @Test("init(event:) throws when there is no d tag")
+    @Test("init(event:) throws missingIdentifier when there is no d tag")
     func eventInitRequiresIdentifier() throws {
         let signer = EventSigner(keyPair: try KeyPair())
         let event = try signer.sign(
@@ -216,7 +216,7 @@ struct NIP51SetTests {
                 publicKey: signer.publicKey, kind: .bookmarkSet, tags: [.hashtag("nostr")], content: ""
             )
         )
-        #expect(throws: (any Error).self) {
+        #expect(throws: NostrListSet.Error.missingIdentifier) {
             try NostrListSet(event: event)
         }
     }

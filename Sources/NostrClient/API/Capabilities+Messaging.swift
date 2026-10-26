@@ -173,11 +173,12 @@ extension NostrMessaging {
     /// Unwraps a received gift wrap as a direct message (kind 14).
     /// - Parameter giftWrap: The gift-wrapped event.
     /// - Returns: The message.
-    /// - Throws: ``NostrError/invalidData`` when the gift wrap carries another payload, or the errors
-    ///   of ``NostrMessaging/parsePayload(_:)``.
+    /// - Throws: ``DirectMessagePayload/Error/unexpectedKind(_:)`` when the gift wrap carries another
+    ///   payload, or the errors of ``NostrMessaging/parsePayload(_:)``.
     public func parse(_ giftWrap: Event) async throws -> DirectMessage {
-        guard case .message(let message) = try await parsePayload(giftWrap) else {
-            throw NostrError.invalidData
+        let payload = try await parsePayload(giftWrap)
+        guard case .message(let message) = payload else {
+            throw DirectMessagePayload.Error.unexpectedKind(payload.kind)
         }
         return message
     }
@@ -185,11 +186,12 @@ extension NostrMessaging {
     /// Unwraps a received gift wrap as a NIP-25 reaction to a direct message (kind 7).
     /// - Parameter giftWrap: The gift-wrapped event.
     /// - Returns: The reaction.
-    /// - Throws: ``NostrError/invalidData`` when the gift wrap carries another payload, or the errors
-    ///   of ``NostrMessaging/parsePayload(_:)``.
+    /// - Throws: ``DirectMessagePayload/Error/unexpectedKind(_:)`` when the gift wrap carries another
+    ///   payload, or the errors of ``NostrMessaging/parsePayload(_:)``.
     public func parseReaction(_ giftWrap: Event) async throws -> DirectMessageReaction {
-        guard case .reaction(let reaction) = try await parsePayload(giftWrap) else {
-            throw NostrError.invalidData
+        let payload = try await parsePayload(giftWrap)
+        guard case .reaction(let reaction) = payload else {
+            throw DirectMessagePayload.Error.unexpectedKind(payload.kind)
         }
         return reaction
     }
@@ -197,11 +199,12 @@ extension NostrMessaging {
     /// Unwraps a received gift wrap as a NIP-17 file message (kind 15).
     /// - Parameter giftWrap: The gift-wrapped event.
     /// - Returns: The file message.
-    /// - Throws: ``NostrError/invalidData`` when the gift wrap carries another payload, or the errors
-    ///   of ``NostrMessaging/parsePayload(_:)``.
+    /// - Throws: ``DirectMessagePayload/Error/unexpectedKind(_:)`` when the gift wrap carries another
+    ///   payload, or the errors of ``NostrMessaging/parsePayload(_:)``.
     public func parseFile(_ giftWrap: Event) async throws -> DirectMessageFile {
-        guard case .file(let file) = try await parsePayload(giftWrap) else {
-            throw NostrError.invalidData
+        let payload = try await parsePayload(giftWrap)
+        guard case .file(let file) = payload else {
+            throw DirectMessagePayload.Error.unexpectedKind(payload.kind)
         }
         return file
     }

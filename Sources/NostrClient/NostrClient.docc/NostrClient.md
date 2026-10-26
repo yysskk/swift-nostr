@@ -182,3 +182,14 @@ add NIP helpers and namespaces of your own; see <doc:ExtendingTheClient>.
 
 - ``InternetIdentifier``
 - ``OpenTimestamps``
+
+### Errors
+
+- ``NIP19Entity/Error``
+- ``GiftWrap/Error``
+- ``DirectMessagePayload/Error``
+- ``EncryptedFile/Error``
+- ``NostrList/Error``
+- ``NostrListSet/Error``
+- ``SimpleGroupList/Error``
+- ``GroupReference/Error``

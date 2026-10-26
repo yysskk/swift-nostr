@@ -51,13 +51,15 @@ public struct GroupReference: Sendable, Hashable {
     /// - Parameters:
     ///   - naddr: The coordinate of the group's kind-39000 metadata event.
     ///   - inviteCode: An invite code shared alongside the coordinate, if any.
-    /// - Throws: ``NostrError/invalidNIP19Entity`` unless the coordinate's kind is 39000 and
-    ///   it carries at least one valid relay hint — a group without a relay is unusable.
-    public init(naddr: NAddr, inviteCode: String? = nil) throws {
-        guard naddr.kind == Event.Kind.groupMetadata.rawValue,
-            let relayURL = naddr.relays.first
-        else {
-            throw NostrError.invalidNIP19Entity
+    /// - Throws: ``GroupReference/Error/unexpectedKind(_:)`` unless the coordinate's kind is
+    ///   39000, or ``GroupReference/Error/missingRelay`` unless it carries at least one valid relay
+    ///   hint — a group without a relay is unusable.
+    public init(naddr: NAddr, inviteCode: String? = nil) throws(GroupReference.Error) {
+        guard naddr.kind == Event.Kind.groupMetadata.rawValue else {
+            throw .unexpectedKind(Event.Kind(rawValue: naddr.kind))
+        }
+        guard let relayURL = naddr.relays.first else {
+            throw .missingRelay
         }
         self.init(relayURL: relayURL, id: naddr.identifier, relayPublicKey: naddr.author, inviteCode: inviteCode)
     }
@@ -69,13 +71,19 @@ public struct GroupReference: Sendable, Hashable {
     /// read URL-style, so a percent-encoded invite code is decoded, with the raw value kept
     /// when the query does not parse as URL components.
     ///
-    /// - Throws: A ``Bech32/Error`` or TLV error when the coordinate does not
-    ///   decode, or ``NostrError/invalidNIP19Entity`` when it is not a usable kind-39000
-    ///   group coordinate (see ``init(naddr:inviteCode:)``).
-    public init(naddrString: String) throws {
+    /// - Throws: ``GroupReference/Error/invalidCoordinate(_:)`` when the coordinate does not
+    ///   decode as an `naddr`, or the errors of ``init(naddr:inviteCode:)`` when it is not a usable
+    ///   kind-39000 group coordinate.
+    public init(naddrString: String) throws(GroupReference.Error) {
         let parts = naddrString.split(separator: "?", maxSplits: 1, omittingEmptySubsequences: false)
         let inviteCode = parts.count == 2 ? Self.inviteCode(fromQuery: String(parts[1])) : nil
-        try self.init(naddr: NAddr(bech32String: String(parts[0])), inviteCode: inviteCode)
+        let naddr: NAddr
+        do throws(NIP19Entity.Error) {
+            naddr = try NAddr(bech32String: String(parts[0]))
+        } catch {
+            throw .invalidCoordinate(error)
+        }
+        try self.init(naddr: naddr, inviteCode: inviteCode)
     }
 
     /// The "invite" value of a share-link query string, percent-decoded when the query
@@ -96,28 +104,66 @@ public struct GroupReference: Sendable, Hashable {
     /// The coordinate of the group's kind-39000 metadata event: identifier = ``id``,
     /// author = ``relayPublicKey``, with ``relayURL`` as the single relay hint.
     ///
-    /// - Throws: ``NostrError/invalidNIP19Entity`` when ``relayPublicKey`` is unknown — an
-    ///   `naddr` cannot be built without its author.
-    public func naddr() throws -> NAddr {
+    /// - Throws: ``GroupReference/Error/unknownRelayPublicKey`` when ``relayPublicKey`` is
+    ///   unknown — an `naddr` cannot be built without its author — or
+    ///   ``GroupReference/Error/invalidCoordinate(_:)`` when ``relayURL`` is too long for one.
+    public func naddr() throws(GroupReference.Error) -> NAddr {
         guard let relayPublicKey else {
-            throw NostrError.invalidNIP19Entity
+            throw .unknownRelayPublicKey
         }
-        return try NAddr(
-            identifier: id,
-            author: relayPublicKey,
-            kind: Event.Kind.groupMetadata.rawValue,
-            relays: [relayURL]
-        )
+        do throws(NIP19Entity.Error) {
+            return try NAddr(
+                identifier: id,
+                author: relayPublicKey,
+                kind: Event.Kind.groupMetadata.rawValue,
+                relays: [relayURL]
+            )
+        } catch {
+            throw .invalidCoordinate(error)
+        }
     }
 
     /// The shareable string: the ``naddr()`` coordinate, plus "?invite=<code>" when
     /// ``inviteCode`` is set (the code percent-encoded so ``init(naddrString:)`` round-trips it).
     ///
-    /// - Throws: ``NostrError/invalidNIP19Entity`` when ``relayPublicKey`` is unknown.
-    public func shareableString() throws -> String {
-        let encoded = try naddr().encoded
+    /// - Throws: ``GroupReference/Error/unknownRelayPublicKey`` when ``relayPublicKey`` is unknown,
+    ///   or ``GroupReference/Error/invalidCoordinate(_:)`` when the coordinate does not encode.
+    public func shareableString() throws(GroupReference.Error) -> String {
+        let coordinate = try naddr()
+        let encoded: String
+        do throws(NIP19Entity.Error) {
+            encoded = try coordinate.encoded
+        } catch {
+            throw .invalidCoordinate(error)
+        }
         guard let inviteCode else { return encoded }
         let code = inviteCode.addingPercentEncoding(withAllowedCharacters: Self.inviteCodeAllowed) ?? inviteCode
         return "\(encoded)?invite=\(code)"
+    }
+
+    /// An error building a group reference from, or encoding one as, an `naddr`.
+    public enum Error: Swift.Error, LocalizedError, Sendable, Equatable {
+        /// The coordinate does not decode or encode as an `naddr`.
+        case invalidCoordinate(NIP19Entity.Error)
+        /// The coordinate is not of a kind-39000 group metadata event (payload: its kind).
+        case unexpectedKind(Event.Kind)
+        /// The coordinate carries no valid relay hint, so the group's relay is unknown.
+        case missingRelay
+        /// ``GroupReference/relayPublicKey`` is unknown, so there is no author to address the
+        /// group's metadata by.
+        case unknownRelayPublicKey
+
+        public var errorDescription: String? {
+            switch self {
+            case .invalidCoordinate(let error):
+                return "Invalid group coordinate: \(error.errorDescription ?? "invalid naddr")"
+            case .unexpectedKind(let kind):
+                return "A group coordinate must be of kind 39000, got \(kind.rawValue)"
+            case .missingRelay:
+                return "A group coordinate must carry a relay hint"
+            case .unknownRelayPublicKey:
+                return "A group's naddr needs the relay's public key"
+            }
+        }
     }
 }

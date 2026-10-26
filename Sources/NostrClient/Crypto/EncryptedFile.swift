@@ -40,6 +40,12 @@ public struct EncryptedFile: Sendable, Hashable {
     /// The GCM authentication tag length, in bytes.
     private static let tagLength = 16
 
+    /// The AES-256 key length, in bytes.
+    private static let keyLength = 32
+
+    /// The GCM nonce length NIP-17 uses, in bytes.
+    private static let nonceLength = 12
+
     public init(ciphertext: Data, key: Data, nonce: Data, encryptedSHA256: String, originalSHA256: String) {
         self.ciphertext = ciphertext
         self.key = key
@@ -73,10 +79,20 @@ public struct EncryptedFile: Sendable, Hashable {
     ///   - key: The AES-256 key from the message's `decryption-key` tag.
     ///   - nonce: The GCM nonce from the message's `decryption-nonce` tag.
     /// - Returns: The decrypted plaintext file contents.
-    /// - Throws: ``NostrError/decryptionFailed`` if the blob is too short or authentication fails.
-    public static func decrypt(_ ciphertext: Data, key: Data, nonce: Data) throws -> Data {
+    /// - Throws: ``EncryptedFile/Error/invalidKeyLength(_:)`` if `key` is not 32 bytes,
+    ///   ``EncryptedFile/Error/invalidNonceLength(_:)`` if `nonce` is not 12 bytes,
+    ///   ``EncryptedFile/Error/truncated`` if the blob is shorter than the GCM tag, or
+    ///   ``EncryptedFile/Error/authenticationFailed`` if the blob does not authenticate under `key`
+    ///   and `nonce`.
+    public static func decrypt(_ ciphertext: Data, key: Data, nonce: Data) throws(EncryptedFile.Error) -> Data {
+        guard key.count == keyLength else {
+            throw .invalidKeyLength(key.count)
+        }
+        guard nonce.count == nonceLength else {
+            throw .invalidNonceLength(nonce.count)
+        }
         guard ciphertext.count >= tagLength else {
-            throw NostrError.decryptionFailed
+            throw .truncated
         }
         let body = ciphertext.prefix(ciphertext.count - tagLength)
         let tag = ciphertext.suffix(tagLength)
@@ -85,7 +101,35 @@ public struct EncryptedFile: Sendable, Hashable {
             let box = try AES.GCM.SealedBox(nonce: try AES.GCM.Nonce(data: nonce), ciphertext: body, tag: tag)
             return try AES.GCM.open(box, using: SymmetricKey(data: key))
         } catch {
-            throw NostrError.decryptionFailed
+            // The key, nonce, and tag lengths are checked above, so what is left is a blob that
+            // does not authenticate.
+            throw .authenticationFailed
+        }
+    }
+
+    /// An error decrypting a NIP-17 file blob.
+    public enum Error: Swift.Error, LocalizedError, Sendable, Equatable {
+        /// The key is not 32 bytes (payload: its byte count).
+        case invalidKeyLength(Int)
+        /// The nonce is not 12 bytes (payload: its byte count).
+        case invalidNonceLength(Int)
+        /// The blob is shorter than the 16-byte GCM authentication tag it must end with.
+        case truncated
+        /// The blob does not authenticate under the key and nonce: it was altered, or they are not
+        /// the ones it was encrypted with.
+        case authenticationFailed
+
+        public var errorDescription: String? {
+            switch self {
+            case .invalidKeyLength(let count):
+                return "A file decryption key must be 32 bytes, got \(count)"
+            case .invalidNonceLength(let count):
+                return "A file decryption nonce must be 12 bytes, got \(count)"
+            case .truncated:
+                return "An encrypted file must end with a 16-byte authentication tag"
+            case .authenticationFailed:
+                return "The encrypted file does not authenticate with this key and nonce"
+            }
         }
     }
 }
