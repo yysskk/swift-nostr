@@ -193,7 +193,7 @@ struct NostrSigningClientTests {
         #expect(published.event.kind == .muteList)
         #expect(!published.event.content.isEmpty)
         // Only the author's key opens the private items; the remote signer sealed them.
-        let opened = try EventSigner(keyPair: keyPair).openList(published.event)
+        let opened = try await NostrList(event: published.event, decryptingWith: EventSigner(keyPair: keyPair))
         #expect(opened.privateItems == list.privateItems)
         #expect(opened.publicItems == list.publicItems)
         await client.relays.disconnect()

@@ -81,7 +81,7 @@ struct EventTests {
     }
 
     @Test("Sign metadata event")
-    func signMetadata() throws {
+    func metadataEvent() throws {
         let keyPair = try KeyPair()
         let signer = EventSigner(keyPair: keyPair)
 
@@ -91,7 +91,7 @@ struct EventTests {
             picture: "https://example.com/avatar.png"
         )
 
-        let event = try signer.signMetadata(metadata)
+        let event = try signer.sign(.metadata(metadata))
 
         #expect(event.kind == 0)
         #expect(event.content.contains("TestUser"))

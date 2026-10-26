@@ -1,5 +1,6 @@
 import Foundation
 import NostrCore
+import NostrTestSupport
 import Testing
 
 @testable import NostrClient
@@ -33,27 +34,19 @@ struct OpenTimestampsTests {
         #expect(tag == ["ots", base64Data])
     }
 
-    @Test("Event with OpenTimestamps attestation")
+    @Test("A template's attestation is signed into the event and read back")
     func eventWithOTS() throws {
-        let keyPair = try KeyPair()
-        let signer = EventSigner(keyPair: keyPair)
-
+        let signer = EventSigner(keyPair: try KeyPair())
         let otsData = "dGVzdCBvdHMgZGF0YQ=="
-        let ots = OpenTimestamps(base64EncodedOTS: otsData)
 
-        let unsigned = UnsignedEvent(
-            publicKey: keyPair.publicKey,
-            kind: .textNote,
-            tags: [["t", "test"]],
-            content: "Test with OTS"
-        )
+        var template = EventTemplate.textNote("Test with OTS", tags: [.hashtag("test")])
+        template.openTimestamps = OpenTimestamps(base64EncodedOTS: otsData)
+        let event = try signer.sign(template)
 
-        let event = try signer.sign(unsigned, withOTS: ots)
-
+        #expect(event.tags == [["t", "test"], ["ots", otsData]])
         #expect(event.hasOpenTimestampsAttestation)
         #expect(event.openTimestamps?.otsData == otsData)
-        #expect(event.tags.contains { $0 == ["ots", otsData] })
-        #expect(event.tags.contains { $0 == ["t", "test"] })
+        #expect(try event.verify())
     }
 
     @Test("Event without OpenTimestamps attestation")
@@ -67,44 +60,47 @@ struct OpenTimestampsTests {
         #expect(event.openTimestamps == nil)
     }
 
-    @Test("UnsignedEvent withOpenTimestamps")
-    func unsignedEventWithOTS() throws {
-        let keyPair = try KeyPair()
-        let otsData = "dGVzdCBvdHM="
-        let ots = OpenTimestamps(base64EncodedOTS: otsData)
+    @Test("Setting openTimestamps appends an ots tag and keeps the rest of the template")
+    func templateSetsOTS() {
+        let ots = OpenTimestamps(base64EncodedOTS: "dGVzdCBvdHM=")
 
-        let unsigned = UnsignedEvent(
-            publicKey: keyPair.publicKey,
-            kind: .textNote,
-            tags: [["p", "somepublickey"]],
-            content: "Test content"
-        )
+        var template = EventTemplate.textNote("Test content", tags: [.publicKey(.fixture("someone"))])
+        #expect(template.openTimestamps == nil)
+        template.openTimestamps = ots
 
-        let withOTS = unsigned.withOpenTimestamps(ots)
-
-        #expect(withOTS.tags.contains { $0 == ["ots", otsData] })
-        #expect(withOTS.tags.contains { $0 == ["p", "somepublickey"] })
-        #expect(withOTS.content == unsigned.content)
-        #expect(withOTS.kind == unsigned.kind)
+        #expect(template.openTimestamps == ots)
+        #expect(template.tags == [.publicKey(.fixture("someone")), ots.tag])
+        #expect(template.content == "Test content")
+        #expect(template.kind == .textNote)
     }
 
-    @Test("withOpenTimestamps replaces existing OTS tag")
-    func replaceExistingOTS() throws {
-        let keyPair = try KeyPair()
+    @Test("Setting openTimestamps replaces an existing ots tag")
+    func replaceExistingOTS() {
         let newOTS = OpenTimestamps(base64EncodedOTS: "bmV3")
 
-        let unsigned = UnsignedEvent(
-            publicKey: keyPair.publicKey,
+        var template = EventTemplate(
             kind: .textNote,
-            tags: [["ots", "b2xk"], ["t", "test"]],
+            tags: [Tag(name: "ots", values: ["b2xk"]), .hashtag("test")],
             content: "Test content"
         )
+        #expect(template.openTimestamps?.otsData == "b2xk")
+        template.openTimestamps = newOTS
 
-        let withNewOTS = unsigned.withOpenTimestamps(newOTS)
+        #expect(template.tags == [.hashtag("test"), Tag(name: "ots", values: ["bmV3"])])
+        #expect(template.openTimestamps == newOTS)
+    }
 
-        let otsTags = withNewOTS.tags.filter { $0.first == "ots" }
-        #expect(otsTags.count == 1)
-        #expect(otsTags.first == ["ots", "bmV3"])
+    @Test("Setting openTimestamps to nil removes the ots tag")
+    func removeOTS() {
+        var template = EventTemplate(
+            kind: .textNote,
+            tags: [.hashtag("test"), Tag(name: "ots", values: ["b2xk"])],
+            content: "Test content"
+        )
+        template.openTimestamps = nil
+
+        #expect(template.tags == [.hashtag("test")])
+        #expect(template.openTimestamps == nil)
     }
 
     @Test("OpenTimestamps equality")

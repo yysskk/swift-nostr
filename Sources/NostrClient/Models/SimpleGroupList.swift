@@ -71,8 +71,8 @@ public struct GroupListEntry: Sendable, Hashable {
 /// forks.
 ///
 /// A typed view over ``NostrList``: convert with ``init(list:)`` and ``list``, and private
-/// entries ride the existing NIP-44 machinery (``EventSigner/signList(_:)`` /
-/// ``EventSigner/openList(_:)``). Publish and fetch through
+/// entries ride the existing NIP-44 machinery (``EventTemplate/list(_:encryptingWith:)`` /
+/// ``NostrList/init(event:decryptingWith:)``). Publish and fetch through
 /// ``NostrGroupsAPI/publishSimpleGroupList(_:strategy:)`` and
 /// ``NostrGroupsAPI/fetchSimpleGroupList(for:timeout:)``.
 ///

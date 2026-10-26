@@ -472,6 +472,22 @@ let remote = try await bunker.sign(.textNote("gm"))         // any NostrSigning:
 let unsigned = UnsignedEvent(note, publicKey: pk)            // the template under an explicit key
 ```
 
+NostrClient adds factories for its models:
+
+```swift
+try EventTemplate.metadata(UserMetadata(name: "Alice"))      // kind 0, JSON content; throws EncodingError
+EventTemplate.contactList([Contact(publicKey: alice)])       // kind 3, one p tag per contact (NIP-02)
+EventTemplate.relayListMetadata(RelayListMetadata(read: [inbox], write: [outbox]))  // kind 10002, r tags (NIP-65)
+EventTemplate.directMessageRelayList(DirectMessageRelayList(relays: [inbox]))      // kind 10050, relay tags (NIP-17)
+EventTemplate.report(author, type: .impersonation, reason: "")  // kind 1984, type on the p tag (NIP-56)
+EventTemplate.report(event, type: .illegal, reason: "")      // type on the e tag + bare p tag for the author
+EventTemplate.longFormContent(article, draft: false)         // kind 30023 / 30024 draft; stamps a nil publishedAt (NIP-23)
+// NIP-51: the signer NIP-44-encrypts the private items to itself (empty content when there are none)
+try await EventTemplate.list(list, encryptingWith: signer)
+try await EventTemplate.set(set, encryptingWith: signer)
+note.openTimestamps = OpenTimestamps(otsFileData: data)      // replaces the ots tag (NIP-03); nil removes it
+```
+
 ## UnsignedEvent
 
 Event before signing (struct: Sendable). Same fields as Event minus `id` and `signature`;
@@ -774,15 +790,10 @@ let signer = try EventSigner(nsec: "nsec1...")
 ```swift
 let note = try signer.sign(.textNote("Hello"))     // any EventTemplate (see EventTemplate)
 let signed = try signer.sign(unsignedEvent)        // a pre-keyed UnsignedEvent
-let meta = try signer.signMetadata(UserMetadata(name: "Alice"))
-let contacts = try signer.signContactList([Contact(publicKey: alice)])
-let relayList = try signer.signRelayListMetadata(
-    read: [try RelayURL(string: "wss://in.example")], write: [try RelayURL(string: "wss://out.example")])
+let meta = try signer.sign(.metadata(UserMetadata(name: "Alice")))
+let contacts = try signer.sign(.contactList([Contact(publicKey: alice)]))
 let pow = try await signer.sign(.textNote("Hello"), proofOfWork: 20)  // mine to 20 leading zero bits, then sign (NIP-13)
-let listEvent = try signer.signList(list)   // NIP-51: private items NIP-44-self-encrypted into content
-let opened = try signer.openList(listEvent) // decrypts private items (throws if not decryptable with this key)
-let report = try signer.signReport(publicKey: author, type: .impersonation)  // kind 1984, NIP-56
-let eventReport = try signer.signReport(event: note, type: .illegal, reason: "reason")  // reports the event and its author
+let report = try signer.sign(.report(author, type: .impersonation))  // kind 1984, NIP-56
 ```
 
 ### NIP-44 Encryption
@@ -1037,6 +1048,10 @@ let theirs = try await client.lists.fetch(kind: .muteList, for: publicKey)
 
 // Public-only view of any list event (private items stay empty).
 let publicView = NostrList(event: event)
+
+// Without a client: build the event with any signer, and decrypt the private items with the author's signer.
+let listEvent = try await signer.sign(EventTemplate.list(list, encryptingWith: signer))
+let opened = try await NostrList(event: listEvent, decryptingWith: signer)  // throws if not decryptable by this signer
 ```
 
 ## NostrListSet
@@ -1088,6 +1103,10 @@ let byAddr = try await client.lists.fetchSet(naddr: addr)
 
 // Public-only view of any set event (private items stay empty).
 let publicView = try NostrListSet(event: event)
+
+// Without a client: build the event with any signer, and decrypt the private items with the author's signer.
+let setEvent = try await signer.sign(EventTemplate.set(set, encryptingWith: signer))
+let opened = try await NostrListSet(event: setEvent, decryptingWith: signer)  // also throws invalidData without a d tag
 ```
 
 ## LongFormContent
@@ -1133,7 +1152,7 @@ let naddr = try article.naddr(author: publicKey, relays: [try RelayURL(string: "
 let byCoord = try await client.events.fetchLongFormContent(naddr: naddr)
 
 // Sign without publishing
-let event = try signer.signLongFormContent(article, draft: false)
+let event = try signer.sign(.longFormContent(article, draft: false))
 ```
 
 ## Groups (NIP-29)
@@ -1294,11 +1313,11 @@ The reason category of a NIP-56 report, kind 1984 (enum: String, Sendable, Hasha
 
 ```swift
 // Report a public key: the type rides on the "p" tag.
-let report = try signer.signReport(publicKey: author, type: .impersonation, reason: "")   // PublicKey
+let report = try signer.sign(.report(author, type: .impersonation, reason: ""))   // PublicKey
 try await client.events.publishReport(publicKey: author, type: .impersonation)
 
 // Report an event: the type rides on the "e" tag, plus a bare "p" tag naming the author.
-let eventReport = try signer.signReport(event: note, type: .illegal, reason: "against the law")
+let eventReport = try signer.sign(.report(note, type: .illegal, reason: "against the law"))
 try await client.events.publishReport(event: note, type: .spam, reason: "unsolicited")
 ```
 
@@ -1360,9 +1379,14 @@ let ots = OpenTimestamps(otsFileData: data)
 let tag = ots.tag                   // ["ots", base64data]
 let raw = ots.rawData               // Data?
 
+// Attach to a template before signing; replaces any existing ots tag, nil removes it
+var note = EventTemplate.textNote("timestamped")
+note.openTimestamps = ots
+let signed = try signer.sign(note)
+
 // Event extensions
-let ots = event.openTimestamps      // OpenTimestamps?
-let has = event.hasOpenTimestamps   // Bool
+let ots = event.openTimestamps                  // OpenTimestamps?
+let has = event.hasOpenTimestampsAttestation    // Bool
 ```
 
 ## RelayURL

@@ -94,7 +94,7 @@ public struct NostrEventsAPI: NostrEventPublishing, NostrEventFetching {
         _ metadata: UserMetadata,
         strategy: PublishStrategy? = nil
     ) async throws -> PublishedEvent {
-        try await signAndPublish(strategy: strategy) { try .metadata(publicKey: $0, metadata) }
+        try await signAndPublish(.metadata(metadata), strategy: strategy)
     }
 
     /// Publishes a reaction to an event
@@ -144,9 +144,7 @@ public struct NostrEventsAPI: NostrEventPublishing, NostrEventFetching {
         reason: String = "",
         strategy: PublishStrategy? = nil
     ) async throws -> PublishedEvent {
-        try await signAndPublish(strategy: strategy) {
-            .report(publicKey: $0, target: target, type: type, reason: reason)
-        }
+        try await signAndPublish(.report(target, type: type, reason: reason), strategy: strategy)
     }
 
     /// Publishes a report of an event and its author (kind 1984, NIP-56).
@@ -158,9 +156,7 @@ public struct NostrEventsAPI: NostrEventPublishing, NostrEventFetching {
         reason: String = "",
         strategy: PublishStrategy? = nil
     ) async throws -> PublishedEvent {
-        try await signAndPublish(strategy: strategy) {
-            .report(publicKey: $0, event: event, type: type, reason: reason)
-        }
+        try await signAndPublish(.report(event, type: type, reason: reason), strategy: strategy)
     }
 
     /// Publishes an already-signed event, to the whole pool or to chosen relays.
@@ -204,7 +200,7 @@ public struct NostrEventsAPI: NostrEventPublishing, NostrEventFetching {
         draft: Bool = false,
         strategy: PublishStrategy? = nil
     ) async throws -> PublishedEvent {
-        try await signAndPublish(strategy: strategy) { .longFormContent(publicKey: $0, article, draft: draft) }
+        try await signAndPublish(.longFormContent(article, draft: draft), strategy: strategy)
     }
 
     /// Fetches an article by author and identifier, keeping the newest copy across relays.
@@ -345,16 +341,6 @@ public struct NostrEventsAPI: NostrEventPublishing, NostrEventFetching {
     /// every convenience `publish*` helper above shares.
     private func signAndPublish(_ template: EventTemplate, strategy: PublishStrategy?) async throws -> PublishedEvent {
         let event = try await client.sign(template)
-        let result = try await client.pool.publish(event, strategy: strategy)
-        return PublishedEvent(event: event, result: result)
-    }
-
-    /// Builds an event under the signer's public key, signs it, and broadcasts it to the whole pool.
-    private func signAndPublish(
-        strategy: PublishStrategy?,
-        _ build: @Sendable (_ publicKey: PublicKey) throws -> UnsignedEvent
-    ) async throws -> PublishedEvent {
-        let event = try await client.withSigner { signer, publicKey in try await signer.sign(build(publicKey)) }
         let result = try await client.pool.publish(event, strategy: strategy)
         return PublishedEvent(event: event, result: result)
     }

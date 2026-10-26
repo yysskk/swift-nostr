@@ -200,7 +200,7 @@ struct ContactListEventTests {
     private let publicKey3 = PublicKey.fixture("publicKey3")
 
     @Test("Sign contact list event")
-    func signContactListEvent() throws {
+    func contactListEvent() throws {
         let keyPair = try KeyPair()
         let signer = EventSigner(keyPair: keyPair)
 
@@ -210,7 +210,7 @@ struct ContactListEventTests {
             Contact(publicKey: publicKey3),
         ]
 
-        let event = try signer.signContactList(contacts)
+        let event = try signer.sign(.contactList(contacts))
 
         #expect(event.kind == 3)
         #expect(event.content == "")
@@ -221,13 +221,13 @@ struct ContactListEventTests {
         #expect(try event.verify())
     }
 
-    @Test("Sign contact list from public keys")
-    func signContactListFromPublicKeys() throws {
+    @Test("Contacts without a relay or petname become bare p tags")
+    func contactListFromPublicKeys() throws {
         let keyPair = try KeyPair()
         let signer = EventSigner(keyPair: keyPair)
 
         let publicKeys = [publicKey1, publicKey2, publicKey3]
-        let event = try signer.signContactList(publicKeys: publicKeys)
+        let event = try signer.sign(.contactList(publicKeys.map { Contact(publicKey: $0) }))
 
         #expect(event.kind == 3)
         #expect(event.tags.count == 3)
@@ -246,7 +246,7 @@ struct ContactListEventTests {
             Contact(publicKey: publicKey2),
         ]
 
-        let event = try signer.signContactList(contacts)
+        let event = try signer.sign(.contactList(contacts))
 
         let extractedContacts = event.contacts
         #expect(extractedContacts != nil)
@@ -282,7 +282,7 @@ struct ContactListEventTests {
         let keyPair = try KeyPair()
         let signer = EventSigner(keyPair: keyPair)
 
-        let contactEvent = try signer.signContactList([Contact(publicKey: publicKey1)])
+        let contactEvent = try signer.sign(.contactList([Contact(publicKey: publicKey1)]))
         let textNote = try signer.sign(.textNote("Hello"))
 
         #expect(contactEvent.isContactList == true)

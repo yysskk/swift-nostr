@@ -204,7 +204,7 @@ struct RelayListMetadataEventTests {
             RelayListEntry(url: RelayURL("wss://c.example.com")!, usage: .write),
         ])
 
-        let event = try signer.signRelayListMetadata(list)
+        let event = try signer.sign(.relayListMetadata(list))
 
         #expect(event.kind == 10002)
         #expect(event.content == "")
@@ -217,10 +217,11 @@ struct RelayListMetadataEventTests {
         let keyPair = try KeyPair()
         let signer = EventSigner(keyPair: keyPair)
 
-        let event = try signer.signRelayListMetadata(
+        let relayList = RelayListMetadata(
             read: [RelayURL("wss://read.example.com")!, RelayURL("wss://both.example.com")!],
             write: [RelayURL("wss://write.example.com")!, RelayURL("wss://both.example.com")!]
         )
+        let event = try signer.sign(.relayListMetadata(relayList))
 
         #expect(event.kind == 10002)
         let list = event.relayListMetadata
@@ -236,10 +237,11 @@ struct RelayListMetadataEventTests {
     func signRelayListFromReadWriteDeduplicates() throws {
         let signer = EventSigner(keyPair: try KeyPair())
 
-        let event = try signer.signRelayListMetadata(
+        let relayList = RelayListMetadata(
             read: [RelayURL("wss://a.example.com")!, RelayURL("wss://a.example.com/")!],
             write: [RelayURL("wss://b.example.com")!, RelayURL("wss://B.example.com")!]
         )
+        let event = try signer.sign(.relayListMetadata(relayList))
 
         // Repeats — including alternate spellings of the same relay — must not become
         // duplicate `r` tags, matching how a parsed list de-duplicates.
@@ -255,9 +257,10 @@ struct RelayListMetadataEventTests {
 
         // The same relay, spelled with a trailing slash on one side and mixed case on the other.
         // Both usages must survive: dropping one would silently demote the relay.
-        let event = try signer.signRelayListMetadata(
-            read: [RelayURL("wss://Relay.example.com/")!],
-            write: [RelayURL("wss://relay.example.com")!]
+        let event = try signer.sign(
+            .relayListMetadata(
+                RelayListMetadata(
+                    read: [RelayURL("wss://Relay.example.com/")!], write: [RelayURL("wss://relay.example.com")!]))
         )
 
         #expect(event.tags == [["r", "wss://relay.example.com"]])
@@ -277,7 +280,7 @@ struct RelayListMetadataEventTests {
             RelayListEntry(url: RelayURL("wss://a.example.com")!, usage: .read),
             RelayListEntry(url: RelayURL("wss://b.example.com")!, usage: .write),
         ])
-        let event = try signer.signRelayListMetadata(list)
+        let event = try signer.sign(.relayListMetadata(list))
 
         let extracted = event.relayListMetadata
         #expect(extracted != nil)
@@ -301,8 +304,8 @@ struct RelayListMetadataEventTests {
         let keyPair = try KeyPair()
         let signer = EventSigner(keyPair: keyPair)
 
-        let relayListEvent = try signer.signRelayListMetadata(
-            RelayListMetadata(entries: [RelayListEntry(url: RelayURL("wss://a.example.com")!)])
+        let relayListEvent = try signer.sign(
+            .relayListMetadata(RelayListMetadata(entries: [RelayListEntry(url: RelayURL("wss://a.example.com")!)]))
         )
         let textNote = try signer.sign(.textNote("Hello"))
 
