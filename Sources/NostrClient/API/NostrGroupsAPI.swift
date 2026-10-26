@@ -254,7 +254,7 @@ public struct NostrGroupsAPI: NostrGroupManaging {
         let filter = Filter.groupTimeline(
             groupID: group.id,
             kinds: kinds,
-            since: since.map { Int64($0.timeIntervalSince1970) },
+            since: since.map(Timestamp.init),
             limit: limit
         )
         return try await client.subscribe(filters: [filter], toURLs: [relayURL])

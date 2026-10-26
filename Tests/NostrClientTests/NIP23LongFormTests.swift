@@ -86,7 +86,7 @@ struct NIP23LongFormTests {
         let event = Event(
             id: EventID.fixture("id"),
             pubkey: PublicKey(String(repeating: "a", count: 64))!,
-            createdAt: 1,
+            createdAt: Timestamp(rawValue: 1),
             kind: .longFormContent,
             tags: article.toTags(),
             content: "",
@@ -204,7 +204,7 @@ struct NIP23LongFormTests {
         let eventDict: [String: Any] = [
             "id": event.id.hex,
             "pubkey": event.pubkey.hex,
-            "created_at": event.createdAt,
+            "created_at": event.createdAt.rawValue,
             "kind": event.kind.rawValue,
             "tags": event.tags,
             "content": event.content,
@@ -233,7 +233,7 @@ struct NIP23LongFormTests {
         )
         let newerUnsigned = UnsignedEvent(
             pubkey: signer.publicKey,
-            createdAt: older.createdAt + 1000,
+            createdAt: Timestamp(rawValue: older.createdAt.rawValue + 1000),
             kind: .longFormContent,
             rawTags: newerBase.toTags(),
             content: ""

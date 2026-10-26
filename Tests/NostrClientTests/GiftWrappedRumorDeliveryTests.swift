@@ -108,8 +108,8 @@ struct GiftWrappedRumorDeliveryTests {
             try await client.messages.sendGiftWrapped(rumor, to: recipient.publicKey, expiration: expiry)
         }
 
-        #expect(result.recipientGiftWrap.expiration == expiry)
-        #expect(result.selfGiftWrap.expiration == expiry)
+        #expect(result.recipientGiftWrap.expiration == Timestamp(expiry))
+        #expect(result.selfGiftWrap.expiration == Timestamp(expiry))
         #expect(result.rumor.expiration == nil)
         await client.relays.disconnect()
     }

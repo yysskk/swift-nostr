@@ -108,7 +108,7 @@ extension Groups {
         previous: [String] = [],
         reason: String? = nil,
         pubkey: PublicKey,
-        createdAt: Date = Date()
+        createdAt: Timestamp = .now
     ) -> UnsignedEvent {
         var tags: [Tag] = [.group(groupID)]
         tags.append(contentsOf: action.actionTags)
@@ -117,7 +117,7 @@ extension Groups {
         }
         return UnsignedEvent(
             pubkey: pubkey,
-            createdAt: Int64(createdAt.timeIntervalSince1970),
+            createdAt: createdAt,
             kind: action.kind,
             tags: tags,
             content: reason ?? ""
@@ -136,7 +136,7 @@ extension Groups {
         groupID: String,
         previous: [String] = [],
         reason: String? = nil,
-        createdAt: Date = Date(),
+        createdAt: Timestamp = .now,
         signer: some NostrSigning
     ) async throws -> Event {
         try await signer.sign(

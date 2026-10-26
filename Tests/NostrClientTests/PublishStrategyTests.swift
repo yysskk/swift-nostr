@@ -15,7 +15,7 @@ struct PublishStrategyTests {
         Event(
             id: EventID(String(repeating: "a", count: 64))!,
             pubkey: PublicKey(String(repeating: "b", count: 64))!,
-            createdAt: 1_700_000_000,
+            createdAt: Timestamp(rawValue: 1_700_000_000),
             kind: 1,
             tags: [],
             content: "test",

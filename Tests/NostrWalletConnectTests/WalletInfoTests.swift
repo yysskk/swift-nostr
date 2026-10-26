@@ -11,7 +11,7 @@ struct WalletInfoTests {
         Event(
             id: .fixture("info"),
             pubkey: .fixture("wallet"),
-            createdAt: 0,
+            createdAt: Timestamp(rawValue: 0),
             kind: .walletConnectInfo,
             tags: tags,
             content: content,
@@ -78,7 +78,7 @@ struct WalletInfoTests {
         let event = Event(
             id: .fixture("info"),
             pubkey: .fixture("wallet"),
-            createdAt: 0,
+            createdAt: Timestamp(rawValue: 0),
             kind: .textNote,
             tags: [],
             content: "pay_invoice",

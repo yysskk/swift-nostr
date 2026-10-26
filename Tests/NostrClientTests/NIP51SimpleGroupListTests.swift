@@ -338,7 +338,7 @@ struct NIP51SimpleGroupListClientTests {
     private func listEvent(
         entries: [GroupListEntry],
         relayURLs: [RelayURL],
-        createdAt: Int64,
+        createdAt: Timestamp,
         signer: EventSigner
     ) throws -> Event {
         let typed = SimpleGroupList(publicEntries: entries, relayURLs: relayURLs)
@@ -399,13 +399,13 @@ struct NIP51SimpleGroupListClientTests {
         let stale = try listEvent(
             entries: [GroupListEntry(groupID: "oldgrp", relayURL: RelayURL("wss://old.example.com")!)],
             relayURLs: [RelayURL("wss://old.example.com")!],
-            createdAt: 1_700_000_000,
+            createdAt: Timestamp(rawValue: 1_700_000_000),
             signer: author
         )
         let newer = try listEvent(
             entries: [GroupListEntry(groupID: "newgrp", relayURL: RelayURL("wss://new.example.com")!, name: "Fresh")],
             relayURLs: [RelayURL("wss://new.example.com")!],
-            createdAt: 1_700_000_100,
+            createdAt: Timestamp(rawValue: 1_700_000_100),
             signer: author
         )
 

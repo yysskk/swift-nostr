@@ -137,7 +137,7 @@ struct RelayConnectionTransportTests {
         Event(
             id: try EventID(hex: id),
             pubkey: try PublicKey(hex: String(repeating: "b", count: 64)),
-            createdAt: 1_700_000_000,
+            createdAt: Timestamp(rawValue: 1_700_000_000),
             kind: .nostrConnect,
             tags: [],
             content: "sealed",

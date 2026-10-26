@@ -35,7 +35,7 @@ actor RelayListStore {
         guard let list = event.relayListMetadata else {
             return nil
         }
-        return store(list, createdAt: event.createdAt, for: event.pubkey)
+        return store(list, createdAt: event.createdAt.rawValue, for: event.pubkey)
     }
 
     /// Returns the cached relay list for a pubkey, if any.

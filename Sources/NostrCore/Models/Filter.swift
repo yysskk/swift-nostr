@@ -18,11 +18,11 @@ public struct Filter: Codable, Sendable, Hashable {
     /// Public keys to match against the events' "p" tags (`#p` on the wire).
     public var pubkeyReferences: [PublicKey]?
 
-    /// Unix timestamp (seconds), events must be newer than this
-    public var since: Int64?
+    /// The earliest `created_at` to match, inclusive.
+    public var since: Timestamp?
 
-    /// Unix timestamp (seconds), events must be older than this
-    public var until: Int64?
+    /// The latest `created_at` to match, inclusive.
+    public var until: Timestamp?
 
     /// Maximum number of events to be returned
     public var limit: Int?
@@ -56,8 +56,8 @@ public struct Filter: Codable, Sendable, Hashable {
         kinds: [Event.Kind]? = nil,
         eventReferences: [EventID]? = nil,
         pubkeyReferences: [PublicKey]? = nil,
-        since: Int64? = nil,
-        until: Int64? = nil,
+        since: Timestamp? = nil,
+        until: Timestamp? = nil,
         limit: Int? = nil,
         search: String? = nil
     ) {
@@ -84,8 +84,8 @@ public struct Filter: Codable, Sendable, Hashable {
         kinds = try container.decodeIfPresent([Event.Kind].self, forKey: .kinds)
         eventReferences = try container.decodeIfPresent([EventID].self, forKey: .eventReferences)
         pubkeyReferences = try container.decodeIfPresent([PublicKey].self, forKey: .pubkeyReferences)
-        since = try container.decodeIfPresent(Int64.self, forKey: .since)
-        until = try container.decodeIfPresent(Int64.self, forKey: .until)
+        since = try container.decodeIfPresent(Timestamp.self, forKey: .since)
+        until = try container.decodeIfPresent(Timestamp.self, forKey: .until)
         limit = try container.decodeIfPresent(Int.self, forKey: .limit)
         search = try container.decodeIfPresent(String.self, forKey: .search)
 
@@ -270,7 +270,7 @@ extension Filter {
     public static func groupTimeline(
         groupID: String,
         kinds: [Event.Kind]? = nil,
-        since: Int64? = nil,
+        since: Timestamp? = nil,
         limit: Int? = nil
     ) -> Filter {
         var filter = Filter(

@@ -59,7 +59,7 @@ public enum HTTPAuth {
         url: URL,
         method: String,
         payload: Data? = nil,
-        createdAt: Date = Date(),
+        createdAt: Timestamp = .now,
         signer: some NostrSigning
     ) async throws -> Event {
         var tags: [Tag] = [
@@ -71,7 +71,7 @@ public enum HTTPAuth {
         }
         let unsigned = UnsignedEvent(
             pubkey: try await signer.publicKey,
-            createdAt: Int64(createdAt.timeIntervalSince1970),
+            createdAt: createdAt,
             kind: .httpAuth,
             tags: tags,
             content: ""
@@ -103,7 +103,7 @@ public enum HTTPAuth {
         url: URL,
         method: String,
         payload: Data? = nil,
-        createdAt: Date = Date(),
+        createdAt: Timestamp = .now,
         signer: some NostrSigning
     ) async throws -> String {
         try authorizationHeaderValue(
@@ -130,7 +130,7 @@ extension HTTPAuth {
         case invalidSignature
         /// The event timestamp is outside the accepted window around the
         /// server's clock.
-        case timestampOutOfTolerance(createdAt: Date)
+        case timestampOutOfTolerance(createdAt: Timestamp)
         /// The "u" tag does not match the request URL.
         case urlMismatch(expected: String, actual: String?)
         /// The "method" tag does not match the request method.
@@ -208,9 +208,8 @@ extension HTTPAuth {
         guard (try? event.verify()) == true else {
             throw ValidationError.invalidSignature
         }
-        let createdAt = Date(timeIntervalSince1970: TimeInterval(event.createdAt))
-        guard abs(createdAt.timeIntervalSince(now)) <= tolerance else {
-            throw ValidationError.timestampOutOfTolerance(createdAt: createdAt)
+        guard abs(event.createdAt.date.timeIntervalSince(now)) <= tolerance else {
+            throw ValidationError.timestampOutOfTolerance(createdAt: event.createdAt)
         }
         let urlTag = event.firstTagValue(named: "u")
         guard urlTag == url.absoluteString else {

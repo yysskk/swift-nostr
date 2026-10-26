@@ -11,7 +11,7 @@ struct FakeRemoteSignerTransportTests {
         Event(
             id: id,
             pubkey: .fixture("author"),
-            createdAt: 0,
+            createdAt: Timestamp(rawValue: 0),
             kind: .nostrConnect,
             tags: [],
             content: content,

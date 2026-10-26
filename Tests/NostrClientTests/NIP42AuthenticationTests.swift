@@ -51,8 +51,8 @@ struct NIP42AuthenticationEventTests {
 
         // NIP-42 requires created_at to be close to the current time; relays
         // typically tolerate ~10 minutes of skew.
-        let now = Int64(Date().timeIntervalSince1970)
-        #expect(abs(event.createdAt - now) < 60)
+        let now = Timestamp.now
+        #expect(abs(event.createdAt.rawValue - now.rawValue) < 60)
     }
 
     @Test("the relay tag is the URL the connection opens")

@@ -45,7 +45,7 @@ struct GiftWrapImpersonationTests {
         let seal = try senderSigner.sign(
             UnsignedEvent(
                 pubkey: sender.publicKey,
-                createdAt: Int64(Date().timeIntervalSince1970) - 60,
+                createdAt: Timestamp(rawValue: Timestamp.now.rawValue - 60),
                 kind: .seal,
                 tags: [],
                 content: try senderSigner.nip44Encrypt(rumorJSON, to: recipientPubkey)
@@ -57,7 +57,7 @@ struct GiftWrapImpersonationTests {
         return try ephemeral.sign(
             UnsignedEvent(
                 pubkey: ephemeral.publicKey,
-                createdAt: Int64(Date().timeIntervalSince1970) - 60,
+                createdAt: Timestamp(rawValue: Timestamp.now.rawValue - 60),
                 kind: .giftWrap,
                 tags: [Tag.pubkey(recipientPubkey)],
                 content: try ephemeral.nip44Encrypt(sealJSON, to: recipientPubkey)
@@ -77,7 +77,7 @@ struct GiftWrapImpersonationTests {
 
         let forged = UnsignedEvent(
             pubkey: alice.publicKey,
-            createdAt: 1_700_000_000,
+            createdAt: Timestamp(rawValue: 1_700_000_000),
             kind: .privateDirectMessage,
             rawTags: [["p", bob.publicKey.hex]],
             content: "I approve this transfer"
@@ -85,7 +85,7 @@ struct GiftWrapImpersonationTests {
         let rumor = try rumorJSON(
             id: try forged.computedID.hex,
             pubkey: alice.publicKey.hex,
-            createdAt: forged.createdAt,
+            createdAt: forged.createdAt.rawValue,
             kind: forged.kind,
             tags: forged.tags,
             content: forged.content
@@ -132,7 +132,7 @@ struct GiftWrapImpersonationTests {
 
         let forged = UnsignedEvent(
             pubkey: alice.publicKey,
-            createdAt: 1_700_000_000,
+            createdAt: Timestamp(rawValue: 1_700_000_000),
             kind: .reaction,
             rawTags: [["p", bob.publicKey.hex]],
             content: "+"
@@ -140,7 +140,7 @@ struct GiftWrapImpersonationTests {
         let rumor = try rumorJSON(
             id: try forged.computedID.hex,
             pubkey: alice.publicKey.hex,
-            createdAt: forged.createdAt,
+            createdAt: forged.createdAt.rawValue,
             kind: forged.kind,
             tags: forged.tags,
             content: forged.content
@@ -162,7 +162,7 @@ struct GiftWrapImpersonationTests {
 
         let event = UnsignedEvent(
             pubkey: alice.publicKey,
-            createdAt: 1_700_000_000,
+            createdAt: Timestamp(rawValue: 1_700_000_000),
             kind: .privateDirectMessage,
             rawTags: [["p", bob.publicKey.hex]],
             content: "hello"
@@ -170,7 +170,7 @@ struct GiftWrapImpersonationTests {
         let rumor = try rumorJSON(
             id: try event.computedID.hex,
             pubkey: alice.publicKey.hex,
-            createdAt: event.createdAt,
+            createdAt: event.createdAt.rawValue,
             kind: event.kind,
             tags: event.tags,
             content: event.content

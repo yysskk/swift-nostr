@@ -226,7 +226,7 @@ struct NIP17FileMessageTests {
             url: "u", mimeType: "image/png", encryption: encrypted,
             to: recipient.publicKey, expiration: expiry)
 
-        #expect(result.recipientGiftWrap.expiration == expiry)
+        #expect(result.recipientGiftWrap.expiration == Timestamp(expiry))
         let file = try await DirectMessageParser(signer: EventSigner(keyPair: recipient)).parseFileMessage(
             result.recipientGiftWrap)
         #expect(file.expiresAt == expiry)

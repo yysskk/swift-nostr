@@ -8,7 +8,7 @@ private func stateEvent(
     kind: Event.Kind,
     tags: [Event.Tag],
     signer: EventSigner,
-    createdAt: Int64 = 1_700_000_000
+    createdAt: Timestamp = Timestamp(rawValue: 1_700_000_000)
 ) throws -> Event {
     try signer.sign(
         UnsignedEvent(
@@ -165,7 +165,7 @@ struct NIP29GroupStateTests {
         let event = Event(
             id: try EventID(hex: String(repeating: "0", count: 64)),
             pubkey: try PublicKey(hex: String(repeating: "b", count: 64)),
-            createdAt: 1_700_000_000,
+            createdAt: Timestamp(rawValue: 1_700_000_000),
             kind: .groupMetadata,
             tags: [
                 ["d", "<id>"],
@@ -380,7 +380,7 @@ struct NIP29GroupMembershipTests {
     private func moderation(
         id: EventID,
         kind: Event.Kind,
-        createdAt: Int64,
+        createdAt: Timestamp,
         tags: [[String]]
     ) -> Event {
         Event(
@@ -388,13 +388,13 @@ struct NIP29GroupMembershipTests {
             signature: nil)
     }
 
-    private func putUser(id: EventID, createdAt: Int64, roles: [String]) -> Event {
+    private func putUser(id: EventID, createdAt: Timestamp, roles: [String]) -> Event {
         moderation(
             id: id, kind: .groupPutUser, createdAt: createdAt,
             tags: [["h", "abcdef"], ["p", member.hex] + roles])
     }
 
-    private func removeUser(id: EventID, createdAt: Int64) -> Event {
+    private func removeUser(id: EventID, createdAt: Timestamp) -> Event {
         moderation(
             id: id, kind: .groupRemoveUser, createdAt: createdAt,
             tags: [["h", "abcdef"], ["p", member.hex]])
@@ -408,8 +408,8 @@ struct NIP29GroupMembershipTests {
     @Test("the latest put-user event wins and carries its roles")
     func latestPutUserWins() {
         let events = [
-            putUser(id: paddedID(1), createdAt: 1_700_000_000, roles: ["member"]),
-            putUser(id: paddedID(2), createdAt: 1_700_000_100, roles: ["admin", "moderator"]),
+            putUser(id: paddedID(1), createdAt: Timestamp(rawValue: 1_700_000_000), roles: ["member"]),
+            putUser(id: paddedID(2), createdAt: Timestamp(rawValue: 1_700_000_100), roles: ["admin", "moderator"]),
         ]
 
         #expect(Groups.membership(of: member, in: events) == .member(roles: ["admin", "moderator"]))
@@ -421,8 +421,8 @@ struct NIP29GroupMembershipTests {
     @Test("a later remove-user event removes the member")
     func laterRemoveWins() {
         let events = [
-            putUser(id: paddedID(1), createdAt: 1_700_000_000, roles: ["member"]),
-            removeUser(id: paddedID(2), createdAt: 1_700_000_100),
+            putUser(id: paddedID(1), createdAt: Timestamp(rawValue: 1_700_000_000), roles: ["member"]),
+            removeUser(id: paddedID(2), createdAt: Timestamp(rawValue: 1_700_000_100)),
         ]
 
         #expect(Groups.membership(of: member, in: events) == .removed)
@@ -431,9 +431,9 @@ struct NIP29GroupMembershipTests {
     @Test("a put-user event after a removal re-adds the member")
     func reAddAfterRemoval() {
         let events = [
-            putUser(id: paddedID(1), createdAt: 1_700_000_000, roles: ["member"]),
-            removeUser(id: paddedID(2), createdAt: 1_700_000_100),
-            putUser(id: paddedID(3), createdAt: 1_700_000_200, roles: []),
+            putUser(id: paddedID(1), createdAt: Timestamp(rawValue: 1_700_000_000), roles: ["member"]),
+            removeUser(id: paddedID(2), createdAt: Timestamp(rawValue: 1_700_000_100)),
+            putUser(id: paddedID(3), createdAt: Timestamp(rawValue: 1_700_000_200), roles: []),
         ]
 
         #expect(Groups.membership(of: member, in: events) == .member(roles: []))
@@ -441,9 +441,9 @@ struct NIP29GroupMembershipTests {
 
     @Test("a created-at tie is broken by the lowest event id")
     func tieBrokenByLowestID() {
-        let removal = removeUser(id: EventID(String(repeating: "a", count: 64))!, createdAt: 1_700_000_000)
-        let put = putUser(
-            id: EventID(String(repeating: "b", count: 64))!, createdAt: 1_700_000_000, roles: ["member"])
+        let createdAt = Timestamp(rawValue: 1_700_000_000)
+        let removal = removeUser(id: EventID(String(repeating: "a", count: 64))!, createdAt: createdAt)
+        let put = putUser(id: EventID(String(repeating: "b", count: 64))!, createdAt: createdAt, roles: ["member"])
 
         #expect(Groups.membership(of: member, in: [removal, put]) == .removed)
         #expect(Groups.membership(of: member, in: [put, removal]) == .removed)
@@ -453,9 +453,9 @@ struct NIP29GroupMembershipTests {
     func otherPubkeysIgnored() {
         let other = PublicKey.fixture("other")
         let events = [
-            putUser(id: paddedID(1), createdAt: 1_700_000_000, roles: ["member"]),
+            putUser(id: paddedID(1), createdAt: Timestamp(rawValue: 1_700_000_000), roles: ["member"]),
             moderation(
-                id: paddedID(2), kind: .groupRemoveUser, createdAt: 1_700_000_100,
+                id: paddedID(2), kind: .groupRemoveUser, createdAt: Timestamp(rawValue: 1_700_000_100),
                 tags: [["h", "abcdef"], ["p", other.hex]]),
         ]
 
@@ -466,12 +466,12 @@ struct NIP29GroupMembershipTests {
     @Test("events of other kinds never affect membership")
     func otherKindsIgnored() {
         let events = [
-            putUser(id: paddedID(1), createdAt: 1_700_000_000, roles: ["member"]),
+            putUser(id: paddedID(1), createdAt: Timestamp(rawValue: 1_700_000_000), roles: ["member"]),
             moderation(
-                id: paddedID(2), kind: .chatMessage, createdAt: 1_700_000_100,
+                id: paddedID(2), kind: .chatMessage, createdAt: Timestamp(rawValue: 1_700_000_100),
                 tags: [["h", "abcdef"], ["p", member.hex]]),
             moderation(
-                id: paddedID(3), kind: .groupDeleteEvent, createdAt: 1_700_000_200,
+                id: paddedID(3), kind: .groupDeleteEvent, createdAt: Timestamp(rawValue: 1_700_000_200),
                 tags: [["h", "abcdef"], ["p", member.hex]]),
         ]
 
@@ -482,7 +482,7 @@ struct NIP29GroupMembershipTests {
     func multiplePubkeyTags() {
         let other = PublicKey.fixture("other")
         let event = moderation(
-            id: paddedID(1), kind: .groupPutUser, createdAt: 1_700_000_000,
+            id: paddedID(1), kind: .groupPutUser, createdAt: Timestamp(rawValue: 1_700_000_000),
             tags: [["h", "abcdef"], ["p", other.hex, "ceo"], ["p", member.hex, "moderator"]])
 
         #expect(Groups.membership(of: member, in: [event]) == .member(roles: ["moderator"]))

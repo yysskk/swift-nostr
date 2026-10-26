@@ -50,12 +50,12 @@ struct HTTPAuthTests {
     @Test("createdAt stamps the event timestamp")
     func createdAtIsStamped() async throws {
         let signer = EventSigner(keyPair: try KeyPair())
-        let createdAt = Date(timeIntervalSince1970: 1_682_327_852)
+        let createdAt = Timestamp(rawValue: 1_682_327_852)
 
         let event = try await HTTPAuth.authorizationEvent(
             url: url, method: "GET", createdAt: createdAt, signer: signer)
 
-        #expect(event.createdAt == 1_682_327_852)
+        #expect(event.createdAt.rawValue == 1_682_327_852)
     }
 
     @Test("the header value is the Nostr scheme plus the base64 event JSON")

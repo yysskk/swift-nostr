@@ -168,7 +168,7 @@ struct NIP25DirectMessageReactionTests {
             reaction: "+", to: messageID, author: sender.publicKey,
             recipientPubkey: recipient.publicKey, expiration: expiry)
 
-        #expect(result.recipientGiftWrap.expiration == expiry)
+        #expect(result.recipientGiftWrap.expiration == Timestamp(expiry))
         let parsed = try await DirectMessageParser(signer: EventSigner(keyPair: recipient)).parseReaction(
             result.recipientGiftWrap)
         #expect(parsed.expiresAt == expiry)

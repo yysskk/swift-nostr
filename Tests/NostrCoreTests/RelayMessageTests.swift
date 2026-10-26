@@ -211,7 +211,7 @@ struct ClientMessageTests {
         let event = Event(
             id: EventID.fixture("id123"),
             pubkey: PublicKey.fixture("pubkey123"),
-            createdAt: 1_234_567_890,
+            createdAt: Timestamp(rawValue: 1_234_567_890),
             kind: 1,
             tags: [],
             content: "Hello",

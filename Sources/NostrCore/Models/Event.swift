@@ -10,8 +10,8 @@ public struct Event: Codable, Identifiable, Hashable, Sendable {
     /// The public key of the event creator.
     public let pubkey: PublicKey
 
-    /// Unix timestamp in seconds
-    public let createdAt: Int64
+    /// When the event was created, carried in the `created_at` field on the wire.
+    public let createdAt: Timestamp
 
     /// Event kind. Encodes as a bare integer (NIP-01); integer literals convert
     /// directly, e.g. `kind: 1`.
@@ -48,7 +48,7 @@ public struct Event: Codable, Identifiable, Hashable, Sendable {
     public init(
         id: EventID,
         pubkey: PublicKey,
-        createdAt: Int64,
+        createdAt: Timestamp,
         kind: Kind,
         tags: [[String]],
         content: String,
@@ -73,7 +73,7 @@ public struct Event: Codable, Identifiable, Hashable, Sendable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.id = try container.decode(EventID.self, forKey: .id)
         self.pubkey = try container.decode(PublicKey.self, forKey: .pubkey)
-        self.createdAt = try container.decode(Int64.self, forKey: .createdAt)
+        self.createdAt = try container.decode(Timestamp.self, forKey: .createdAt)
         self.kind = try container.decode(Kind.self, forKey: .kind)
         self.tags = try container.decode([[String]].self, forKey: .tags)
         self.content = try container.decode(String.self, forKey: .content)
@@ -305,8 +305,8 @@ extension Event.Kind: Codable {
 public struct UnsignedEvent: Sendable {
     /// The creator's public key.
     public let pubkey: PublicKey
-    /// Creation time as a Unix timestamp in seconds.
-    public let createdAt: Int64
+    /// When the event was created.
+    public let createdAt: Timestamp
     /// The event kind (NIP-01).
     public let kind: Event.Kind
     /// Tags in their raw NIP-01 wire form (what is hashed and signed).
@@ -317,7 +317,7 @@ public struct UnsignedEvent: Sendable {
     /// Builds an unsigned event from typed ``Tag``s.
     public init(
         pubkey: PublicKey,
-        createdAt: Int64 = Int64(Date().timeIntervalSince1970),
+        createdAt: Timestamp = .now,
         kind: Event.Kind,
         tags: [Tag] = [],
         content: String
@@ -330,7 +330,7 @@ public struct UnsignedEvent: Sendable {
     /// constructing tags yourself.
     public init(
         pubkey: PublicKey,
-        createdAt: Int64 = Int64(Date().timeIntervalSince1970),
+        createdAt: Timestamp = .now,
         kind: Event.Kind,
         rawTags: [[String]],
         content: String
@@ -347,7 +347,7 @@ public struct UnsignedEvent: Sendable {
         let serializable: [Any] = [
             0,
             pubkey.hex,
-            createdAt,
+            createdAt.rawValue,
             kind.rawValue,
             tags,
             content,

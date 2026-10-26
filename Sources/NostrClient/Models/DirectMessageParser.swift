@@ -154,11 +154,11 @@ public struct DirectMessageParser: Sendable {
             senderPubkey: unwrapped.senderPubkey,
             recipientPubkey: recipientPubkey,
             content: rumor.content,
-            createdAt: Date(timeIntervalSince1970: TimeInterval(rumor.createdAt)),
+            createdAt: rumor.createdAt.date,
             subject: subject,
             replyTo: replyTo,
             // NIP-40 expiration lives on the public gift wrap, not the encrypted rumor.
-            expiresAt: giftWrap.expiration
+            expiresAt: giftWrap.expiration?.date
         )
     }
 
@@ -182,8 +182,8 @@ public struct DirectMessageParser: Sendable {
             messageID: messageID,
             messageAuthorPubkey: author,
             content: rumor.content,
-            createdAt: Date(timeIntervalSince1970: TimeInterval(rumor.createdAt)),
-            expiresAt: giftWrap.expiration
+            createdAt: rumor.createdAt.date,
+            expiresAt: giftWrap.expiration?.date
         )
     }
 
@@ -221,8 +221,8 @@ public struct DirectMessageParser: Sendable {
             size: rumor.firstTagValue(named: "size").flatMap(Int.init),
             dimensions: rumor.firstTagValue(named: "dim"),
             blurhash: rumor.firstTagValue(named: "blurhash"),
-            createdAt: Date(timeIntervalSince1970: TimeInterval(rumor.createdAt)),
-            expiresAt: giftWrap.expiration
+            createdAt: rumor.createdAt.date,
+            expiresAt: giftWrap.expiration?.date
         )
     }
 

@@ -25,6 +25,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   failable `init?(_:)` returns nil. `description` and the JSON encoding are the canonical string,
   `url` is the `URL` the WebSocket opens, and decoding an invalid string fails with
   `DecodingError.dataCorrupted`.
+- **`Timestamp` is a typed Unix time**: whole seconds since the epoch, with `rawValue: Int64` kept
+  exactly as on the wire and a bare JSON integer encoding (decoding a non-integer fails).
+  `Timestamp(_ date:)` truncates toward zero and clamps to ±2^53 seconds, infinity and NaN included,
+  and `date` clamps the same way, so neither conversion traps. `Timestamp.now` is the current time;
+  the type is `Comparable` and its `description` is the decimal seconds.
 
 ### Changed
 
@@ -199,6 +204,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `RemoteSignerError.invalidURI(reason:)` or `WalletConnectError.invalidURI(reason:)`, and a
   `switch_relays` reply with such an entry throws `responseDecodingFailed`. `stringValue` writes each
   relay in canonical form.
+- **Event and filter times are `Timestamp`** (breaking): `Event.createdAt`,
+  `UnsignedEvent.createdAt`, `Filter.since`, and `Filter.until` were `Int64`, as were the matching
+  parameters of `Event.init`, `UnsignedEvent.init` (default `.now`), `Filter.init`, and
+  `Filter.groupTimeline`. The wire format and event ids are unchanged.
+- **NIP-29 and NIP-98 builders take a `Timestamp`** (breaking): the `createdAt:` parameters of
+  `Groups.joinRequest`, `leaveRequest`, `contentEvent`, and `moderationEvent`, and of
+  `HTTPAuth.authorizationEvent` and `authorizationHeaderValue(url:…)`, were `Date`; they default to
+  `.now`. An infinite or out-of-range time no longer traps.
+  `HTTPAuth.ValidationError.timestampOutOfTolerance(createdAt:)` carries the event's `Timestamp`.
+- **NIP-40 expirations are `Timestamp`** (breaking): `Tag.expiration(_:)` takes one,
+  `Event.expiration` returns one, and `Event.isExpired(asOf:)` compares against one (default `.now`).
 - **`subscriptionId` is spelled `subscriptionID`** (breaking): the acronym is now cased the same way
   as `groupID`, `eventID`, and `computedID` throughout. This renames the associated values of
   `ClientMessage.request`, `close`, and `count` and of `RelayMessage.event`, `endOfStoredEvents`,

@@ -45,13 +45,14 @@ struct FilterTests {
 
     @Test("Filter with time range")
     func filterWithTimeRange() {
-        let now = Int64(Date().timeIntervalSince1970)
+        let now = Timestamp.now
+        let hourAgo = Timestamp(rawValue: now.rawValue - 3600)
         let filter = Filter(
-            since: now - 3600,
+            since: hourAgo,
             until: now
         )
 
-        #expect(filter.since == now - 3600)
+        #expect(filter.since == hourAgo)
         #expect(filter.until == now)
     }
 

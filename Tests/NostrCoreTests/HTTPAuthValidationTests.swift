@@ -12,12 +12,12 @@ struct HTTPAuthValidationTests {
     func signedHeader(
         method: String = "GET",
         payload: Data? = nil,
-        createdAt: Date = Date(timeIntervalSince1970: 1_700_000_000)
+        createdAt: Timestamp = Timestamp(rawValue: 1_700_000_000)
     ) async throws -> (header: String, now: Date, signer: EventSigner) {
         let signer = EventSigner(keyPair: try KeyPair())
         let header = try await HTTPAuth.authorizationHeaderValue(
             url: url, method: method, payload: payload, createdAt: createdAt, signer: signer)
-        return (header, createdAt, signer)
+        return (header, createdAt.date, signer)
     }
 
     /// Encodes an arbitrary event as a header value, bypassing the
@@ -64,7 +64,7 @@ struct HTTPAuthValidationTests {
         #expect(event.kind == .httpAuth)
         #expect(event.pubkey.hex == "63fe6318dc58583cfe16810f86dd09e18bfd76aabc24a0081ce2856f330504ed")
         #expect(event.id.hex == "fe964e758903360f28d8424d092da8494ed207cba823110be3a57dfe4b578734")
-        #expect(event.createdAt == 1_682_327_852)
+        #expect(event.createdAt.rawValue == 1_682_327_852)
         #expect(event.firstTagValue(named: "u") == "https://api.snort.social/api/v1/n5sp/list")
         #expect(event.firstTagValue(named: "method") == "GET")
 
@@ -190,42 +190,57 @@ struct HTTPAuthValidationTests {
 
     @Test("a timestamp outside the tolerance is rejected, at the boundary it passes")
     func timestampTolerance() async throws {
-        let createdAt = Date(timeIntervalSince1970: 1_700_000_000)
+        let createdAt = Timestamp(rawValue: 1_700_000_000)
         let (header, _, _) = try await signedHeader(createdAt: createdAt)
 
         // Exactly at the tolerance edge, in both directions: accepted.
         #expect(throws: Never.self) {
             try HTTPAuth.validate(
                 authorization: header, url: url, method: "GET",
-                now: createdAt.addingTimeInterval(60))
+                now: createdAt.date.addingTimeInterval(60))
         }
         #expect(throws: Never.self) {
             try HTTPAuth.validate(
                 authorization: header, url: url, method: "GET",
-                now: createdAt.addingTimeInterval(-60))
+                now: createdAt.date.addingTimeInterval(-60))
         }
         // One second past the tolerance, in both directions: rejected.
         #expect(throws: HTTPAuth.ValidationError.timestampOutOfTolerance(createdAt: createdAt)) {
             try HTTPAuth.validate(
                 authorization: header, url: url, method: "GET",
-                now: createdAt.addingTimeInterval(61))
+                now: createdAt.date.addingTimeInterval(61))
         }
         #expect(throws: HTTPAuth.ValidationError.timestampOutOfTolerance(createdAt: createdAt)) {
             try HTTPAuth.validate(
                 authorization: header, url: url, method: "GET",
-                now: createdAt.addingTimeInterval(-61))
+                now: createdAt.date.addingTimeInterval(-61))
+        }
+    }
+
+    @Test(
+        "an out-of-range timestamp is rejected rather than trapping",
+        arguments: [Int64.max, Int64.min]
+    )
+    func extremeTimestampIsRejected(seconds: Int64) async throws {
+        let createdAt = Timestamp(rawValue: seconds)
+        let (header, _, _) = try await signedHeader(createdAt: createdAt)
+
+        #expect(throws: HTTPAuth.ValidationError.timestampOutOfTolerance(createdAt: createdAt)) {
+            try HTTPAuth.validate(
+                authorization: header, url: url, method: "GET",
+                now: Date(timeIntervalSince1970: 1_700_000_000))
         }
     }
 
     @Test("a custom tolerance widens the accepted window")
     func customTolerance() async throws {
-        let createdAt = Date(timeIntervalSince1970: 1_700_000_000)
+        let createdAt = Timestamp(rawValue: 1_700_000_000)
         let (header, _, _) = try await signedHeader(createdAt: createdAt)
 
         #expect(throws: Never.self) {
             try HTTPAuth.validate(
                 authorization: header, url: url, method: "GET",
-                tolerance: 300, now: createdAt.addingTimeInterval(200))
+                tolerance: 300, now: createdAt.date.addingTimeInterval(200))
         }
     }
 

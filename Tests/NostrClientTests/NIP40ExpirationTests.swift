@@ -12,20 +12,19 @@ struct NIP40ExpirationTests {
 
     @Test("expiration tag carries the Unix timestamp in seconds")
     func expirationTag() {
-        let date = Date(timeIntervalSince1970: 1_700_000_000)
-        #expect(Tag.expiration(date).rawArray == ["expiration", "1700000000"])
+        #expect(Tag.expiration(Timestamp(rawValue: 1_700_000_000)).rawArray == ["expiration", "1700000000"])
     }
 
-    @Test("expiration tag truncates sub-second precision")
+    @Test("an expiration from a date drops sub-second precision")
     func expirationTagTruncates() {
         let date = Date(timeIntervalSince1970: 1_700_000_000.9)
-        #expect(Tag.expiration(date).rawArray == ["expiration", "1700000000"])
+        #expect(Tag.expiration(Timestamp(date)).rawArray == ["expiration", "1700000000"])
     }
 
     @Test("Event.expiration reads a valid expiration tag")
     func eventExpiration() throws {
         let signer = EventSigner(keyPair: try KeyPair())
-        let expiry = Date(timeIntervalSince1970: 1_700_000_000)
+        let expiry = Timestamp(rawValue: 1_700_000_000)
         let event = try signer.signTextNote(content: "gm", tags: [.expiration(expiry)])
         #expect(event.expiration == expiry)
     }
@@ -40,8 +39,8 @@ struct NIP40ExpirationTests {
     @Test("Event.expiration is nil for a non-integer value")
     func eventExpirationInvalid() {
         let event = Event(
-            id: EventID.fixture("x"), pubkey: PublicKey.fixture("p"), createdAt: 0, kind: .textNote,
-            tags: [["expiration", "soon"]], content: "", signature: nil
+            id: EventID.fixture("x"), pubkey: PublicKey.fixture("p"), createdAt: Timestamp(rawValue: 0),
+            kind: .textNote, tags: [["expiration", "soon"]], content: "", signature: nil
         )
         #expect(event.expiration == nil)
     }
@@ -49,17 +48,17 @@ struct NIP40ExpirationTests {
     @Test("isExpired compares against the given time, expiring at the boundary")
     func isExpired() throws {
         let signer = EventSigner(keyPair: try KeyPair())
-        let event = try signer.signTextNote(content: "gm", tags: [.expiration(Date(timeIntervalSince1970: 1000))])
-        #expect(event.isExpired(asOf: Date(timeIntervalSince1970: 1001)))
-        #expect(event.isExpired(asOf: Date(timeIntervalSince1970: 1000)))
-        #expect(!event.isExpired(asOf: Date(timeIntervalSince1970: 999)))
+        let event = try signer.signTextNote(content: "gm", tags: [.expiration(Timestamp(rawValue: 1000))])
+        #expect(event.isExpired(asOf: Timestamp(rawValue: 1001)))
+        #expect(event.isExpired(asOf: Timestamp(rawValue: 1000)))
+        #expect(!event.isExpired(asOf: Timestamp(rawValue: 999)))
     }
 
     @Test("an event without an expiration tag never expires")
     func noExpirationNeverExpires() throws {
         let signer = EventSigner(keyPair: try KeyPair())
         let event = try signer.signTextNote(content: "gm")
-        #expect(!event.isExpired(asOf: Date(timeIntervalSince1970: 9_999_999_999)))
+        #expect(!event.isExpired(asOf: Timestamp(rawValue: 9_999_999_999)))
     }
 
     // MARK: - Disappearing direct messages
@@ -76,8 +75,8 @@ struct NIP40ExpirationTests {
 
         // The public gift wraps carry the expiration; the encrypted rumor stays untouched
         // so the plaintext leaks nothing.
-        #expect(result.recipientGiftWrap.expiration == expiry)
-        #expect(result.selfGiftWrap.expiration == expiry)
+        #expect(result.recipientGiftWrap.expiration == Timestamp(expiry))
+        #expect(result.selfGiftWrap.expiration == Timestamp(expiry))
         #expect(result.rumor.expiration == nil)
     }
 

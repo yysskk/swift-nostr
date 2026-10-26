@@ -58,7 +58,7 @@ public struct GiftWrap: Sendable {
 
         var wrapTags: [Tag] = [.pubkey(recipientPubkey)]
         if let expiration {
-            wrapTags.append(.expiration(expiration))
+            wrapTags.append(.expiration(Timestamp(expiration)))
         }
 
         let wrapUnsigned = UnsignedEvent(
@@ -204,11 +204,10 @@ public struct GiftWrap: Sendable {
 
     /// Returns a randomized timestamp in the past (up to 2 days ago) for privacy.
     /// Only past offset is used so relays that reject "created_at too late" will accept the event.
-    private static func randomizedTimestamp() -> Int64 {
-        let now = Int64(Date().timeIntervalSince1970)
+    private static func randomizedTimestamp() -> Timestamp {
         let twoDays: Int64 = 2 * 24 * 60 * 60
         let randomOffset = Int64.random(in: -twoDays...0)
-        return now + randomOffset
+        return Timestamp(rawValue: Timestamp.now.rawValue + randomOffset)
     }
 }
 
@@ -216,7 +215,7 @@ public struct GiftWrap: Sendable {
 private struct Rumor: Codable {
     let id: EventID
     let pubkey: PublicKey
-    let createdAt: Int64
+    let createdAt: Timestamp
     let kind: Event.Kind
     let tags: [[String]]
     let content: String

@@ -12,7 +12,7 @@ private func makeEvent(
     Event(
         id: EventID(String(repeating: "a", count: 64))!,
         pubkey: PublicKey.fixture("admin"),
-        createdAt: 1_700_000_000,
+        createdAt: Timestamp(rawValue: 1_700_000_000),
         kind: kind,
         tags: tags,
         content: content,
@@ -22,7 +22,7 @@ private func makeEvent(
 
 @Suite("NIP-29 Moderation Builders")
 struct NIP29ModerationBuilderTests {
-    let createdAt = Date(timeIntervalSince1970: 1_700_000_000)
+    let createdAt = Timestamp(rawValue: 1_700_000_000)
     let target = PublicKey.fixture("target")
 
     @Test("every action maps to its spec kind")
@@ -39,6 +39,25 @@ struct NIP29ModerationBuilderTests {
         #expect(Groups.ModerationAction.updatePinList([]).kind == .groupUpdatePinList)
     }
 
+    /// Converting a `Date` that is infinite or beyond `Int64` used to trap inside the builder.
+    @Test(
+        "a moderation event takes an extreme timestamp without trapping",
+        arguments: [
+            Timestamp(rawValue: Int64.max), Timestamp(rawValue: Int64.min),
+            Timestamp(Date(timeIntervalSince1970: -.infinity)),
+        ]
+    )
+    func extremeTimestamp(createdAt: Timestamp) async throws {
+        let unsigned = Groups.moderationEvent(
+            .deleteGroup, groupID: "abcdef", pubkey: PublicKey.fixture("admin"), createdAt: createdAt)
+        #expect(unsigned.createdAt == createdAt)
+
+        let signed = try await Groups.moderationEvent(
+            .deleteGroup, groupID: "abcdef", createdAt: createdAt, signer: EventSigner(keyPair: try KeyPair()))
+        #expect(signed.createdAt == createdAt)
+        #expect(try signed.verify())
+    }
+
     @Test("a put-user event carries the p tag with roles after the h tag")
     func putUserLayout() {
         let unsigned = Groups.moderationEvent(
@@ -50,7 +69,7 @@ struct NIP29ModerationBuilderTests {
 
         #expect(unsigned.kind == .groupPutUser)
         #expect(unsigned.pubkey == PublicKey.fixture("admin"))
-        #expect(unsigned.createdAt == 1_700_000_000)
+        #expect(unsigned.createdAt.rawValue == 1_700_000_000)
         #expect(unsigned.tags == [["h", "abcdef"], ["p", target.hex, "ceo", "gardener"]])
         #expect(unsigned.content.isEmpty)
     }
@@ -185,7 +204,7 @@ struct NIP29ModerationBuilderTests {
 
         #expect(event.kind == .groupRemoveUser)
         #expect(event.pubkey == signer.publicKey)
-        #expect(event.createdAt == 1_700_000_000)
+        #expect(event.createdAt.rawValue == 1_700_000_000)
         #expect(event.tags == [["h", "abcdef"], ["p", target.hex]])
         #expect(event.content == "spam")
         #expect(try event.verify())
@@ -194,7 +213,7 @@ struct NIP29ModerationBuilderTests {
 
 @Suite("NIP-29 Moderation Parsing")
 struct NIP29ModerationParsingTests {
-    let createdAt = Date(timeIntervalSince1970: 1_700_000_000)
+    let createdAt = Timestamp(rawValue: 1_700_000_000)
     let target = PublicKey.fixture("target")
 
     /// Builds and signs a moderation event at a pinned timestamp.
