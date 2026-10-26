@@ -28,6 +28,14 @@ public actor RelayConnection {
     /// Active subscriptions (subscription ID -> filters) for resubscription after reconnect
     var subscriptions: [String: [Filter]] = [:]
 
+    /// REQs still on their way out, by subscription ID: the send's token and the filters the ID
+    /// was registered with before it. A failed REQ restores them only while its token is still
+    /// here — a later subscribe, unsubscribe, or teardown on the ID replaces or removes the entry.
+    private var subscriptionRequestsInFlight: [String: (token: UInt64, previousFilters: [Filter]?)] = [:]
+
+    /// The token of the most recent REQ sent.
+    private var lastSubscriptionRequestToken: UInt64 = 0
+
     /// The active WebSocket transport
     var webSocketTask: (any WebSocketSession)?
 
@@ -386,6 +394,7 @@ public actor RelayConnection {
         }
 
         subscriptions.removeAll()
+        subscriptionRequestsInFlight.removeAll()
         for waiters in pendingPublishWaiters.values {
             for waiter in waiters.values {
                 waiter.finish(throwing: Error.notConnected)
@@ -481,6 +490,27 @@ public actor RelayConnection {
         let generation = socketGeneration
 
         let text = try message.serialize()
+
+        // Track subscription state before the frame goes out: the send suspends, and an
+        // unsubscribe arriving meanwhile must find the subscription to forget and CLOSE — tracked
+        // only afterwards, the REQ would register a subscription its caller already ended. A
+        // `.count` message is intentionally not tracked: it is a one-shot request that must never
+        // be replayed on reconnect.
+        var request: (subscriptionID: String, token: UInt64)?
+        switch message {
+        case .request(let subscriptionID, let filters):
+            lastSubscriptionRequestToken &+= 1
+            request = (subscriptionID, lastSubscriptionRequestToken)
+            subscriptionRequestsInFlight[subscriptionID] = (
+                lastSubscriptionRequestToken, subscriptions[subscriptionID]
+            )
+            subscriptions[subscriptionID] = filters
+        case .close(let subscriptionID):
+            forgetSubscription(subscriptionID)
+        default:
+            break
+        }
+
         do {
             // Send with timeout
             try await withThrowingTaskGroup(of: Void.self) { group in
@@ -507,6 +537,9 @@ public actor RelayConnection {
                 discardSocket()
                 scheduleReconnectIfNeeded()
             }
+            if let request {
+                finishSubscriptionRequest(request, succeeded: false)
+            }
             if let error = error as? Error {
                 throw error
             } else {
@@ -514,17 +547,29 @@ public actor RelayConnection {
             }
         }
 
-        // Track subscription state. A `.count` message is intentionally not
-        // tracked: it is a one-shot request that must never be replayed on
-        // reconnect.
-        switch message {
-        case .request(let subscriptionID, let filters):
-            subscriptions[subscriptionID] = filters
-        case .close(let subscriptionID):
-            subscriptions.removeValue(forKey: subscriptionID)
-        default:
-            break
+        if let request {
+            finishSubscriptionRequest(request, succeeded: true)
         }
+    }
+
+    /// Settles the REQ sent under `request`. A failed one puts back the filters its subscription ID
+    /// had before — none for a new subscription — unless the ID changed hands while it was in
+    /// flight: a newer subscribe's registration is not clobbered, and one an unsubscribe removed is
+    /// not resurrected.
+    private func finishSubscriptionRequest(_ request: (subscriptionID: String, token: UInt64), succeeded: Bool) {
+        guard let inFlight = subscriptionRequestsInFlight[request.subscriptionID],
+            inFlight.token == request.token
+        else { return }
+        subscriptionRequestsInFlight.removeValue(forKey: request.subscriptionID)
+        guard !succeeded else { return }
+        subscriptions[request.subscriptionID] = inFlight.previousFilters
+    }
+
+    /// Forgets a subscription, including any REQ for it still in flight, so neither a reconnection
+    /// nor a failing REQ brings it back.
+    private func forgetSubscription(_ subscriptionID: String) {
+        subscriptions.removeValue(forKey: subscriptionID)
+        subscriptionRequestsInFlight.removeValue(forKey: subscriptionID)
     }
 
     /// Publishes an event to the relay and waits for OK from the relay.
@@ -870,13 +915,16 @@ public actor RelayConnection {
 
     /// Unsubscribes from a subscription.
     ///
-    /// The subscription is forgotten at once, so a reconnection does not re-request it. A CLOSE goes
+    /// The subscription is forgotten at once — even while its REQ is still being sent — so a
+    /// reconnection does not re-request it. A CLOSE goes
     /// out only when the connection is established and holds the subscription; otherwise this does
     /// nothing, and it never connects — a dropped socket took the relay's subscription with it. A
     /// CLOSE that fails to send is not reported: the failure discards the socket, and the relay's
     /// subscription with it.
     public func unsubscribe(subscriptionID: String) async {
-        guard subscriptions.removeValue(forKey: subscriptionID) != nil, state == .connected else { return }
+        guard subscriptions[subscriptionID] != nil else { return }
+        forgetSubscription(subscriptionID)
+        guard state == .connected else { return }
         try? await send(.close(subscriptionID: subscriptionID))
     }
 

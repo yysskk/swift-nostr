@@ -689,6 +689,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   when a `for await` over a client subscription ends — sent `CLOSE` to every relay in the pool, and
   each disconnected, failed, or backing-off relay reconnected (blocking up to `connectionTimeout`)
   just to send it. `CLOSE` now goes only to the connected relays holding the subscription.
+- **Unsubscribing while the REQ is still being sent ends the subscription**: `RelayConnection`
+  recorded a subscription only once its REQ had gone out, so an `unsubscribe(subscriptionID:)` in
+  that window found nothing to close and the REQ then registered it, leaving it open on the relay
+  and replayed on reconnect. It is now recorded before the REQ is sent, and a REQ that fails to
+  send restores what its ID held before unless a newer subscribe or unsubscribe has replaced it.
 
 ## [0.8.0] - 2026-10-25
 
