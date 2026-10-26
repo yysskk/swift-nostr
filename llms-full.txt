@@ -186,7 +186,7 @@ try await client.events.publishReply(to: parentEvent, content: "Nice post!")
 try await client.events.publishMetadata(UserMetadata(name: "Alice", about: "Nostr user"))
 try await client.events.publishReaction(to: note.event, content: "🤙")
 try await client.events.publishRepost(of: note.event, relayURL: "wss://relay.example.com")
-try await client.events.publishDeletion(eventIds: ["eventId1"], reason: "posted by mistake")
+try await client.events.publishDeletion(eventIds: [note.event.id.hex], reason: "posted by mistake")
 try await client.events.publishReport(pubkey: "authorHex", type: .impersonation)  // report a pubkey (NIP-56)
 try await client.events.publishReport(event: note.event, type: .spam, reason: "unsolicited")  // report an event and its author
 try await client.events.publishTextNote(content: "Important!", strategy: .quorum(2))
@@ -210,7 +210,7 @@ let mentions = try await client.subscriptions.mentions(pubkey: "...")
 let metadata = try await client.subscriptions.metadata(pubkeys: ["..."])
 
 // Custom filter subscription, events only
-let filter = Filter(kinds: [1], authors: ["pubkey1", "pubkey2"], limit: 100)
+let filter = Filter(authors: [alice, bob], kinds: [1], limit: 100)  // [PublicKey]
 for await event in try await client.subscriptions.events(filters: [filter]) { print(event.id) }
 
 // Relay-aware iteration
@@ -308,7 +308,8 @@ for await event in timeline.events { recent.append(event) }
 // Chat (kind 9, NIP-C7, by default; any kind allowed) with "previous" timeline references.
 try await client.groups.publishMessage(
     "hello", in: group,
-    previous: Groups.previousReferences(from: recent, excludingAuthor: await client.identity.publicKey))
+    previous: Groups.previousReferences(
+        from: recent, excludingAuthor: (await client.identity.publicKey).flatMap(PublicKey.init)))
 
 // Moderation (kinds 9000-9002, 9005, 9007-9010): the relay checks the author's role and answers with OK.
 try await client.groups.publishModeration(
@@ -343,7 +344,8 @@ NIP-01 Nostr Event (struct: Codable, Identifiable, Hashable, Sendable).
 Typed tag value (`Event.Tag`, top-level alias `Tag`). Event-construction APIs
 (`UnsignedEvent`, `signTextNote`, `events.publishTextNote`) take `[Tag]`; `Event.tags`
 stays `[[String]]` (the hashed wire form). `Tag` is array-literal expressible, so
-`tags: [["t", "nostr"]]` still compiles.
+`tags: [["t", "nostr"]]` still compiles. Builders that reference an event or a key take an
+`EventID` (`id`) or `PublicKey` (`pk`) and write its hex form.
 
 ```swift
 Tag.event(id, relayURL: "wss://r", marker: .reply)  // ["e", id, "wss://r", "reply"]
@@ -353,7 +355,8 @@ Tag.hashtag("nostr")             // ["t", "nostr"]
 Tag.identifier("my-article")     // ["d", "my-article"]
 Tag.subject("hi")                // ["subject", "hi"]
 Tag.word("spam")                 // ["word", "spam"] (NIP-51 muted word)
-Tag.address(kind: .longFormContent, pubkey: pk, identifier: "d")  // ["a", "30023:pk:d"] (optional relayURL:)
+Tag.quote(id, pubkey: pk)        // ["q", id, "", pk] (NIP-18; optional relayURL:)
+Tag.address(kind: .longFormContent, pubkey: pk, identifier: "d")  // ["a", "30023:<pk>:d"] (optional relayURL:)
 Tag.reference("https://x")       // ["r", "https://x"]
 Tag.group("abcdef")              // ["h", "abcdef"] (NIP-29 group scope, on everything a user sends)
 Tag.previous(["12345678"])       // ["previous", ref...] (NIP-29 timeline references)
@@ -373,8 +376,8 @@ Read accessors on `Event`:
 event.structuredTags            // [Tag]
 event.tags(named: "e")          // [Tag]
 event.firstTagValue(named: "subject")  // String?
-event.referencedEventIds        // values of "e" tags
-event.referencedPubkeys         // values of "p" tags
+event.referencedEventIDs        // [EventID] from "e" tags; malformed values are skipped
+event.referencedPubkeys         // [PublicKey] from "p" tags; malformed values are skipped
 ```
 
 ### Event.Kind
@@ -451,11 +454,11 @@ NIP-01 Subscription Filter (struct: Codable, Sendable, Hashable).
 
 ### Properties
 
-- `ids: [String]?` -- event IDs to match
-- `authors: [String]?` -- author pubkeys to match
+- `ids: [EventID]?` -- event IDs to match
+- `authors: [PublicKey]?` -- author public keys to match
 - `kinds: [Event.Kind]?` -- event kinds to match
-- `eventReferences: [String]?` -- #e tag references
-- `pubkeyReferences: [String]?` -- #p tag references
+- `eventReferences: [EventID]?` -- #e tag references
+- `pubkeyReferences: [PublicKey]?` -- #p tag references
 - `since: Int64?` -- unix timestamp lower bound
 - `until: Int64?` -- unix timestamp upper bound
 - `limit: Int?` -- max events to return
@@ -472,12 +475,13 @@ let values = filter.getTagQuery("t")
 ### Convenience Builders
 
 ```swift
-Filter.userNotes(pubkey: "...", limit: 50)
-Filter.metadata(pubkeys: ["..."])
-Filter.replies(to: "eventId", limit: 20)
-Filter.mentions(pubkey: "...")
+// Ids and keys encode as their hex strings, the NIP-01 wire form.
+Filter.userNotes(pubkey: pk, limit: 50)
+Filter.metadata(pubkeys: [pk])
+Filter.replies(to: eventID, limit: 20)
+Filter.mentions(pubkey: pk)
 Filter.globalFeed(limit: 100)
-Filter.contactList(pubkey: "...")
+Filter.contactList(pubkey: pk)   // also relayListMetadata(pubkey:), directMessageRelayList(pubkey:), and pubkeys: variants
 Filter.search("nostr", kinds: [.textNote], limit: 20)  // NIP-50 full-text search
 Filter.groupTimeline(groupID: "abcdef", kinds: [.chatMessage], limit: 50)  // NIP-29 "#h" timeline
 Filter.groupState(groupID: "abcdef")  // NIP-29 kind-39xxx state by "#d" (all five kinds by default)
@@ -526,7 +530,7 @@ Messages received from relay (NIP-01) (enum: Sendable).
 - `.event(subscriptionId: String, event: Event)`
 - `.endOfStoredEvents(subscriptionId: String)`
 - `.notice(message: String)`
-- `.ok(eventId: String, accepted: Bool, message: String)` -- NIP-20
+- `.ok(eventID: EventID, accepted: Bool, message: String)` -- an `OK` whose id is not canonical hex fails to parse (`invalidMessageFormat`)
 - `.auth(challenge: String)` -- NIP-42
 - `.closed(subscriptionId: String, message: String)`
 - `.count(subscriptionId: String, count: Int, approximate: Bool?)` -- NIP-45
@@ -695,9 +699,8 @@ let signer = try EventSigner(nsec: "nsec1...")
 
 ### Properties
 
-- `publicKey: String` -- hex public key
+- `publicKey: PublicKey`
 - `npub: String`
-- `keyPair: KeyPair`
 
 ### Signing Methods
 
@@ -707,7 +710,7 @@ let note = try signer.signTextNote(content: "Hello", tags: [])
 let meta = try signer.signMetadata(UserMetadata(name: "Alice"))
 let reaction = try signer.signReaction(to: event, content: "🤙")
 let repost = try signer.signRepost(of: event, relayURL: "wss://...")
-let deletion = try signer.signDeletion(eventIds: ["id1"], reason: "mistake")
+let deletion = try signer.signDeletion(eventIDs: [event.id], reason: "mistake")
 let contacts = try signer.signContactList([Contact(pubkey: "...")])
 let relayList = try signer.signRelayListMetadata(read: ["wss://in.example"], write: ["wss://out.example"])
 let auth = try signer.signClientAuthentication(relayURL: url, challenge: "challenge")  // kind 22242, NIP-42
@@ -722,7 +725,7 @@ let eventReport = try signer.signReport(event: note, type: .illegal, reason: "re
 
 ```swift
 // Encrypt/decrypt with NIP-44 v2 as this signer's identity (self as sender/recipient).
-let ct = try signer.nip44Encrypt("secret", to: recipientPubkey)   // base64 payload
+let ct = try signer.nip44Encrypt("secret", to: recipientPubkey)   // PublicKey in, base64 payload out
 let pt = try signer.nip44Decrypt(ct, from: senderPubkey)
 ```
 
@@ -732,10 +735,10 @@ A signer abstraction over a local key (`EventSigner`) and a remote NIP-46 signer
 
 ```swift
 public protocol NostrSigning: Sendable {
-    var publicKey: String { get async throws }   // author key (the user key for a remote signer)
+    var publicKey: PublicKey { get async throws }   // author key (the user key for a remote signer)
     func sign(_ event: UnsignedEvent) async throws -> Event
-    func nip44Encrypt(_ plaintext: String, to recipientPubkey: String) async throws -> String
-    func nip44Decrypt(_ ciphertext: String, from senderPubkey: String) async throws -> String
+    func nip44Encrypt(_ plaintext: String, to recipientPubkey: PublicKey) async throws -> String
+    func nip44Decrypt(_ ciphertext: String, from senderPubkey: PublicKey) async throws -> String
 }
 
 let signer: any NostrSigning = EventSigner(keyPair: keyPair)   // or a RemoteSigner
@@ -747,8 +750,8 @@ let event = try await signer.sign(unsignedEvent)
 NIP-13 proof of work: leading-zero-bit difficulty over event ids, with mining and validation (enum).
 
 ```swift
-// Leading zero bits of a hex event id (each leading "0" nibble is 4 bits).
-let bits = ProofOfWork.difficulty(ofHexId: event.id.hex)
+// Leading zero bits of an event id, 0...256.
+let bits = ProofOfWork.difficulty(of: event.id)
 
 // Mine an unsigned event to a target difficulty, then sign it. Mining holds createdAt fixed
 // (deterministic) and is cooperative — it checks cancellation and yields, so it can be cancelled.
@@ -806,7 +809,7 @@ Uses ECDH shared secret, HKDF key derivation, ChaCha20 encryption, HMAC-SHA256 a
 
 ```swift
 // Seal
-let sealed = try SealedMessage.seal("message", for: recipientPubkey, using: senderKeyPair)
+let sealed = try SealedMessage.seal("message", for: recipientPubkey, using: senderKeyPair)  // PublicKey
 print(sealed.payload)  // base64-encoded
 
 // Open
@@ -1090,11 +1093,11 @@ let promote = try await Groups.moderationEvent(
 ### Timeline References ("previous")
 
 ```swift
-Groups.previousReference(forEventID: id)  // first 8 chars of an event id
-Groups.previousReferences(from: recentEvents, excludingAuthor: myPubkey, maxCount: 3)
+Groups.previousReference(forEventID: id)  // first 8 hex chars of an EventID
+Groups.previousReferences(from: recentEvents, excludingAuthor: myPubkey, maxCount: 3)  // PublicKey?
     // random sample over the newest 50 events, for a trailing "previous" tag (spec: carry >= 3)
 Groups.previousReferences(of: event)      // the references an event carries ([] when absent)
-Groups.unknownPreviousReferences(of: event, knownEventIDs: seenIds)
+Groups.unknownPreviousReferences(of: event, knownEventIDs: seenIDs)  // some Sequence<EventID>
     // references matching no known id — non-empty means the timeline may be forged
 ```
 
@@ -1103,8 +1106,10 @@ A deterministic overload `previousReferences(from:excludingAuthor:maxCount:using
 
 ### Relay-Generated State (kinds 39000-39005)
 
-Parsers check the kind, read the group id from the "d" tag, and — when `relayPubkey` is given —
-reject any other author; they never verify signatures (call `event.verify()` yourself). All
+Parsers check the kind, read the group id from the "d" tag, and — when `relayPubkey` (a
+`PublicKey`) is given — reject any other author; they never verify signatures (call
+`event.verify()` yourself). A "p" or "e" entry whose value is not a canonical hex key or id is
+skipped. All
 throw `Groups.ValidationError` (`invalidEventKind`, `missingGroupID`, `unexpectedAuthor`,
 `missingTag`, `unsupportedModerationKind`).
 
@@ -1115,10 +1120,10 @@ let meta = try Groups.Metadata(event: e39000, relayPubkey: relayPubkey)
 // .additionalTags (uninterpreted tags, lossless), .toTags / .fieldTags for re-emission
 // (fieldTags is exactly the kind-9002 edit-metadata tag layout)
 
-let admins = try Groups.AdminList(event: e39001)   // .admins: [Groups.Admin] (pubkey + roles)
-let members = try Groups.MemberList(event: e39002) // .members: [String]; may be partial or withheld
+let admins = try Groups.AdminList(event: e39001)   // .admins: [Groups.Admin] (PublicKey + roles)
+let members = try Groups.MemberList(event: e39002) // .members: [PublicKey]; may be partial or withheld
 let roles = try Groups.RoleList(event: e39003)     // .roles: [Groups.Role] (name + description?)
-let pins = try Groups.PinList(event: e39005)       // .items: [Groups.PinnedItem] (.event(id:) / .address)
+let pins = try Groups.PinList(event: e39005)       // .items: [Groups.PinnedItem] (.event(id: EventID) / .address)
 ```
 
 LiveKit AV rooms (kind 39004 and the .well-known JWT flow) are not modeled — only the
@@ -1132,7 +1137,7 @@ separate NIP and not part of this library's NIP-29 surface.
 let request = try Groups.ModerationRequest(event: e9000)
 print(request.action, request.groupID, request.reason ?? "", request.previousReferences)
 
-// A pubkey's standing from kind-9000/9001 history — the latest event targeting it wins
+// A PublicKey's standing from kind-9000/9001 history — the latest event targeting it wins
 // (ties broken by lowest id, the NIP-01 convention). nil means no record: assume non-member.
 switch Groups.membership(of: pubkey, in: moderationEvents) {
 case .member(let roles): print("member", roles)
@@ -1247,6 +1252,7 @@ NIP-11 Relay Information Document (struct: Codable, Sendable, Hashable). All fie
 let info = try await RelayInformation.fetch(fromRelayURLString: "wss://relay.example.com")
 print(info.name)            // String?
 print(info.supportedNIPs)   // [Int]?
+print(info.pubkey)          // PublicKey? -- nil when absent or not canonical hex (decoded leniently)
 print(info.limitation?.authRequired)
 
 // From an existing RelayConnection
@@ -1323,7 +1329,7 @@ Manages WebSocket connection to a single relay (actor).
 - `state: RelayConnectionState` -- current connection state
 - `config: RelayConnectionConfig`
 - `authenticationChallenge: String?` -- latest NIP-42 AUTH challenge (session-scoped)
-- `authenticatedPubkeys: Set<String>` / `isAuthenticated: Bool` -- NIP-42 session state
+- `authenticatedPubkeys: Set<PublicKey>` / `isAuthenticated: Bool` -- NIP-42 session state
 
 ### Configuration
 
@@ -1483,17 +1489,18 @@ let remoteSignerPubkey = try await signer.awaitConnection()
 ### Commands
 
 ```swift
-let userPubkey = try await signer.userPublicKey()  // get_public_key; cached; may differ from the signer's
+let userPubkey = try await signer.publicKey  // PublicKey via get_public_key; cached; may differ from the signer's
+let userPubkeyHex = try await signer.userPublicKey()  // the same key as hex
 
 // sign_event: signs remotely, then verifies the returned event and checks its kind/content/tags/
 // created_at match the request (throws RemoteSignerError.responseValidationFailed otherwise).
 let signed = try await signer.sign(UnsignedEvent(pubkey: userPubkey, kind: .textNote, content: "hi"))
 
 try await signer.ping()                                       // expects "pong"
-let ct = try await signer.nip44Encrypt("hi", to: thirdPartyPubkey)
-let pt = try await signer.nip44Decrypt(ct, from: thirdPartyPubkey)
-let ct04 = try await signer.nip04Encrypt("hi", to: thirdPartyPubkey)  // legacy NIP-04
-let pt04 = try await signer.nip04Decrypt(ct04, from: thirdPartyPubkey)
+let ct = try await signer.nip44Encrypt("hi", to: thirdParty)   // PublicKey
+let pt = try await signer.nip44Decrypt(ct, from: thirdParty)
+let ct04 = try await signer.nip04Encrypt("hi", to: thirdParty.hex)  // legacy NIP-04, hex string
+let pt04 = try await signer.nip04Decrypt(ct04, from: thirdParty.hex)
 let relays = try await signer.switchRelays()                  // [URL]? — nil when the signer keeps its set
 await signer.logout()                                          // best-effort logout, then disconnect
 await signer.disconnect()                                      // tear down; fails in-flight with notConnected

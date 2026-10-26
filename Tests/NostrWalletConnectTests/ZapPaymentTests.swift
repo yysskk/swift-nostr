@@ -1,5 +1,6 @@
 import Foundation
 import NostrCore
+import NostrTestSupport
 import Testing
 
 @testable import NostrWalletConnect
@@ -12,7 +13,7 @@ struct ZapPaymentTests {
             minSendable: 1000,
             maxSendable: 1_000_000_000,
             allowsNostr: true,
-            nostrPubkey: String(repeating: "0", count: 64))
+            nostrPubkey: PublicKey.fixture("0"))
     }
 
     @Test("payZap fetches the invoice and pays it, returning the preimage")
@@ -29,7 +30,7 @@ struct ZapPaymentTests {
         MockURLProtocol.statusCode = 200
         MockURLProtocol.responseBody = Data(#"{"pr":"lnbc210n1pzapinvoice"}"#.utf8)
         let zapRequest = try zapSigner.signZapRequest(
-            recipientPubkey: String(repeating: "1", count: 64), relays: ["wss://relay.example"],
+            recipientPubkey: PublicKey.fixture("1"), relays: ["wss://relay.example"],
             amountMillisats: 21000)
 
         async let result = connection.payZap(
@@ -68,7 +69,7 @@ struct ZapPaymentTests {
         MockURLProtocol.statusCode = 200
         MockURLProtocol.responseBody = Data(#"{"pr":"lnbc210n1pzapinvoice"}"#.utf8)
         let zapRequest = try zapSigner.signZapRequest(
-            recipientPubkey: String(repeating: "1", count: 64), relays: ["wss://relay.example"],
+            recipientPubkey: PublicKey.fixture("1"), relays: ["wss://relay.example"],
             amountMillisats: 21000)
 
         async let result = connection.payZap(
@@ -103,7 +104,7 @@ struct ZapPaymentTests {
             uri: try NWCFixtures.uri(wallet: wallet, client: client), transport: transport)
 
         let zapRequest = try zapSigner.signZapRequest(
-            recipientPubkey: String(repeating: "1", count: 64), relays: ["wss://relay.example"])
+            recipientPubkey: PublicKey.fixture("1"), relays: ["wss://relay.example"])
 
         await #expect(throws: LNURLPayResponse.InvoiceError.self) {
             _ = try await connection.payZap(

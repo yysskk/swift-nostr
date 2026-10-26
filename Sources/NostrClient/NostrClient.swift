@@ -91,7 +91,7 @@ public actor NostrClient {
     /// Backs ``NostrIdentityAPI/setSigner(_:)-(EventSigner)``.
     func install(_ signer: EventSigner) async {
         activeSigner = signer
-        cachedPublicKey = signer.typedPublicKey
+        cachedPublicKey = signer.publicKey
         await refreshAuthenticationResponder()
     }
 
@@ -100,7 +100,7 @@ public actor NostrClient {
     ///
     /// Backs ``NostrIdentityAPI/setSigner(_:)-(any NostrSigning)``.
     func install(_ signer: any NostrSigning) async throws {
-        cachedPublicKey = try PublicKey(hex: await signer.publicKey)
+        cachedPublicKey = try await signer.publicKey
         activeSigner = signer
         await refreshAuthenticationResponder()
     }

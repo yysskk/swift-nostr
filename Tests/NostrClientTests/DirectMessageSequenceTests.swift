@@ -9,19 +9,19 @@ import Testing
 private struct UnreachableSigner: NostrSigning {
     let keyPair: KeyPair
 
-    var publicKey: String {
-        get async throws { keyPair.publicKey.hex }
+    var publicKey: PublicKey {
+        get async throws { keyPair.publicKey }
     }
 
     func sign(_ event: UnsignedEvent) async throws -> Event {
         throw NostrError.timeout
     }
 
-    func nip44Encrypt(_ plaintext: String, to recipientPubkey: String) async throws -> String {
+    func nip44Encrypt(_ plaintext: String, to recipientPubkey: PublicKey) async throws -> String {
         throw NostrError.timeout
     }
 
-    func nip44Decrypt(_ ciphertext: String, from senderPubkey: String) async throws -> String {
+    func nip44Decrypt(_ ciphertext: String, from senderPubkey: PublicKey) async throws -> String {
         throw NostrError.timeout
     }
 }

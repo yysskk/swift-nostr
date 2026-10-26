@@ -76,19 +76,30 @@ public struct NostrContentReference: Sendable, Hashable {
     /// `p` for npub/nprofile mentions, `q` for note/nevent quotes, `a` for `naddr` —
     /// each carrying the entity's first relay hint when present.
     public var tag: Tag {
+        // Every stored entity came from `NIP19Entity.decode`, whose keys and ids are always
+        // canonical 32-byte hex, so these conversions cannot fail.
+        func publicKey(_ hex: String) -> PublicKey {
+            guard let key = PublicKey(hex) else { preconditionFailure("A decoded NIP-19 key is canonical hex") }
+            return key
+        }
+        func eventID(_ hex: String) -> EventID {
+            guard let id = EventID(hex) else { preconditionFailure("A decoded NIP-19 id is canonical hex") }
+            return id
+        }
+
         switch entity {
-        case .npub(let publicKey):
-            return .pubkey(publicKey)
+        case .npub(let hex):
+            return .pubkey(publicKey(hex))
         case .nprofile(let profile):
-            return .pubkey(profile.publicKey, relayURL: profile.relays.first)
-        case .note(let id):
-            return .quote(id)
+            return .pubkey(publicKey(profile.publicKey), relayURL: profile.relays.first)
+        case .note(let hex):
+            return .quote(eventID(hex))
         case .nevent(let event):
-            return .quote(event.eventId, relayURL: event.relays.first, pubkey: event.author)
+            return .quote(eventID(event.eventId), relayURL: event.relays.first, pubkey: event.author.map(publicKey))
         case .naddr(let addr):
             return .address(
                 kind: Event.Kind(rawValue: addr.kind),
-                pubkey: addr.author,
+                pubkey: publicKey(addr.author),
                 identifier: addr.identifier,
                 relayURL: addr.relays.first
             )

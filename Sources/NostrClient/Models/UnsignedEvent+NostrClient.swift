@@ -51,7 +51,7 @@ extension UnsignedEvent {
             kind: .report,
             tags: [
                 Tag(name: "e", values: [event.id.hex, type.rawValue]),
-                Tag(name: "p", values: [event.pubkey.hex]),
+                .pubkey(event.pubkey),
             ],
             content: reason
         )

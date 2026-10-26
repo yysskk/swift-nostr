@@ -35,7 +35,7 @@ struct HTTPAuthValidationTests {
         let event = try HTTPAuth.validate(
             authorization: header, url: url, method: "GET", now: now)
 
-        #expect(event.pubkey.hex == signer.publicKey)
+        #expect(event.pubkey == signer.publicKey)
         #expect(event.kind == .httpAuth)
     }
 
@@ -47,7 +47,7 @@ struct HTTPAuthValidationTests {
         let event = try HTTPAuth.validate(
             authorization: header, url: url, method: "POST", payload: body, now: now)
 
-        #expect(event.pubkey.hex == signer.publicKey)
+        #expect(event.pubkey == signer.publicKey)
     }
 
     @Test("the NIP-98 spec example header decodes, and its inconsistent signature is rejected")
@@ -155,7 +155,7 @@ struct HTTPAuthValidationTests {
     func wrongKind() async throws {
         let signer = EventSigner(keyPair: try KeyPair())
         let note = try signer.sign(
-            UnsignedEvent(pubkey: try PublicKey(hex: signer.publicKey), kind: .textNote, content: ""))
+            UnsignedEvent(pubkey: signer.publicKey, kind: .textNote, content: ""))
 
         #expect(throws: HTTPAuth.ValidationError.invalidEventKind(.textNote)) {
             try HTTPAuth.validate(
@@ -287,7 +287,7 @@ struct HTTPAuthValidationTests {
         // Succeeds even though the event is long expired against the real clock.
         let event = try HTTPAuth.event(fromAuthorizationHeader: header)
 
-        #expect(event.pubkey.hex == signer.publicKey)
+        #expect(event.pubkey == signer.publicKey)
         #expect(event.firstTagValue(named: "u") == url.absoluteString)
     }
 }

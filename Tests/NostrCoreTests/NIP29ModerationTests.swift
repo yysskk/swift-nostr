@@ -23,7 +23,7 @@ private func makeEvent(
 @Suite("NIP-29 Moderation Builders")
 struct NIP29ModerationBuilderTests {
     let createdAt = Date(timeIntervalSince1970: 1_700_000_000)
-    let target = String(repeating: "b", count: 64)
+    let target = PublicKey.fixture("target")
 
     @Test("every action maps to its spec kind")
     func actionKinds() {
@@ -32,7 +32,7 @@ struct NIP29ModerationBuilderTests {
         #expect(
             Groups.ModerationAction.editMetadata(Groups.Metadata(groupID: "abcdef")).kind
                 == .groupEditMetadata)
-        #expect(Groups.ModerationAction.deleteEvent(id: target).kind == .groupDeleteEvent)
+        #expect(Groups.ModerationAction.deleteEvent(id: EventID.fixture("deleted")).kind == .groupDeleteEvent)
         #expect(Groups.ModerationAction.createGroup.kind == .groupCreation)
         #expect(Groups.ModerationAction.deleteGroup.kind == .groupDeletion)
         #expect(Groups.ModerationAction.createInvite(code: "invite123").kind == .groupCreateInvite)
@@ -51,7 +51,7 @@ struct NIP29ModerationBuilderTests {
         #expect(unsigned.kind == .groupPutUser)
         #expect(unsigned.pubkey == PublicKey.fixture("admin"))
         #expect(unsigned.createdAt == 1_700_000_000)
-        #expect(unsigned.tags == [["h", "abcdef"], ["p", target, "ceo", "gardener"]])
+        #expect(unsigned.tags == [["h", "abcdef"], ["p", target.hex, "ceo", "gardener"]])
         #expect(unsigned.content.isEmpty)
     }
 
@@ -60,13 +60,13 @@ struct NIP29ModerationBuilderTests {
         let put = Groups.moderationEvent(
             .putUser(pubkey: target, roles: []), groupID: "abcdef", pubkey: PublicKey.fixture("admin"),
             createdAt: createdAt)
-        #expect(put.tags == [["h", "abcdef"], ["p", target]])
+        #expect(put.tags == [["h", "abcdef"], ["p", target.hex]])
 
         let remove = Groups.moderationEvent(
             .removeUser(pubkey: target), groupID: "abcdef", reason: "spam", pubkey: PublicKey.fixture("admin"),
             createdAt: createdAt)
         #expect(remove.kind == .groupRemoveUser)
-        #expect(remove.tags == [["h", "abcdef"], ["p", target]])
+        #expect(remove.tags == [["h", "abcdef"], ["p", target.hex]])
         #expect(remove.content == "spam")
     }
 
@@ -98,12 +98,12 @@ struct NIP29ModerationBuilderTests {
 
     @Test("delete-event and create-invite carry their e and code tags")
     func deleteEventAndInviteLayouts() {
-        let id = String(repeating: "c", count: 64)
+        let id = EventID.fixture("deleted")
         let deletion = Groups.moderationEvent(
             .deleteEvent(id: id), groupID: "abcdef", reason: "off topic", pubkey: PublicKey.fixture("admin"),
             createdAt: createdAt)
         #expect(deletion.kind == .groupDeleteEvent)
-        #expect(deletion.tags == [["h", "abcdef"], ["e", id]])
+        #expect(deletion.tags == [["h", "abcdef"], ["e", id.hex]])
         #expect(deletion.content == "off topic")
 
         let invite = Groups.moderationEvent(
@@ -129,8 +129,8 @@ struct NIP29ModerationBuilderTests {
 
     @Test("update-pin-list preserves the interleaved order of e and a items")
     func pinListLayout() {
-        let first = String(repeating: "3", count: 64)
-        let second = String(repeating: "4", count: 64)
+        let first = EventID.fixture("first")
+        let second = EventID.fixture("second")
         let address = "39000:\(String(repeating: "b", count: 64)):abcdef"
 
         let unsigned = Groups.moderationEvent(
@@ -141,7 +141,7 @@ struct NIP29ModerationBuilderTests {
         )
 
         #expect(unsigned.kind == .groupUpdatePinList)
-        #expect(unsigned.tags == [["h", "abcdef"], ["e", first], ["a", address], ["e", second]])
+        #expect(unsigned.tags == [["h", "abcdef"], ["e", first.hex], ["a", address], ["e", second.hex]])
 
         let cleared = Groups.moderationEvent(
             .updatePinList([]), groupID: "abcdef", pubkey: PublicKey.fixture("admin"), createdAt: createdAt)
@@ -161,7 +161,7 @@ struct NIP29ModerationBuilderTests {
         #expect(
             unsigned.tags == [
                 ["h", "abcdef"],
-                ["p", target, "member"],
+                ["p", target.hex, "member"],
                 ["previous", "00000001", "00000002", "00000003"],
             ])
 
@@ -184,9 +184,9 @@ struct NIP29ModerationBuilderTests {
         )
 
         #expect(event.kind == .groupRemoveUser)
-        #expect(event.pubkey.hex == signer.publicKey)
+        #expect(event.pubkey == signer.publicKey)
         #expect(event.createdAt == 1_700_000_000)
-        #expect(event.tags == [["h", "abcdef"], ["p", target]])
+        #expect(event.tags == [["h", "abcdef"], ["p", target.hex]])
         #expect(event.content == "spam")
         #expect(try event.verify())
     }
@@ -195,7 +195,7 @@ struct NIP29ModerationBuilderTests {
 @Suite("NIP-29 Moderation Parsing")
 struct NIP29ModerationParsingTests {
     let createdAt = Date(timeIntervalSince1970: 1_700_000_000)
-    let target = String(repeating: "b", count: 64)
+    let target = PublicKey.fixture("target")
 
     /// Builds and signs a moderation event at a pinned timestamp.
     private func signedModeration(
@@ -211,7 +211,7 @@ struct NIP29ModerationParsingTests {
                 groupID: groupID,
                 previous: previous,
                 reason: reason,
-                pubkey: try PublicKey(hex: signer.publicKey),
+                pubkey: signer.publicKey,
                 createdAt: createdAt
             )
         )
@@ -272,7 +272,7 @@ struct NIP29ModerationParsingTests {
 
     @Test("a delete-event round-trips its target id and reason")
     func deleteEventRoundTrip() throws {
-        let id = String(repeating: "c", count: 64)
+        let id = EventID.fixture("deleted")
 
         let request = try Groups.ModerationRequest(
             event: try signedModeration(.deleteEvent(id: id), reason: "off topic"))
@@ -305,8 +305,8 @@ struct NIP29ModerationParsingTests {
 
     @Test("an update-pin-list round-trips interleaved items and an empty list")
     func pinListRoundTrip() throws {
-        let first = String(repeating: "3", count: 64)
-        let second = String(repeating: "4", count: 64)
+        let first = EventID.fixture("first")
+        let second = EventID.fixture("second")
         let address = "39000:\(String(repeating: "b", count: 64)):abcdef"
         let items: [Groups.PinnedItem] = [.event(id: first), .address(address), .event(id: second)]
 
@@ -323,7 +323,7 @@ struct NIP29ModerationParsingTests {
     func unsupportedKinds() {
         for raw in [1, 9003, 9004, 9006, 9011] {
             let kind = Event.Kind(rawValue: raw)
-            let event = makeEvent(kind: kind, tags: [["h", "abcdef"], ["p", target]])
+            let event = makeEvent(kind: kind, tags: [["h", "abcdef"], ["p", target.hex]])
 
             #expect(throws: Groups.ValidationError.unsupportedModerationKind(kind)) {
                 try Groups.ModerationRequest(event: event)
@@ -348,7 +348,7 @@ struct NIP29ModerationParsingTests {
         ]
         for kind in kinds {
             for tags in [[], [["h"]], [["h", ""]]] as [[[String]]] {
-                let event = makeEvent(kind: kind, tags: tags + [["p", target]])
+                let event = makeEvent(kind: kind, tags: tags + [["p", target.hex]])
                 #expect(throws: Groups.ValidationError.missingGroupID(kind)) {
                     try Groups.ModerationRequest(event: event)
                 }
@@ -369,6 +369,42 @@ struct NIP29ModerationParsingTests {
                 try Groups.ModerationRequest(event: valueless)
             }
         }
+    }
+
+    /// Moderation events are written by whoever signed them, so a target that is not a canonical
+    /// key or id counts as no target at all.
+    @Test("put-user and remove-user treat a malformed p value as a missing p tag")
+    func malformedPubkeyTag() {
+        for kind in [Event.Kind.groupPutUser, .groupRemoveUser] {
+            for value in ["other", target.hex.uppercased(), String(target.hex.dropLast())] {
+                let event = makeEvent(kind: kind, tags: [["h", "abcdef"], ["p", value]])
+                #expect(throws: Groups.ValidationError.missingTag(name: "p", kind: kind)) {
+                    try Groups.ModerationRequest(event: event)
+                }
+            }
+        }
+    }
+
+    @Test("delete-event treats a malformed e value as a missing e tag")
+    func malformedEventTag() {
+        let event = makeEvent(kind: .groupDeleteEvent, tags: [["h", "abcdef"], ["e", "not-an-id"]])
+
+        #expect(throws: Groups.ValidationError.missingTag(name: "e", kind: .groupDeleteEvent)) {
+            try Groups.ModerationRequest(event: event)
+        }
+    }
+
+    @Test("update-pin-list skips pinned events whose id is malformed")
+    func pinListSkipsMalformedIDs() throws {
+        let pinned = EventID.fixture("pinned")
+        let event = makeEvent(
+            kind: .groupUpdatePinList,
+            tags: [["h", "abcdef"], ["e", "not-an-id"], ["e", pinned.hex], ["a", "39000:pubkey:abcdef"]]
+        )
+
+        #expect(
+            try Groups.ModerationRequest(event: event).action
+                == .updatePinList([.event(id: pinned), .address("39000:pubkey:abcdef")]))
     }
 
     @Test("delete-event requires an e tag")
@@ -394,7 +430,7 @@ struct NIP29ModerationParsingTests {
     func putUserFirstTagWins() throws {
         let event = makeEvent(
             kind: .groupPutUser,
-            tags: [["h", "abcdef"], ["p", target, "ceo"], ["p", "other", "member"]]
+            tags: [["h", "abcdef"], ["p", target.hex, "ceo"], ["p", "other", "member"]]
         )
 
         #expect(try Groups.ModerationRequest(event: event).action == .putUser(pubkey: target, roles: ["ceo"]))
@@ -404,7 +440,7 @@ struct NIP29ModerationParsingTests {
     func removeUserExtras() throws {
         let event = makeEvent(
             kind: .groupRemoveUser,
-            tags: [["h", "abcdef"], ["p", target, "ceo"], ["p", "other"]]
+            tags: [["h", "abcdef"], ["p", target.hex, "ceo"], ["p", "other"]]
         )
 
         #expect(try Groups.ModerationRequest(event: event).action == .removeUser(pubkey: target))

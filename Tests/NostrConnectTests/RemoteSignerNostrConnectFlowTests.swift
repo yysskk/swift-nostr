@@ -1,5 +1,6 @@
 import Foundation
 import NostrCore
+import NostrTestSupport
 import Testing
 
 @testable import NostrConnect
@@ -62,7 +63,7 @@ struct RemoteSignerNostrConnectFlowTests {
         try await waitForSubscription(transport)
         let subscribed = await transport.subscriptions.values.first?.first
         #expect(subscribed?.authors == nil)
-        #expect(subscribed?.pubkeyReferences == [client.publicKey.hex])
+        #expect(subscribed?.pubkeyReferences == [client.publicKey])
 
         // The signer accepts by echoing the invitation secret as the response result.
         try await transport.deliver(
@@ -90,7 +91,7 @@ struct RemoteSignerNostrConnectFlowTests {
 
         // After discovery the subscription is narrowed to the signer's pubkey for defense in depth.
         let repinned = await transport.subscriptions.values.first?.first
-        #expect(repinned?.authors == [signer.publicKey.hex])
+        #expect(repinned?.authors == [signer.publicKey])
     }
 
     // MARK: - secret validation
@@ -144,9 +145,9 @@ struct RemoteSignerNostrConnectFlowTests {
         #expect(request.method == RemoteSignerMethod.getPublicKey.rawValue)
         try await transport.deliver(
             RemoteSignerFixtures.response(
-                requestID: request.id, result: "userpub", client: client, signer: signer))
+                requestID: request.id, result: PublicKey.fixture("user").hex, client: client, signer: signer))
 
-        #expect(try await pubkey.value == "userpub")
+        #expect(try await pubkey.value == PublicKey.fixture("user").hex)
     }
 
     // MARK: - timeout

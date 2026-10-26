@@ -22,7 +22,7 @@ struct HTTPAuthTests {
         #expect(event.firstTagValue(named: "u") == "https://api.example.com/upload?type=media")
         #expect(event.firstTagValue(named: "method") == "GET")
         #expect(event.firstTagValue(named: "payload") == nil)
-        #expect(event.pubkey.hex == signer.publicKey)
+        #expect(event.pubkey == signer.publicKey)
         #expect(try event.verify())
     }
 
@@ -77,7 +77,7 @@ struct HTTPAuthTests {
     func headerValueRejectsWrongKind() async throws {
         let signer = EventSigner(keyPair: try KeyPair())
         let note = try signer.sign(
-            UnsignedEvent(pubkey: try PublicKey(hex: signer.publicKey), kind: .textNote, content: "hi"))
+            UnsignedEvent(pubkey: signer.publicKey, kind: .textNote, content: "hi"))
 
         #expect(throws: NostrError.invalidData) {
             try HTTPAuth.authorizationHeaderValue(for: note)

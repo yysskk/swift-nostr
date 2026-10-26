@@ -56,24 +56,24 @@ struct FetchVerificationTests {
     ) throws -> Event {
         try signer.sign(
             UnsignedEvent(
-                pubkey: try PublicKey(hex: signer.publicKey), createdAt: createdAt, kind: kind, rawTags: tags,
+                pubkey: signer.publicKey, createdAt: createdAt, kind: kind, rawTags: tags,
                 content: content))
     }
 
     /// An event claiming `pubkey` as its author, with a correct id but a signature that is not
     /// theirs — what a relay can fabricate for anyone.
     private func forged(
-        claiming pubkey: String,
+        claiming pubkey: PublicKey,
         kind: Event.Kind,
         createdAt: Int64,
         tags: [[String]] = [],
         content: String = ""
     ) throws -> Event {
         let unsigned = UnsignedEvent(
-            pubkey: try PublicKey(hex: pubkey), createdAt: createdAt, kind: kind, rawTags: tags, content: content)
+            pubkey: pubkey, createdAt: createdAt, kind: kind, rawTags: tags, content: content)
         return Event(
             id: try unsigned.computedID,
-            pubkey: try PublicKey(hex: pubkey),
+            pubkey: pubkey,
             createdAt: createdAt,
             kind: kind,
             tags: unsigned.tags,
@@ -101,7 +101,7 @@ struct FetchVerificationTests {
             tags: [["relay", "wss://attacker.example.com"]])
 
         let list = try await answering(socket, with: [real, forgery]) {
-            try await client.routing.fetchDirectMessageRelayList(for: victim.publicKey)
+            try await client.routing.fetchDirectMessageRelayList(for: victim.publicKey.hex)
         }
 
         #expect(list?.relays == ["wss://real.example.com"])
@@ -120,7 +120,7 @@ struct FetchVerificationTests {
             tags: [["relay", "wss://attacker.example.com"]])
 
         let list = try await answering(socket, with: [strangersList]) {
-            try await client.routing.fetchDirectMessageRelayList(for: victim.publicKey)
+            try await client.routing.fetchDirectMessageRelayList(for: victim.publicKey.hex)
         }
 
         #expect(list == nil)
@@ -142,7 +142,7 @@ struct FetchVerificationTests {
             tags: [["r", "wss://attacker.example.com"]])
 
         let list = try await answering(socket, with: [real, forgery]) {
-            try await client.routing.fetchRelayList(for: victim.publicKey)
+            try await client.routing.fetchRelayList(for: victim.publicKey.hex)
         }
 
         #expect(list?.entries.map(\.url) == ["wss://real.example.com"])
@@ -166,7 +166,7 @@ struct FetchVerificationTests {
 
         // The forgery arrives first and is the newest by timestamp: both old selections favoured it.
         let metadata = try await answering(socket, with: [forgery, stale, current]) {
-            try await client.events.fetchMetadata(pubkey: victim.publicKey)
+            try await client.events.fetchMetadata(pubkey: victim.publicKey.hex)
         }
 
         #expect(metadata?.name == "current")

@@ -229,6 +229,6 @@ public struct DirectMessageParser: Sendable {
         if let tagged = rumor.firstTagValue(named: "p") {
             return tagged
         }
-        return try await signer.publicKey
+        return try await signer.publicKey.hex
     }
 }

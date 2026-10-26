@@ -12,12 +12,12 @@ private func stateEvent(
 ) throws -> Event {
     try signer.sign(
         UnsignedEvent(
-            pubkey: try PublicKey(hex: signer.publicKey), createdAt: createdAt, kind: kind, tags: tags, content: ""))
+            pubkey: signer.publicKey, createdAt: createdAt, kind: kind, tags: tags, content: ""))
 }
 
 /// One (kind, parser) pair per relay-generated state model, so the shared validation
 /// paths are exercised uniformly across all five parsers.
-private let stateParsers: [(kind: Event.Kind, parse: @Sendable (Event, String?) throws -> Void)] = [
+private let stateParsers: [(kind: Event.Kind, parse: @Sendable (Event, PublicKey?) throws -> Void)] = [
     (.groupMetadata, { _ = try Groups.Metadata(event: $0, relayPubkey: $1) }),
     (.groupAdmins, { _ = try Groups.AdminList(event: $0, relayPubkey: $1) }),
     (.groupMembers, { _ = try Groups.MemberList(event: $0, relayPubkey: $1) }),
@@ -204,8 +204,8 @@ struct NIP29GroupStateTests {
     @Test("an admin list with multi-role and role-less admins round-trips")
     func adminListRoundTrip() throws {
         let relay = EventSigner(keyPair: try KeyPair())
-        let ceo = String(repeating: "1", count: 64)
-        let greeter = String(repeating: "2", count: 64)
+        let ceo = PublicKey.fixture("ceo")
+        let greeter = PublicKey.fixture("greeter")
         let list = Groups.AdminList(
             groupID: "abcdef",
             admins: [
@@ -216,7 +216,7 @@ struct NIP29GroupStateTests {
 
         #expect(
             list.toTags.map(\.rawArray)
-                == [["d", "abcdef"], ["p", ceo, "ceo", "admin"], ["p", greeter]])
+                == [["d", "abcdef"], ["p", ceo.hex, "ceo", "admin"], ["p", greeter.hex]])
 
         let event = try stateEvent(kind: .groupAdmins, tags: list.toTags, signer: relay)
         #expect(try Groups.AdminList(event: event) == list)
@@ -225,10 +225,10 @@ struct NIP29GroupStateTests {
     @Test("a member list round-trips with order preserved")
     func memberListRoundTrip() throws {
         let relay = EventSigner(keyPair: try KeyPair())
-        let members = [String(repeating: "1", count: 64), String(repeating: "2", count: 64)]
+        let members = [PublicKey.fixture("first"), PublicKey.fixture("second")]
         let list = Groups.MemberList(groupID: "abcdef", members: members)
 
-        #expect(list.toTags.map(\.rawArray) == [["d", "abcdef"], ["p", members[0]], ["p", members[1]]])
+        #expect(list.toTags.map(\.rawArray) == [["d", "abcdef"], ["p", members[0].hex], ["p", members[1].hex]])
 
         let event = try stateEvent(kind: .groupMembers, tags: list.toTags, signer: relay)
         #expect(try Groups.MemberList(event: event) == list)
@@ -256,8 +256,8 @@ struct NIP29GroupStateTests {
     @Test("a pin list preserves the exact order of interleaved e and a items")
     func pinListRoundTrip() throws {
         let relay = EventSigner(keyPair: try KeyPair())
-        let first = String(repeating: "3", count: 64)
-        let second = String(repeating: "4", count: 64)
+        let first = EventID.fixture("first")
+        let second = EventID.fixture("second")
         let address = "39000:\(String(repeating: "b", count: 64)):abcdef"
         let list = Groups.PinList(
             groupID: "abcdef",
@@ -266,12 +266,39 @@ struct NIP29GroupStateTests {
 
         #expect(
             list.toTags.map(\.rawArray)
-                == [["d", "abcdef"], ["e", first], ["a", address], ["e", second]])
+                == [["d", "abcdef"], ["e", first.hex], ["a", address], ["e", second.hex]])
 
         let event = try stateEvent(kind: .groupPinList, tags: list.toTags, signer: relay)
         let parsed = try Groups.PinList(event: event)
         #expect(parsed == list)
         #expect(parsed.items == [.event(id: first), .address(address), .event(id: second)])
+    }
+
+    /// State events come from the group's relay, so a "p" or "e" value that is not a canonical key
+    /// or id is dropped while the well-formed entries around it are kept.
+    @Test("admin, member, and pin lists skip entries whose key or id is malformed")
+    func listsSkipMalformedEntries() throws {
+        let relay = EventSigner(keyPair: try KeyPair())
+        let member = PublicKey.fixture("member")
+        let pinned = EventID.fixture("pinned")
+        let malformed = ["not-a-key", member.hex.uppercased(), String(member.hex.dropLast())]
+
+        let admins = try stateEvent(
+            kind: .groupAdmins,
+            tags: [.identifier("abcdef")] + malformed.map { Event.Tag(name: "p", values: [$0, "ceo"]) }
+                + [["p", member.hex, "admin"]],
+            signer: relay)
+        #expect(try Groups.AdminList(event: admins).admins == [Groups.Admin(pubkey: member, roles: ["admin"])])
+
+        let members = try stateEvent(
+            kind: .groupMembers,
+            tags: [.identifier("abcdef")] + malformed.map { Event.Tag(name: "p", values: [$0]) } + [["p", member.hex]],
+            signer: relay)
+        #expect(try Groups.MemberList(event: members).members == [member])
+
+        let pins = try stateEvent(
+            kind: .groupPinList, tags: [["d", "abcdef"], ["e", "not-an-id"], ["e", pinned.hex]], signer: relay)
+        #expect(try Groups.PinList(event: pins).items == [.event(id: pinned)])
     }
 
     // MARK: Validation
@@ -341,7 +368,7 @@ struct NIP29GroupStateTests {
 
 @Suite("NIP-29 Group Membership")
 struct NIP29GroupMembershipTests {
-    let member = String(repeating: "c", count: 64)
+    let member = PublicKey.fixture("member")
 
     /// The 64-character event id whose first 8 characters encode `index` in hex.
     private func paddedID(_ index: Int) -> EventID {
@@ -364,13 +391,13 @@ struct NIP29GroupMembershipTests {
     private func putUser(id: EventID, createdAt: Int64, roles: [String]) -> Event {
         moderation(
             id: id, kind: .groupPutUser, createdAt: createdAt,
-            tags: [["h", "abcdef"], ["p", member] + roles])
+            tags: [["h", "abcdef"], ["p", member.hex] + roles])
     }
 
     private func removeUser(id: EventID, createdAt: Int64) -> Event {
         moderation(
             id: id, kind: .groupRemoveUser, createdAt: createdAt,
-            tags: [["h", "abcdef"], ["p", member]])
+            tags: [["h", "abcdef"], ["p", member.hex]])
     }
 
     @Test("membership is nil when no moderation event targets the pubkey")
@@ -424,12 +451,12 @@ struct NIP29GroupMembershipTests {
 
     @Test("moderation events targeting other pubkeys are ignored")
     func otherPubkeysIgnored() {
-        let other = String(repeating: "d", count: 64)
+        let other = PublicKey.fixture("other")
         let events = [
             putUser(id: paddedID(1), createdAt: 1_700_000_000, roles: ["member"]),
             moderation(
                 id: paddedID(2), kind: .groupRemoveUser, createdAt: 1_700_000_100,
-                tags: [["h", "abcdef"], ["p", other]]),
+                tags: [["h", "abcdef"], ["p", other.hex]]),
         ]
 
         #expect(Groups.membership(of: member, in: events) == .member(roles: ["member"]))
@@ -442,10 +469,10 @@ struct NIP29GroupMembershipTests {
             putUser(id: paddedID(1), createdAt: 1_700_000_000, roles: ["member"]),
             moderation(
                 id: paddedID(2), kind: .chatMessage, createdAt: 1_700_000_100,
-                tags: [["h", "abcdef"], ["p", member]]),
+                tags: [["h", "abcdef"], ["p", member.hex]]),
             moderation(
                 id: paddedID(3), kind: .groupDeleteEvent, createdAt: 1_700_000_200,
-                tags: [["h", "abcdef"], ["p", member]]),
+                tags: [["h", "abcdef"], ["p", member.hex]]),
         ]
 
         #expect(Groups.membership(of: member, in: events) == .member(roles: ["member"]))
@@ -453,10 +480,10 @@ struct NIP29GroupMembershipTests {
 
     @Test("a put-user event with several p tags applies the matching one")
     func multiplePubkeyTags() {
-        let other = String(repeating: "d", count: 64)
+        let other = PublicKey.fixture("other")
         let event = moderation(
             id: paddedID(1), kind: .groupPutUser, createdAt: 1_700_000_000,
-            tags: [["h", "abcdef"], ["p", other, "ceo"], ["p", member, "moderator"]])
+            tags: [["h", "abcdef"], ["p", other.hex, "ceo"], ["p", member.hex, "moderator"]])
 
         #expect(Groups.membership(of: member, in: [event]) == .member(roles: ["moderator"]))
         #expect(Groups.membership(of: other, in: [event]) == .member(roles: ["ceo"]))

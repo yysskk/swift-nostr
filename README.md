@@ -132,7 +132,7 @@ for await event in timeline.events {
 }
 
 // Custom filter
-let filter = Filter(kinds: [1], authors: ["pubkey1"], limit: 100)
+let filter = Filter(authors: [try PublicKey(npub: "npub1...")], kinds: [1], limit: 100)
 for await event in try await client.subscriptions.events(filters: [filter]) {
     print(event.id)
 }
@@ -223,7 +223,7 @@ A `RemoteSigner` can also drive a `NostrClient`: `client.identity.setSigner(_:)`
 
 ```swift
 try await client.identity.setSigner(signer)   // any NostrSigning — a RemoteSigner or a local EventSigner
-guard let userPubkey = await client.identity.publicKey else { return }
+let userPubkey = try await signer.publicKey
 let signed = try await client.identity.sign(
     UnsignedEvent(pubkey: userPubkey, kind: .textNote, content: "Signed by my bunker"))
 try await client.events.publish(signed)
@@ -273,7 +273,8 @@ for await event in timeline.events {
 try await client.groups.publishMessage(
     "Hello, group!",
     in: group,
-    previous: Groups.previousReferences(from: recent, excludingAuthor: await client.identity.publicKey)
+    previous: Groups.previousReferences(
+        from: recent, excludingAuthor: (await client.identity.publicKey).flatMap(PublicKey.init))
 )
 ```
 

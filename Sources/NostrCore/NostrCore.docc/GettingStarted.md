@@ -49,9 +49,11 @@ let signer = EventSigner(keyPair: keyPair)
 let note = try signer.signTextNote(content: "Hello, Nostr!")
 let reaction = try signer.signReaction(to: note, content: "🤙")
 
-// Or build any event yourself.
+// Or build any event yourself. Tags that reference an event or a key take the typed value.
 let custom = try signer.sign(
-    UnsignedEvent(pubkey: keyPair.publicKey, kind: .textNote, content: "gm")
+    UnsignedEvent(
+        pubkey: keyPair.publicKey, kind: .textNote,
+        tags: [.event(note.id, marker: .reply), .pubkey(note.pubkey)], content: "gm")
 )
 
 let isValid = try note.verify()
@@ -110,7 +112,8 @@ try await relay.connect()
 
 try await relay.send(.event(note))
 
-try await relay.subscribe(subscriptionId: "sub1", filters: [Filter(kinds: [.textNote], limit: 20)])
+try await relay.subscribe(
+    subscriptionId: "sub1", filters: [Filter(authors: [pubkey], kinds: [.textNote], limit: 20)])
 for await message in await relay.messages() {
     if case .event(_, let event) = message {
         print(event.content)

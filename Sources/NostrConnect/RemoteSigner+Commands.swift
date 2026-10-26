@@ -9,9 +9,18 @@ extension RemoteSigner {
     /// session identity. The result is cached, so subsequent calls return without another
     /// round-trip.
     /// - Returns: The user's public key (hex).
+    /// - Throws: ``RemoteSignerError/responseValidationFailed`` if the signer replies with anything
+    ///   but a canonical hex public key.
     public func userPublicKey() async throws -> String {
+        try await fetchUserPublicKey().hex
+    }
+
+    /// Fetches (and caches) the user's public key, parsed from the signer's hex reply.
+    func fetchUserPublicKey() async throws -> PublicKey {
         if let cached = userPublicKeyIfCached { return cached }
-        let pubkey = try await performSingle(method: .getPublicKey, params: [])
+        guard let pubkey = PublicKey(try await performSingle(method: .getPublicKey, params: [])) else {
+            throw RemoteSignerError.responseValidationFailed
+        }
         cacheUserPublicKey(pubkey)
         return pubkey
     }
@@ -63,20 +72,20 @@ extension RemoteSigner {
     /// with the user's key.
     /// - Parameters:
     ///   - plaintext: The message to encrypt.
-    ///   - thirdPartyPubkey: The recipient's public key (hex).
+    ///   - thirdPartyPubkey: The recipient's public key.
     /// - Returns: The NIP-44 ciphertext.
-    public func nip44Encrypt(_ plaintext: String, to thirdPartyPubkey: String) async throws -> String {
-        try await performSingle(method: .nip44Encrypt, params: [thirdPartyPubkey, plaintext])
+    public func nip44Encrypt(_ plaintext: String, to thirdPartyPubkey: PublicKey) async throws -> String {
+        try await performSingle(method: .nip44Encrypt, params: [thirdPartyPubkey.hex, plaintext])
     }
 
     /// Decrypts a NIP-44 message from a third party (`nip44_decrypt`); the signer performs it with
     /// the user's key.
     /// - Parameters:
     ///   - ciphertext: The NIP-44 ciphertext to decrypt.
-    ///   - thirdPartyPubkey: The sender's public key (hex).
+    ///   - thirdPartyPubkey: The sender's public key.
     /// - Returns: The decrypted plaintext.
-    public func nip44Decrypt(_ ciphertext: String, from thirdPartyPubkey: String) async throws -> String {
-        try await performSingle(method: .nip44Decrypt, params: [thirdPartyPubkey, ciphertext])
+    public func nip44Decrypt(_ ciphertext: String, from thirdPartyPubkey: PublicKey) async throws -> String {
+        try await performSingle(method: .nip44Decrypt, params: [thirdPartyPubkey.hex, ciphertext])
     }
 
     /// Encrypts `plaintext` for a third party using legacy NIP-04 (`nip04_encrypt`); the signer

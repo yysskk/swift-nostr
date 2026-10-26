@@ -1,5 +1,6 @@
 import Foundation
 import NostrCore
+import NostrTestSupport
 import Testing
 
 /// Filters are only correct if the keys reach the relay exactly as NIP-01 spells them. A relay
@@ -59,12 +60,16 @@ struct FilterSerializationTests {
     @Test("declared filter keys keep their wire spelling")
     func declaredKeysAreUnchanged() throws {
         let now = Int64(1_700_000_000)
+        let id = EventID.fixture("id")
+        let author = PublicKey.fixture("author")
+        let referencedEvent = EventID.fixture("referenced event")
+        let referencedPubkey = PublicKey.fixture("referenced pubkey")
         let filter = Filter(
-            ids: ["aa"],
-            authors: ["bb"],
+            ids: [id],
+            authors: [author],
             kinds: [1],
-            eventReferences: ["cc"],
-            pubkeyReferences: ["dd"],
+            eventReferences: [referencedEvent],
+            pubkeyReferences: [referencedPubkey],
             since: now,
             until: now + 60,
             limit: 10
@@ -72,11 +77,11 @@ struct FilterSerializationTests {
 
         let dictionary = try serializedFilter(filter)
 
-        #expect(dictionary["ids"] as? [String] == ["aa"])
-        #expect(dictionary["authors"] as? [String] == ["bb"])
+        #expect(dictionary["ids"] as? [String] == [id.hex])
+        #expect(dictionary["authors"] as? [String] == [author.hex])
         #expect(dictionary["kinds"] as? [Int] == [1])
-        #expect(dictionary["#e"] as? [String] == ["cc"])
-        #expect(dictionary["#p"] as? [String] == ["dd"])
+        #expect(dictionary["#e"] as? [String] == [referencedEvent.hex])
+        #expect(dictionary["#p"] as? [String] == [referencedPubkey.hex])
         #expect(dictionary["since"] as? Int64 == now)
         #expect(dictionary["until"] as? Int64 == now + 60)
         #expect(dictionary["limit"] as? Int == 10)

@@ -77,7 +77,7 @@ struct RelayMessageResponsePrefixTests {
     @Test("OK message exposes its machine-readable prefix")
     func okPrefix() throws {
         let message = try RelayMessage.parse(
-            #"["OK","eventid123",false,"auth-required: we only accept events from registered users"]"#
+            #"["OK","abababababababababababababababababababababababababababababababab",false,"auth-required: we only accept events from registered users"]"#
         )
         #expect(message.responsePrefix == .authRequired)
     }
@@ -92,7 +92,8 @@ struct RelayMessageResponsePrefixTests {
 
     @Test("OK message without a prefix has none")
     func okWithoutPrefix() throws {
-        let message = try RelayMessage.parse(#"["OK","eventid123",true,""]"#)
+        let eventID = String(repeating: "ab", count: 32)
+        let message = try RelayMessage.parse(#"["OK","\#(eventID)",true,""]"#)
         #expect(message.responsePrefix == nil)
     }
 

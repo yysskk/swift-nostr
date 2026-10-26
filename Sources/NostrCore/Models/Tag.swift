@@ -15,8 +15,8 @@ extension Event {
     /// placeholders for skipped middle elements:
     ///
     /// ```swift
-    /// Tag.event(noteId, marker: .reply)   // ["e", noteId, "", "reply"]
-    /// Tag.pubkey(pk, petname: "alice")    // ["p", pk, "", "alice"]
+    /// Tag.event(note.id, marker: .reply)  // ["e", "<id hex>", "", "reply"]
+    /// Tag.pubkey(alice, petname: "alice") // ["p", "<pubkey hex>", "", "alice"]
     /// Tag.hashtag("nostr")                // ["t", "nostr"]
     /// ```
     ///
@@ -64,14 +64,15 @@ extension Tag {
     }
 
     /// An "e" tag referencing an event (NIP-10): `["e", id, relay, marker, pubkey]`.
-    /// Skipped middle elements are padded with empty-string placeholders.
+    /// Skipped middle elements are padded with empty-string placeholders; the id and the
+    /// author's public key are written as hex.
     public static func event(
-        _ id: String,
+        _ id: EventID,
         relayURL: String? = nil,
         marker: EventMarker? = nil,
-        pubkey: String? = nil
+        pubkey: PublicKey? = nil
     ) -> Tag {
-        var values = [id]
+        var values = [id.hex]
         if let relayURL {
             values.append(relayURL)
         } else if marker != nil || pubkey != nil {
@@ -83,34 +84,36 @@ extension Tag {
             values.append("")
         }
         if let pubkey {
-            values.append(pubkey)
+            values.append(pubkey.hex)
         }
         return Tag(name: "e", values: values)
     }
 
     /// A "q" tag quoting another event (NIP-18): `["q", id, relay, pubkey]`.
-    /// Skipped middle elements are padded with empty-string placeholders.
-    public static func quote(_ id: String, relayURL: String? = nil, pubkey: String? = nil) -> Tag {
-        var values = [id]
+    /// Skipped middle elements are padded with empty-string placeholders; the id and the
+    /// author's public key are written as hex.
+    public static func quote(_ id: EventID, relayURL: String? = nil, pubkey: PublicKey? = nil) -> Tag {
+        var values = [id.hex]
         if let relayURL {
             values.append(relayURL)
         } else if pubkey != nil {
             values.append("")
         }
         if let pubkey {
-            values.append(pubkey)
+            values.append(pubkey.hex)
         }
         return Tag(name: "q", values: values)
     }
 
-    /// A "p" tag referencing a pubkey: `["p", pubkey, relay, petname]`.
-    /// Skipped middle elements are padded with empty-string placeholders.
+    /// A "p" tag referencing a public key: `["p", pubkey, relay, petname]`.
+    /// Skipped middle elements are padded with empty-string placeholders; the key is written
+    /// as hex.
     public static func pubkey(
-        _ pubkey: String,
+        _ pubkey: PublicKey,
         relayURL: String? = nil,
         petname: String? = nil
     ) -> Tag {
-        var values = [pubkey]
+        var values = [pubkey.hex]
         if let relayURL {
             values.append(relayURL)
         } else if petname != nil {
@@ -126,8 +129,8 @@ extension Tag {
     /// kind-39001 admin lists): `["p", pubkey, role...]`. Unlike
     /// ``pubkey(_:relayURL:petname:)``, index 1 here is a role, not a relay hint.
     /// https://github.com/nostr-protocol/nips/blob/master/29.md
-    public static func pubkey(_ pubkey: String, roles: [String]) -> Tag {
-        Tag(name: "p", values: [pubkey] + roles)
+    public static func pubkey(_ pubkey: PublicKey, roles: [String]) -> Tag {
+        Tag(name: "p", values: [pubkey.hex] + roles)
     }
 
     /// A "t" hashtag tag.
@@ -212,11 +215,11 @@ extension Tag {
     /// `["a", "kind:pubkey:identifier", relay?]`.
     public static func address(
         kind: Event.Kind,
-        pubkey: String,
+        pubkey: PublicKey,
         identifier: String,
         relayURL: String? = nil
     ) -> Tag {
-        var values = ["\(kind.rawValue):\(pubkey):\(identifier)"]
+        var values = ["\(kind.rawValue):\(pubkey.hex):\(identifier)"]
         if let relayURL {
             values.append(relayURL)
         }
@@ -278,7 +281,7 @@ extension Tag {
 
 // MARK: - Array Literal
 extension Tag: ExpressibleByArrayLiteral {
-    /// Builds a tag from a string array literal: `["e", eventId]`.
+    /// Builds a tag from a string array literal: `["t", "nostr"]`.
     /// The literal must contain at least the tag name.
     public init(arrayLiteral elements: String...) {
         precondition(!elements.isEmpty, "A tag array literal requires at least the tag name")
@@ -325,14 +328,20 @@ extension Event {
         tags(named: name).first?.primaryValue
     }
 
-    /// The event IDs referenced by "e" tags.
-    public var referencedEventIds: [String] {
-        tags.filter { $0.count >= 2 && $0[0] == "e" }.map { $0[1] }
+    /// The event ids referenced by "e" tags, in tag order.
+    ///
+    /// Tags come from whoever wrote the event, so an "e" tag whose value is not a canonical
+    /// 64-digit lowercase hex id is skipped rather than reported.
+    public var referencedEventIDs: [EventID] {
+        tags.compactMap { $0.count >= 2 && $0[0] == "e" ? EventID($0[1]) : nil }
     }
 
-    /// The pubkeys referenced by "p" tags.
-    public var referencedPubkeys: [String] {
-        tags.filter { $0.count >= 2 && $0[0] == "p" }.map { $0[1] }
+    /// The public keys referenced by "p" tags, in tag order.
+    ///
+    /// Tags come from whoever wrote the event, so a "p" tag whose value is not a canonical
+    /// 64-digit lowercase hex public key is skipped rather than reported.
+    public var referencedPubkeys: [PublicKey] {
+        tags.compactMap { $0.count >= 2 && $0[0] == "p" ? PublicKey($0[1]) : nil }
     }
 
     /// The event's NIP-40 expiration time, if it carries a valid `expiration` tag.

@@ -28,7 +28,7 @@ struct ReplyThreadingTests {
         let signer = EventSigner(keyPair: try KeyPair())
         let parent = try signer.sign(
             UnsignedEvent(
-                pubkey: try PublicKey(hex: signer.publicKey),
+                pubkey: signer.publicKey,
                 createdAt: 1_700_000_000,
                 kind: .textNote,
                 rawTags: parentTags,

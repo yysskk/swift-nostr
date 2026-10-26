@@ -22,18 +22,18 @@ extension RelayConnection {
                     case .string(let text):
                         if let relayMessage = try? RelayMessage.parse(text) {
                             switch relayMessage {
-                            case .ok(let eventId, let accepted, let message):
+                            case .ok(let eventID, let accepted, let message):
                                 // Settle a pending NIP-42 authentication for this event id.
-                                if let pubkey = pendingAuthentications.removeValue(forKey: eventId) {
+                                if let pubkey = pendingAuthentications.removeValue(forKey: eventID) {
                                     settleAuthentication(
                                         pubkey: pubkey, accepted: accepted, message: message)
                                 }
-                                for waiter in removeAllPublishWaiters(eventId: eventId) {
+                                for waiter in removeAllPublishWaiters(eventID: eventID) {
                                     if accepted {
                                         waiter.finish()
                                     } else {
                                         waiter.finish(
-                                            throwing: EventRejection(eventId: eventId, message: message))
+                                            throwing: EventRejection(eventID: eventID, message: message))
                                     }
                                 }
                             case .auth(let challenge):

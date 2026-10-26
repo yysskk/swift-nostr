@@ -1,5 +1,6 @@
 import Foundation
 import NostrCore
+import NostrTestSupport
 import Testing
 
 @testable import NostrClient
@@ -25,7 +26,7 @@ struct NIP57ZapReceiptTests {
     private func makeReceipt(signedBy payee: KeyPair, tags: [[String]]) throws -> Event {
         let signer = EventSigner(keyPair: payee)
         return try signer.sign(
-            UnsignedEvent(pubkey: try PublicKey(hex: signer.publicKey), kind: .zap, rawTags: tags, content: ""))
+            UnsignedEvent(pubkey: signer.publicKey, kind: .zap, rawTags: tags, content: ""))
     }
 
     /// Builds a JSON-encoded kind-9734 zap request with the given amount and, optionally, zapped event.
@@ -34,8 +35,8 @@ struct NIP57ZapReceiptTests {
     {
         let sender = EventSigner(keyPair: try KeyPair())
         let request = try sender.signZapRequest(
-            recipientPubkey: recipient, relays: ["wss://relay.example.com"],
-            amountMillisats: amountMillisats, eventId: eventId)
+            recipientPubkey: try PublicKey(hex: recipient), relays: ["wss://relay.example.com"],
+            amountMillisats: amountMillisats, eventID: try eventId.map(EventID.init(hex:)))
         return String(decoding: try JSONEncoder().encode(request), as: UTF8.self)
     }
 
@@ -159,7 +160,7 @@ struct NIP57ZapReceiptTests {
         let sender = EventSigner(keyPair: try KeyPair())
         let request = try sender.sign(
             UnsignedEvent(
-                pubkey: try PublicKey(hex: sender.publicKey),
+                pubkey: sender.publicKey,
                 kind: .zapRequest,
                 rawTags: [["p", recipient], ["amount", "not-a-number"]],
                 content: ""
@@ -360,14 +361,14 @@ struct NIP57ZapReceiptTests {
         let payee = try KeyPair()
         let recipient = try KeyPair().publicKey.hex
         let description = try zapRequestJSON(
-            recipient: recipient, amountMillisats: coffeeAmountMillisats, eventId: "eventInRequest")
+            recipient: recipient, amountMillisats: coffeeAmountMillisats, eventId: EventID.fixture("in request").hex)
         let receipt = try makeReceipt(
             signedBy: payee,
             tags: [
                 ["bolt11", coffeeInvoice],
                 ["description", description],
                 ["p", recipient],
-                ["e", "aDifferentEvent"],
+                ["e", EventID.fixture("a different event").hex],
             ])
 
         #expect(throws: ZapReceipt.ValidationError.zappedEventMismatch) {

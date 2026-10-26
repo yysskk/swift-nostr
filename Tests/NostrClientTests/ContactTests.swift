@@ -1,5 +1,6 @@
 import Foundation
 import NostrCore
+import NostrTestSupport
 import Testing
 
 @testable import NostrClient
@@ -153,6 +154,9 @@ struct ContactTests {
 
 @Suite("Contact List Event Tests")
 struct ContactListEventTests {
+    private let pubkey1Hex = PublicKey.fixture("pubkey1").hex
+    private let pubkey2Hex = PublicKey.fixture("pubkey2").hex
+    private let pubkey3Hex = PublicKey.fixture("pubkey3").hex
 
     @Test("Sign contact list event")
     func signContactListEvent() throws {
@@ -160,9 +164,9 @@ struct ContactListEventTests {
         let signer = EventSigner(keyPair: keyPair)
 
         let contacts = [
-            Contact(pubkey: "pubkey1", relayURL: "wss://relay1.com", petname: "alice"),
-            Contact(pubkey: "pubkey2", relayURL: "wss://relay2.com"),
-            Contact(pubkey: "pubkey3"),
+            Contact(pubkey: pubkey1Hex, relayURL: "wss://relay1.com", petname: "alice"),
+            Contact(pubkey: pubkey2Hex, relayURL: "wss://relay2.com"),
+            Contact(pubkey: pubkey3Hex),
         ]
 
         let event = try signer.signContactList(contacts)
@@ -170,10 +174,19 @@ struct ContactListEventTests {
         #expect(event.kind == 3)
         #expect(event.content == "")
         #expect(event.tags.count == 3)
-        #expect(event.tags[0] == ["p", "pubkey1", "wss://relay1.com", "alice"])
-        #expect(event.tags[1] == ["p", "pubkey2", "wss://relay2.com"])
-        #expect(event.tags[2] == ["p", "pubkey3"])
+        #expect(event.tags[0] == ["p", pubkey1Hex, "wss://relay1.com", "alice"])
+        #expect(event.tags[1] == ["p", pubkey2Hex, "wss://relay2.com"])
+        #expect(event.tags[2] == ["p", pubkey3Hex])
         #expect(try event.verify())
+    }
+
+    @Test("Sign contact list rejects a contact whose pubkey is not hex")
+    func signContactListRejectsMalformedPubkey() throws {
+        let signer = EventSigner(keyPair: try KeyPair())
+
+        #expect(throws: NostrError.invalidPublicKey) {
+            try signer.signContactList([Contact(pubkey: pubkey1Hex), Contact(pubkey: "pubkey2")])
+        }
     }
 
     @Test("Sign contact list from pubkeys")
@@ -181,14 +194,14 @@ struct ContactListEventTests {
         let keyPair = try KeyPair()
         let signer = EventSigner(keyPair: keyPair)
 
-        let pubkeys = ["pubkey1", "pubkey2", "pubkey3"]
+        let pubkeys = [pubkey1Hex, pubkey2Hex, pubkey3Hex]
         let event = try signer.signContactList(pubkeys: pubkeys)
 
         #expect(event.kind == 3)
         #expect(event.tags.count == 3)
-        #expect(event.tags[0] == ["p", "pubkey1"])
-        #expect(event.tags[1] == ["p", "pubkey2"])
-        #expect(event.tags[2] == ["p", "pubkey3"])
+        #expect(event.tags[0] == ["p", pubkey1Hex])
+        #expect(event.tags[1] == ["p", pubkey2Hex])
+        #expect(event.tags[2] == ["p", pubkey3Hex])
     }
 
     @Test("Extract contacts from event")
@@ -197,8 +210,8 @@ struct ContactListEventTests {
         let signer = EventSigner(keyPair: keyPair)
 
         let contacts = [
-            Contact(pubkey: "pubkey1", relayURL: "wss://relay1.com", petname: "alice"),
-            Contact(pubkey: "pubkey2"),
+            Contact(pubkey: pubkey1Hex, relayURL: "wss://relay1.com", petname: "alice"),
+            Contact(pubkey: pubkey2Hex),
         ]
 
         let event = try signer.signContactList(contacts)
@@ -206,10 +219,10 @@ struct ContactListEventTests {
         let extractedContacts = event.contacts
         #expect(extractedContacts != nil)
         #expect(extractedContacts?.count == 2)
-        #expect(extractedContacts?[0].pubkey == "pubkey1")
+        #expect(extractedContacts?[0].pubkey == pubkey1Hex)
         #expect(extractedContacts?[0].relayURL == "wss://relay1.com")
         #expect(extractedContacts?[0].petname == "alice")
-        #expect(extractedContacts?[1].pubkey == "pubkey2")
+        #expect(extractedContacts?[1].pubkey == pubkey2Hex)
         #expect(extractedContacts?[1].relayURL == nil)
     }
 
@@ -218,7 +231,7 @@ struct ContactListEventTests {
         let keyPair = try KeyPair()
         let signer = EventSigner(keyPair: keyPair)
 
-        let contactEvent = try signer.signContactList([Contact(pubkey: "test")])
+        let contactEvent = try signer.signContactList([Contact(pubkey: pubkey1Hex)])
         let textNote = try signer.signTextNote(content: "Hello")
 
         #expect(contactEvent.isContactList == true)
@@ -240,18 +253,18 @@ struct ContactListFilterTests {
 
     @Test("Contact list filter for single pubkey")
     func contactListFilterSinglePubkey() {
-        let filter = Filter.contactList(pubkey: "abc123")
+        let filter = Filter.contactList(pubkey: .fixture("abc123"))
 
-        #expect(filter.authors == ["abc123"])
+        #expect(filter.authors == [.fixture("abc123")])
         #expect(filter.kinds == [3])
         #expect(filter.limit == 1)
     }
 
     @Test("Contact list filter for multiple pubkeys")
     func contactListFilterMultiplePubkeys() {
-        let filter = Filter.contactList(pubkeys: ["abc123", "def456"])
+        let filter = Filter.contactList(pubkeys: [.fixture("abc123"), .fixture("def456")])
 
-        #expect(filter.authors == ["abc123", "def456"])
+        #expect(filter.authors == [.fixture("abc123"), .fixture("def456")])
         #expect(filter.kinds == [3])
         #expect(filter.limit == nil)
     }

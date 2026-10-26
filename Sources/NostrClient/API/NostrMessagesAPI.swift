@@ -156,8 +156,9 @@ public struct NostrMessagesAPI: NostrMessaging {
     ///   - strategy: How many relay acknowledgments to wait for on the recipient gift wrap before
     ///     returning (default: the pool config's ``RelayPoolConfig/defaultPublishStrategy``).
     /// - Returns: The shared rumor, both gift wraps, and the per-relay publish outcomes.
-    /// - Throws: ``NostrError/invalidPublicKey`` when `rumor.pubkey` is not the signer's public key
-    ///   (the recipient's unwrap would reject it as an impersonation), or
+    /// - Throws: ``NostrError/invalidPublicKey`` when `recipientPubkey` is not a hex public key or
+    ///   `rumor.pubkey` is not the signer's public key (the recipient's unwrap would reject it as an
+    ///   impersonation), or
     ///   ``NostrError/noRelaysInPool`` when the recipient copy falls back to an empty pool.
     @discardableResult
     public func sendGiftWrapped(
@@ -166,14 +167,15 @@ public struct NostrMessagesAPI: NostrMessaging {
         expiration: Date? = nil,
         strategy: PublishStrategy? = nil
     ) async throws -> SendDirectMessageResult {
+        let recipient = try PublicKey(callerHex: recipientPubkey)
         let result = try await client.withSigner { signer, publicKey in
             guard rumor.pubkey == publicKey else {
                 throw NostrError.invalidPublicKey
             }
             return try await DirectMessageBuilder(signer: signer).wrapWithSelfCopy(
                 rumor: try rumor.asRumor(),
-                senderPubkey: publicKey.hex,
-                to: recipientPubkey,
+                senderPubkey: publicKey,
+                to: recipient,
                 expiration: expiration
             )
         }
@@ -314,7 +316,7 @@ public struct NostrMessagesAPI: NostrMessaging {
     private func giftWrapFilter(limit: Int) async throws -> Filter {
         Filter(
             kinds: [.giftWrap],
-            pubkeyReferences: [try await client.requiredPublicKey().hex],
+            pubkeyReferences: [try await client.requiredPublicKey()],
             limit: limit
         )
     }

@@ -1,5 +1,6 @@
 import Foundation
 import NostrCore
+import NostrTestSupport
 import Testing
 
 #if canImport(FoundationNetworking)
@@ -86,13 +87,15 @@ struct RelayInformationTests {
 
     @Test("Decode snake_case top-level fields")
     func decodeSnakeCaseTopLevel() throws {
+        let admin = PublicKey.fixture("admin")
+        let relay = PublicKey.fixture("relay")
         let json = Data(
             #"""
             {
               "name": "Test Relay",
               "description": "A test relay",
-              "pubkey": "abc123",
-              "self": "def456",
+              "pubkey": "\#(admin.hex)",
+              "self": "\#(relay.hex)",
               "contact": "mailto:admin@example.com",
               "supported_nips": [1, 2, 11],
               "software": "https://example.com/relay",
@@ -110,8 +113,8 @@ struct RelayInformationTests {
 
         #expect(info.name == "Test Relay")
         #expect(info.description == "A test relay")
-        #expect(info.pubkey == "abc123")
-        #expect(info.selfPubkey == "def456")
+        #expect(info.pubkey == admin)
+        #expect(info.selfPubkey == relay)
         #expect(info.contact == "mailto:admin@example.com")
         #expect(info.supportedNIPs == [1, 2, 11])
         #expect(info.software == "https://example.com/relay")
@@ -122,6 +125,45 @@ struct RelayInformationTests {
         #expect(info.tags == ["sfw-only", "bitcoin"])
         #expect(info.postingPolicy == "https://example.com/policy")
         #expect(info.paymentsURL == "https://example.com/pay")
+    }
+
+    /// The document is written by the relay operator, so a malformed key must not cost the caller
+    /// the rest of it — the relay's limits and supported NIPs are what a client actually needs.
+    @Test(
+        "Malformed pubkey and self values decode as nil without failing the document",
+        arguments: [#""abc123""#, #""\#(String(repeating: "A", count: 64))""#, "42", "null"])
+    func decodeMalformedPubkeysLeniently(value: String) throws {
+        let json = Data(
+            #"""
+            {
+              "name": "Test Relay",
+              "pubkey": \#(value),
+              "self": \#(value),
+              "supported_nips": [1, 11],
+              "limitation": { "auth_required": true }
+            }
+            """#.utf8)
+
+        let info = try JSONDecoder().decode(RelayInformation.self, from: json)
+
+        #expect(info.pubkey == nil)
+        #expect(info.selfPubkey == nil)
+        #expect(info.name == "Test Relay")
+        #expect(info.supportedNIPs == [1, 11])
+        #expect(info.limitation?.authRequired == true)
+    }
+
+    @Test("Public keys encode as their hex strings")
+    func encodePublicKeysAsHex() throws {
+        let admin = PublicKey.fixture("admin")
+        let info = RelayInformation(name: "Test Relay", pubkey: admin, selfPubkey: admin)
+
+        let object = try #require(
+            JSONSerialization.jsonObject(with: JSONEncoder().encode(info)) as? [String: Any])
+
+        #expect(object["pubkey"] as? String == admin.hex)
+        #expect(object["self"] as? String == admin.hex)
+        #expect(try JSONDecoder().decode(RelayInformation.self, from: JSONEncoder().encode(info)) == info)
     }
 
     @Test("Decode limitation fields")
@@ -298,7 +340,7 @@ struct RelayInformationTests {
     @Test("Encoding uses snake_case keys")
     func encodingUsesSnakeCaseKeys() throws {
         let info = RelayInformation(
-            selfPubkey: "abc",
+            selfPubkey: PublicKey.fixture("abc"),
             supportedNIPs: [1],
             termsOfService: "https://example.com/tos",
             relayCountries: ["US"],

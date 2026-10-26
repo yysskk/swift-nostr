@@ -24,7 +24,7 @@ enum VerifiedEventSelection {
     static func newest(
         in events: [Event],
         kind: Event.Kind? = nil,
-        author: String? = nil,
+        author: PublicKey? = nil,
         identifier: String? = nil
     ) -> Event? {
         var newest: Event?
@@ -49,20 +49,18 @@ enum VerifiedEventSelection {
     ///
     /// A relay that ignores an id filter can substitute any event; without this the caller believes
     /// it holds the event it asked for.
-    static func event(withID id: String, in events: [Event]) -> Event? {
-        events.first { $0.id.hex == id.lowercased() && (try? $0.verify()) == true }
+    static func event(withID id: EventID, in events: [Event]) -> Event? {
+        events.first { $0.id == id && (try? $0.verify()) == true }
     }
 
     private static func matches(
         _ event: Event,
         kind: Event.Kind?,
-        author: String?,
+        author: PublicKey?,
         identifier: String?
     ) -> Bool {
         if let kind, event.kind != kind { return false }
-        // A caller may hold an uppercase spelling of the key, which names the same person as the
-        // canonical lowercase form the event carries.
-        if let author, event.pubkey.hex != author.lowercased() { return false }
+        if let author, event.pubkey != author { return false }
         // NIP-01 treats a missing `d` tag as an empty one, so an addressable event published
         // without it is still addressed by `""` — dropping it would lose a legitimate event.
         if let identifier, (event.firstTagValue(named: "d") ?? "") != identifier { return false }

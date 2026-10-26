@@ -22,12 +22,7 @@ public struct EventSigner: Sendable {
     }
 
     /// The public key associated with this signer
-    public var publicKey: String {
-        keyPair.publicKey.hex
-    }
-
-    /// ``publicKey`` as a ``PublicKey``, for package code that builds events from it.
-    package var typedPublicKey: PublicKey {
+    public var publicKey: PublicKey {
         keyPair.publicKey
     }
 
@@ -62,18 +57,18 @@ public struct EventSigner: Sendable {
     /// Encrypts `plaintext` to `recipientPubkey` with NIP-44 v2, as this signer's identity.
     /// - Parameters:
     ///   - plaintext: The message to encrypt.
-    ///   - recipientPubkey: The recipient's public key (hex).
+    ///   - recipientPubkey: The recipient's public key.
     /// - Returns: The base64-encoded NIP-44 payload.
-    public func nip44Encrypt(_ plaintext: String, to recipientPubkey: String) throws -> String {
+    public func nip44Encrypt(_ plaintext: String, to recipientPubkey: PublicKey) throws -> String {
         try SealedMessage.seal(plaintext, for: recipientPubkey, using: keyPair).payload
     }
 
     /// Decrypts a NIP-44 v2 payload from `senderPubkey` addressed to this signer's identity.
     /// - Parameters:
     ///   - ciphertext: The base64-encoded NIP-44 payload.
-    ///   - senderPubkey: The sender's public key (hex).
+    ///   - senderPubkey: The sender's public key.
     /// - Returns: The decrypted plaintext.
-    public func nip44Decrypt(_ ciphertext: String, from senderPubkey: String) throws -> String {
+    public func nip44Decrypt(_ ciphertext: String, from senderPubkey: PublicKey) throws -> String {
         try SealedMessage(payload: ciphertext).open(from: senderPubkey, using: keyPair)
     }
 
@@ -95,9 +90,9 @@ public struct EventSigner: Sendable {
         try sign(.repost(pubkey: keyPair.publicKey, of: event, relayURL: relayURL))
     }
 
-    /// Creates and signs a delete event (kind 5)
-    public func signDeletion(eventIds: [String], reason: String = "") throws -> Event {
-        try sign(.deletion(pubkey: keyPair.publicKey, eventIds: eventIds, reason: reason))
+    /// Creates and signs a delete event (kind 5) requesting deletion of `eventIDs`, one `e` tag each.
+    public func signDeletion(eventIDs: [EventID], reason: String = "") throws -> Event {
+        try sign(.deletion(pubkey: keyPair.publicKey, eventIDs: eventIDs, reason: reason))
     }
 
     /// Creates and signs a client authentication event (kind 22242, NIP-42)
@@ -122,20 +117,21 @@ public struct EventSigner: Sendable {
     /// which returns a Lightning invoice and later publishes the matching kind-9735 zap receipt.
     /// https://github.com/nostr-protocol/nips/blob/master/57.md
     /// - Parameters:
-    ///   - recipientPubkey: The hex-encoded pubkey being zapped (the `p` tag, required).
+    ///   - recipientPubkey: The public key being zapped (the `p` tag, required).
     ///   - relays: Relays the recipient's wallet should publish the zap receipt to (the `relays`
     ///     tag, required — must contain at least one relay).
     ///   - amountMillisats: The amount in millisatoshis (the `amount` tag). Recommended.
     ///   - lnurl: The recipient's lnurl-pay URL, bech32-encoded with the `lnurl` prefix. Recommended.
-    ///   - eventId: The hex event id when zapping an event rather than a person (the `e` tag).
+    ///   - eventID: The id of the event being zapped, when zapping an event rather than a person
+    ///     (the `e` tag).
     ///   - eventCoordinate: An event coordinate when zapping an addressable event (the `a` tag).
     ///   - comment: An optional message sent with the payment (the event content).
     public func signZapRequest(
-        recipientPubkey: String,
+        recipientPubkey: PublicKey,
         relays: [String],
         amountMillisats: Int64? = nil,
         lnurl: String? = nil,
-        eventId: String? = nil,
+        eventID: EventID? = nil,
         eventCoordinate: String? = nil,
         comment: String = ""
     ) throws -> Event {
@@ -155,8 +151,8 @@ public struct EventSigner: Sendable {
         if let lnurl {
             tags.append(Tag(name: "lnurl", values: [lnurl]))
         }
-        if let eventId {
-            tags.append(.event(eventId))
+        if let eventID {
+            tags.append(.event(eventID))
         }
         if let eventCoordinate {
             tags.append(Tag(name: "a", values: [eventCoordinate]))

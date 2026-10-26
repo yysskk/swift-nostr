@@ -74,10 +74,12 @@ public struct NostrIdentityAPI: NostrIdentityProviding {
     ///   - plaintext: The message to encrypt.
     ///   - recipientPubkey: The recipient's public key (hex).
     /// - Returns: The NIP-44 payload.
-    /// - Throws: ``NostrError/signerNotSet`` if no signer is set, plus anything the signer throws.
+    /// - Throws: ``NostrError/signerNotSet`` if no signer is set, ``NostrError/invalidPublicKey``
+    ///   if `recipientPubkey` is not a hex public key, plus anything the signer throws.
     public func nip44Encrypt(_ plaintext: String, to recipientPubkey: String) async throws -> String {
-        try await client.withSigner { signer, _ in
-            try await signer.nip44Encrypt(plaintext, to: recipientPubkey)
+        let recipient = try PublicKey(callerHex: recipientPubkey)
+        return try await client.withSigner { signer, _ in
+            try await signer.nip44Encrypt(plaintext, to: recipient)
         }
     }
 
@@ -88,10 +90,12 @@ public struct NostrIdentityAPI: NostrIdentityProviding {
     ///   - ciphertext: The NIP-44 payload.
     ///   - senderPubkey: The sender's public key (hex).
     /// - Returns: The decrypted plaintext.
-    /// - Throws: ``NostrError/signerNotSet`` if no signer is set, plus anything the signer throws.
+    /// - Throws: ``NostrError/signerNotSet`` if no signer is set, ``NostrError/invalidPublicKey``
+    ///   if `senderPubkey` is not a hex public key, plus anything the signer throws.
     public func nip44Decrypt(_ ciphertext: String, from senderPubkey: String) async throws -> String {
-        try await client.withSigner { signer, _ in
-            try await signer.nip44Decrypt(ciphertext, from: senderPubkey)
+        let sender = try PublicKey(callerHex: senderPubkey)
+        return try await client.withSigner { signer, _ in
+            try await signer.nip44Decrypt(ciphertext, from: sender)
         }
     }
 

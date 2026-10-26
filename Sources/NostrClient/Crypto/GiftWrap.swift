@@ -31,10 +31,23 @@ public struct GiftWrap: Sendable {
     ///     kind-1059 event relays act on) so the message disappears after the given time. The
     ///     inner rumor is unaffected, keeping the plaintext content private until then.
     /// - Returns: The gift-wrapped event ready for publishing
+    /// - Throws: ``NostrError/invalidPublicKey`` if `recipientPubkey` is not a hex public key.
     public static func wrap(
         event: Event,
         signer: any NostrSigning,
         recipientPubkey: String,
+        expiration: Date? = nil
+    ) async throws -> Event {
+        try await wrap(
+            event: event, signer: signer, recipient: PublicKey(callerHex: recipientPubkey),
+            expiration: expiration)
+    }
+
+    /// ``wrap(event:signer:recipientPubkey:expiration:)`` for an already-parsed recipient key.
+    static func wrap(
+        event: Event,
+        signer: any NostrSigning,
+        recipient recipientPubkey: PublicKey,
         expiration: Date? = nil
     ) async throws -> Event {
         // 1. Create rumor (unsigned event JSON)
@@ -43,7 +56,7 @@ public struct GiftWrap: Sendable {
 
         // 2. Create seal (encrypt rumor to recipient, signed by the sender)
         let sealUnsigned = UnsignedEvent(
-            pubkey: try PublicKey(hex: await signer.publicKey),
+            pubkey: try await signer.publicKey,
             createdAt: randomizedTimestamp(),
             kind: .seal,
             tags: [],
@@ -62,7 +75,7 @@ public struct GiftWrap: Sendable {
         }
 
         let wrapUnsigned = UnsignedEvent(
-            pubkey: ephemeralSigner.typedPublicKey,
+            pubkey: ephemeralSigner.publicKey,
             createdAt: randomizedTimestamp(),
             kind: .giftWrap,
             tags: wrapTags,
@@ -95,7 +108,7 @@ public struct GiftWrap: Sendable {
         }
 
         // 1. Open gift wrap to get seal
-        let sealJson = try await recipient.nip44Decrypt(giftWrap.content, from: giftWrap.pubkey.hex)
+        let sealJson = try await recipient.nip44Decrypt(giftWrap.content, from: giftWrap.pubkey)
         let seal = try decodeSeal(sealJson)
 
         guard seal.kind == .seal else {
@@ -108,7 +121,7 @@ public struct GiftWrap: Sendable {
         }
 
         // 2. Open seal to get rumor
-        let rumorJson = try await recipient.nip44Decrypt(seal.content, from: seal.pubkey.hex)
+        let rumorJson = try await recipient.nip44Decrypt(seal.content, from: seal.pubkey)
         let rumor = try decodeRumor(rumorJson)
 
         // NIP-17: "Clients MUST verify if pubkey of the kind:13 is the same pubkey on the kind:14,

@@ -62,12 +62,13 @@ struct RelayMessageTests {
 
     @Test("Parse OK message - accepted")
     func parseOkMessageAccepted() throws {
-        let json = #"["OK","eventid123",true,""]"#
+        let id = EventID.fixture("ok")
+        let json = #"["OK","\#(id.hex)",true,""]"#
 
         let message = try RelayMessage.parse(json)
 
-        if case .ok(let eventId, let accepted, let okMessage) = message {
-            #expect(eventId == "eventid123")
+        if case .ok(let eventID, let accepted, let okMessage) = message {
+            #expect(eventID == id)
             #expect(accepted == true)
             #expect(okMessage == "")
         } else {
@@ -77,16 +78,33 @@ struct RelayMessageTests {
 
     @Test("Parse OK message - rejected")
     func parseOkMessageRejected() throws {
-        let json = #"["OK","eventid123",false,"duplicate: already have this event"]"#
+        let id = EventID.fixture("ok")
+        let json = #"["OK","\#(id.hex)",false,"duplicate: already have this event"]"#
 
         let message = try RelayMessage.parse(json)
 
-        if case .ok(let eventId, let accepted, let okMessage) = message {
-            #expect(eventId == "eventid123")
+        if case .ok(let eventID, let accepted, let okMessage) = message {
+            #expect(eventID == id)
             #expect(accepted == false)
             #expect(okMessage == "duplicate: already have this event")
         } else {
             Issue.record("Expected OK message")
+        }
+    }
+
+    /// An OK can only answer an event this client sent, and those always carry a canonical id — so
+    /// a frame whose id is anything else is malformed, like an EVENT carrying a malformed event.
+    @Test(
+        "Parse OK message - a malformed event id fails to parse",
+        arguments: [
+            "eventid123",
+            "",
+            String(repeating: "A", count: 64),
+            String(repeating: "0", count: 63),
+        ])
+    func parseOkMessageWithMalformedID(id: String) {
+        #expect(throws: NostrError.invalidMessageFormat) {
+            try RelayMessage.parse(#"["OK","\#(id)",true,""]"#)
         }
     }
 

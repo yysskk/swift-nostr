@@ -76,7 +76,7 @@ public enum Groups {
                 groupID: groupID,
                 inviteCode: inviteCode,
                 reason: reason,
-                pubkey: try PublicKey(hex: await signer.publicKey),
+                pubkey: try await signer.publicKey,
                 createdAt: createdAt
             )
         )
@@ -125,7 +125,7 @@ public enum Groups {
             leaveRequest(
                 groupID: groupID,
                 reason: reason,
-                pubkey: try PublicKey(hex: await signer.publicKey),
+                pubkey: try await signer.publicKey,
                 createdAt: createdAt
             )
         )
@@ -196,7 +196,7 @@ public enum Groups {
                 content: content,
                 tags: tags,
                 previous: previous,
-                pubkey: try PublicKey(hex: await signer.publicKey),
+                pubkey: try await signer.publicKey,
                 createdAt: createdAt
             )
         )
@@ -204,10 +204,9 @@ public enum Groups {
 
     // MARK: - Timeline References ("previous")
 
-    /// The NIP-29 timeline reference for an event id: its first 8 characters (shorter ids
-    /// are returned whole).
-    public static func previousReference(forEventID id: String) -> String {
-        String(id.prefix(8))
+    /// The NIP-29 timeline reference for an event id: the first 8 characters of its hex form.
+    public static func previousReference(forEventID id: EventID) -> String {
+        String(id.hex.prefix(8))
     }
 
     /// Samples timeline references for a "previous" tag from recently seen group events.
@@ -219,7 +218,7 @@ public enum Groups {
     /// - Returns: Up to `maxCount` distinct references from the newest 50 of `events`.
     public static func previousReferences(
         from events: some Sequence<Event>,
-        excludingAuthor pubkey: String? = nil,
+        excludingAuthor pubkey: PublicKey? = nil,
         maxCount: Int = 3
     ) -> [String] {
         var generator = SystemRandomNumberGenerator()
@@ -251,7 +250,7 @@ public enum Groups {
     /// - Returns: The sampled references, e.g. for ``Event/Tag/previous(_:)``.
     public static func previousReferences(
         from events: some Sequence<Event>,
-        excludingAuthor pubkey: String? = nil,
+        excludingAuthor pubkey: PublicKey? = nil,
         maxCount: Int = 3,
         using generator: inout some RandomNumberGenerator
     ) -> [String] {
@@ -264,14 +263,14 @@ public enum Groups {
                 return lhs.id < rhs.id
             }
             .prefix(50)
-        var candidates = window.filter { $0.pubkey.hex != pubkey }
+        var candidates = window.filter { $0.pubkey != pubkey }
         let count = min(max(maxCount, 0), candidates.count)
         var references: [String] = []
         references.reserveCapacity(count)
         for index in 0..<count {
             let swapIndex = Int.random(in: index..<candidates.count, using: &generator)
             candidates.swapAt(index, swapIndex)
-            references.append(previousReference(forEventID: candidates[index].id.hex))
+            references.append(previousReference(forEventID: candidates[index].id))
         }
         return references
     }
@@ -283,7 +282,7 @@ public enum Groups {
 
     /// The references of `event` that match none of `knownEventIDs`.
     ///
-    /// A reference matches when it equals the first 8 characters of a known event id — the
+    /// A reference matches when it equals the first 8 hex characters of a known event id — the
     /// spec's reference length — so references of any other length are reported unknown. A
     /// non-empty result means the timeline may be forged: the spec asks clients to verify
     /// references against events they have seen "to keep relays honest".
@@ -294,9 +293,9 @@ public enum Groups {
     /// - Returns: The references matching no known id ([] when all are known).
     public static func unknownPreviousReferences(
         of event: Event,
-        knownEventIDs: some Sequence<String>
+        knownEventIDs: some Sequence<EventID>
     ) -> [String] {
-        let knownReferences = Set(knownEventIDs.map { String($0.prefix(8)) })
+        let knownReferences = Set(knownEventIDs.map(previousReference(forEventID:)))
         return previousReferences(of: event).filter { !knownReferences.contains($0) }
     }
 }

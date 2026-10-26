@@ -10,11 +10,11 @@
 /// NostrWalletConnect layer, and pulling it into this abstraction would force every signer to
 /// support it.
 public protocol NostrSigning: Sendable {
-    /// The public key events are authored under, hex-encoded.
+    /// The public key events are authored under.
     ///
     /// For a remote signer this is the *user* key it signs on behalf of, which may differ from the
     /// signer's own session identity.
-    var publicKey: String { get async throws }
+    var publicKey: PublicKey { get async throws }
 
     /// Signs `event`, returning the complete signed event.
     /// - Parameter event: The unsigned event to sign. Its `pubkey` should be this signer's
@@ -25,16 +25,16 @@ public protocol NostrSigning: Sendable {
     /// Encrypts `plaintext` to `recipientPubkey` with NIP-44 as this signer's identity.
     /// - Parameters:
     ///   - plaintext: The message to encrypt.
-    ///   - recipientPubkey: The recipient's public key (hex).
+    ///   - recipientPubkey: The recipient's public key.
     /// - Returns: The NIP-44 payload.
-    func nip44Encrypt(_ plaintext: String, to recipientPubkey: String) async throws -> String
+    func nip44Encrypt(_ plaintext: String, to recipientPubkey: PublicKey) async throws -> String
 
     /// Decrypts a NIP-44 payload from `senderPubkey` addressed to this signer's identity.
     /// - Parameters:
     ///   - ciphertext: The NIP-44 payload.
-    ///   - senderPubkey: The sender's public key (hex).
+    ///   - senderPubkey: The sender's public key.
     /// - Returns: The decrypted plaintext.
-    func nip44Decrypt(_ ciphertext: String, from senderPubkey: String) async throws -> String
+    func nip44Decrypt(_ ciphertext: String, from senderPubkey: PublicKey) async throws -> String
 }
 
 extension EventSigner: NostrSigning {}

@@ -17,13 +17,13 @@ struct NIP17Tests {
         let originalMessage = "Hello, Bob! This is a private message."
 
         // Alice seals a message for Bob
-        let sealed = try SealedMessage.seal(originalMessage, for: bob.publicKey.hex, using: alice)
+        let sealed = try SealedMessage.seal(originalMessage, for: bob.publicKey, using: alice)
 
         // Verify it's base64 encoded
         #expect(Data(base64Encoded: sealed.payload) != nil)
 
         // Bob opens the message from Alice
-        let opened = try sealed.open(from: alice.publicKey.hex, using: bob)
+        let opened = try sealed.open(from: alice.publicKey, using: bob)
 
         #expect(opened == originalMessage)
     }
@@ -35,10 +35,10 @@ struct NIP17Tests {
 
         let originalMessage = "Hello, Bob!"
 
-        let sealed = try SealedMessage.seal(originalMessage, for: bob.publicKey.hex, using: alice)
+        let sealed = try SealedMessage.seal(originalMessage, for: bob.publicKey, using: alice)
 
         // Alice can open using Bob's pubkey (same shared secret)
-        let opened = try sealed.open(from: bob.publicKey.hex, using: alice)
+        let opened = try sealed.open(from: bob.publicKey, using: alice)
 
         #expect(opened == originalMessage)
     }
@@ -50,8 +50,8 @@ struct NIP17Tests {
 
         let originalMessage = "Hello! 🎉 Special: <>&\"'日本語中文한국어"
 
-        let sealed = try SealedMessage.seal(originalMessage, for: bob.publicKey.hex, using: alice)
-        let opened = try sealed.open(from: alice.publicKey.hex, using: bob)
+        let sealed = try SealedMessage.seal(originalMessage, for: bob.publicKey, using: alice)
+        let opened = try sealed.open(from: alice.publicKey, using: bob)
 
         #expect(opened == originalMessage)
     }
@@ -63,8 +63,8 @@ struct NIP17Tests {
 
         let originalMessage = String(repeating: "A", count: 10000)
 
-        let sealed = try SealedMessage.seal(originalMessage, for: bob.publicKey.hex, using: alice)
-        let opened = try sealed.open(from: alice.publicKey.hex, using: bob)
+        let sealed = try SealedMessage.seal(originalMessage, for: bob.publicKey, using: alice)
+        let opened = try sealed.open(from: alice.publicKey, using: bob)
 
         #expect(opened == originalMessage)
     }
@@ -74,7 +74,7 @@ struct NIP17Tests {
         let alice = try KeyPair()
         let bob = try KeyPair()
 
-        let sealed = try SealedMessage.seal("test", for: bob.publicKey.hex, using: alice)
+        let sealed = try SealedMessage.seal("test", for: bob.publicKey, using: alice)
         let payload = Data(base64Encoded: sealed.payload)!
 
         // First byte should be version 2

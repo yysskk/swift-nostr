@@ -70,8 +70,9 @@ public enum RelayMessage: Sendable {
     /// Notice message from the relay
     case notice(message: String)
 
-    /// OK response for an event (NIP-20)
-    case ok(eventId: String, accepted: Bool, message: String)
+    /// OK response for an event (NIP-01): whether the relay accepted the event with id
+    /// `eventID`, and its status message.
+    case ok(eventID: EventID, accepted: Bool, message: String)
 
     /// Authentication challenge (NIP-42)
     case auth(challenge: String)
@@ -86,7 +87,12 @@ public enum RelayMessage: Sendable {
     /// Unknown message type
     case unknown(type: String, rawData: String)
 
-    /// Parses a raw JSON message from a relay
+    /// Parses a raw JSON message from a relay.
+    ///
+    /// - Throws: ``NostrError/invalidMessageFormat`` if the frame is not a JSON array or lacks the
+    ///   fields its type requires — including an `OK` whose event id is not canonical 64-digit
+    ///   lowercase hex, which cannot answer any event this client sent — and a decoding error for
+    ///   an `EVENT` carrying a malformed event.
     public static func parse(_ text: String) throws -> RelayMessage {
         guard let data = text.data(using: .utf8) else {
             throw NostrError.invalidData
@@ -127,13 +133,13 @@ public enum RelayMessage: Sendable {
 
         case "OK":
             guard array.count >= 4,
-                let eventId = array[1] as? String,
+                let eventID = (array[1] as? String).flatMap(EventID.init),
                 let accepted = array[2] as? Bool,
                 let message = array[3] as? String
             else {
                 throw NostrError.invalidMessageFormat
             }
-            return .ok(eventId: eventId, accepted: accepted, message: message)
+            return .ok(eventID: eventID, accepted: accepted, message: message)
 
         case "AUTH":
             guard array.count >= 2,

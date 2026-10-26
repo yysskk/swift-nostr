@@ -376,8 +376,11 @@ struct RequestResponseSessionTests {
     /// Starts the session, sends the request under `key`, answers it, and returns what resolved.
     private func perform(_ session: Session, transport: FakeTransport, key: String) async throws -> [String] {
         try await start(session)
+        // Wait for this request's own send: an earlier request under the same key is already in
+        // the log, and answering before this one is registered would leave it to time out.
+        let sent = await transport.sendCount(of: key)
         async let response = session.perform(request(key), key: key, state: [], timeout: 2)
-        try await transport.waitForSend(key)
+        try await transport.waitForSend(key, count: sent + 1)
         await transport.deliver(self.response(for: key, content: "\(key)-done"))
         return try await response
     }
@@ -475,9 +478,14 @@ private actor FakeTransport: RelayTransport {
         try await poll { self.log.filter { if case .send = $0 { return true } else { return false } }.count >= count }
     }
 
-    /// Polls until the event with `id` has been sent.
-    func waitForSend(_ id: String) async throws {
-        try await poll { self.log.contains(.send(id)) }
+    /// How many times the event with `id` has been sent.
+    func sendCount(of id: String) -> Int {
+        log.filter { $0 == .send(id) }.count
+    }
+
+    /// Polls until the event with `id` has been sent at least `count` times.
+    func waitForSend(_ id: String, count: Int = 1) async throws {
+        try await poll { self.sendCount(of: id) >= count }
     }
 
     /// Polls until `connect()` has been entered at least `count` times.

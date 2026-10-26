@@ -64,18 +64,22 @@ public struct LNURLPayResponse: Decodable, Sendable, Hashable {
     /// Whether the endpoint supports Nostr zaps.
     public let allowsNostr: Bool?
 
-    /// The pubkey the endpoint uses to sign kind-9735 zap receipts.
-    public let nostrPubkey: String?
+    /// The public key the endpoint uses to sign kind-9735 zap receipts.
+    ///
+    /// Nil when the response omits it or carries a value that is not a canonical hex public key,
+    /// so such an endpoint does not ``supportsZaps``.
+    public let nostrPubkey: PublicKey?
 
     /// The maximum comment length the endpoint accepts, if it accepts comments.
     public let commentAllowed: Int?
 
+    /// Creates a response from its fields, e.g. for tests or a cached endpoint.
     public init(
         callback: String,
         minSendable: Int64,
         maxSendable: Int64,
         allowsNostr: Bool? = nil,
-        nostrPubkey: String? = nil,
+        nostrPubkey: PublicKey? = nil,
         commentAllowed: Int? = nil
     ) {
         self.callback = callback
@@ -84,6 +88,28 @@ public struct LNURLPayResponse: Decodable, Sendable, Hashable {
         self.allowsNostr = allowsNostr
         self.nostrPubkey = nostrPubkey
         self.commentAllowed = commentAllowed
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case callback, minSendable, maxSendable, allowsNostr, nostrPubkey, commentAllowed
+    }
+
+    /// Decodes an LNURL-pay response.
+    ///
+    /// The response comes from a third-party endpoint, so `nostrPubkey` is read leniently: a value
+    /// that is not a canonical 64-digit lowercase hex public key decodes as nil rather than failing
+    /// the whole response. Every other field is decoded strictly.
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            callback: try container.decode(String.self, forKey: .callback),
+            minSendable: try container.decode(Int64.self, forKey: .minSendable),
+            maxSendable: try container.decode(Int64.self, forKey: .maxSendable),
+            allowsNostr: try container.decodeIfPresent(Bool.self, forKey: .allowsNostr),
+            nostrPubkey: (try? container.decodeIfPresent(String.self, forKey: .nostrPubkey))?
+                .flatMap(PublicKey.init),
+            commentAllowed: try container.decodeIfPresent(Int.self, forKey: .commentAllowed)
+        )
     }
 
     /// Whether this endpoint can receive zaps: it advertises Nostr support and a signing pubkey.

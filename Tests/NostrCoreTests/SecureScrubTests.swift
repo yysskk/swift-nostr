@@ -54,8 +54,8 @@ struct SecureScrubTests {
         let alice = try KeyPair()
         let bob = try KeyPair()
 
-        let sealed = try SealedMessage.seal("hello there", for: bob.publicKey.hex, using: alice)
-        #expect(try sealed.open(from: alice.publicKey.hex, using: bob) == "hello there")
+        let sealed = try SealedMessage.seal("hello there", for: bob.publicKey, using: alice)
+        #expect(try sealed.open(from: alice.publicKey, using: bob) == "hello there")
     }
 
     @Test("NIP-49 still round-trips after scrubbing its derived key")

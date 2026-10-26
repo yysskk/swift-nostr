@@ -340,7 +340,7 @@ struct NIP51SimpleGroupListClientTests {
         let typed = SimpleGroupList(publicEntries: entries, relayURLs: relayURLs)
         return try signer.sign(
             UnsignedEvent(
-                pubkey: try PublicKey(hex: signer.publicKey),
+                pubkey: signer.publicKey,
                 createdAt: createdAt,
                 kind: .simpleGroupList,
                 tags: typed.list.publicItems,
@@ -406,7 +406,7 @@ struct NIP51SimpleGroupListClientTests {
         )
 
         let fetched = try await answering(socket, with: [stale, newer]) {
-            try await client.groups.fetchSimpleGroupList(for: author.publicKey)
+            try await client.groups.fetchSimpleGroupList(for: author.publicKey.hex)
         }
 
         let list = try #require(fetched)
@@ -421,7 +421,7 @@ struct NIP51SimpleGroupListClientTests {
 
         let (_, filter) = try sentREQ(in: socket)
         #expect(filter["kinds"] as? [Int] == [10009])
-        #expect(filter["authors"] as? [String] == [author.publicKey])
+        #expect(filter["authors"] as? [String] == [author.publicKey.hex])
         await client.relays.disconnect()
     }
 

@@ -56,7 +56,7 @@ struct WalletConnectURITests {
         let expected = try KeyPair(privateKeyHex: secretHex)
         #expect(uri.clientKeyPair().publicKey.hex == expected.publicKey.hex)
         #expect(uri.clientPublicKeyHex == expected.publicKey.hex)
-        #expect(uri.clientSigner().publicKey == expected.publicKey.hex)
+        #expect(uri.clientSigner().publicKey == expected.publicKey)
     }
 
     @Test("rejects a wrong scheme")

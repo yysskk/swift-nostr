@@ -16,7 +16,7 @@ extension UnsignedEvent {
         UnsignedEvent(
             pubkey: pubkey,
             kind: .reaction,
-            tags: [.event(event.id.hex), .pubkey(event.pubkey.hex)],
+            tags: [.event(event.id), .pubkey(event.pubkey)],
             content: content
         )
     }
@@ -31,17 +31,17 @@ extension UnsignedEvent {
         return UnsignedEvent(
             pubkey: pubkey,
             kind: .repost,
-            tags: [.event(event.id.hex, relayURL: relayURL), .pubkey(event.pubkey.hex)],
+            tags: [.event(event.id, relayURL: relayURL), .pubkey(event.pubkey)],
             content: String(decoding: eventJson, as: UTF8.self)
         )
     }
 
-    /// A deletion request for `eventIds` (kind 5).
-    package static func deletion(pubkey: PublicKey, eventIds: [String], reason: String) -> UnsignedEvent {
+    /// A deletion request for `eventIDs` (kind 5).
+    package static func deletion(pubkey: PublicKey, eventIDs: [EventID], reason: String) -> UnsignedEvent {
         UnsignedEvent(
             pubkey: pubkey,
             kind: .eventDeletion,
-            tags: eventIds.map { Tag.event($0) },
+            tags: eventIDs.map { Tag.event($0) },
             content: reason
         )
     }

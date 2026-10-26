@@ -17,7 +17,7 @@ public struct NostrListsAPI: NostrListManaging {
     @discardableResult
     public func publish(_ list: NostrList, strategy: PublishStrategy? = nil) async throws -> PublishedEvent {
         let event = try await client.withSigner { signer, publicKey in
-            let content = try await Self.sealPrivateItems(list.privateItems, with: signer, ownPubkey: publicKey.hex)
+            let content = try await Self.sealPrivateItems(list.privateItems, with: signer, ownPubkey: publicKey)
             return try await signer.sign(.list(pubkey: publicKey, list, encryptedContent: content))
         }
         let result = try await client.pool.publish(event, strategy: strategy)
@@ -65,7 +65,7 @@ public struct NostrListsAPI: NostrListManaging {
         strategy: PublishStrategy? = nil
     ) async throws -> PublishedEvent {
         let event = try await client.withSigner { signer, publicKey in
-            let content = try await Self.sealPrivateItems(set.privateItems, with: signer, ownPubkey: publicKey.hex)
+            let content = try await Self.sealPrivateItems(set.privateItems, with: signer, ownPubkey: publicKey)
             return try await signer.sign(.set(pubkey: publicKey, set, encryptedContent: content))
         }
         let result = try await client.pool.publish(event, strategy: strategy)
@@ -141,14 +141,15 @@ public struct NostrListsAPI: NostrListManaging {
     /// ``fetchSet(kind:identifier:for:timeout:)`` with no `pubkey`.
     /// - Returns: The set, or nil if none was found.
     public func fetchSet(naddr: NAddr, timeout: TimeInterval = 10) async throws -> NostrListSet? {
-        var filter = Filter(authors: [naddr.author], kinds: [Event.Kind(rawValue: naddr.kind)])
+        let author = try PublicKey(callerHex: naddr.author)
+        var filter = Filter(authors: [author], kinds: [Event.Kind(rawValue: naddr.kind)])
         filter.addTagQuery("d", values: [naddr.identifier])
         let events = try await client.fetch(filters: [filter], toURLs: nil, timeout: timeout)
         guard
             let newest = VerifiedEventSelection.newest(
                 in: events,
                 kind: Event.Kind(rawValue: naddr.kind),
-                author: naddr.author,
+                author: author,
                 identifier: naddr.identifier)
         else {
             return nil
@@ -160,9 +161,10 @@ public struct NostrListsAPI: NostrListManaging {
 
     /// The author to query: the given pubkey, or the signer's own when none is given.
     /// - Throws: ``NostrError/signerNotSet`` when neither is available.
-    private func author(_ pubkey: String?) async throws -> String {
-        if let pubkey { return pubkey }
-        return try await client.requiredPublicKey().hex
+    /// - Throws: ``NostrError/invalidPublicKey`` when `pubkey` is not a hex public key.
+    private func author(_ pubkey: String?) async throws -> PublicKey {
+        if let pubkey { return try PublicKey(callerHex: pubkey) }
+        return try await client.requiredPublicKey()
     }
 
     /// Reads a list event authored by the current user, decrypting its private items.
@@ -182,7 +184,7 @@ public struct NostrListsAPI: NostrListManaging {
     /// Seals a list's or set's private items to the author's own key, or returns empty content
     /// when there are none. Goes through the signer, so a remote NIP-46 signer seals them too.
     private static func sealPrivateItems(
-        _ items: [Tag], with signer: any NostrSigning, ownPubkey: String
+        _ items: [Tag], with signer: any NostrSigning, ownPubkey: PublicKey
     ) async throws -> String {
         guard let json = try ListItemCipher.plaintext(items) else { return "" }
         return try await signer.nip44Encrypt(json, to: ownPubkey)
@@ -192,7 +194,7 @@ public struct NostrListsAPI: NostrListManaging {
     private func openPrivateItems(_ content: String) async throws -> [Tag] {
         guard !content.isEmpty else { return [] }
         let json = try await client.withSigner { signer, publicKey in
-            try await signer.nip44Decrypt(content, from: publicKey.hex)
+            try await signer.nip44Decrypt(content, from: publicKey)
         }
         return try ListItemCipher.items(fromJSON: json)
     }

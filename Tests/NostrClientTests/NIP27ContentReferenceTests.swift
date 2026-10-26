@@ -1,5 +1,6 @@
 import Foundation
 import NostrCore
+import NostrTestSupport
 import Testing
 
 @testable import NostrClient
@@ -167,11 +168,14 @@ struct NIP27ContentReferenceTests {
 
     @Test("Tag.quote pads a skipped relay when a pubkey is present")
     func quoteTagPadsSkippedRelay() {
-        #expect(Event.Tag.quote("id", pubkey: "pk").rawArray == ["q", "id", "", "pk"])
+        let id = EventID.fixture("id")
+        let pubkey = PublicKey.fixture("pk")
+        #expect(Event.Tag.quote(id, pubkey: pubkey).rawArray == ["q", id.hex, "", pubkey.hex])
     }
 
     @Test("Tag.quote with only an id emits a two-element tag")
     func quoteTagIdOnly() {
-        #expect(Event.Tag.quote("id").rawArray == ["q", "id"])
+        let id = EventID.fixture("id")
+        #expect(Event.Tag.quote(id).rawArray == ["q", id.hex])
     }
 }

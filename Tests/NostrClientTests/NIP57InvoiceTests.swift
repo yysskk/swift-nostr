@@ -1,5 +1,6 @@
 import Foundation
 import NostrCore
+import NostrTestSupport
 import Testing
 
 @testable import NostrClient
@@ -10,13 +11,13 @@ struct NIP57InvoiceTests {
     private func makePayResponse(min: Int64 = 1000, max: Int64 = 100_000_000) -> LNURLPayResponse {
         LNURLPayResponse(
             callback: "https://example.com/lnurl/cb", minSendable: min, maxSendable: max,
-            allowsNostr: true, nostrPubkey: "np")
+            allowsNostr: true, nostrPubkey: PublicKey.fixture("np"))
     }
 
     private func makeZapRequest() throws -> Event {
         let signer = EventSigner(keyPair: try KeyPair())
         return try signer.signZapRequest(
-            recipientPubkey: "rp", relays: ["wss://r.example.com"], amountMillisats: 21000)
+            recipientPubkey: PublicKey.fixture("rp"), relays: ["wss://r.example.com"], amountMillisats: 21000)
     }
 
     // MARK: - Success

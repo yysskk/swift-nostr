@@ -11,7 +11,7 @@ struct GiftWrappedRumorDeliveryTests {
     private let customKind = Event.Kind(rawValue: 30_999)
     private let senderKey = String(repeating: "1", count: 64)
 
-    private func makeRumor(pubkey: PublicKey, recipient: String) -> UnsignedEvent {
+    private func makeRumor(pubkey: PublicKey, recipient: PublicKey) -> UnsignedEvent {
         UnsignedEvent(
             pubkey: pubkey, kind: customKind,
             tags: [.pubkey(recipient), .hashtag("friend-request")],
@@ -27,7 +27,7 @@ struct GiftWrappedRumorDeliveryTests {
         let recipient = try KeyPair()
         await client.dmRelayListStore.markNoList(for: recipient.publicKey.hex)
         await client.dmRelayListStore.markNoList(for: sender.publicKey.hex)
-        let rumor = makeRumor(pubkey: sender.publicKey, recipient: recipient.publicKey.hex)
+        let rumor = makeRumor(pubkey: sender.publicKey, recipient: recipient.publicKey)
 
         let result = try await PublishAckSupport.acknowledgingPublishes(2, on: socket) {
             try await client.messages.sendGiftWrapped(rumor, to: recipient.publicKey.hex)
@@ -76,7 +76,7 @@ struct GiftWrappedRumorDeliveryTests {
             DirectMessageRelayList(relays: [inboxURL.absoluteString]), createdAt: 1, for: recipient.publicKey.hex)
         // The sender advertised no list, so the self-copy falls back to the whole pool.
         await client.dmRelayListStore.markNoList(for: sender.publicKey.hex)
-        let rumor = makeRumor(pubkey: sender.publicKey, recipient: recipient.publicKey.hex)
+        let rumor = makeRumor(pubkey: sender.publicKey, recipient: recipient.publicKey)
 
         let task = Task { try await client.messages.sendGiftWrapped(rumor, to: recipient.publicKey.hex) }
         // The inbox relay receives both wraps; the other pool relay only the self-copy.
@@ -102,7 +102,7 @@ struct GiftWrappedRumorDeliveryTests {
         await client.dmRelayListStore.markNoList(for: recipient.publicKey.hex)
         await client.dmRelayListStore.markNoList(for: sender.publicKey.hex)
         let expiry = Date(timeIntervalSince1970: 2_000_000_000)
-        let rumor = makeRumor(pubkey: sender.publicKey, recipient: recipient.publicKey.hex)
+        let rumor = makeRumor(pubkey: sender.publicKey, recipient: recipient.publicKey)
 
         let result = try await PublishAckSupport.acknowledgingPublishes(2, on: socket) {
             try await client.messages.sendGiftWrapped(rumor, to: recipient.publicKey.hex, expiration: expiry)
@@ -119,7 +119,7 @@ struct GiftWrappedRumorDeliveryTests {
         let (client, socket) = try await ConnectedClientFixture.make()
         try await client.identity.setPrivateKey(senderKey)
         let recipient = try KeyPair()
-        let rumor = makeRumor(pubkey: try KeyPair().publicKey, recipient: recipient.publicKey.hex)
+        let rumor = makeRumor(pubkey: try KeyPair().publicKey, recipient: recipient.publicKey)
 
         await #expect(throws: NostrError.invalidPublicKey) {
             try await client.messages.sendGiftWrapped(rumor, to: recipient.publicKey.hex)
@@ -134,7 +134,7 @@ struct GiftWrappedRumorDeliveryTests {
         try await client.identity.setPrivateKey(senderKey)
         let sender = try KeyPair(privateKeyHex: senderKey)
         let recipient = try KeyPair()
-        let rumor = makeRumor(pubkey: sender.publicKey, recipient: recipient.publicKey.hex)
+        let rumor = makeRumor(pubkey: sender.publicKey, recipient: recipient.publicKey)
 
         await #expect(throws: NostrError.noRelaysInPool) {
             try await client.messages.sendGiftWrapped(rumor, to: recipient.publicKey.hex)
@@ -144,7 +144,7 @@ struct GiftWrappedRumorDeliveryTests {
     @Test("without a signer it throws signerNotSet")
     func noSignerThrows() async throws {
         let client = NostrClient()
-        let rumor = makeRumor(pubkey: try KeyPair().publicKey, recipient: try KeyPair().publicKey.hex)
+        let rumor = makeRumor(pubkey: try KeyPair().publicKey, recipient: try KeyPair().publicKey)
 
         await #expect(throws: NostrError.signerNotSet) {
             try await client.messages.sendGiftWrapped(rumor, to: try KeyPair().publicKey.hex)

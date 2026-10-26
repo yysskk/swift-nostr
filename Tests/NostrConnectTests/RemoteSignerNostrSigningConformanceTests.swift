@@ -1,5 +1,6 @@
 import Foundation
 import NostrCore
+import NostrTestSupport
 import Testing
 
 @testable import NostrConnect
@@ -55,9 +56,9 @@ struct RemoteSignerNostrSigningConformanceTests {
         #expect(request.method == RemoteSignerMethod.getPublicKey.rawValue)
         try await transport.deliver(
             RemoteSignerFixtures.response(
-                requestID: request.id, result: "userpubhex", client: client, signer: signer))
+                requestID: request.id, result: PublicKey.fixture("user").hex, client: client, signer: signer))
 
-        #expect(try await resolved.value == "userpubhex")
+        #expect(try await resolved.value == PublicKey.fixture("user"))
     }
 
     @Test("signing through any NostrSigning round-trips a verifiable event")

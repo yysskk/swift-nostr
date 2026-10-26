@@ -1,19 +1,24 @@
 import Foundation
 import NostrCore
+import NostrTestSupport
 import Testing
 
 @Suite("Filter Tests")
 struct FilterTests {
+    private let alice = PublicKey.fixture("alice")
+    private let bob = PublicKey.fixture("bob")
+    private let note = EventID.fixture("note")
+    private let reply = EventID.fixture("reply")
 
     @Test("Create basic filter")
     func createBasicFilter() {
         let filter = Filter(
-            authors: ["pubkey1", "pubkey2"],
+            authors: [alice, bob],
             kinds: [1],
             limit: 50
         )
 
-        #expect(filter.authors == ["pubkey1", "pubkey2"])
+        #expect(filter.authors == [alice, bob])
         #expect(filter.kinds == [1])
         #expect(filter.limit == 50)
     }
@@ -22,20 +27,20 @@ struct FilterTests {
     func filterWithEventReferences() {
         let filter = Filter(
             kinds: [1],
-            eventReferences: ["eventid1", "eventid2"]
+            eventReferences: [note, reply]
         )
 
-        #expect(filter.eventReferences == ["eventid1", "eventid2"])
+        #expect(filter.eventReferences == [note, reply])
     }
 
     @Test("Filter with pubkey references")
     func filterWithPubkeyReferences() {
         let filter = Filter(
             kinds: [1],
-            pubkeyReferences: ["pubkey1"]
+            pubkeyReferences: [alice]
         )
 
-        #expect(filter.pubkeyReferences == ["pubkey1"])
+        #expect(filter.pubkeyReferences == [alice])
     }
 
     @Test("Filter with time range")
@@ -52,39 +57,35 @@ struct FilterTests {
 
     @Test("User notes convenience filter")
     func userNotesFilter() {
-        let pubkey = "testpubkey123"
-        let filter = Filter.userNotes(pubkey: pubkey, limit: 25)
+        let filter = Filter.userNotes(pubkey: alice, limit: 25)
 
-        #expect(filter.authors == [pubkey])
+        #expect(filter.authors == [alice])
         #expect(filter.kinds == [1])
         #expect(filter.limit == 25)
     }
 
     @Test("Metadata convenience filter")
     func metadataFilter() {
-        let pubkeys = ["pubkey1", "pubkey2"]
-        let filter = Filter.metadata(pubkeys: pubkeys)
+        let filter = Filter.metadata(pubkeys: [alice, bob])
 
-        #expect(filter.authors == pubkeys)
+        #expect(filter.authors == [alice, bob])
         #expect(filter.kinds == [0])
     }
 
     @Test("Replies convenience filter")
     func repliesFilter() {
-        let eventId = "eventid123"
-        let filter = Filter.replies(to: eventId, limit: 50)
+        let filter = Filter.replies(to: note, limit: 50)
 
-        #expect(filter.eventReferences == [eventId])
+        #expect(filter.eventReferences == [note])
         #expect(filter.kinds == [1])
         #expect(filter.limit == 50)
     }
 
     @Test("Mentions convenience filter")
     func mentionsFilter() {
-        let pubkey = "testpubkey"
-        let filter = Filter.mentions(pubkey: pubkey)
+        let filter = Filter.mentions(pubkey: alice)
 
-        #expect(filter.pubkeyReferences == [pubkey])
+        #expect(filter.pubkeyReferences == [alice])
         #expect(filter.kinds == [1])
     }
 
@@ -99,9 +100,9 @@ struct FilterTests {
     @Test("Filter JSON encoding")
     func filterJsonEncoding() throws {
         let filter = Filter(
-            authors: ["pubkey1"],
+            authors: [alice],
             kinds: [1],
-            eventReferences: ["eventid1"],
+            eventReferences: [note],
             limit: 10
         )
 
@@ -119,10 +120,11 @@ struct FilterTests {
     func filterJsonDecoding() throws {
         let json = """
             {
-                "authors": ["pubkey1"],
+                "ids": ["\(reply.hex)"],
+                "authors": ["\(alice.hex)"],
                 "kinds": [1, 7],
-                "#e": ["eventid1"],
-                "#p": ["pubkey2"],
+                "#e": ["\(note.hex)"],
+                "#p": ["\(bob.hex)"],
                 "limit": 50
             }
             """
@@ -130,11 +132,43 @@ struct FilterTests {
         let decoder = JSONDecoder()
         let filter = try decoder.decode(Filter.self, from: json.data(using: .utf8)!)
 
-        #expect(filter.authors == ["pubkey1"])
+        #expect(filter.ids == [reply])
+        #expect(filter.authors == [alice])
         #expect(filter.kinds == [1, 7])
-        #expect(filter.eventReferences == ["eventid1"])
-        #expect(filter.pubkeyReferences == ["pubkey2"])
+        #expect(filter.eventReferences == [note])
+        #expect(filter.pubkeyReferences == [bob])
         #expect(filter.limit == 50)
+    }
+
+    @Test(
+        "Filter JSON decoding rejects a malformed id or public key",
+        arguments: ["ids", "authors", "#e", "#p"])
+    func filterJsonDecodingRejectsMalformedValues(key: String) {
+        let json = #"{"\#(key)": ["pubkey1"]}"#
+
+        #expect(throws: DecodingError.self) {
+            try JSONDecoder().decode(Filter.self, from: Data(json.utf8))
+        }
+    }
+
+    @Test("Profile list filters take public keys and encode them as hex authors")
+    func profileListFilters() throws {
+        let filters: [(Filter, Event.Kind, Int?)] = [
+            (.contactList(pubkey: alice), .contacts, 1),
+            (.relayListMetadata(pubkey: alice), .relayListMetadata, 1),
+            (.directMessageRelayList(pubkey: alice), .directMessageRelayList, 1),
+            (.contactList(pubkeys: [alice]), .contacts, nil),
+            (.relayListMetadata(pubkeys: [alice]), .relayListMetadata, nil),
+            (.directMessageRelayList(pubkeys: [alice]), .directMessageRelayList, nil),
+        ]
+
+        for (filter, kind, limit) in filters {
+            let json = try #require(
+                JSONSerialization.jsonObject(with: JSONEncoder().encode(filter)) as? [String: Any])
+            #expect(json["authors"] as? [String] == [alice.hex])
+            #expect(filter.kinds == [kind])
+            #expect(filter.limit == limit)
+        }
     }
 
     @Test("Filter with search query")

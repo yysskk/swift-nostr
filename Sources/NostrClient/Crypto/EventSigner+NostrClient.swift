@@ -8,16 +8,20 @@ import NostrCore
 extension EventSigner {
     /// Creates and signs a metadata event (kind 0)
     public func signMetadata(_ metadata: UserMetadata) throws -> Event {
-        try sign(.metadata(pubkey: typedPublicKey, metadata))
+        try sign(.metadata(pubkey: publicKey, metadata))
     }
 
     /// Creates and signs a contact list event (kind 3, NIP-02)
+    /// - Throws: ``NostrError/invalidPublicKey`` if a contact's pubkey is not a hex public key.
     public func signContactList(_ contacts: [Contact]) throws -> Event {
-        let tags = contacts.map { Tag.pubkey($0.pubkey, relayURL: $0.relayURL, petname: $0.petname) }
-        return try sign(UnsignedEvent(pubkey: typedPublicKey, kind: .contacts, tags: tags, content: ""))
+        let tags = try contacts.map {
+            Tag.pubkey(try PublicKey(callerHex: $0.pubkey), relayURL: $0.relayURL, petname: $0.petname)
+        }
+        return try sign(UnsignedEvent(pubkey: publicKey, kind: .contacts, tags: tags, content: ""))
     }
 
     /// Creates and signs a contact list event from pubkeys
+    /// - Throws: ``NostrError/invalidPublicKey`` if a pubkey is not a hex public key.
     public func signContactList(pubkeys: [String]) throws -> Event {
         let contacts = pubkeys.map { Contact(pubkey: $0) }
         return try signContactList(contacts)
@@ -25,7 +29,7 @@ extension EventSigner {
 
     /// Creates and signs a relay list metadata event (kind 10002, NIP-65)
     public func signRelayListMetadata(_ relayList: RelayListMetadata) throws -> Event {
-        try sign(.relayListMetadata(pubkey: typedPublicKey, relayList))
+        try sign(.relayListMetadata(pubkey: publicKey, relayList))
     }
 
     /// Creates and signs a relay list metadata event from explicit read/write relay URLs (NIP-65).
@@ -40,7 +44,7 @@ extension EventSigner {
     /// private direct messages. Its content is empty; the relays are carried as
     /// `relay` tags.
     public func signDirectMessageRelayList(_ relayList: DirectMessageRelayList) throws -> Event {
-        try sign(.directMessageRelayList(pubkey: typedPublicKey, relayList))
+        try sign(.directMessageRelayList(pubkey: publicKey, relayList))
     }
 
     /// Creates and signs a DM relay list event from relay URLs (kind 10050, NIP-17).
@@ -51,26 +55,26 @@ extension EventSigner {
     /// Creates and signs a report of a pubkey (kind 1984, NIP-56).
     /// The report type rides on the "p" tag; `reason` becomes the content.
     public func signReport(pubkey: String, type: ReportType, reason: String = "") throws -> Event {
-        try sign(.report(pubkey: typedPublicKey, target: pubkey, type: type, reason: reason))
+        try sign(.report(pubkey: publicKey, target: pubkey, type: type, reason: reason))
     }
 
     /// Creates and signs a report of an event and its author (kind 1984, NIP-56).
     /// The report type rides on the "e" tag; a bare "p" tag names the author.
     public func signReport(event: Event, type: ReportType, reason: String = "") throws -> Event {
-        try sign(.report(pubkey: typedPublicKey, event: event, type: type, reason: reason))
+        try sign(.report(pubkey: publicKey, event: event, type: type, reason: reason))
     }
 
     /// Creates and signs a long-form article (kind 30023, or 30024 when `draft`; NIP-23).
     /// When `publishedAt` is nil it is set to the current time (first-publication time per the spec);
     /// it is preserved verbatim on later edits.
     public func signLongFormContent(_ article: LongFormContent, draft: Bool = false) throws -> Event {
-        try sign(.longFormContent(pubkey: typedPublicKey, article, draft: draft))
+        try sign(.longFormContent(pubkey: publicKey, article, draft: draft))
     }
 
     /// Creates and signs a NIP-51 list event, encrypting private items to the signer's own key
     /// (NIP-44). Content is empty when there are no private items.
     public func signList(_ list: NostrList) throws -> Event {
-        try sign(.list(pubkey: typedPublicKey, list, encryptedContent: sealPrivateItems(list.privateItems)))
+        try sign(.list(pubkey: publicKey, list, encryptedContent: sealPrivateItems(list.privateItems)))
     }
 
     /// Reads a NIP-51 list authored by this signer, decrypting its private items.
@@ -85,7 +89,7 @@ extension EventSigner {
     /// public items as tags, with private items NIP-44-encrypted to the signer's own key in
     /// the content. Content is empty when there are no private items.
     public func signSet(_ set: NostrListSet) throws -> Event {
-        try sign(.set(pubkey: typedPublicKey, set, encryptedContent: sealPrivateItems(set.privateItems)))
+        try sign(.set(pubkey: publicKey, set, encryptedContent: sealPrivateItems(set.privateItems)))
     }
 
     /// Reads a NIP-51 set authored by this signer, decrypting its private items.

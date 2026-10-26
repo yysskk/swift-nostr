@@ -30,7 +30,7 @@ struct NIP42AuthenticationEventTests {
         let event = try signer.signClientAuthentication(relayURL: relayURL, challenge: "challengestringhere")
 
         #expect(event.kind == .clientAuthentication)
-        #expect(event.pubkey.hex == signer.publicKey)
+        #expect(event.pubkey == signer.publicKey)
         #expect(event.firstTagValue(named: "relay") == "wss://relay.example.com/")
         #expect(event.firstTagValue(named: "challenge") == "challengestringhere")
         #expect(event.content.isEmpty)
@@ -247,7 +247,7 @@ struct NIP42RelayConnectionTests {
         try await pollUntil { mock.sentTextFrames.contains { $0.contains("\"AUTH\"") } }
         let sent = try sentAuthEvent(in: mock)
         #expect(sent.kind == .clientAuthentication)
-        #expect(sent.pubkey.hex == signer.publicKey)
+        #expect(sent.pubkey == signer.publicKey)
         #expect(sent.firstTagValue(named: "relay") == relayURL.absoluteString)
         #expect(sent.firstTagValue(named: "challenge") == "challengestringhere")
         #expect(try sent.verify())

@@ -26,11 +26,15 @@ public struct RelayInformation: Codable, Sendable, Hashable {
     /// URL to an icon image for the relay (preferably square).
     public var icon: String?
 
-    /// Administrator's public key (32-byte hex).
-    public var pubkey: String?
+    /// The administrator's public key.
+    ///
+    /// Nil when the document omits it or carries a value that is not a canonical hex public key.
+    public var pubkey: PublicKey?
 
-    /// The relay's own independent identity public key (32-byte hex).
-    public var selfPubkey: String?
+    /// The relay's own independent identity public key (the document's `self` field).
+    ///
+    /// Nil when the document omits it or carries a value that is not a canonical hex public key.
+    public var selfPubkey: PublicKey?
 
     /// Administrator's contact (URI, e.g. `mailto:` or `https://`).
     public var contact: String?
@@ -93,13 +97,14 @@ public struct RelayInformation: Codable, Sendable, Hashable {
         case retention
     }
 
+    /// Creates a document from its fields; every field defaults to absent.
     public init(
         name: String? = nil,
         description: String? = nil,
         banner: String? = nil,
         icon: String? = nil,
-        pubkey: String? = nil,
-        selfPubkey: String? = nil,
+        pubkey: PublicKey? = nil,
+        selfPubkey: PublicKey? = nil,
         contact: String? = nil,
         supportedNIPs: [Int]? = nil,
         software: String? = nil,
@@ -133,6 +138,43 @@ public struct RelayInformation: Codable, Sendable, Hashable {
         self.paymentsURL = paymentsURL
         self.fees = fees
         self.retention = retention
+    }
+}
+
+// MARK: - Decoding
+extension RelayInformation {
+    /// Decodes a NIP-11 document.
+    ///
+    /// The document is written by the relay operator, so the two public keys are read leniently:
+    /// a `pubkey` or `self` value that is not a canonical 64-digit lowercase hex public key
+    /// decodes as nil instead of failing the whole document. Every other field is decoded strictly.
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        func lenientPublicKey(_ key: CodingKeys) -> PublicKey? {
+            (try? container.decodeIfPresent(String.self, forKey: key))?.flatMap(PublicKey.init)
+        }
+
+        self.init(
+            name: try container.decodeIfPresent(String.self, forKey: .name),
+            description: try container.decodeIfPresent(String.self, forKey: .description),
+            banner: try container.decodeIfPresent(String.self, forKey: .banner),
+            icon: try container.decodeIfPresent(String.self, forKey: .icon),
+            pubkey: lenientPublicKey(.pubkey),
+            selfPubkey: lenientPublicKey(.selfPubkey),
+            contact: try container.decodeIfPresent(String.self, forKey: .contact),
+            supportedNIPs: try container.decodeIfPresent([Int].self, forKey: .supportedNIPs),
+            software: try container.decodeIfPresent(String.self, forKey: .software),
+            version: try container.decodeIfPresent(String.self, forKey: .version),
+            termsOfService: try container.decodeIfPresent(String.self, forKey: .termsOfService),
+            limitation: try container.decodeIfPresent(Limitation.self, forKey: .limitation),
+            relayCountries: try container.decodeIfPresent([String].self, forKey: .relayCountries),
+            languageTags: try container.decodeIfPresent([String].self, forKey: .languageTags),
+            tags: try container.decodeIfPresent([String].self, forKey: .tags),
+            postingPolicy: try container.decodeIfPresent(String.self, forKey: .postingPolicy),
+            paymentsURL: try container.decodeIfPresent(String.self, forKey: .paymentsURL),
+            fees: try container.decodeIfPresent(Fees.self, forKey: .fees),
+            retention: try container.decodeIfPresent([Retention].self, forKey: .retention)
+        )
     }
 }
 
