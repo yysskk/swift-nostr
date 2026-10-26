@@ -130,6 +130,58 @@ subscribe, and count too, so it stays on the concrete `NostrRelaysAPI`.
 
 `NostrClient` itself exposes only its initializers and these namespaces.
 
+### Extending the Client
+
+The capability protocols are the public extension points; nothing beyond the public API is needed.
+
+- **Conformers** implement only the primitives, without default arguments, and get every
+  convenience from the extensions. Change behavior in a primitive, not by redeclaring a
+  convenience: extension methods dispatch statically, so a call through the existential would still
+  reach the extension's version.
+- **A helper** is an extension of the capability it needs, built on its primitives or conveniences;
+  it then works on `client.events`, on any `any NostrEventPublishing`, and on stubs.
+- **A namespace** is a `Sendable` struct holding the capability existentials it needs (not the
+  client), exposed through a `nonisolated` accessor on `NostrClient` (an actor whose namespace
+  accessors are all `nonisolated`). Because it holds capabilities, a test passes it stubs that
+  implement only the primitives, mixed freely with real namespaces such as `client.identity`.
+
+```swift
+extension NostrEventPublishing {
+    /// NIP-38 general user status (kind 30315).
+    @discardableResult
+    public func publishStatus(_ status: String, strategy: PublishStrategy? = nil) async throws -> PublishedEvent {
+        try await publish(
+            EventTemplate(kind: Event.Kind(rawValue: 30315), tags: [.identifier("general")], content: status),
+            strategy: strategy)
+    }
+}
+
+public struct ZapsAPI: Sendable {
+    let events: any NostrEventFetching
+    let identity: any NostrIdentityProviding
+
+    public init(events: any NostrEventFetching, identity: any NostrIdentityProviding) {
+        self.events = events
+        self.identity = identity
+    }
+
+    /// Fetches the zap receipts naming the signer as recipient.
+    public func received(limit: Int = 50, timeout: Duration? = nil) async throws -> [ZapReceipt] {
+        guard let publicKey = await identity.publicKey else { throw NostrError.signerNotSet }
+        let filter = Filter(kinds: [.zap], publicKeyReferences: [publicKey], limit: limit)
+        return try await events.fetch(filters: [filter], timeout: timeout).compactMap(ZapReceipt.init(event:))
+    }
+}
+
+extension NostrClient {
+    public nonisolated var zaps: ZapsAPI { ZapsAPI(events: events, identity: identity) }
+}
+
+// In a test: a stub implementing only fetch(filters:from:timeout:) and
+// countEvents(matching:from:timeout:), with the client's offline identity.
+let zaps = ZapsAPI(events: CannedEvents([receipt]), identity: client.identity)
+```
+
 ### Signer Setup
 
 ```swift

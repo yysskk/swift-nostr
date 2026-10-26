@@ -20,6 +20,10 @@ import NostrCore
 // are built only on the primitives. The concrete namespaces inherit them, so a stub implements only
 // the primitives and a call through `any NostrEventPublishing` is as short as one through
 // `client.events`.
+//
+// The protocols are also the public extension points: a helper added to one in an extension works on
+// the namespace, on any conformer, and on stubs, and a namespace of your own composes the protocols
+// it needs. The "Extending the Client" article (NostrClient.docc/ExtendingTheClient.md) covers both.
 
 // MARK: - Identity
 
