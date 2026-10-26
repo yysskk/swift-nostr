@@ -50,11 +50,29 @@ public enum HTTPAuth {
     /// - Parameter event: A signed NIP-98 event, e.g. signed from
     ///   ``EventTemplate/httpAuthorization(url:method:payload:)``.
     /// - Returns: The header value, e.g. `"Nostr eyJpZCI6…"`.
-    /// - Throws: ``NostrError/invalidData`` when `event` is not kind 27235.
+    /// - Throws: ``HTTPAuth/AuthorizationError/invalidEventKind(_:)`` when `event` is not
+    ///   kind 27235.
     public static func authorizationHeaderValue(for event: Event) throws -> String {
-        guard event.kind == .httpAuth else { throw NostrError.invalidData }
+        guard event.kind == .httpAuth else { throw AuthorizationError.invalidEventKind(event.kind) }
         let json = try JSONEncoder().encode(event)
         return "\(scheme) \(json.base64EncodedString())"
+    }
+
+    /// Why a request could not be given a NIP-98 `Authorization` header.
+    public enum AuthorizationError: Swift.Error, LocalizedError, Sendable, Equatable {
+        /// The event is not kind 27235 (payload: the kind it has).
+        case invalidEventKind(Event.Kind)
+        /// The request has no URL for the event to commit to.
+        case missingURL
+
+        public var errorDescription: String? {
+            switch self {
+            case .invalidEventKind(let kind):
+                return "Expected a kind-27235 authorization event, got kind \(kind)"
+            case .missingURL:
+                return "The request has no URL to authorize"
+            }
+        }
     }
 }
 
@@ -218,10 +236,10 @@ extension URLRequest {
     /// whose timestamp falls outside a small window around their clock.
     ///
     /// - Parameter signer: The identity to sign as.
-    /// - Throws: ``NostrError/invalidData`` when the request has no URL, and
+    /// - Throws: ``HTTPAuth/AuthorizationError/missingURL`` when the request has no URL, and
     ///   whatever `signer` throws.
     public mutating func setNostrAuthorization(signer: some NostrSigning) async throws {
-        guard let url else { throw NostrError.invalidData }
+        guard let url else { throw HTTPAuth.AuthorizationError.missingURL }
         let event = try await signer.sign(
             .httpAuthorization(url: url, method: httpMethod ?? "GET", payload: httpBody)
         )

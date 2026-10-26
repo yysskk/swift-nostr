@@ -9,11 +9,12 @@ enum HChaCha20 {
     /// The ChaCha "expand 32-byte k" constants (RFC 8439 §2.3), state words 0..3.
     private static let constants: [UInt32] = [0x6170_7865, 0x3320_646e, 0x7962_2d32, 0x6b20_6574]
 
-    /// Runs the HChaCha20 block function. `key` must be 32 bytes, `nonce` 16 bytes.
+    /// Runs the HChaCha20 block function.
     /// - Returns: the 32-byte subkey (state words 0..3 concatenated with words 12..15).
-    static func deriveSubkey(key: Data, nonce: Data) throws -> Data {
-        guard key.count == 32 else { throw NostrError.invalidData }
-        guard nonce.count == 16 else { throw NostrError.invalidData }
+    /// - Precondition: `key` is 32 bytes and `nonce` 16.
+    static func deriveSubkey(key: Data, nonce: Data) -> Data {
+        precondition(key.count == 32, "An HChaCha20 key is 32 bytes")
+        precondition(nonce.count == 16, "An HChaCha20 nonce is 16 bytes")
 
         var state = [UInt32](repeating: 0, count: 16)
 
@@ -100,28 +101,38 @@ enum HChaCha20 {
 ///
 /// https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-xchacha-03#section-2.3
 enum XChaCha20Poly1305 {
+    /// The ciphertext did not authenticate under the key, nonce, and associated data. Each public
+    /// caller maps this into its own domain error.
+    struct AuthenticationFailure: Error {}
+
     /// The Poly1305 authentication tag length, in bytes.
     private static let tagLength = 16
 
     /// Seals `plaintext`. Returns ciphertext with the 16-byte Poly1305 tag appended.
-    /// `key` 32 bytes, `nonce` 24 bytes.
+    /// - Precondition: `key` is 32 bytes and `nonce` 24.
     static func seal(
         _ plaintext: Data,
         key: Data,
         nonce: Data,
         authenticating aad: Data = Data()
-    ) throws -> Data {
-        guard key.count == 32 else { throw NostrError.invalidData }
-        guard nonce.count == 24 else { throw NostrError.invalidData }
+    ) -> Data {
+        precondition(key.count == 32, "An XChaCha20-Poly1305 key is 32 bytes")
+        precondition(nonce.count == 24, "An XChaCha20-Poly1305 nonce is 24 bytes")
 
-        let (subkey, ietfNonce) = try deriveSubkeyAndNonce(key: key, nonce: nonce)
+        let (subkey, ietfNonce) = deriveSubkeyAndNonce(key: key, nonce: nonce)
 
-        let sealedBox = try ChaChaPoly.seal(
-            plaintext,
-            using: SymmetricKey(data: subkey),
-            nonce: ChaChaPoly.Nonce(data: ietfNonce),
-            authenticating: aad
-        )
+        // swift-crypto only rejects a wrong-length key or nonce, which the preconditions rule out.
+        let sealedBox: ChaChaPoly.SealedBox
+        do {
+            sealedBox = try ChaChaPoly.seal(
+                plaintext,
+                using: SymmetricKey(data: subkey),
+                nonce: ChaChaPoly.Nonce(data: ietfNonce),
+                authenticating: aad
+            )
+        } catch {
+            preconditionFailure("ChaChaPoly rejected a 32-byte key and a 12-byte nonce: \(error)")
+        }
 
         // `sealedBox.combined` prefixes the nonce, so assemble ciphertext‖tag explicitly.
         // `ciphertext` is a slice of the combined buffer, so wrap the result in a fresh
@@ -132,19 +143,21 @@ enum XChaCha20Poly1305 {
         return result
     }
 
-    /// Opens `ciphertext` (tag appended), authenticating `aad`. Throws on auth failure.
-    /// `key` 32 bytes, `nonce` 24 bytes, `ciphertext` at least 16 bytes (the tag).
+    /// Opens `ciphertext` (tag appended), authenticating `aad`.
+    /// - Throws: ``AuthenticationFailure`` if `ciphertext` is shorter than the tag or does not
+    ///   authenticate.
+    /// - Precondition: `key` is 32 bytes and `nonce` 24.
     static func open(
         _ ciphertext: Data,
         key: Data,
         nonce: Data,
         authenticating aad: Data = Data()
-    ) throws -> Data {
-        guard key.count == 32 else { throw NostrError.invalidData }
-        guard nonce.count == 24 else { throw NostrError.invalidData }
-        guard ciphertext.count >= tagLength else { throw NostrError.invalidData }
+    ) throws(AuthenticationFailure) -> Data {
+        precondition(key.count == 32, "An XChaCha20-Poly1305 key is 32 bytes")
+        precondition(nonce.count == 24, "An XChaCha20-Poly1305 nonce is 24 bytes")
+        guard ciphertext.count >= tagLength else { throw AuthenticationFailure() }
 
-        let (subkey, ietfNonce) = try deriveSubkeyAndNonce(key: key, nonce: nonce)
+        let (subkey, ietfNonce) = deriveSubkeyAndNonce(key: key, nonce: nonce)
 
         // Data slices keep their parent's indices, so re-wrap in fresh Data values.
         let splitIndex = ciphertext.index(ciphertext.endIndex, offsetBy: -tagLength)
@@ -159,16 +172,16 @@ enum XChaCha20Poly1305 {
             )
             return try ChaChaPoly.open(sealedBox, using: SymmetricKey(data: subkey), authenticating: aad)
         } catch {
-            throw NostrError.decryptionFailed
+            throw AuthenticationFailure()
         }
     }
 
     /// Derives the HChaCha20 subkey and the 12-byte IETF nonce (four zero bytes followed by the
     /// last eight bytes of the 24-byte nonce) shared by ``seal(_:key:nonce:authenticating:)`` and
     /// ``open(_:key:nonce:authenticating:)``.
-    private static func deriveSubkeyAndNonce(key: Data, nonce: Data) throws -> (subkey: Data, ietfNonce: Data) {
+    private static func deriveSubkeyAndNonce(key: Data, nonce: Data) -> (subkey: Data, ietfNonce: Data) {
         let hchachaNonce = Data(nonce[nonce.startIndex..<nonce.index(nonce.startIndex, offsetBy: 16)])
-        let subkey = try HChaCha20.deriveSubkey(key: key, nonce: hchachaNonce)
+        let subkey = HChaCha20.deriveSubkey(key: key, nonce: hchachaNonce)
 
         var ietfNonce = Data(repeating: 0, count: 4)
         ietfNonce.append(Data(nonce[nonce.index(nonce.startIndex, offsetBy: 16)...]))

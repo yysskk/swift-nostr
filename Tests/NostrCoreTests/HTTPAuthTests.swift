@@ -79,7 +79,7 @@ struct HTTPAuthTests {
     func headerValueRejectsWrongKind() throws {
         let note = try EventSigner(keyPair: try KeyPair()).sign(.textNote("hi"))
 
-        #expect(throws: NostrError.invalidData) {
+        #expect(throws: HTTPAuth.AuthorizationError.invalidEventKind(.textNote)) {
             try HTTPAuth.authorizationHeaderValue(for: note)
         }
     }
@@ -127,9 +127,9 @@ struct HTTPAuthTests {
 
         do {
             try await request.setNostrAuthorization(signer: signer)
-            Issue.record("Expected NostrError.invalidData")
+            Issue.record("Expected HTTPAuth.AuthorizationError.missingURL")
         } catch {
-            #expect(error as? NostrError == .invalidData)
+            #expect(error as? HTTPAuth.AuthorizationError == .missingURL)
         }
         #expect(request.value(forHTTPHeaderField: "Authorization") == nil)
     }

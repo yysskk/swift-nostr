@@ -237,8 +237,9 @@ try await client.identity.authenticate(relayURL: relay)  // answer a pending cha
 Every API that takes or returns a relay URL uses `RelayURL` (NostrCore): a validated
 `ws`/`wss` URL in canonical form — lowercased scheme and host, root trailing slash and
 default port removed, path case and a non-root trailing slash kept. `RelayURL(string:)` /
-`RelayURL(url:)` throw `NostrError.invalidRelayURL(input)` for an unparseable string, a
-non-`ws(s)` scheme, an empty host, or a fragment/user/password; `RelayURL(_:)` is the failable
+`RelayURL(url:)` throw `RelayURL.Error`: `malformed` (no URL with a scheme),
+`unsupportedScheme(String)` (not `ws`/`wss`), `missingHost`, `containsFragment`, or
+`containsCredentials` (a user or password); `RelayURL(_:)` is the failable
 form. Equality and hashing use the canonical form, so any spelling of the same relay routes
 to one pooled connection. `description` (and the JSON encoding) is the canonical string;
 `url` is the `URL` the WebSocket opens. Relay hints read from third-party tags (contact lists,
@@ -424,7 +425,7 @@ NIP-01 Nostr Event (struct: Codable, Identifiable, Hashable, Sendable).
 - `kind: Event.Kind` -- event kind (RawRepresentable struct, encodes as bare integer)
 - `tags: [[String]]` -- array of tag arrays (raw NIP-01 wire form)
 - `content: String` -- arbitrary string content
-- `signature: Signature?` -- Schnorr signature, the `sig` field on the wire; `nil` for an unsigned NIP-59 rumor, which encodes without `sig` (decoding treats a missing or empty `sig` as `nil`). A malformed `id`, `pubkey`, or `sig` fails decoding, so a relay frame carrying one is dropped. `verify()` throws `invalidSignature` for a rumor.
+- `signature: Signature?` -- Schnorr signature, the `sig` field on the wire; `nil` for an unsigned NIP-59 rumor, which encodes without `sig` (decoding treats a missing or empty `sig` as `nil`). A malformed `id`, `pubkey`, or `sig` fails decoding, so a relay frame carrying one is dropped. `verify()` throws `Event.VerificationError`: `idMismatch` when the id is not the hash of the other fields, `missingSignature` for a rumor.
 
 ### Tag
 
@@ -539,7 +540,7 @@ EventTemplate.reaction(to: event, content: "🤙")              // kind 7, e + p
 try EventTemplate.repost(of: event, relayURL: relay)         // kind 6, event JSON as content; RelayURL? hint
 EventTemplate.deletion(of: [event.id], reason: "mistake")    // kind 5, one e tag per id (NIP-09)
 EventTemplate.clientAuthentication(relayURL: relay, challenge: "challenge")  // kind 22242 (NIP-42)
-try EventTemplate.zapRequest(                                // kind 9734 (NIP-57); throws invalidData for no relays
+try EventTemplate.zapRequest(                                // kind 9734 (NIP-57); throws ZapRequestError.missingRelays for no relays
     to: recipient, relays: [relay], amountMillisats: 21_000, lnurl: lnurl,
     eventID: nil, eventCoordinate: nil, comment: "great post")
 EventTemplate.httpAuthorization(url: url, method: "post", payload: body)  // kind 27235 (NIP-98)
@@ -671,7 +672,7 @@ Messages received from relay (NIP-01) (enum: Sendable).
 - `.event(subscriptionID: String, event: Event)`
 - `.endOfStoredEvents(subscriptionID: String)`
 - `.notice(message: String)`
-- `.ok(eventID: EventID, accepted: Bool, message: String)` -- an `OK` whose id is not canonical hex fails to parse (`invalidMessageFormat`)
+- `.ok(eventID: EventID, accepted: Bool, message: String)` -- an `OK` whose id is not canonical hex fails to parse (`RelayMessage.Error.malformed`, also thrown for a frame that is not a JSON array or lacks its fields)
 - `.auth(challenge: String)` -- NIP-42
 - `.closed(subscriptionID: String, message: String)`
 - `.count(subscriptionID: String, count: Int, approximate: Bool?)` -- NIP-45
@@ -927,7 +928,7 @@ let bits = ProofOfWork.difficulty(of: event.id)
 
 // Mine an unsigned event to a target difficulty, then sign it. Mining holds createdAt fixed
 // (deterministic) and is cooperative — it checks cancellation and yields, so it can be cancelled.
-let mined = try await ProofOfWork.mine(event: unsignedEvent, difficulty: 20)  // throws NostrError.invalidData outside 0...256
+let mined = try await ProofOfWork.mine(event: unsignedEvent, difficulty: 20)  // throws ProofOfWork.Error.invalidDifficulty outside 0...256
 let signed = try signer.sign(mined)
 // Or mine and sign a template in one step, with any NostrSigning:
 let minedNote = try await signer.sign(.textNote("gm"), proofOfWork: 20)
@@ -1000,6 +1001,11 @@ With a caller-supplied 32-byte conversation key (e.g. one shared by a group) ins
 let sealed = try SealedMessage.seal("message", conversationKey: groupKey)
 let plaintext = try sealed.open(conversationKey: groupKey)
 ```
+
+Every seal and open throws `SealedMessage.Error`: `invalidConversationKey` (not 32 bytes),
+`invalidPlaintextLength(Int)` (not 1...65535 UTF-8 bytes), `invalidPublicKey` (the peer key is not
+on secp256k1), `malformedPayload` (bad base64, length out of range, non-UTF-8 plaintext),
+`unsupportedVersion(UInt8)`, `invalidMAC` (wrong key or tampered), or `invalidPadding`.
 
 ## GiftWrap
 
@@ -1498,7 +1504,7 @@ scheme and host, root trailing slash stripped, default port (443 for wss, 80 for
 path case and a non-root trailing slash are kept. Equal and hashed by that canonical form.
 
 ```swift
-let relay = try RelayURL(string: "WSS://Relay.Example.com:443/")  // throws NostrError.invalidRelayURL(input)
+let relay = try RelayURL(string: "WSS://Relay.Example.com:443/")  // throws RelayURL.Error for a non-relay URL
 let fromURL = try RelayURL(url: someURL)
 let maybe = RelayURL("wss://relay.example.com")  // failable: nil when invalid
 relay.description   // "wss://relay.example.com" (also its JSON encoding)
@@ -1775,7 +1781,7 @@ for await challenge in await signer.authChallenges() {
 
 Error types (enum: Error, LocalizedError, Sendable, Equatable).
 
-Cases: `invalidPrivateKey`, `invalidPublicKey`, `invalidSignature`, `invalidEventID`, `signingFailed`, `signerNotSet`, `verificationFailed`, `serializationFailed`, `invalidData`, `invalidMessageFormat`, `invalidRelayURL(String)`, `connectionFailed(String)`, `notConnected`, `subscriptionNotFound(String)`, `relayError(String)`, `noRelaysInPool`, `noMatchingRelays([RelayURL])`, `authenticationFailed(String)`, `cannotPublishAuthenticationEvent`, `timeout`, `unknownPrefix(String)`, `invalidTLV`, `invalidNIP19Entity`, `invalidNostrURI`, `encryptionFailed`, `decryptionFailed`, `unsupportedEncryptionVersion(UInt8)`, `invalidPayloadFormat`, `hmacVerificationFailed`, `invalidPadding`.
+Cases: `invalidEventID`, `signerNotSet`, `verificationFailed`, `serializationFailed`, `invalidData`, `connectionFailed(String)`, `notConnected`, `relayError(String)`, `noRelaysInPool`, `noMatchingRelays([RelayURL])`, `authenticationFailed(String)`, `cannotPublishAuthenticationEvent`, `timeout`, `unknownPrefix(String)`, `invalidTLV`, `invalidNIP19Entity`, `invalidNostrURI`, `decryptionFailed`.
 
 ## Supported NIPs
 

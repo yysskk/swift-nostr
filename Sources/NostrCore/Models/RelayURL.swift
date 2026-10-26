@@ -19,17 +19,28 @@ public struct RelayURL: Sendable {
     public let url: URL
 
     /// Creates a relay URL from a string, normalizing it to its canonical form.
-    /// - Throws: ``NostrError/invalidRelayURL(_:)`` carrying `string` when it does not parse,
-    ///   its scheme is not `ws` or `wss`, its host is empty, or it has a fragment or a user or
+    /// - Throws: ``RelayURL/Error/malformed`` when `string` does not parse as a URL with a scheme,
+    ///   ``RelayURL/Error/unsupportedScheme(_:)`` when its scheme is not `ws` or `wss`,
+    ///   ``RelayURL/Error/missingHost`` when its host is empty, ``RelayURL/Error/containsFragment``
+    ///   when it has a fragment, or ``RelayURL/Error/containsCredentials`` when it has a user or
     ///   password.
-    public init(string: String) throws {
+    public init(string: String) throws(RelayURL.Error) {
         guard var components = URLComponents(string: string),
-            let scheme = components.scheme?.lowercased(), scheme == "wss" || scheme == "ws",
-            let host = components.host, !host.isEmpty,
-            components.fragment == nil,
-            components.user == nil, components.password == nil
+            let scheme = components.scheme?.lowercased()
         else {
-            throw NostrError.invalidRelayURL(string)
+            throw .malformed
+        }
+        guard scheme == "wss" || scheme == "ws" else {
+            throw .unsupportedScheme(scheme)
+        }
+        guard let host = components.host, !host.isEmpty else {
+            throw .missingHost
+        }
+        guard components.fragment == nil else {
+            throw .containsFragment
+        }
+        guard components.user == nil, components.password == nil else {
+            throw .containsCredentials
         }
         components.scheme = scheme
         components.host = host.lowercased()
@@ -38,17 +49,47 @@ public struct RelayURL: Sendable {
             components.port = nil
         }
         guard let canonical = components.string, let url = URL(string: canonical) else {
-            throw NostrError.invalidRelayURL(string)
+            throw .malformed
         }
         self.canonical = canonical
         self.url = url
     }
 
     /// Creates a relay URL from a URL, normalizing it to its canonical form.
-    /// - Throws: ``NostrError/invalidRelayURL(_:)`` carrying `url.absoluteString` when its scheme
-    ///   is not `ws` or `wss`, its host is empty, or it has a fragment or a user or password.
-    public init(url: URL) throws {
+    /// - Throws: What ``init(string:)`` throws for `url.absoluteString`.
+    public init(url: URL) throws(RelayURL.Error) {
         try self.init(string: url.absoluteString)
+    }
+}
+
+extension RelayURL {
+    /// Why a string or URL is not a valid ``RelayURL``.
+    public enum Error: Swift.Error, LocalizedError, Sendable, Equatable {
+        /// The string does not parse as a URL with a scheme.
+        case malformed
+        /// The scheme is not `ws` or `wss` (payload: the scheme found, lowercased).
+        case unsupportedScheme(String)
+        /// The URL has no host, or an empty one.
+        case missingHost
+        /// The URL has a fragment, which a WebSocket URL must not carry.
+        case containsFragment
+        /// The URL has a user or password.
+        case containsCredentials
+
+        public var errorDescription: String? {
+            switch self {
+            case .malformed:
+                return "A relay URL must be a ws:// or wss:// URL"
+            case .unsupportedScheme(let scheme):
+                return "A relay URL must use ws or wss, got \(scheme)"
+            case .missingHost:
+                return "A relay URL must have a host"
+            case .containsFragment:
+                return "A relay URL must not have a fragment"
+            case .containsCredentials:
+                return "A relay URL must not carry a user or password"
+            }
+        }
     }
 }
 

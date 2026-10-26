@@ -123,7 +123,7 @@ struct NIP42RelayConnectionTests {
         guard let frame = mock.sentTextFrames.first(where: { $0.hasPrefix("[\"AUTH\"") }),
             case .auth(let event) = try parseClientFrame(frame)
         else {
-            throw NostrError.invalidMessageFormat
+            throw RelayMessage.Error.malformed
         }
         return event
     }
@@ -136,7 +136,7 @@ struct NIP42RelayConnectionTests {
             array.first as? String == "AUTH",
             let eventDict = array[1] as? [String: Any]
         else {
-            throw NostrError.invalidMessageFormat
+            throw RelayMessage.Error.malformed
         }
         let eventData = try JSONSerialization.data(withJSONObject: eventDict)
         return .auth(try JSONDecoder().decode(Event.self, from: eventData))

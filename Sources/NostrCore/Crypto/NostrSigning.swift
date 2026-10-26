@@ -62,8 +62,8 @@ extension NostrSigning {
     ///   - template: The event to mine and sign. Any existing `nonce` tags are replaced.
     ///   - difficulty: The target number of leading zero bits, in `0...256`.
     /// - Returns: The signed ``Event``, whose id meets `difficulty`.
-    /// - Throws: `CancellationError` if cancelled; ``NostrError/invalidData`` if `difficulty` is
-    ///   outside `0...256`; anything resolving ``publicKey`` or signing throws.
+    /// - Throws: `CancellationError` if cancelled; ``ProofOfWork/Error/invalidDifficulty(_:)`` if
+    ///   `difficulty` is outside `0...256`; anything resolving ``publicKey`` or signing throws.
     public func sign(_ template: EventTemplate, proofOfWork difficulty: Int) async throws -> Event {
         let unsigned = UnsignedEvent(template, publicKey: try await publicKey)
         return try await sign(ProofOfWork.mine(event: unsigned, difficulty: difficulty))

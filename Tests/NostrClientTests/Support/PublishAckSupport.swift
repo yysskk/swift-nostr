@@ -20,7 +20,7 @@ enum PublishAckSupport {
             array.count >= 2,
             let eventDict = array[1] as? [String: Any]
         else {
-            throw NostrError.invalidMessageFormat
+            throw RelayMessage.Error.malformed
         }
         let eventData = try JSONSerialization.data(withJSONObject: eventDict)
         return try JSONDecoder().decode(Event.self, from: eventData)

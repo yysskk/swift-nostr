@@ -17,9 +17,10 @@ enum ChaCha20 {
     ///   - nonce: The 12-byte nonce.
     ///   - initialCounter: The block counter for the first keystream block (0 for NIP-44).
     /// - Returns: `data` XORed with the keystream, the same length as `data`.
-    static func xor(_ data: Data, key: Data, nonce: Data, initialCounter: UInt32 = 0) throws -> Data {
-        guard key.count == 32 else { throw NostrError.invalidData }
-        guard nonce.count == 12 else { throw NostrError.invalidData }
+    /// - Precondition: `key` is 32 bytes and `nonce` 12; every caller derives them at those sizes.
+    static func xor(_ data: Data, key: Data, nonce: Data, initialCounter: UInt32 = 0) -> Data {
+        precondition(key.count == 32, "A ChaCha20 key is 32 bytes")
+        precondition(nonce.count == 12, "A ChaCha20 nonce is 12 bytes")
 
         var result = Data(capacity: data.count)
         var counter = initialCounter

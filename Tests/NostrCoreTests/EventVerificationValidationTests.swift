@@ -101,7 +101,7 @@ struct EventVerificationValidationTests {
         let rumor = try UnsignedEvent(publicKey: try KeyPair().publicKey, kind: .textNote, content: "gm").asRumor()
 
         #expect(rumor.signature == nil)
-        #expect(throws: NostrError.invalidSignature) {
+        #expect(throws: Event.VerificationError.missingSignature) {
             try rumor.verify()
         }
     }

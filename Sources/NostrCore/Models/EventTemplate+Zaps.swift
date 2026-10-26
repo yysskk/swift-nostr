@@ -19,7 +19,7 @@ extension EventTemplate {
     ///   - eventCoordinate: An event coordinate when zapping an addressable event (the `a` tag).
     ///   - comment: An optional message sent with the payment (the event content).
     /// - Returns: The template for the zap request.
-    /// - Throws: ``NostrError/invalidData`` if `relays` is empty.
+    /// - Throws: ``EventTemplate/ZapRequestError/missingRelays`` if `relays` is empty.
     public static func zapRequest(
         to recipient: PublicKey,
         relays: [RelayURL],
@@ -28,11 +28,11 @@ extension EventTemplate {
         eventID: EventID? = nil,
         eventCoordinate: String? = nil,
         comment: String = ""
-    ) throws -> EventTemplate {
+    ) throws(ZapRequestError) -> EventTemplate {
         // NIP-57 requires at least one relay so the recipient's wallet knows where to publish the
         // kind-9735 zap receipt; an empty list would otherwise yield a useless ["relays"] tag.
         guard !relays.isEmpty else {
-            throw NostrError.invalidData
+            throw .missingRelays
         }
 
         var tags: [Tag] = [
@@ -53,5 +53,20 @@ extension EventTemplate {
         }
 
         return EventTemplate(kind: .zapRequest, tags: tags, content: comment)
+    }
+
+    /// Why ``zapRequest(to:relays:amountMillisats:lnurl:eventID:eventCoordinate:comment:)`` could
+    /// not build a zap request.
+    public enum ZapRequestError: Swift.Error, LocalizedError, Sendable, Equatable {
+        /// No relays were given, so the recipient's wallet would not know where to publish the
+        /// zap receipt.
+        case missingRelays
+
+        public var errorDescription: String? {
+            switch self {
+            case .missingRelays:
+                return "A zap request must name at least one relay for the zap receipt"
+            }
+        }
     }
 }

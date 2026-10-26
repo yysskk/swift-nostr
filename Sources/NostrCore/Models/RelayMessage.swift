@@ -19,6 +19,8 @@ public enum ClientMessage: Sendable {
     case count(subscriptionID: String, filters: [Filter])
 
     /// Serializes the message to JSON array format
+    /// - Throws: The error `JSONEncoder` or `JSONSerialization` throws for an event or filter that
+    ///   does not encode.
     public func serialize() throws -> String {
         let array: [Any]
 
@@ -51,11 +53,9 @@ public enum ClientMessage: Sendable {
             array = arr
         }
 
+        // `JSONSerialization` always writes UTF-8.
         let data = try JSONSerialization.data(withJSONObject: array, options: [.withoutEscapingSlashes])
-        guard let string = String(data: data, encoding: .utf8) else {
-            throw NostrError.serializationFailed
-        }
-        return string
+        return String(decoding: data, as: UTF8.self)
     }
 }
 
@@ -89,19 +89,16 @@ public enum RelayMessage: Sendable {
 
     /// Parses a raw JSON message from a relay.
     ///
-    /// - Throws: ``NostrError/invalidMessageFormat`` if the frame is not a JSON array or lacks the
+    /// - Throws: ``RelayMessage/Error/malformed`` if the frame is not a JSON array or lacks the
     ///   fields its type requires — including an `OK` whose event id is not canonical 64-digit
-    ///   lowercase hex, which cannot answer any event this client sent — and a decoding error for
-    ///   an `EVENT` carrying a malformed event.
-    public static func parse(_ text: String) throws -> RelayMessage {
-        guard let data = text.data(using: .utf8) else {
-            throw NostrError.invalidData
-        }
-
-        guard let array = try JSONSerialization.jsonObject(with: data) as? [Any],
+    ///   lowercase hex, which cannot answer any event this client sent, and an `EVENT` carrying a
+    ///   malformed event.
+    public static func parse(_ text: String) throws(RelayMessage.Error) -> RelayMessage {
+        guard let object = try? JSONSerialization.jsonObject(with: Data(text.utf8)),
+            let array = object as? [Any],
             let type = array.first as? String
         else {
-            throw NostrError.invalidMessageFormat
+            throw .malformed
         }
 
         switch type {
@@ -110,16 +107,18 @@ public enum RelayMessage: Sendable {
                 let subscriptionID = array[1] as? String,
                 let eventDict = array[2] as? [String: Any]
             else {
-                throw NostrError.invalidMessageFormat
+                throw .malformed
             }
-            let event = try Event(jsonObject: eventDict)
+            guard let event = try? Event(jsonObject: eventDict) else {
+                throw .malformed
+            }
             return .event(subscriptionID: subscriptionID, event: event)
 
         case "EOSE":
             guard array.count >= 2,
                 let subscriptionID = array[1] as? String
             else {
-                throw NostrError.invalidMessageFormat
+                throw .malformed
             }
             return .endOfStoredEvents(subscriptionID: subscriptionID)
 
@@ -127,7 +126,7 @@ public enum RelayMessage: Sendable {
             guard array.count >= 2,
                 let message = array[1] as? String
             else {
-                throw NostrError.invalidMessageFormat
+                throw .malformed
             }
             return .notice(message: message)
 
@@ -137,7 +136,7 @@ public enum RelayMessage: Sendable {
                 let accepted = array[2] as? Bool,
                 let message = array[3] as? String
             else {
-                throw NostrError.invalidMessageFormat
+                throw .malformed
             }
             return .ok(eventID: eventID, accepted: accepted, message: message)
 
@@ -145,7 +144,7 @@ public enum RelayMessage: Sendable {
             guard array.count >= 2,
                 let challenge = array[1] as? String
             else {
-                throw NostrError.invalidMessageFormat
+                throw .malformed
             }
             return .auth(challenge: challenge)
 
@@ -154,7 +153,7 @@ public enum RelayMessage: Sendable {
                 let subscriptionID = array[1] as? String,
                 let message = array[2] as? String
             else {
-                throw NostrError.invalidMessageFormat
+                throw .malformed
             }
             return .closed(subscriptionID: subscriptionID, message: message)
 
@@ -166,13 +165,27 @@ public enum RelayMessage: Sendable {
                 let payload = array[2] as? [String: Any],
                 let count = payload["count"] as? Int
             else {
-                throw NostrError.invalidMessageFormat
+                throw .malformed
             }
             let approximate = payload["approximate"] as? Bool
             return .count(subscriptionID: subscriptionID, count: count, approximate: approximate)
 
         default:
             return .unknown(type: type, rawData: text)
+        }
+    }
+
+    /// Why a relay frame could not be parsed as a ``RelayMessage``.
+    public enum Error: Swift.Error, LocalizedError, Sendable, Equatable {
+        /// The frame is not a JSON array, or lacks the elements its message type requires, or
+        /// carries them with the wrong types — including an `EVENT` whose event does not decode.
+        case malformed
+
+        public var errorDescription: String? {
+            switch self {
+            case .malformed:
+                return "The relay message is malformed"
+            }
         }
     }
 }
@@ -189,8 +202,9 @@ extension Encodable {
         // rest of the filter, silently returning more than was asked for.
         let encoder = JSONEncoder()
         let data = try encoder.encode(self)
+        // Only `Event` and `Filter` come through here, and both encode as keyed containers.
         guard let dict = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            throw NostrError.serializationFailed
+            preconditionFailure("\(Self.self) did not encode as a JSON object")
         }
         return dict
     }

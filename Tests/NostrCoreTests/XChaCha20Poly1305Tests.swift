@@ -15,29 +15,9 @@ struct XChaCha20Poly1305Tests {
         let nonce = Data(hexString: "000000090000004a0000000031415927")!
         let expectedSubkey = "82413b4227b27bfed30e42508a877d73a0f9e4d58a74a853c12ec41326d3ecdc"
 
-        let subkey = try HChaCha20.deriveSubkey(key: key, nonce: nonce)
+        let subkey = HChaCha20.deriveSubkey(key: key, nonce: nonce)
 
         #expect(subkey.hexEncodedString() == expectedSubkey)
-    }
-
-    @Test("HChaCha20 rejects a wrong key length")
-    func hchacha20RejectsWrongKeyLength() {
-        let key = Data(repeating: 0, count: 31)
-        let nonce = Data(repeating: 0, count: 16)
-
-        #expect(throws: NostrError.invalidData) {
-            try HChaCha20.deriveSubkey(key: key, nonce: nonce)
-        }
-    }
-
-    @Test("HChaCha20 rejects a wrong nonce length")
-    func hchacha20RejectsWrongNonceLength() {
-        let key = Data(repeating: 0, count: 32)
-        let nonce = Data(repeating: 0, count: 15)
-
-        #expect(throws: NostrError.invalidData) {
-            try HChaCha20.deriveSubkey(key: key, nonce: nonce)
-        }
     }
 
     // MARK: - AEAD vector
@@ -62,7 +42,7 @@ struct XChaCha20Poly1305Tests {
             + "21f9664c97637da9768812f615c68b13b52e"
         let expectedTag = "c0875924c1c7987947deafd8780acf49"
 
-        let sealed = try XChaCha20Poly1305.seal(plaintext, key: key, nonce: nonce, authenticating: aad)
+        let sealed = XChaCha20Poly1305.seal(plaintext, key: key, nonce: nonce, authenticating: aad)
 
         #expect(sealed.hexEncodedString() == expectedCiphertext + expectedTag)
     }
@@ -100,7 +80,7 @@ struct XChaCha20Poly1305Tests {
             let aad = randomData(count: Int.random(in: 0...48))
             let plaintext = randomData(count: Int.random(in: 0...256))
 
-            let sealed = try XChaCha20Poly1305.seal(plaintext, key: key, nonce: nonce, authenticating: aad)
+            let sealed = XChaCha20Poly1305.seal(plaintext, key: key, nonce: nonce, authenticating: aad)
             let opened = try XChaCha20Poly1305.open(sealed, key: key, nonce: nonce, authenticating: aad)
 
             #expect(opened == plaintext)
@@ -113,7 +93,7 @@ struct XChaCha20Poly1305Tests {
         let nonce = randomData(count: 24)
         let plaintext = Data("swift-nostr".utf8)
 
-        let sealed = try XChaCha20Poly1305.seal(plaintext, key: key, nonce: nonce)
+        let sealed = XChaCha20Poly1305.seal(plaintext, key: key, nonce: nonce)
         let opened = try XChaCha20Poly1305.open(sealed, key: key, nonce: nonce)
 
         #expect(opened == plaintext)
@@ -127,11 +107,11 @@ struct XChaCha20Poly1305Tests {
         let nonce = randomData(count: 24)
         let plaintext = Data("tamper the ciphertext".utf8)
 
-        var sealed = try XChaCha20Poly1305.seal(plaintext, key: key, nonce: nonce)
+        var sealed = XChaCha20Poly1305.seal(plaintext, key: key, nonce: nonce)
         // Flip a byte inside the ciphertext body (before the 16-byte tag).
         sealed[sealed.startIndex] ^= 0x01
 
-        #expect(throws: NostrError.decryptionFailed) {
+        #expect(throws: XChaCha20Poly1305.AuthenticationFailure.self) {
             try XChaCha20Poly1305.open(sealed, key: key, nonce: nonce)
         }
     }
@@ -142,11 +122,11 @@ struct XChaCha20Poly1305Tests {
         let nonce = randomData(count: 24)
         let plaintext = Data("tamper the tag".utf8)
 
-        var sealed = try XChaCha20Poly1305.seal(plaintext, key: key, nonce: nonce)
+        var sealed = XChaCha20Poly1305.seal(plaintext, key: key, nonce: nonce)
         // Flip a byte inside the trailing 16-byte tag.
         sealed[sealed.index(before: sealed.endIndex)] ^= 0x01
 
-        #expect(throws: NostrError.decryptionFailed) {
+        #expect(throws: XChaCha20Poly1305.AuthenticationFailure.self) {
             try XChaCha20Poly1305.open(sealed, key: key, nonce: nonce)
         }
     }
@@ -158,54 +138,18 @@ struct XChaCha20Poly1305Tests {
         let plaintext = Data("tamper the aad".utf8)
         let aad = Data("original".utf8)
 
-        let sealed = try XChaCha20Poly1305.seal(plaintext, key: key, nonce: nonce, authenticating: aad)
+        let sealed = XChaCha20Poly1305.seal(plaintext, key: key, nonce: nonce, authenticating: aad)
 
-        #expect(throws: NostrError.decryptionFailed) {
+        #expect(throws: XChaCha20Poly1305.AuthenticationFailure.self) {
             try XChaCha20Poly1305.open(sealed, key: key, nonce: nonce, authenticating: Data("modified".utf8))
         }
     }
 
     // MARK: - Length validation
 
-    @Test("Seal rejects a wrong key length")
-    func sealRejectsWrongKeyLength() {
-        #expect(throws: NostrError.invalidData) {
-            try XChaCha20Poly1305.seal(Data(), key: Data(repeating: 0, count: 31), nonce: Data(repeating: 0, count: 24))
-        }
-    }
-
-    @Test("Seal rejects a wrong nonce length")
-    func sealRejectsWrongNonceLength() {
-        #expect(throws: NostrError.invalidData) {
-            try XChaCha20Poly1305.seal(Data(), key: Data(repeating: 0, count: 32), nonce: Data(repeating: 0, count: 23))
-        }
-    }
-
-    @Test("Open rejects a wrong key length")
-    func openRejectsWrongKeyLength() {
-        #expect(throws: NostrError.invalidData) {
-            try XChaCha20Poly1305.open(
-                Data(repeating: 0, count: 16),
-                key: Data(repeating: 0, count: 31),
-                nonce: Data(repeating: 0, count: 24)
-            )
-        }
-    }
-
-    @Test("Open rejects a wrong nonce length")
-    func openRejectsWrongNonceLength() {
-        #expect(throws: NostrError.invalidData) {
-            try XChaCha20Poly1305.open(
-                Data(repeating: 0, count: 16),
-                key: Data(repeating: 0, count: 32),
-                nonce: Data(repeating: 0, count: 23)
-            )
-        }
-    }
-
     @Test("Open rejects input shorter than the tag")
     func openRejectsShortInput() {
-        #expect(throws: NostrError.invalidData) {
+        #expect(throws: XChaCha20Poly1305.AuthenticationFailure.self) {
             try XChaCha20Poly1305.open(
                 Data(repeating: 0, count: 15),
                 key: Data(repeating: 0, count: 32),

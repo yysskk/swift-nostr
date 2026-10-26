@@ -130,7 +130,7 @@ struct ProofOfWorkTests {
     @Test("mining rejects a difficulty outside 0...256")
     func mineRejectsOutOfRangeDifficulty() async throws {
         let signer = try testSigner()
-        await #expect(throws: NostrError.invalidData) {
+        await #expect(throws: ProofOfWork.Error.invalidDifficulty(257)) {
             _ = try await ProofOfWork.mine(event: try unsignedNote(for: signer), difficulty: 257)
         }
     }
@@ -187,7 +187,7 @@ struct ProofOfWorkTests {
     @Test("sign(_:proofOfWork:) rejects a difficulty outside 0...256")
     func signWithProofOfWorkRejectsDifficultyOutOfRange() async throws {
         let signer = try testSigner()
-        await #expect(throws: NostrError.invalidData) {
+        await #expect(throws: ProofOfWork.Error.invalidDifficulty(257)) {
             _ = try await signer.sign(.textNote("too hard"), proofOfWork: 257)
         }
     }

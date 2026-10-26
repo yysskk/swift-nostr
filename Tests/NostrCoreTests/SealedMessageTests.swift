@@ -69,7 +69,7 @@ struct SealedMessageTests {
         let sealed = try SealedMessage.seal("secret", for: bob.publicKey, using: alice)
 
         // Mallory derives a different conversation key, so the HMAC check fails.
-        #expect(throws: NostrError.hmacVerificationFailed) {
+        #expect(throws: SealedMessage.Error.invalidMAC) {
             _ = try sealed.open(from: alice.publicKey, using: mallory)
         }
     }
@@ -86,8 +86,41 @@ struct SealedMessageTests {
         bytes[40] ^= 0x01
         let tampered = SealedMessage(payload: bytes.base64EncodedString())
 
-        #expect(throws: NostrError.hmacVerificationFailed) {
+        #expect(throws: SealedMessage.Error.invalidMAC) {
             _ = try tampered.open(from: alice.publicKey, using: bob)
+        }
+    }
+
+    /// `ff…ff` is 64 well-formed hex digits but exceeds the field prime, so it names no point.
+    private static let offCurvePublicKey = PublicKey(String(repeating: "ff", count: 32))!
+
+    @Test("Sealing to a public key that is not on the curve throws")
+    func sealToOffCurveKeyFails() throws {
+        let alice = try KeyPair()
+
+        #expect(throws: SealedMessage.Error.invalidPublicKey) {
+            _ = try SealedMessage.seal("secret", for: Self.offCurvePublicKey, using: alice)
+        }
+    }
+
+    @Test("Opening from a public key that is not on the curve throws")
+    func openFromOffCurveKeyFails() throws {
+        let alice = try KeyPair()
+        let bob = try KeyPair()
+        let sealed = try SealedMessage.seal("secret", for: bob.publicKey, using: alice)
+
+        #expect(throws: SealedMessage.Error.invalidPublicKey) {
+            _ = try sealed.open(from: Self.offCurvePublicKey, using: bob)
+        }
+    }
+
+    @Test("A payload that is not base64 is malformed")
+    func nonBase64PayloadIsMalformed() throws {
+        let alice = try KeyPair()
+        let bob = try KeyPair()
+
+        #expect(throws: SealedMessage.Error.malformedPayload) {
+            _ = try SealedMessage(payload: "not base64!").open(from: alice.publicKey, using: bob)
         }
     }
 

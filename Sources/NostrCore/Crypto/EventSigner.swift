@@ -77,7 +77,10 @@ public struct EventSigner: Sendable {
     ///   - plaintext: The message to encrypt.
     ///   - recipientPublicKey: The recipient's public key.
     /// - Returns: The base64-encoded NIP-44 payload.
-    public func nip44Encrypt(_ plaintext: String, to recipientPublicKey: PublicKey) throws -> String {
+    /// - Throws: What ``SealedMessage/seal(_:for:using:)`` throws.
+    public func nip44Encrypt(
+        _ plaintext: String, to recipientPublicKey: PublicKey
+    ) throws(SealedMessage.Error) -> String {
         try SealedMessage.seal(plaintext, for: recipientPublicKey, using: keyPair).payload
     }
 
@@ -86,7 +89,10 @@ public struct EventSigner: Sendable {
     ///   - ciphertext: The base64-encoded NIP-44 payload.
     ///   - senderPublicKey: The sender's public key.
     /// - Returns: The decrypted plaintext.
-    public func nip44Decrypt(_ ciphertext: String, from senderPublicKey: PublicKey) throws -> String {
+    /// - Throws: What ``SealedMessage/open(from:using:)`` throws.
+    public func nip44Decrypt(
+        _ ciphertext: String, from senderPublicKey: PublicKey
+    ) throws(SealedMessage.Error) -> String {
         try SealedMessage(payload: ciphertext).open(from: senderPublicKey, using: keyPair)
     }
 }
@@ -95,10 +101,10 @@ public struct EventSigner: Sendable {
 extension Event {
     /// Verifies the event's id and signature.
     /// - Returns: Whether ``signature`` is a valid Schnorr signature by ``publicKey`` over ``id``.
-    /// - Throws: ``NostrError/invalidEventID`` if ``id`` is not the hash of the event's other
-    ///   fields; ``NostrError/invalidSignature`` if the event is an unsigned rumor (``signature``
-    ///   is `nil`) or the signature bytes cannot be parsed.
-    public func verify() throws -> Bool {
+    /// - Throws: ``Event/VerificationError/idMismatch`` if ``id`` is not the hash of the event's
+    ///   other fields; ``Event/VerificationError/missingSignature`` if the event is an unsigned
+    ///   rumor (``signature`` is `nil`).
+    public func verify() throws(Event.VerificationError) -> Bool {
         // Reconstruct the unsigned event
         let unsigned = UnsignedEvent(
             publicKey: publicKey,
@@ -108,26 +114,49 @@ extension Event {
             content: content
         )
 
-        // Serialize and hash
-        let serialized = try unsigned.serializedForHashing()
+        // Serialize and hash. Strings and integers always serialize; were that ever to fail, the
+        // id could not be shown to commit to these fields, which is what a mismatch means.
+        guard let serialized = try? unsigned.serializedForHashing() else {
+            throw .idMismatch
+        }
         let hash = SHA256.hash(data: serialized)
 
         // Verify the event ID
         guard Data(hash) == id.data else {
-            throw NostrError.invalidEventID
+            throw .idMismatch
         }
 
         guard let signature else {
-            throw NostrError.invalidSignature
+            throw .missingSignature
         }
 
         // libsecp256k1 parses these as fixed-width buffers: `XonlyKey` forwards the bytes to
         // `secp256k1_xonly_pubkey_parse`, which reads 32 bytes unconditionally and neither checks
         // nor reports the length. `PublicKey` and `Signature` only ever hold 32 and 64 bytes, so
-        // the lengths are guaranteed by the types rather than checked here.
+        // the lengths are guaranteed by the types rather than checked here — and `SchnorrSignature`
+        // rejects nothing but a buffer that is not 64 bytes, so its parse cannot fail either.
         let xonlyKey = P256K.Schnorr.XonlyKey(dataRepresentation: publicKey.data, keyParity: 0)
-        let schnorrSignature = try P256K.Schnorr.SchnorrSignature(dataRepresentation: signature.data)
+        guard let schnorrSignature = try? P256K.Schnorr.SchnorrSignature(dataRepresentation: signature.data) else {
+            return false
+        }
 
         return xonlyKey.isValidSignature(schnorrSignature, for: hash)
+    }
+
+    /// Why ``Event/verify()`` could not check an event's signature.
+    public enum VerificationError: Swift.Error, LocalizedError, Sendable, Equatable {
+        /// The event's ``Event/id`` is not the hash of its other fields.
+        case idMismatch
+        /// The event is an unsigned rumor: its ``Event/signature`` is `nil`.
+        case missingSignature
+
+        public var errorDescription: String? {
+            switch self {
+            case .idMismatch:
+                return "The event id does not match the hash of its contents"
+            case .missingSignature:
+                return "The event has no signature"
+            }
+        }
     }
 }

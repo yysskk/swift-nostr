@@ -269,7 +269,7 @@ struct NostrClientNamespaceTests {
             let array = try JSONSerialization.jsonObject(with: data) as? [Any],
             let subscriptionID = array.count >= 2 ? array[1] as? String : nil
         else {
-            throw NostrError.invalidMessageFormat
+            throw RelayMessage.Error.malformed
         }
         for event in events {
             let json = String(decoding: try JSONEncoder().encode(event), as: UTF8.self)

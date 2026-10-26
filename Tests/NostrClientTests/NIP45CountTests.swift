@@ -49,7 +49,7 @@ struct NIP45CountTests {
             array.count >= 2,
             let subscriptionID = array[1] as? String
         else {
-            throw NostrError.invalidMessageFormat
+            throw RelayMessage.Error.malformed
         }
         return subscriptionID
     }

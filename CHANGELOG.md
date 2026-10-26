@@ -20,9 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`RelayURL` is a typed relay URL**: a `ws` or `wss` URL held in canonical form — lowercased
   scheme and host, root trailing slash and default port removed, path case and a non-root trailing
   slash kept — so every spelling of a relay is the same value, and equality and hashing follow it.
-  `RelayURL(string:)` and `RelayURL(url:)` throw `NostrError.invalidRelayURL` carrying the input for
-  an unparseable string, another scheme, an empty host, a fragment, or a user or password; the
-  failable `init?(_:)` returns nil. `description` and the JSON encoding are the canonical string,
+  `RelayURL(string:)` and `RelayURL(url:)` throw `RelayURL.Error` for an unparseable string,
+  another scheme, an empty host, a fragment, or a user or password; the failable `init?(_:)`
+  returns nil. `description` and the JSON encoding are the canonical string,
   `url` is the `URL` the WebSocket opens, and decoding an invalid string fails with
   `DecodingError.dataCorrupted`.
 - **`Timestamp` is a typed Unix time**: whole seconds since the epoch, with `rawValue: Int64` kept
@@ -113,6 +113,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `unexpectedPrefix`, `invalidURL`). `KeyPair.nsec` and `LNURL.encode(_:)` no longer throw.
   Secure random bytes come from `SystemRandomNumberGenerator` on every platform, so
   `NostrError.randomGenerationFailed` is gone with the other replaced cases.
+- **NIP-44, event verification, relay message, and relay URL failures have their own error
+  types** (breaking): `SealedMessage` seal and open, and `EventSigner.nip44Encrypt/nip44Decrypt`,
+  throw `SealedMessage.Error` with typed throws — `invalidConversationKey` and
+  `invalidPlaintextLength(Int)` (were `encryptionFailed` / NIP-44's `decryptionFailed`),
+  `invalidPublicKey` (a peer key not on secp256k1), `malformedPayload` (was `invalidPayloadFormat`),
+  `unsupportedVersion(UInt8)` (was `unsupportedEncryptionVersion`), `invalidMAC` (was
+  `hmacVerificationFailed`), and `invalidPadding`. `Event.verify()` is
+  `throws(Event.VerificationError)` — `idMismatch` (was `invalidEventID`) or `missingSignature` (was
+  `invalidSignature`) — and returns `false` for a signature that does not verify.
+  `RelayMessage.parse(_:)` is `throws(RelayMessage.Error)`, whose `malformed` replaces
+  `invalidMessageFormat` and the `DecodingError` of an `EVENT` carrying a malformed event.
+  `RelayURL(string:)` / `RelayURL(url:)` are `throws(RelayURL.Error)` — `malformed`,
+  `unsupportedScheme(String)`, `missingHost`, `containsFragment`, `containsCredentials` — instead of
+  `invalidRelayURL(String)`. `ProofOfWork.mine` and `sign(_:proofOfWork:)` throw
+  `ProofOfWork.Error.invalidDifficulty(Int)`, `HTTPAuth.authorizationHeaderValue(for:)` and
+  `URLRequest.setNostrAuthorization(signer:)` throw `HTTPAuth.AuthorizationError`
+  (`invalidEventKind(Event.Kind)`, `missingURL`), and `EventTemplate.zapRequest` is
+  `throws(EventTemplate.ZapRequestError)` (`missingRelays`), each instead of `invalidData`. The
+  replaced `NostrError` cases are removed, along with the unused `signingFailed` and
+  `subscriptionNotFound`.
 - **`Event.id`, `Event.pubkey`, and the event signature are typed** (breaking): `id` is an
   `EventID`, `pubkey` a `PublicKey`, and `sig: String` is now `signature: Signature?` — still the
   `sig` field on the wire. `Event.init` takes `signature:` instead of `sig:`. A `nil` signature is an
