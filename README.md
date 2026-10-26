@@ -118,7 +118,7 @@ extension NostrClient {
 import NostrClient
 
 let keyPair = try KeyPair()               // new random keypair
-print(keyPair.publicKey.npub, try keyPair.nsec)
+print(keyPair.publicKey.npub, keyPair.nsec)
 
 let imported = try KeyPair(nsec: "nsec1...")
 

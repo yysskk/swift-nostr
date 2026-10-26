@@ -9,7 +9,7 @@ import Testing
 struct SealedMessageConversationKeyTests {
 
     private static func randomKey() throws -> Data {
-        try SecureRandom.generateBytes(count: 32)
+        SecureRandom.generateBytes(count: 32)
     }
 
     // MARK: - Round Trip

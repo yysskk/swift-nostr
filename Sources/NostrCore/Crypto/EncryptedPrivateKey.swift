@@ -70,8 +70,9 @@ public struct EncryptedPrivateKey: Sendable, Hashable {
     /// Parses and structurally validates an `ncryptsec` string (HRP, version 0x02, 91-byte payload)
     /// without decrypting.
     /// - Parameter ncryptsec: The bech32 `ncryptsec1...` string to validate.
-    /// - Throws: ``NostrError/invalidNcryptsec`` if the string is not a well-formed NIP-49 payload.
-    public init(ncryptsec: String) throws {
+    /// - Throws: ``EncryptedPrivateKey/Error/malformedPayload`` if the string is not a well-formed
+    ///   NIP-49 payload.
+    public init(ncryptsec: String) throws(EncryptedPrivateKey.Error) {
         let payload = try Self.decodePayload(ncryptsec)
 
         self.ncryptsec = ncryptsec
@@ -94,8 +95,8 @@ public struct EncryptedPrivateKey: Sendable, Hashable {
     ///   - maximumLogN: The largest cost this call will write, defaulting to
     ///     ``defaultMaximumLogN``. NIP-49 permits up to 22.
     /// - Returns: The resulting ``EncryptedPrivateKey``.
-    /// - Throws: ``NostrError/invalidPrivateKey`` if `privateKey` is not 32 bytes, or
-    ///   ``NostrError/unsupportedScryptCost(_:)`` if `logN` exceeds `maximumLogN`, or `maximumLogN`
+    /// - Throws: ``KeyPair/Error/invalidLength(_:)`` if `privateKey` is not 32 bytes, or
+    ///   ``EncryptedPrivateKey/Error/unsupportedScryptCost(_:)`` if `logN` exceeds `maximumLogN`, or `maximumLogN`
     ///   exceeds the `22` NIP-49 defines.
     public static func encrypt(
         privateKey: Data,
@@ -105,22 +106,22 @@ public struct EncryptedPrivateKey: Sendable, Hashable {
         maximumLogN: UInt8 = defaultMaximumLogN
     ) throws -> EncryptedPrivateKey {
         guard privateKey.count == 32 else {
-            throw NostrError.invalidPrivateKey
+            throw KeyPair.Error.invalidLength(privateKey.count)
         }
         // The whole range, as on the reading side: a `maximumLogN` of 0 clears an upper-bound-only
         // guard and then makes the `1...maximumLogN` below an invalid range, trapping on the very
         // input this bound exists to check.
         guard 1...specMaximumLogN ~= maximumLogN else {
-            throw NostrError.unsupportedScryptCost(maximumLogN)
+            throw Error.unsupportedScryptCost(maximumLogN)
         }
         // Bounded by the same default the reader applies, so this library never writes a payload it
         // would then refuse to open — a round trip that failed inside one module.
         guard 1...maximumLogN ~= logN else {
-            throw NostrError.unsupportedScryptCost(logN)
+            throw Error.unsupportedScryptCost(logN)
         }
 
-        let salt = try SecureRandom.generateBytes(count: saltByteCount)
-        let nonce = try SecureRandom.generateBytes(count: nonceByteCount)
+        let salt = SecureRandom.generateBytes(count: saltByteCount)
+        let nonce = SecureRandom.generateBytes(count: nonceByteCount)
         // Scrubbed once the payload is sealed: the key is re-derived from the password on every
         // decrypt, so nothing needs this copy afterwards.
         var symmetricKey = try deriveSymmetricKey(password: password, salt: salt, logN: logN)
@@ -142,7 +143,7 @@ public struct EncryptedPrivateKey: Sendable, Hashable {
         payload.append(associatedData)
         payload.append(ciphertext)
 
-        let ncryptsec = try Bech32.encode(hrp: humanReadablePrefix, data: payload)
+        let ncryptsec = Bech32.encode(validatedHRP: humanReadablePrefix, data: payload)
         return try EncryptedPrivateKey(ncryptsec: ncryptsec)
     }
 
@@ -154,15 +155,15 @@ public struct EncryptedPrivateKey: Sendable, Hashable {
     ///     ``defaultMaximumLogN``. Raise it to open a deliberately costly key, keeping in mind that
     ///     the derivation allocates 2^logN KiB; ``logN`` reports what a given payload asks for.
     /// - Returns: The decrypted 32-byte private key.
-    /// - Throws: ``NostrError/unsupportedScryptCost(_:)`` if the recorded cost is outside
-    ///   `1...maximumLogN`, or if `maximumLogN` itself exceeds the `22` NIP-49 defines;
-    ///   ``NostrError/decryptionFailed`` if authentication fails (almost always a wrong password).
+    /// - Throws: ``EncryptedPrivateKey/Error/unsupportedScryptCost(_:)`` if the recorded cost is
+    ///   outside `1...maximumLogN`, or if `maximumLogN` itself exceeds the `22` NIP-49 defines;
+    ///   ``EncryptedPrivateKey/Error/decryptionFailed`` if authentication fails (almost always a wrong password).
     public func decrypt(password: String, maximumLogN: UInt8 = defaultMaximumLogN) throws -> Data {
         // The whole range, not just the ceiling: a `maximumLogN` of 0 would clear an upper-bound-only
         // guard and then make the `1...maximumLogN` below an invalid range, trapping on exactly the
         // caller-supplied input this bound exists to make safe.
         guard 1...Self.specMaximumLogN ~= maximumLogN else {
-            throw NostrError.unsupportedScryptCost(maximumLogN)
+            throw Error.unsupportedScryptCost(maximumLogN)
         }
 
         let payload = try Self.decodePayload(ncryptsec)
@@ -172,7 +173,7 @@ public struct EncryptedPrivateKey: Sendable, Hashable {
         // asks for is committed the moment scrypt starts.
         let logN = payload[base + 1]
         guard 1...maximumLogN ~= logN else {
-            throw NostrError.unsupportedScryptCost(logN)
+            throw Error.unsupportedScryptCost(logN)
         }
 
         let salt = Data(payload[(base + 2)..<(base + 18)])
@@ -182,30 +183,33 @@ public struct EncryptedPrivateKey: Sendable, Hashable {
 
         var symmetricKey = try Self.deriveSymmetricKey(password: password, salt: salt, logN: logN)
         defer { symmetricKey.secureScrub() }
-        return try XChaCha20Poly1305.open(
-            ciphertext,
-            key: symmetricKey,
-            nonce: nonce,
-            authenticating: associatedData
-        )
+        do {
+            return try XChaCha20Poly1305.open(
+                ciphertext,
+                key: symmetricKey,
+                nonce: nonce,
+                authenticating: associatedData
+            )
+        } catch {
+            throw Error.decryptionFailed
+        }
     }
 
     // MARK: - Private Helpers
 
     /// Decodes and structurally validates the bech32 payload (HRP, length, version byte).
-    private static func decodePayload(_ ncryptsec: String) throws -> Data {
-        let decoded: (hrp: String, data: Data)
-        do {
-            decoded = try Bech32.decode(ncryptsec)
-        } catch {
-            throw NostrError.invalidNcryptsec
+    private static func decodePayload(_ ncryptsec: String) throws(EncryptedPrivateKey.Error) -> Data {
+        // A bech32 failure is reported as a malformed payload: which encoding rule broke says
+        // nothing useful about an ncryptsec.
+        guard let decoded = try? Bech32.decode(ncryptsec) else {
+            throw .malformedPayload
         }
 
         guard decoded.hrp == humanReadablePrefix,
             decoded.data.count == payloadByteCount,
             decoded.data[decoded.data.startIndex] == version
         else {
-            throw NostrError.invalidNcryptsec
+            throw .malformedPayload
         }
 
         return decoded.data
@@ -226,6 +230,31 @@ public struct EncryptedPrivateKey: Sendable, Hashable {
     }
 }
 
+extension EncryptedPrivateKey {
+    /// Why an `ncryptsec` could not be parsed, written, or opened.
+    public enum Error: Swift.Error, LocalizedError, Sendable, Equatable {
+        /// The string is not valid bech32 with the `ncryptsec` prefix, or its payload is not the
+        /// 91 bytes of a version-2 NIP-49 key.
+        case malformedPayload
+        /// The scrypt cost exponent is outside the accepted range (payload: the offending `logN`
+        /// or `maximumLogN`).
+        case unsupportedScryptCost(UInt8)
+        /// The key did not authenticate — almost always a wrong password.
+        case decryptionFailed
+
+        public var errorDescription: String? {
+            switch self {
+            case .malformedPayload:
+                return "The ncryptsec payload is malformed or has an unsupported version"
+            case .unsupportedScryptCost(let logN):
+                return "The ncryptsec declares an unsupported scrypt cost: \(logN)"
+            case .decryptionFailed:
+                return "The ncryptsec could not be decrypted — the password is likely wrong"
+            }
+        }
+    }
+}
+
 // MARK: - KeyPair Convenience
 extension KeyPair {
     /// Encrypts this keypair's private key to a NIP-49 `ncryptsec` string.
@@ -237,7 +266,8 @@ extension KeyPair {
     ///   - maximumLogN: The largest cost to write, defaulting to
     ///     ``EncryptedPrivateKey/defaultMaximumLogN``.
     /// - Returns: The resulting ``EncryptedPrivateKey``.
-    /// - Throws: ``NostrError/unsupportedScryptCost(_:)`` if `logN` exceeds `maximumLogN`.
+    /// - Throws: ``EncryptedPrivateKey/Error/unsupportedScryptCost(_:)`` if `logN` exceeds
+    ///   `maximumLogN`.
     public func encryptedPrivateKey(
         password: String,
         logN: UInt8 = 16,
@@ -259,10 +289,10 @@ extension KeyPair {
     ///   - password: The password protecting the key. It is NFKC-normalized before key derivation.
     ///   - maximumLogN: The largest scrypt cost to spend on this payload, defaulting to
     ///     ``EncryptedPrivateKey/defaultMaximumLogN``.
-    /// - Throws: ``NostrError/invalidNcryptsec`` if the payload is malformed,
-    ///   ``NostrError/unsupportedScryptCost(_:)`` if the recorded cost exceeds `maximumLogN`,
-    ///   ``NostrError/decryptionFailed`` if the password is wrong, or
-    ///   ``NostrError/invalidPrivateKey`` if the decrypted bytes are not a valid secp256k1 scalar.
+    /// - Throws: ``EncryptedPrivateKey/Error/malformedPayload`` if the payload is malformed,
+    ///   ``EncryptedPrivateKey/Error/unsupportedScryptCost(_:)`` if the recorded cost exceeds
+    ///   `maximumLogN`, ``EncryptedPrivateKey/Error/decryptionFailed`` if the password is wrong, or
+    ///   ``KeyPair/Error/invalidPrivateKey`` if the decrypted bytes are not a valid secp256k1 scalar.
     public init(
         ncryptsec: String,
         password: String,

@@ -71,7 +71,7 @@ struct MnemonicTests {
 
     @Test("init(entropy:) rejects an unsupported entropy length")
     func entropyRejectsInvalidLength() {
-        #expect(throws: NostrError.invalidMnemonic) {
+        #expect(throws: Mnemonic.Error.invalidEntropyLength(15)) {
             _ = try Mnemonic(entropy: Data(count: 15))
         }
     }
@@ -117,15 +117,22 @@ struct MnemonicTests {
 
     @Test("Invalid word count throws error")
     func invalidWordCount() {
-        #expect(throws: NostrError.invalidMnemonic) {
+        #expect(throws: Mnemonic.Error.invalidWordCount(13)) {
             _ = try Mnemonic.generate(wordCount: 13)
+        }
+    }
+
+    @Test("A phrase with an unsupported word count throws error")
+    func phraseWithInvalidWordCount() {
+        #expect(throws: Mnemonic.Error.invalidWordCount(3)) {
+            _ = try Mnemonic(phrase: "leader monkey parrot")
         }
     }
 
     @Test("Invalid word throws error")
     func invalidWord() {
         let invalidPhrase = "leader monkey parrot ring guide accident before fence cannon height naive notaword"
-        #expect(throws: NostrError.invalidMnemonicWord("notaword")) {
+        #expect(throws: Mnemonic.Error.unknownWord("notaword")) {
             _ = try Mnemonic(phrase: invalidPhrase)
         }
     }
@@ -134,7 +141,7 @@ struct MnemonicTests {
     func invalidChecksum() {
         // Using wrong last word (checksum mismatch)
         let invalidPhrase = "leader monkey parrot ring guide accident before fence cannon height naive ability"
-        #expect(throws: NostrError.invalidMnemonicChecksum) {
+        #expect(throws: Mnemonic.Error.invalidChecksum) {
             _ = try Mnemonic(phrase: invalidPhrase)
         }
     }

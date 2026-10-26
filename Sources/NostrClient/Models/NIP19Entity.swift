@@ -25,7 +25,8 @@ public enum NIP19Entity: Sendable, Hashable {
     /// Decodes any NIP-19 bech32 entity, dispatching on its human-readable prefix.
     /// - Throws: ``NostrError/invalidNIP19Entity`` if an `npub`, `nsec`, or `note` payload is not
     ///   32 bytes or a TLV entity is missing a required field, ``NostrError/unknownPrefix(_:)`` for
-    ///   any other prefix, or the bech32 and TLV decoding errors.
+    ///   any other prefix, a ``Bech32/Error`` if the string is not valid bech32, or the TLV decoding
+    ///   errors.
     public static func decode(_ bech32String: String) throws -> NIP19Entity {
         let (hrp, data) = try Bech32.decode(bech32String)
         switch hrp {

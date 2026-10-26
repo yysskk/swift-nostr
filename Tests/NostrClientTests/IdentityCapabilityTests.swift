@@ -41,7 +41,7 @@ struct IdentityCapabilityTests {
         let identity: any NostrIdentityProviding = stub
         let keyPair = try KeyPair()
 
-        try await identity.setNsec(try keyPair.nsec)
+        try await identity.setNsec(keyPair.nsec)
 
         #expect(await installedLocalKeys(stub) == [keyPair.publicKey])
         #expect(await identity.publicKey == keyPair.publicKey)
@@ -49,8 +49,11 @@ struct IdentityCapabilityTests {
 
     @Test(
         "setPrivateKey throws EventSigner's error for a malformed key and keeps the current signer",
-        arguments: [("not hex", NostrError.invalidHex), ("abcd", NostrError.invalidPrivateKey)])
-    func setPrivateKeyRejectsMalformedKeys(_ privateKeyHex: String, expected: NostrError) async throws {
+        arguments: [
+            ("not hex", KeyPair.Error.invalidHex),
+            (String(repeating: "0", count: 64), KeyPair.Error.invalidPrivateKey),
+        ])
+    func setPrivateKeyRejectsMalformedKeys(_ privateKeyHex: String, expected: KeyPair.Error) async throws {
         let stub = RecordingIdentityCapabilities()
         let identity: any NostrIdentityProviding = stub
         let current = try KeyPair()
@@ -69,13 +72,13 @@ struct IdentityCapabilityTests {
         let stub = RecordingIdentityCapabilities()
         let identity: any NostrIdentityProviding = stub
         let current = try KeyPair()
-        try await identity.setNsec(try current.nsec)
+        try await identity.setNsec(current.nsec)
         let npub = current.publicKey.npub
 
-        await #expect(throws: NostrError.unknownPrefix("npub")) {
+        await #expect(throws: KeyPair.Error.unexpectedPrefix("npub")) {
             try await identity.setNsec(npub)
         }
-        await #expect(throws: NostrError.invalidBech32) {
+        await #expect(throws: KeyPair.Error.invalidBech32(.invalidCharacter("b"))) {
             try await identity.setNsec("nsec1garbled")
         }
 

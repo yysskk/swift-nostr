@@ -114,6 +114,8 @@ public struct DirectMessageParser: Sendable {
     private static func describesUnreadableEvent(_ error: any Error) -> Bool {
         // A seal or rumor that is not the JSON this parser expects.
         if error is DecodingError { return true }
+        // An id, key, or signature in the event that is not a well-formed value.
+        if error is EventID.Error || error is PublicKey.Error || error is Signature.Error { return true }
 
         switch error as? NostrError {
         // The wrap is not a gift wrap, its seal is not a seal, or the rumor is not a well-formed
@@ -121,7 +123,7 @@ public struct DirectMessageParser: Sendable {
         case .invalidData:
             return true
         // The seal does not verify as the event it claims to be.
-        case .verificationFailed, .invalidEventID, .invalidSignature, .invalidHex:
+        case .verificationFailed, .invalidEventID, .invalidSignature:
             return true
         // NIP-44 refused the payload — the usual outcome for a wrap sealed to someone else.
         case .decryptionFailed, .invalidPublicKey, .invalidPayloadFormat, .hmacVerificationFailed,

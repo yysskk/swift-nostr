@@ -31,11 +31,27 @@ struct LNURLTests {
     func encodeDecodeRoundTrip() throws {
         let url = try #require(URL(string: "https://example.com/.well-known/lnurlp/name"))
 
-        let encoded = try LNURL.encode(url)
+        let encoded = LNURL.encode(url)
         #expect(encoded.lowercased().hasPrefix("lnurl1"))
 
         let decoded = try LNURL.decode(encoded)
         #expect(decoded == url)
+    }
+
+    @Test("Decoding reports why a string is not an lnurl")
+    func decodeFailureReasons() throws {
+        let npub = try KeyPair().publicKey.npub
+        let notUTF8 = try Bech32.encode(hrp: "lnurl", data: Data([0xff, 0xfe]))
+
+        #expect(throws: LNURL.Error.invalidBech32(.missingSeparator)) {
+            try LNURL.decode("lnurl")
+        }
+        #expect(throws: LNURL.Error.unexpectedPrefix("npub")) {
+            try LNURL.decode(npub)
+        }
+        #expect(throws: LNURL.Error.invalidURL) {
+            try LNURL.decode(notUTF8)
+        }
     }
 
     // MARK: - LNURLPayResponse

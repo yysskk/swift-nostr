@@ -22,32 +22,46 @@ public struct PublicKey: Sendable, Hashable {
 
     /// Creates a public key from its canonical hex form.
     /// - Parameter hex: Exactly 64 lowercase hexadecimal digits.
-    /// - Throws: ``NostrError/invalidPublicKey`` if `hex` has the wrong length, contains anything
+    /// - Throws: ``PublicKey/Error/invalidHex`` if `hex` has the wrong length, contains anything
     ///   but `0`–`9` and `a`–`f`, or uses uppercase digits.
-    public init(hex: String) throws {
+    public init(hex: String) throws(PublicKey.Error) {
         guard hex.isCanonicalHex(byteCount: 32) else {
-            throw NostrError.invalidPublicKey
+            throw .invalidHex
         }
         self.hex = hex
     }
 
     /// Creates a public key from its 32 bytes.
-    /// - Throws: ``NostrError/invalidPublicKey`` if `data` is not exactly 32 bytes.
-    public init(data: Data) throws {
+    /// - Throws: ``PublicKey/Error/invalidLength(_:)`` if `data` is not exactly 32 bytes.
+    public init(data: Data) throws(PublicKey.Error) {
         guard data.count == 32 else {
-            throw NostrError.invalidPublicKey
+            throw .invalidLength(data.count)
         }
         self.hex = data.hexEncodedString()
     }
 
     /// Creates a public key from a NIP-19 `npub` bech32 string.
-    /// - Throws: ``NostrError/invalidPublicKey`` if `npub` is not valid bech32, carries a prefix
-    ///   other than `npub`, or does not hold exactly 32 bytes.
-    public init(npub: String) throws {
-        guard let (prefix, data) = try? Bech32.decode(npub), prefix == "npub" else {
-            throw NostrError.invalidPublicKey
+    /// - Throws: ``PublicKey/Error/invalidBech32(_:)`` if `npub` is not valid bech32,
+    ///   ``PublicKey/Error/unexpectedPrefix(_:)`` if it carries a prefix other than `npub`, or
+    ///   ``PublicKey/Error/invalidLength(_:)`` if it does not hold exactly 32 bytes.
+    public init(npub: String) throws(PublicKey.Error) {
+        let decoded: (hrp: String, data: Data)
+        do throws(Bech32.Error) {
+            decoded = try Bech32.decode(npub)
+        } catch {
+            throw .invalidBech32(error)
         }
-        try self.init(data: data)
+        guard decoded.hrp == "npub" else {
+            throw .unexpectedPrefix(decoded.hrp)
+        }
+        try self.init(data: decoded.data)
+    }
+
+    /// Creates a public key from bytes the caller guarantees are 32 long, such as the x-only key
+    /// of a secp256k1 private key.
+    init(validatedData data: Data) {
+        precondition(data.count == 32, "A public key is 32 bytes")
+        self.hex = data.hexEncodedString()
     }
 }
 
@@ -83,5 +97,32 @@ extension PublicKey: Codable {
     public func encode(to encoder: any Encoder) throws {
         var container = encoder.singleValueContainer()
         try container.encode(hex)
+    }
+}
+
+extension PublicKey {
+    /// Why a value could not be parsed as a ``PublicKey``.
+    public enum Error: Swift.Error, LocalizedError, Sendable, Equatable {
+        /// The string is not 64 lowercase hexadecimal digits.
+        case invalidHex
+        /// The data is not 32 bytes (payload: its byte count).
+        case invalidLength(Int)
+        /// The `npub` string is not valid bech32.
+        case invalidBech32(Bech32.Error)
+        /// The bech32 string carries a prefix other than `npub` (payload: the prefix found).
+        case unexpectedPrefix(String)
+
+        public var errorDescription: String? {
+            switch self {
+            case .invalidHex:
+                return "A public key must be 64 lowercase hexadecimal digits"
+            case .invalidLength(let count):
+                return "A public key must be 32 bytes, got \(count)"
+            case .invalidBech32(let error):
+                return "Invalid npub: \(error.errorDescription ?? "invalid bech32")"
+            case .unexpectedPrefix(let prefix):
+                return "Expected an npub, got bech32 prefix \(prefix)"
+            }
+        }
     }
 }

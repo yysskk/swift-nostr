@@ -16,20 +16,20 @@ public struct Signature: Sendable, Hashable {
 
     /// Creates a signature from its canonical hex form.
     /// - Parameter hex: Exactly 128 lowercase hexadecimal digits.
-    /// - Throws: ``NostrError/invalidSignature`` if `hex` has the wrong length, contains anything
+    /// - Throws: ``Signature/Error/invalidHex`` if `hex` has the wrong length, contains anything
     ///   but `0`–`9` and `a`–`f`, or uses uppercase digits.
-    public init(hex: String) throws {
+    public init(hex: String) throws(Signature.Error) {
         guard hex.isCanonicalHex(byteCount: 64) else {
-            throw NostrError.invalidSignature
+            throw .invalidHex
         }
         self.hex = hex
     }
 
     /// Creates a signature from its 64 bytes.
-    /// - Throws: ``NostrError/invalidSignature`` if `data` is not exactly 64 bytes.
-    public init(data: Data) throws {
+    /// - Throws: ``Signature/Error/invalidLength(_:)`` if `data` is not exactly 64 bytes.
+    public init(data: Data) throws(Signature.Error) {
         guard data.count == 64 else {
-            throw NostrError.invalidSignature
+            throw .invalidLength(data.count)
         }
         self.hex = data.hexEncodedString()
     }
@@ -68,5 +68,24 @@ extension Signature: Codable {
     public func encode(to encoder: any Encoder) throws {
         var container = encoder.singleValueContainer()
         try container.encode(hex)
+    }
+}
+
+extension Signature {
+    /// Why a value could not be parsed as a ``Signature``.
+    public enum Error: Swift.Error, LocalizedError, Sendable, Equatable {
+        /// The string is not 128 lowercase hexadecimal digits.
+        case invalidHex
+        /// The data is not 64 bytes (payload: its byte count).
+        case invalidLength(Int)
+
+        public var errorDescription: String? {
+            switch self {
+            case .invalidHex:
+                return "A signature must be 128 lowercase hexadecimal digits"
+            case .invalidLength(let count):
+                return "A signature must be 64 bytes, got \(count)"
+            }
+        }
     }
 }

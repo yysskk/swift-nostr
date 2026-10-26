@@ -99,3 +99,11 @@ let isValid = try event.verify()
 ### Errors
 
 - ``NostrError``
+- ``Bech32/Error``
+- ``PublicKey/Error``
+- ``EventID/Error``
+- ``Signature/Error``
+- ``KeyPair/Error``
+- ``Mnemonic/Error``
+- ``EncryptedPrivateKey/Error``
+- ``LNURL/Error``

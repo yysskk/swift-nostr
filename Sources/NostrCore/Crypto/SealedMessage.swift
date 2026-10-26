@@ -45,7 +45,7 @@ public struct SealedMessage: Sendable {
         using senderKeyPair: KeyPair
     ) throws -> SealedMessage {
         // Generate a random 32-byte nonce, then delegate to the deterministic implementation.
-        let nonce = try generateSecureRandomBytes(count: 32)
+        let nonce = SecureRandom.generateBytes(count: 32)
         return try seal(message, for: recipientPublicKey, using: senderKeyPair, nonce: nonce)
     }
 
@@ -94,7 +94,7 @@ public struct SealedMessage: Sendable {
     /// - Throws: ``NostrError/encryptionFailed`` if `conversationKey` is not 32 bytes or `message`
     ///   is not 1 to 65535 bytes of UTF-8.
     public static func seal(_ message: String, conversationKey: Data) throws -> SealedMessage {
-        let nonce = try generateSecureRandomBytes(count: nonceByteCount)
+        let nonce = SecureRandom.generateBytes(count: nonceByteCount)
         let payload = try encrypt(plaintext: message, conversationKey: conversationKey, nonce: nonce)
         return SealedMessage(payload: payload)
     }
@@ -457,12 +457,5 @@ public struct SealedMessage: Sendable {
             result |= a ^ b
         }
         return result == 0
-    }
-
-    /// Generates cryptographically secure random bytes
-    /// - Parameter count: The number of random bytes to generate
-    /// - Returns: Data containing the random bytes
-    private static func generateSecureRandomBytes(count: Int) throws -> Data {
-        try SecureRandom.generateBytes(count: count)
     }
 }

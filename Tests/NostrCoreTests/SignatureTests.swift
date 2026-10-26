@@ -19,7 +19,7 @@ struct SignatureTests {
 
     @Test("uppercase hex is rejected")
     func uppercaseHexIsRejected() {
-        #expect(throws: NostrError.invalidSignature) {
+        #expect(throws: Signature.Error.invalidHex) {
             try Signature(hex: hex.uppercased())
         }
     }
@@ -32,14 +32,14 @@ struct SignatureTests {
         ]
     )
     func wrongLengthHexIsRejected(hex: String) {
-        #expect(throws: NostrError.invalidSignature) {
+        #expect(throws: Signature.Error.invalidHex) {
             try Signature(hex: hex)
         }
     }
 
     @Test("hex with non-hex characters is rejected")
     func nonHexIsRejected() {
-        #expect(throws: NostrError.invalidSignature) {
+        #expect(throws: Signature.Error.invalidHex) {
             try Signature(hex: String(repeating: "zz", count: 64))
         }
     }
@@ -50,7 +50,7 @@ struct SignatureTests {
 
         #expect(try Signature(data: data).data == data)
         for count in [0, 32, 63, 65] {
-            #expect(throws: NostrError.invalidSignature) {
+            #expect(throws: Signature.Error.invalidLength(count)) {
                 try Signature(data: Data(repeating: 1, count: count))
             }
         }

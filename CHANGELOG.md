@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   spelling, canonical lowercase hex (64, 64, and 128 digits), which is also its `description` and
   its JSON encoding. `init(hex:)`, `init(data:)`, `PublicKey(npub:)`, and `EventID(note:)` reject
   anything else — uppercase, the wrong length, non-hex, or a bech32 string with another prefix —
-  with `invalidPublicKey`, `invalidEventID`, or `invalidSignature`; the failable `init?(_:)` returns
+  with `PublicKey.Error`, `EventID.Error`, or `Signature.Error`; the failable `init?(_:)` returns
   nil, and decoding fails with `DecodingError.dataCorrupted`. `PublicKey.npub` and `EventID.note`
   give the NIP-19 forms and no longer throw. `EventID` is `Comparable` in byte order, the order
   NIP-01 breaks `created_at` ties by.
@@ -94,6 +94,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `InternetIdentifier.verify(_:)`, `verify(_:expectedPublicKey:)`, `lookupPublicKey(_:)`,
   `lookupRelays(_:)`, and `String.verifyAsInternetIdentifier()` /
   `verifyAsInternetIdentifier(expectedPublicKey:)` are `async throws(InternetIdentifier.VerificationError)`.
+- **Bech32, key, mnemonic, and NIP-49 failures have their own error types** (breaking): each
+  domain throws a nested `Error` with typed throws, so callers can branch on why parsing failed.
+  `Bech32.encode/decode/decodeToWords` throw `Bech32.Error` (`invalidHumanReadablePart`, `mixedCase`,
+  `missingSeparator`, `invalidLength`, `invalidCharacter`, `invalidChecksum`, `invalidPadding`) instead
+  of `NostrError.invalidBech32`. `PublicKey`, `EventID`, `Signature`, and `KeyPair` initializers throw
+  `PublicKey.Error` / `EventID.Error` / `Signature.Error` / `KeyPair.Error` — `invalidHex`,
+  `invalidLength(Int)`, and for npub/note/nsec `invalidBech32(Bech32.Error)` or
+  `unexpectedPrefix(String)` — instead of `invalidPublicKey`, `invalidEventID`, `invalidSignature`,
+  `invalidHex`, `invalidBech32`, and `unknownPrefix`; `KeyPair.Error.invalidPrivateKey` (also thrown by
+  `KeyDerivation`) replaces `NostrError.invalidPrivateKey`. `EventSigner(privateKeyHex:)`,
+  `EventSigner(nsec:)`, `setPrivateKey(_:)`, and `setNsec(_:)` throw `KeyPair.Error`. `Mnemonic.Error`
+  replaces `invalidMnemonic` (now `invalidWordCount(Int)` or `invalidEntropyLength(Int)`),
+  `invalidMnemonicWord` (`unknownWord`), and `invalidMnemonicChecksum` (`invalidChecksum`).
+  `EncryptedPrivateKey.Error` replaces `invalidNcryptsec` (`malformedPayload`), `unsupportedScryptCost`,
+  and NIP-49's `decryptionFailed`; encrypting a key that is not 32 bytes throws
+  `KeyPair.Error.invalidLength`. `LNURL.decode(_:)` throws `LNURL.Error` (`invalidBech32`,
+  `unexpectedPrefix`, `invalidURL`). `KeyPair.nsec` and `LNURL.encode(_:)` no longer throw.
+  Secure random bytes come from `SystemRandomNumberGenerator` on every platform, so
+  `NostrError.randomGenerationFailed` is gone with the other replaced cases.
 - **`Event.id`, `Event.pubkey`, and the event signature are typed** (breaking): `id` is an
   `EventID`, `pubkey` a `PublicKey`, and `sig: String` is now `signature: Signature?` — still the
   `sig` field on the wire. `Event.init` takes `signature:` instead of `sig:`. A `nil` signature is an

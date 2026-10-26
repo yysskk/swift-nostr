@@ -18,35 +18,53 @@ public struct KeyPair: Sendable {
     public init() throws {
         let secpPrivateKey = try P256K.Schnorr.PrivateKey()
         self.privateKey = Data(secpPrivateKey.dataRepresentation)
-        self.publicKey = try PublicKey(data: Data(secpPrivateKey.xonly.bytes))
+        self.publicKey = PublicKey(validatedData: Data(secpPrivateKey.xonly.bytes))
     }
 
     /// Creates a keypair from an existing private key
-    public init(privateKey: Data) throws {
+    /// - Throws: ``KeyPair/Error/invalidLength(_:)`` if `privateKey` is not 32 bytes, or
+    ///   ``KeyPair/Error/invalidPrivateKey`` if it is not a valid secp256k1 scalar.
+    public init(privateKey: Data) throws(KeyPair.Error) {
         guard privateKey.count == 32 else {
-            throw NostrError.invalidPrivateKey
+            throw .invalidLength(privateKey.count)
         }
 
-        let secpPrivateKey = try P256K.Schnorr.PrivateKey(dataRepresentation: privateKey)
+        let secpPrivateKey: P256K.Schnorr.PrivateKey
+        do {
+            secpPrivateKey = try P256K.Schnorr.PrivateKey(dataRepresentation: privateKey)
+        } catch {
+            throw .invalidPrivateKey
+        }
         self.privateKey = privateKey
-        self.publicKey = try PublicKey(data: Data(secpPrivateKey.xonly.bytes))
+        self.publicKey = PublicKey(validatedData: Data(secpPrivateKey.xonly.bytes))
     }
 
     /// Creates a keypair from a hex-encoded private key
-    public init(privateKeyHex: String) throws {
-        guard let privateKeyData = Data(hexString: privateKeyHex) else {
-            throw NostrError.invalidHex
+    /// - Throws: ``KeyPair/Error/invalidHex`` if `privateKeyHex` is not 64 hexadecimal digits, or
+    ///   ``KeyPair/Error/invalidPrivateKey`` if it is not a valid secp256k1 scalar.
+    public init(privateKeyHex: String) throws(KeyPair.Error) {
+        guard let privateKeyData = Data(hexString: privateKeyHex), privateKeyData.count == 32 else {
+            throw .invalidHex
         }
         try self.init(privateKey: privateKeyData)
     }
 
     /// Creates a keypair from a nsec bech32-encoded private key
-    public init(nsec: String) throws {
-        let (hrp, data) = try Bech32.decode(nsec)
-        guard hrp == "nsec" else {
-            throw NostrError.unknownPrefix(hrp)
+    /// - Throws: ``KeyPair/Error/invalidBech32(_:)`` if `nsec` is not valid bech32,
+    ///   ``KeyPair/Error/unexpectedPrefix(_:)`` if it carries a prefix other than `nsec`,
+    ///   ``KeyPair/Error/invalidLength(_:)`` if it does not hold 32 bytes, or
+    ///   ``KeyPair/Error/invalidPrivateKey`` if they are not a valid secp256k1 scalar.
+    public init(nsec: String) throws(KeyPair.Error) {
+        let decoded: (hrp: String, data: Data)
+        do throws(Bech32.Error) {
+            decoded = try Bech32.decode(nsec)
+        } catch {
+            throw .invalidBech32(error)
         }
-        try self.init(privateKey: data)
+        guard decoded.hrp == "nsec" else {
+            throw .unexpectedPrefix(decoded.hrp)
+        }
+        try self.init(privateKey: decoded.data)
     }
 
     /// Creates a keypair from a BIP-39 mnemonic phrase (NIP-06)
@@ -55,7 +73,9 @@ public struct KeyPair: Sendable {
     ///   - mnemonic: The BIP-39 mnemonic phrase
     ///   - passphrase: Optional passphrase for additional security
     ///   - account: The account index (default 0)
-    public init(mnemonic: Mnemonic, passphrase: String = "", account: UInt32 = 0) throws {
+    /// - Throws: ``KeyPair/Error/invalidPrivateKey`` in the vanishingly rare case that derivation
+    ///   produces an invalid secp256k1 scalar.
+    public init(mnemonic: Mnemonic, passphrase: String = "", account: UInt32 = 0) throws(KeyPair.Error) {
         let seed = mnemonic.seed(passphrase: passphrase)
         let privateKey = try KeyDerivation.deriveNostrKey(seed: seed, account: account)
         try self.init(privateKey: privateKey)
@@ -67,6 +87,8 @@ public struct KeyPair: Sendable {
     ///   - mnemonicPhrase: The BIP-39 mnemonic phrase as a space-separated string
     ///   - passphrase: Optional passphrase for additional security
     ///   - account: The account index (default 0)
+    /// - Throws: A ``Mnemonic/Error`` if the phrase is not a valid mnemonic, or
+    ///   ``KeyPair/Error/invalidPrivateKey`` if derivation produces an invalid scalar.
     public init(mnemonicPhrase: String, passphrase: String = "", account: UInt32 = 0) throws {
         let mnemonic = try Mnemonic(phrase: mnemonicPhrase)
         try self.init(mnemonic: mnemonic, passphrase: passphrase, account: account)
@@ -77,6 +99,8 @@ public struct KeyPair: Sendable {
     ///   - wordCount: Number of words in the mnemonic (12, 15, 18, 21, or 24)
     ///   - passphrase: Optional passphrase for additional security
     /// - Returns: A tuple containing the generated mnemonic and keypair
+    /// - Throws: ``Mnemonic/Error/invalidWordCount(_:)`` for an unsupported `wordCount`, or
+    ///   ``KeyPair/Error/invalidPrivateKey`` if derivation produces an invalid scalar.
     public static func generate(
         wordCount: Int = 12, passphrase: String = ""
     ) throws -> (mnemonic: Mnemonic, keyPair: KeyPair) {
@@ -87,8 +111,37 @@ public struct KeyPair: Sendable {
 
     /// Returns the private key as nsec (bech32 encoded)
     public var nsec: String {
-        get throws {
-            try Bech32.encode(hrp: "nsec", data: privateKey)
+        Bech32.encode(validatedHRP: "nsec", data: privateKey)
+    }
+}
+
+extension KeyPair {
+    /// Why a value could not be used as a ``KeyPair``'s private key.
+    public enum Error: Swift.Error, LocalizedError, Sendable, Equatable {
+        /// The string is not 64 hexadecimal digits.
+        case invalidHex
+        /// The data is not 32 bytes (payload: its byte count).
+        case invalidLength(Int)
+        /// The `nsec` string is not valid bech32.
+        case invalidBech32(Bech32.Error)
+        /// The bech32 string carries a prefix other than `nsec` (payload: the prefix found).
+        case unexpectedPrefix(String)
+        /// The 32 bytes are not a valid secp256k1 private key: zero, or not below the curve order.
+        case invalidPrivateKey
+
+        public var errorDescription: String? {
+            switch self {
+            case .invalidHex:
+                return "A private key must be 64 hexadecimal digits"
+            case .invalidLength(let count):
+                return "A private key must be 32 bytes, got \(count)"
+            case .invalidBech32(let error):
+                return "Invalid nsec: \(error.errorDescription ?? "invalid bech32")"
+            case .unexpectedPrefix(let prefix):
+                return "Expected an nsec, got bech32 prefix \(prefix)"
+            case .invalidPrivateKey:
+                return "Invalid private key"
+            }
         }
     }
 }

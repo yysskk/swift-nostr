@@ -19,7 +19,9 @@ public enum KeyDerivation {
     ///   - seed: The 64-byte BIP-39 seed
     ///   - account: The account index (default 0)
     /// - Returns: 32-byte private key
-    public static func deriveNostrKey(seed: Data, account: UInt32 = 0) throws -> Data {
+    /// - Throws: ``KeyPair/Error/invalidPrivateKey`` in the vanishingly rare case (BIP-32) that a
+    ///   derived key is not a valid secp256k1 scalar.
+    public static func deriveNostrKey(seed: Data, account: UInt32 = 0) throws(KeyPair.Error) -> Data {
         // Generate master key from seed
         let (masterKey, masterChainCode) = try masterKeyFromSeed(seed)
 
@@ -66,7 +68,7 @@ public enum KeyDerivation {
     }
 
     /// Generates the master key and chain code from a seed using HMAC-SHA512
-    private static func masterKeyFromSeed(_ seed: Data) throws -> (key: Data, chainCode: Data) {
+    private static func masterKeyFromSeed(_ seed: Data) throws(KeyPair.Error) -> (key: Data, chainCode: Data) {
         let hmacKey = Data("Bitcoin seed".utf8)
         let hmac = HMAC<SHA512>.authenticationCode(for: seed, using: SymmetricKey(data: hmacKey))
         let hmacData = Data(hmac)
@@ -76,7 +78,7 @@ public enum KeyDerivation {
 
         // Validate key is valid for secp256k1
         guard isValidPrivateKey(key) else {
-            throw NostrError.invalidPrivateKey
+            throw .invalidPrivateKey
         }
 
         return (Data(key), Data(chainCode))
@@ -87,7 +89,7 @@ public enum KeyDerivation {
         parentKey: Data,
         parentChainCode: Data,
         index: UInt32
-    ) throws -> (key: Data, chainCode: Data) {
+    ) throws(KeyPair.Error) -> (key: Data, chainCode: Data) {
         var data = Data()
 
         if index >= hardenedOffset {
@@ -114,10 +116,10 @@ public enum KeyDerivation {
         let chainCode = Data(hmacData.suffix(32))
 
         // Calculate child key: (il + parent_key) mod n
-        let childKey = try addPrivateKeys(il, parentKey)
+        let childKey = addPrivateKeys(il, parentKey)
 
         guard isValidPrivateKey(childKey) else {
-            throw NostrError.invalidPrivateKey
+            throw .invalidPrivateKey
         }
 
         return (childKey, chainCode)
@@ -157,7 +159,7 @@ public enum KeyDerivation {
     }
 
     /// Adds two private keys modulo the curve order
-    private static func addPrivateKeys(_ a: Data, _ b: Data) throws -> Data {
+    private static func addPrivateKeys(_ a: Data, _ b: Data) -> Data {
         let n = secp256k1Order
 
         // Convert to big integers and add
@@ -192,8 +194,12 @@ public enum KeyDerivation {
 
     /// Computes the compressed public key from a private key
     /// Returns 33-byte compressed public key with 02/03 prefix
-    private static func compressedPublicKey(from privateKey: Data) throws -> Data {
-        let signingKey = try P256K.Signing.PrivateKey(dataRepresentation: privateKey)
-        return Data(signingKey.publicKey.dataRepresentation)
+    private static func compressedPublicKey(from privateKey: Data) throws(KeyPair.Error) -> Data {
+        do {
+            let signingKey = try P256K.Signing.PrivateKey(dataRepresentation: privateKey)
+            return Data(signingKey.publicKey.dataRepresentation)
+        } catch {
+            throw .invalidPrivateKey
+        }
     }
 }

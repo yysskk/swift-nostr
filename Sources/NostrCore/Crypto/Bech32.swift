@@ -19,12 +19,13 @@ public enum Bech32 {
     /// Uppercase is rejected rather than folded: the checksum covers the prefix as written, while
     /// decoding recomputes it over the lowercased string, so an uppercase prefix would produce a
     /// string that ``decode(_:)`` could never accept.
-    /// - Throws: ``NostrError/invalidBech32`` if `hrp` is empty or not lowercase printable ASCII.
-    public static func encode(hrp: String, data: Data) throws -> String {
+    /// - Throws: ``Bech32/Error/invalidHumanReadablePart`` if `hrp` is empty or not lowercase
+    ///   printable ASCII.
+    public static func encode(hrp: String, data: Data) throws(Bech32.Error) -> String {
         guard !hrp.isEmpty,
             hrp.allSatisfy({ $0.isASCII && !$0.isUppercase && ("!"..."~").contains($0) })
         else {
-            throw NostrError.invalidBech32
+            throw .invalidHumanReadablePart
         }
         return encode(validatedHRP: hrp, data: data)
     }
@@ -48,8 +49,9 @@ public enum Bech32 {
     /// could be desynchronized from the identity it names.
     ///
     /// The string must also be all-lowercase or all-uppercase; see ``decodeToWords(_:)``.
-    /// - Throws: ``NostrError/invalidBech32`` if the checksum, case, or padding is invalid.
-    public static func decode(_ str: String) throws -> (hrp: String, data: Data) {
+    /// - Throws: The errors of ``decodeToWords(_:)``, or ``Bech32/Error/invalidPadding`` if the
+    ///   payload is not canonically padded.
+    public static func decode(_ str: String) throws(Bech32.Error) -> (hrp: String, data: Data) {
         let (hrp, words) = try decodeToWords(str)
         return (hrp, Data(try wordsToBytesCanonical(words)))
     }
@@ -63,18 +65,23 @@ public enum Bech32 {
     ///
     /// Decoding is case-insensitive, but BIP-173 forbids mixing: the string must be entirely
     /// lowercase or entirely uppercase. Uppercase is common in QR codes, so both remain valid.
-    /// - Throws: ``NostrError/invalidBech32`` if the string mixes case or fails the checksum.
-    public static func decodeToWords(_ str: String) throws -> (hrp: String, words: [UInt8]) {
+    /// - Throws: ``Bech32/Error/mixedCase`` if the string mixes case,
+    ///   ``Bech32/Error/missingSeparator`` if it has no `1`, ``Bech32/Error/invalidLength`` if the
+    ///   prefix is empty or the data part shorter than the checksum,
+    ///   ``Bech32/Error/invalidHumanReadablePart`` if the prefix is not ASCII,
+    ///   ``Bech32/Error/invalidCharacter(_:)`` for a character outside the bech32 alphabet, or
+    ///   ``Bech32/Error/invalidChecksum`` if the checksum does not match.
+    public static func decodeToWords(_ str: String) throws(Bech32.Error) -> (hrp: String, words: [UInt8]) {
         // BIP-173: "Decoders MUST NOT accept strings where some characters are uppercase and some
         // are lowercase." Checked before folding the case, which would otherwise hide the mix.
         guard !(str.contains(where: \.isUppercase) && str.contains(where: \.isLowercase)) else {
-            throw NostrError.invalidBech32
+            throw .mixedCase
         }
 
         let lowercased = str.lowercased()
 
         guard let separatorIndex = lowercased.lastIndex(of: "1") else {
-            throw NostrError.invalidBech32
+            throw .missingSeparator
         }
 
         let hrp = String(lowercased[..<separatorIndex])
@@ -82,25 +89,25 @@ public enum Bech32 {
         let dataPart = String(lowercased[dataPartStart...])
 
         guard hrp.count >= 1, dataPart.count >= 6 else {
-            throw NostrError.invalidBech32
+            throw .invalidLength
         }
 
         // The HRP must be ASCII: `hrpExpand` (used by the checksum) reads each
         // character's `asciiValue`, so a non-ASCII HRP would otherwise trap.
         guard hrp.allSatisfy(\.isASCII) else {
-            throw NostrError.invalidBech32
+            throw .invalidHumanReadablePart
         }
 
         var values = [UInt8]()
         for char in dataPart {
             guard let value = charsetMap[char] else {
-                throw NostrError.invalidBech32
+                throw .invalidCharacter(char)
             }
             values.append(value)
         }
 
         guard verifyChecksum(hrp: hrp, values: values) else {
-            throw NostrError.invalidBech32
+            throw .invalidChecksum
         }
 
         // Remove the checksum (the last 6 words).
@@ -124,7 +131,7 @@ public enum Bech32 {
     /// BIP-173 requires both checks: five or more leftover bits mean the payload could have been
     /// written in fewer words, and non-zero leftover bits mean the padding carries information the
     /// byte payload does not, which is what gives one key several valid spellings.
-    private static func wordsToBytesCanonical(_ words: [UInt8]) throws -> [UInt8] {
+    private static func wordsToBytesCanonical(_ words: [UInt8]) throws(Bech32.Error) -> [UInt8] {
         var acc = 0
         var bits = 0
         var result = [UInt8]()
@@ -139,7 +146,7 @@ public enum Bech32 {
         }
 
         guard bits < 5, acc & ((1 << bits) - 1) == 0 else {
-            throw NostrError.invalidBech32
+            throw .invalidPadding
         }
 
         return result
@@ -210,5 +217,48 @@ public enum Bech32 {
         }
 
         return result
+    }
+}
+
+extension Bech32 {
+    /// Why a string could not be bech32-encoded or decoded.
+    ///
+    /// These describe the encoding only. Whether a well-formed string carries the expected
+    /// prefix is for the caller to check — see, for example, ``PublicKey/init(npub:)``.
+    public enum Error: Swift.Error, LocalizedError, Sendable, Equatable {
+        /// The human-readable prefix is not allowed: when encoding, it is empty or not lowercase
+        /// printable ASCII; when decoding, it contains a non-ASCII character.
+        case invalidHumanReadablePart
+        /// The string mixes uppercase and lowercase characters, which BIP-173 forbids.
+        case mixedCase
+        /// The string has no `1` separating the prefix from the data part.
+        case missingSeparator
+        /// The prefix is empty, or the data part is shorter than the six-character checksum.
+        case invalidLength
+        /// The data part contains a character outside the bech32 alphabet.
+        case invalidCharacter(Character)
+        /// The checksum does not match the prefix and data.
+        case invalidChecksum
+        /// The data does not regroup into whole bytes with canonical, all-zero padding.
+        case invalidPadding
+
+        public var errorDescription: String? {
+            switch self {
+            case .invalidHumanReadablePart:
+                return "Invalid bech32 human-readable prefix"
+            case .mixedCase:
+                return "The bech32 string mixes uppercase and lowercase characters"
+            case .missingSeparator:
+                return "The bech32 string has no separator"
+            case .invalidLength:
+                return "The bech32 string has an empty prefix or a data part shorter than its checksum"
+            case .invalidCharacter(let character):
+                return "Invalid bech32 character: \(character)"
+            case .invalidChecksum:
+                return "Invalid bech32 checksum"
+            case .invalidPadding:
+                return "The bech32 data is not canonically padded"
+            }
+        }
     }
 }

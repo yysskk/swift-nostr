@@ -136,9 +136,9 @@ enum TLV {
     /// Encodes records into a bech32 string with the given prefix.
     ///
     /// Throws ``NostrError/invalidTLV`` if a record value exceeds 255 bytes, or
-    /// ``NostrError/invalidBech32`` if `prefix` is not ASCII. Neither happens for the
-    /// entity `encoded` accessors: their initializers validate every field and the
-    /// prefixes are constant ASCII literals.
+    /// ``Bech32/Error/invalidHumanReadablePart`` if `prefix` is not lowercase printable ASCII.
+    /// Neither happens for the entity `encoded` accessors: their initializers validate every
+    /// field and the prefixes are constant ASCII literals.
     static func bech32(_ records: [Record], prefix: String) throws -> String {
         let data = try encode(records)
         return try Bech32.encode(hrp: prefix, data: data)

@@ -19,36 +19,41 @@ public struct Mnemonic: Sendable {
     // MARK: - Initialization
 
     /// Creates a mnemonic from a space-separated phrase
-    public init(phrase: String) throws {
+    /// - Throws: The errors of ``init(words:)``.
+    public init(phrase: String) throws(Mnemonic.Error) {
         let words = phrase.split(separator: " ").map(String.init)
         try self.init(words: words)
     }
 
     /// Creates a mnemonic from an array of words
-    public init(words: [String]) throws {
+    /// - Throws: ``Mnemonic/Error/invalidWordCount(_:)`` unless there are 12, 15, 18, 21, or 24
+    ///   words, ``Mnemonic/Error/unknownWord(_:)`` for the first word not in the BIP-39 English
+    ///   word list, or ``Mnemonic/Error/invalidChecksum`` if the checksum does not match.
+    public init(words: [String]) throws(Mnemonic.Error) {
         guard [12, 15, 18, 21, 24].contains(words.count) else {
-            throw NostrError.invalidMnemonic
+            throw .invalidWordCount(words.count)
         }
 
         // Validate all words are in the wordlist
         for word in words {
             guard BIP39WordList.english.contains(word) else {
-                throw NostrError.invalidMnemonicWord(word)
+                throw .unknownWord(word)
             }
         }
 
         // Validate checksum
         guard Self.validateChecksum(words: words) else {
-            throw NostrError.invalidMnemonicChecksum
+            throw .invalidChecksum
         }
 
         self.words = words
     }
 
     /// Generates a new random mnemonic with the specified word count
-    public static func generate(wordCount: Int = 12) throws -> Mnemonic {
+    /// - Throws: ``Mnemonic/Error/invalidWordCount(_:)`` unless `wordCount` is 12, 15, 18, 21, or 24.
+    public static func generate(wordCount: Int = 12) throws(Mnemonic.Error) -> Mnemonic {
         guard [12, 15, 18, 21, 24].contains(wordCount) else {
-            throw NostrError.invalidMnemonic
+            throw .invalidWordCount(wordCount)
         }
 
         // Calculate entropy bytes needed
@@ -59,15 +64,16 @@ public struct Mnemonic: Sendable {
         // 24 words = 256 bits = 32 bytes
         let entropyBytes = wordCount * 4 / 3
 
-        let entropy = try SecureRandom.generateBytes(count: entropyBytes)
+        let entropy = SecureRandom.generateBytes(count: entropyBytes)
 
         return try Mnemonic(entropy: entropy)
     }
 
     /// Creates a mnemonic from BIP-39 entropy: 16, 20, 24, 28 or 32 bytes for 12 to 24 words.
-    public init(entropy: Data) throws {
+    /// - Throws: ``Mnemonic/Error/invalidEntropyLength(_:)`` for any other byte count.
+    public init(entropy: Data) throws(Mnemonic.Error) {
         guard [16, 20, 24, 28, 32].contains(entropy.count) else {
-            throw NostrError.invalidMnemonic
+            throw .invalidEntropyLength(entropy.count)
         }
 
         // Calculate checksum
@@ -205,5 +211,32 @@ public struct Mnemonic: Sendable {
         }
 
         return Data(derivedKey.prefix(keyLength))
+    }
+}
+
+extension Mnemonic {
+    /// Why a mnemonic could not be created.
+    public enum Error: Swift.Error, LocalizedError, Sendable, Equatable {
+        /// The word count is not 12, 15, 18, 21, or 24 (payload: the count given).
+        case invalidWordCount(Int)
+        /// A word is not in the BIP-39 English word list (payload: the word).
+        case unknownWord(String)
+        /// The words are all valid but their checksum does not match.
+        case invalidChecksum
+        /// The entropy is not 16, 20, 24, 28, or 32 bytes (payload: its byte count).
+        case invalidEntropyLength(Int)
+
+        public var errorDescription: String? {
+            switch self {
+            case .invalidWordCount(let count):
+                return "A mnemonic must have 12, 15, 18, 21, or 24 words, got \(count)"
+            case .unknownWord(let word):
+                return "Invalid mnemonic word: \(word)"
+            case .invalidChecksum:
+                return "Invalid mnemonic checksum"
+            case .invalidEntropyLength(let count):
+                return "Mnemonic entropy must be 16, 20, 24, 28, or 32 bytes, got \(count)"
+            }
+        }
     }
 }
