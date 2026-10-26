@@ -71,8 +71,8 @@ struct RemoteSignerNostrConnectFlowTests {
                 requestID: "connect-ack", result: invitation.secret, client: client, signer: signer))
 
         let discovered = try await connection.value
-        #expect(discovered == signer.publicKey.hex)
-        #expect(await remote.remoteSignerPubkey == signer.publicKey.hex)
+        #expect(discovered == signer.publicKey)
+        #expect(await remote.remoteSignerPubkey == signer.publicKey)
         #expect(await remote.isConnectedForTesting == true)
     }
 
@@ -120,7 +120,7 @@ struct RemoteSignerNostrConnectFlowTests {
                 requestID: "connect-ack", result: invitation.secret, client: client, signer: signer))
 
         let discovered = try await connection.value
-        #expect(discovered == signer.publicKey.hex)
+        #expect(discovered == signer.publicKey)
     }
 
     // MARK: - post-connection command
@@ -147,7 +147,7 @@ struct RemoteSignerNostrConnectFlowTests {
             RemoteSignerFixtures.response(
                 requestID: request.id, result: PublicKey.fixture("user").hex, client: client, signer: signer))
 
-        #expect(try await pubkey.value == PublicKey.fixture("user").hex)
+        #expect(try await pubkey.value == PublicKey.fixture("user"))
     }
 
     // MARK: - timeout
@@ -185,7 +185,7 @@ struct RemoteSignerNostrConnectFlowTests {
         try await transport.deliver(
             RemoteSignerFixtures.response(
                 requestID: "connect-ack", result: invitation.secret, client: client, signer: signer))
-        #expect(try await connection.value == signer.publicKey.hex)
+        #expect(try await connection.value == signer.publicKey)
     }
 
     // MARK: - Helpers

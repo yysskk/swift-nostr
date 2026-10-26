@@ -36,7 +36,7 @@ public actor WalletConnection {
 
     /// The shared relay session, correlating each request by its event id (which responses echo in
     /// their `e` tag) and holding the parts collected for it so far.
-    private typealias Session = RequestResponseSession<String, RequestState, [ResponsePart]>
+    private typealias Session = RequestResponseSession<EventID, RequestState, [ResponsePart]>
 
     private let session: Session
     private let config: Config
@@ -64,11 +64,7 @@ public actor WalletConnection {
         self.config = config
         self.keyPair = keyPair
         self.signer = EventSigner(keyPair: keyPair)
-        // `WalletConnectURI` only holds a validated, lowercased 32-byte hex key.
-        guard let walletPubkey = PublicKey(uri.walletPubkey) else {
-            preconditionFailure("WalletConnectURI.walletPubkey is canonical hex")
-        }
-        self.walletPubkey = walletPubkey
+        self.walletPubkey = uri.walletPubkey
         self.clientPubkey = keyPair.publicKey
         self.session = Session(
             transport: transport ?? RelayConnectionTransport(relayURLs: uri.relays),
@@ -207,7 +203,7 @@ public actor WalletConnection {
         let collected: Session.PartialResult = { $0.collected }
         return try await session.perform(
             event,
-            key: event.id.hex,
+            key: event.id,
             state: RequestState(scheme: scheme, expected: expectedResponses, method: method),
             timeout: config.requestTimeout,
             partialResult: partialOnTimeout ? collected : nil)
@@ -250,7 +246,7 @@ public actor WalletConnection {
         let content: String
         do {
             let json = String(decoding: try JSONEncoder().encode(request), as: UTF8.self)
-            content = try WalletConnectCipher(scheme).encrypt(json, recipientPubkey: walletPubkey.hex, sender: keyPair)
+            content = try WalletConnectCipher(scheme).encrypt(json, recipientPubkey: walletPubkey, sender: keyPair)
         } catch {
             throw WalletConnectError.requestEncodingFailed
         }
@@ -292,7 +288,9 @@ public actor WalletConnection {
     }
 
     private func handleResponse(_ event: Event) async {
-        guard let requestID = event.firstTagValue(named: "e") else { return }
+        // The `e` tag names the request this answers. A value that is not a canonical event id
+        // cannot name any request this connection sent, so the response is dropped.
+        guard let requestID = event.firstTagValue(named: "e").flatMap(EventID.init) else { return }
         let walletPubkey = walletPubkey
         let keyPair = keyPair
 
@@ -310,7 +308,7 @@ public actor WalletConnection {
             // response arriving over two relays would otherwise count twice, completing a
             // `multi_pay_*` early with a duplicate part while the response it was still owed had
             // nowhere left to go.
-            guard request.seenResponseIDs.insert(event.id.hex).inserted else { return .pending }
+            guard request.seenResponseIDs.insert(event.id).inserted else { return .pending }
             request.receivedCount += 1
 
             // A tag naming a scheme this package does not implement is reported as such: the
@@ -326,7 +324,7 @@ public actor WalletConnection {
 
             guard
                 let content = try? WalletConnectCipher(scheme).decrypt(
-                    event.content, senderPubkey: walletPubkey.hex, recipient: keyPair)
+                    event.content, senderPubkey: walletPubkey, recipient: keyPair)
             else {
                 // Nothing to preserve for a single-response request, so fail fast.
                 if request.expected == 1 {
@@ -374,7 +372,7 @@ public actor WalletConnection {
     private func handleNotification(_ event: Event, scheme: WalletConnectEncryption) {
         guard !notificationStreams.isEmpty,
             let content = try? WalletConnectCipher(scheme).decrypt(
-                event.content, senderPubkey: walletPubkey.hex, recipient: keyPair),
+                event.content, senderPubkey: walletPubkey, recipient: keyPair),
             let notification = WalletConnectNotification(content: content)
         else {
             return
@@ -426,5 +424,5 @@ private struct RequestState: Sendable {
     var receivedCount = 0
     /// Response event ids already folded in, so a response delivered over more than one relay is
     /// counted once.
-    var seenResponseIDs: Set<String> = []
+    var seenResponseIDs: Set<EventID> = []
 }

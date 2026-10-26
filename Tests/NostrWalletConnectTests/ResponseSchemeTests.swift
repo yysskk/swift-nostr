@@ -162,4 +162,30 @@ struct ResponseSchemeTests {
             _ = try await payment.value
         }
     }
+
+    /// The `e` tag names the request a response answers, and an event id has one spelling: an
+    /// uppercase id names no request this connection sent, so the response is dropped and the
+    /// properly tagged one that follows is what resolves the request.
+    @Test("a response whose e tag is not a canonical event id is ignored")
+    func responseWithMalformedRequestIDIsIgnored() async throws {
+        let (connection, transport, client, wallet) = try makeConnection()
+
+        let payment = Task { try await connection.payInvoice("lnbc1") }
+
+        let request = try await NWCFixtures.waitForSentEvents(transport, count: 1)[0]
+        await transport.emit(
+            try NWCFixtures.signed(
+                kind: .walletConnectResponse,
+                tags: [["e", request.id.hex.uppercased()], ["p", client.publicKey.hex]],
+                content: try NWCFixtures.encrypt(
+                    #"{"result_type":"pay_invoice","result":{"preimage":"misaddressed"}}"#,
+                    to: client, from: wallet),
+                wallet: wallet))
+        await transport.emit(
+            try NWCFixtures.response(
+                resultJSON: #"{"result_type":"pay_invoice","result":{"preimage":"genuine"}}"#,
+                requestID: request.id, client: client, wallet: wallet))
+
+        #expect(try await payment.value.preimage == "genuine")
+    }
 }

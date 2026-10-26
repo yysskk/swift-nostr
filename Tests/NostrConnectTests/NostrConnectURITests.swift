@@ -17,7 +17,7 @@ struct NostrConnectURITests {
             permissions: [.signEvent(kind: .textNote)]
         )
 
-        #expect(invitation.clientPubkey == keyPair.publicKey.hex)
+        #expect(invitation.clientPubkey == keyPair.publicKey)
         #expect(!invitation.secret.isEmpty)
         #expect(Data(hexString: invitation.secret)?.count == 16)
     }
@@ -35,7 +35,7 @@ struct NostrConnectURITests {
     func roundTripsWithMetadata() throws {
         let keyPair = try KeyPair()
         let invitation = try NostrConnectURI(
-            clientPubkey: keyPair.publicKey.hex,
+            clientPubkey: keyPair.publicKey,
             relays: relays,
             secret: "deadbeef",
             permissions: [.signEvent(kind: .textNote), .nip44Encrypt],
@@ -64,7 +64,7 @@ struct NostrConnectURITests {
     func encodedMetadataSurvivesRoundTrip() throws {
         let keyPair = try KeyPair()
         let invitation = try NostrConnectURI(
-            clientPubkey: keyPair.publicKey.hex,
+            clientPubkey: keyPair.publicKey,
             relays: relays,
             secret: "s3cr3t",
             name: "My App & Co",
@@ -88,9 +88,28 @@ struct NostrConnectURITests {
 
     @Test("rejects a malformed pubkey")
     func rejectsMalformedPubkey() {
-        #expect(throws: RemoteSignerError.self) {
+        #expect(throws: RemoteSignerError.invalidURI(reason: "client pubkey must be lowercase 32-byte hex")) {
             try NostrConnectURI(string: "nostrconnect://zzzz?relay=wss%3A%2F%2Frelay.example&secret=s")
         }
+    }
+
+    /// A key has one spelling, so an uppercase host is rejected rather than folded to lowercase.
+    @Test("rejects an uppercase pubkey")
+    func rejectsUppercasePubkey() throws {
+        let pubkey = try KeyPair().publicKey.hex.uppercased()
+        #expect(throws: RemoteSignerError.invalidURI(reason: "client pubkey must be lowercase 32-byte hex")) {
+            try NostrConnectURI(string: "nostrconnect://\(pubkey)?relay=wss%3A%2F%2Frelay.example&secret=s")
+        }
+    }
+
+    @Test("serializes the typed client key as the lowercase hex host and parses it back")
+    func serializesTypedKeyAsHost() throws {
+        let keyPair = try KeyPair()
+        let invitation = try NostrConnectURI(clientPubkey: keyPair.publicKey, relays: relays, secret: "s")
+
+        let expected = "nostrconnect://\(keyPair.publicKey.hex)?relay=wss%3A%2F%2Frelay.example&secret=s"
+        #expect(invitation.stringValue == expected)
+        #expect(try NostrConnectURI(string: invitation.stringValue).clientPubkey == keyPair.publicKey)
     }
 
     @Test("rejects a non-WebSocket relay")

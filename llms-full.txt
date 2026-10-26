@@ -1470,8 +1470,8 @@ let authorized = try RemoteSigner(
 // Connect, subscribe to responses, and perform the connect handshake (presents the bunker secret
 // when present). Commands call this automatically; call it to surface errors up front.
 try await signer.connect()
-signer.clientPublicKey                       // the local client identity (hex, nonisolated)
-let remotePubkey = await signer.remoteSignerPubkey   // String? — the signer's pubkey (not necessarily the user's)
+signer.clientPublicKey                       // PublicKey — the local client identity (nonisolated)
+let remotePubkey = await signer.remoteSignerPubkey   // PublicKey? — the signer's key (not necessarily the user's)
 ```
 
 ### Client-initiated nostrconnect:// flow
@@ -1483,7 +1483,8 @@ let remotePubkey = await signer.remoteSignerPubkey   // String? — the signer's
 let invitation = try NostrConnectURI.invitation(clientKeyPair: clientKeyPair, relays: [relayURL])
 displayQRCode(invitation.stringValue)
 
-// clientKeyPair MUST match invitation.clientPubkey (else RemoteSignerError.invalidURI). Transport
+// clientKeyPair.publicKey MUST equal invitation.clientPubkey, a PublicKey (else
+// RemoteSignerError.invalidURI). Transport
 // defaults to a RelayConnectionTransport over the invitation's relays.
 let signer = try RemoteSigner(invitation: invitation, clientKeyPair: clientKeyPair)
 
@@ -1491,14 +1492,15 @@ let signer = try RemoteSigner(invitation: invitation, clientKeyPair: clientKeyPa
 // spec), pins subsequent traffic to that pubkey, marks the session connected, and returns it. A
 // response with a mismatched secret is ignored (keeps waiting); throws RemoteSignerError.timedOut
 // after Config.requestTimeout. Commands then work exactly as in the bunker flow.
-let remoteSignerPubkey = try await signer.awaitConnection()
+let remoteSignerPubkey: PublicKey = try await signer.awaitConnection()
 ```
 
 ### Commands
 
 ```swift
-let userPubkey = try await signer.publicKey  // PublicKey via get_public_key; cached; may differ from the signer's
-let userPubkeyHex = try await signer.userPublicKey()  // the same key as hex
+// PublicKey via get_public_key; cached; may differ from the signer's. A reply that is not canonical
+// hex throws RemoteSignerError.responseValidationFailed.
+let userPubkey = try await signer.userPublicKey()  // the same value as `try await signer.publicKey`
 
 // sign_event: signs remotely, then verifies the returned event and checks its kind/content/tags/
 // created_at match the request (throws RemoteSignerError.responseValidationFailed otherwise).
@@ -1507,8 +1509,8 @@ let signed = try await signer.sign(UnsignedEvent(pubkey: userPubkey, kind: .text
 try await signer.ping()                                       // expects "pong"
 let ct = try await signer.nip44Encrypt("hi", to: thirdParty)   // PublicKey
 let pt = try await signer.nip44Decrypt(ct, from: thirdParty)
-let ct04 = try await signer.nip04Encrypt("hi", to: thirdParty.hex)  // legacy NIP-04, hex string
-let pt04 = try await signer.nip04Decrypt(ct04, from: thirdParty.hex)
+let ct04 = try await signer.nip04Encrypt("hi", to: thirdParty)  // legacy NIP-04, PublicKey
+let pt04 = try await signer.nip04Decrypt(ct04, from: thirdParty)
 let relays = try await signer.switchRelays()                  // [URL]? — nil when the signer keeps its set
 await signer.logout()                                          // best-effort logout, then disconnect
 await signer.disconnect()                                      // tear down; fails in-flight with notConnected
@@ -1525,7 +1527,7 @@ for await challenge in await signer.authChallenges() {
 }
 ```
 
-- `BunkerURI(string:)` / `NostrConnectURI(string:)` — parse `bunker://` tokens and `nostrconnect://` invitations
+- `BunkerURI(string:)` / `NostrConnectURI(string:)` — parse `bunker://` tokens and `nostrconnect://` invitations; the host is the signer's `remoteSignerPubkey` / the client's `clientPubkey` as a `PublicKey`, and a host that is not canonical lowercase hex (uppercase included) throws `invalidURI(reason:)`. `BunkerURI(remoteSignerPubkey:relays:secret:)` and `NostrConnectURI(clientPubkey:relays:secret:…)` take a `PublicKey`
 - `RemoteSignerMethod` — the method set (`connect`, `sign_event`, `ping`, `get_public_key`, `nip04_*`, `nip44_*`, `switch_relays`, `logout`)
 - `RemoteSignerPermission` — `perms` tokens (e.g. `.signEvent(kind:)`, `.nip44Encrypt`)
 - `RemoteSignerAuthChallenge` — `url`, `method`, `requestID`

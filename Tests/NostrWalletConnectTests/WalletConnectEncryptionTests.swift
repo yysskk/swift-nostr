@@ -22,8 +22,8 @@ struct WalletConnectEncryptionTests {
         let cipher = WalletConnectCipher(scheme)
         let message = #"{"method":"get_balance","params":{}}"#
 
-        let payload = try cipher.encrypt(message, recipientPubkey: wallet.publicKey.hex, sender: client)
-        let decrypted = try cipher.decrypt(payload, senderPubkey: client.publicKey.hex, recipient: wallet)
+        let payload = try cipher.encrypt(message, recipientPubkey: wallet.publicKey, sender: client)
+        let decrypted = try cipher.decrypt(payload, senderPubkey: client.publicKey, recipient: wallet)
 
         #expect(decrypted == message)
     }
@@ -33,8 +33,8 @@ struct WalletConnectEncryptionTests {
         let client = try KeyPair()
         let wallet = try KeyPair()
 
-        let nip04 = try WalletConnectCipher(.nip04).encrypt("hi", recipientPubkey: wallet.publicKey.hex, sender: client)
-        let nip44 = try WalletConnectCipher(.nip44).encrypt("hi", recipientPubkey: wallet.publicKey.hex, sender: client)
+        let nip04 = try WalletConnectCipher(.nip04).encrypt("hi", recipientPubkey: wallet.publicKey, sender: client)
+        let nip44 = try WalletConnectCipher(.nip44).encrypt("hi", recipientPubkey: wallet.publicKey, sender: client)
 
         #expect(nip04.contains("?iv="))
         #expect(!nip44.contains("?iv="))
@@ -46,27 +46,28 @@ struct WalletConnectEncryptionTests {
         let wallet = try KeyPair()
 
         let nip04Payload = try WalletConnectCipher(.nip04)
-            .encrypt("hi", recipientPubkey: wallet.publicKey.hex, sender: client)
+            .encrypt("hi", recipientPubkey: wallet.publicKey, sender: client)
         #expect(throws: (any Error).self) {
-            try WalletConnectCipher(.nip44).decrypt(nip04Payload, senderPubkey: client.publicKey.hex, recipient: wallet)
+            try WalletConnectCipher(.nip44).decrypt(nip04Payload, senderPubkey: client.publicKey, recipient: wallet)
         }
 
         let nip44Payload = try WalletConnectCipher(.nip44)
-            .encrypt("hi", recipientPubkey: wallet.publicKey.hex, sender: client)
+            .encrypt("hi", recipientPubkey: wallet.publicKey, sender: client)
         #expect(throws: (any Error).self) {
-            try WalletConnectCipher(.nip04).decrypt(nip44Payload, senderPubkey: client.publicKey.hex, recipient: wallet)
+            try WalletConnectCipher(.nip04).decrypt(nip44Payload, senderPubkey: client.publicKey, recipient: wallet)
         }
     }
 
     @Test(
-        "an invalid recipient public key is rejected for each scheme",
+        "a recipient public key that is not on the curve is rejected for each scheme",
         arguments: [WalletConnectEncryption.nip44, .nip04]
     )
-    func invalidPubkey(scheme: WalletConnectEncryption) throws {
+    func offCurvePubkey(scheme: WalletConnectEncryption) throws {
         let client = try KeyPair()
-        // Not valid hex, so both the NIP-04 length guard and SealedMessage's hex check reject it.
-        #expect(throws: NostrError.invalidPublicKey) {
-            try WalletConnectCipher(scheme).encrypt("hi", recipientPubkey: "zz", sender: client)
+        // Well-formed hex, but no secp256k1 point has this x coordinate (it exceeds the field size).
+        let offCurve = try PublicKey(hex: String(repeating: "ff", count: 32))
+        #expect(throws: (any Error).self) {
+            try WalletConnectCipher(scheme).encrypt("hi", recipientPubkey: offCurve, sender: client)
         }
     }
 }

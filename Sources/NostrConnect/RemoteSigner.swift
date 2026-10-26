@@ -51,10 +51,10 @@ public actor RemoteSigner {
     private let signer: EventSigner
     private let secret: String?
 
-    /// The local client identity's public key (hex). The user's key never leaves the signer.
-    public nonisolated let clientPublicKey: String
+    /// The local client identity's public key. The user's key never leaves the signer.
+    public nonisolated let clientPublicKey: PublicKey
 
-    /// The remote signer's public key (hex). Known up front for a `bunker://` session; `nil` for a
+    /// The remote signer's public key. Known up front for a `bunker://` session; `nil` for a
     /// client-initiated `nostrconnect://` session until ``awaitConnection()`` discovers it from the
     /// signer's first valid response.
     private var signerPubkey: PublicKey?
@@ -121,8 +121,8 @@ public actor RemoteSigner {
         let keyPair = try clientKeyPair ?? KeyPair()
         self.clientKeyPair = keyPair
         self.signer = EventSigner(keyPair: keyPair)
-        self.clientPublicKey = keyPair.publicKey.hex
-        self.signerPubkey = try PublicKey(hex: bunker.remoteSignerPubkey)
+        self.clientPublicKey = keyPair.publicKey
+        self.signerPubkey = bunker.remoteSignerPubkey
         self.secret = bunker.secret
         self.expectedInvitationSecret = nil
         self.requestedPermissions = permissions
@@ -145,7 +145,7 @@ public actor RemoteSigner {
     ) {
         self.clientKeyPair = clientKeyPair
         self.signer = EventSigner(keyPair: clientKeyPair)
-        self.clientPublicKey = clientKeyPair.publicKey.hex
+        self.clientPublicKey = clientKeyPair.publicKey
         self.signerPubkey = nil
         self.secret = nil
         self.expectedInvitationSecret = expectedInvitationSecret
@@ -159,11 +159,11 @@ public actor RemoteSigner {
             notConnected: RemoteSignerError.notConnected)
     }
 
-    /// The remote signer's public key (hex), or `nil` for a client-initiated `nostrconnect://`
-    /// session before ``awaitConnection()`` has discovered it. Known immediately for a `bunker://`
-    /// session. Not necessarily the user's key (see ``userPublicKey()``).
-    public var remoteSignerPubkey: String? {
-        signerPubkey?.hex
+    /// The remote signer's public key, or `nil` for a client-initiated `nostrconnect://` session
+    /// before ``awaitConnection()`` has discovered it. Known immediately for a `bunker://` session.
+    /// Not necessarily the user's key (see ``userPublicKey()``).
+    public var remoteSignerPubkey: PublicKey? {
+        signerPubkey
     }
 
     // MARK: - Lifecycle

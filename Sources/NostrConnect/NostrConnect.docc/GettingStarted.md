@@ -37,6 +37,10 @@ let bunker = try BunkerURI(string: "bunker://...")
 let signer = try RemoteSigner(bunker: bunker)
 ```
 
+The token's host is the signer's public key, held as a `PublicKey` in
+``BunkerURI/remoteSignerPubkey``. It must be canonical lowercase hex: anything else, uppercase hex
+included, throws ``RemoteSignerError/invalidURI(reason:)``.
+
 The session signs and encrypts with a *client* identity — a fresh random keypair by default — so the
 user's main Nostr key never leaves the signer. Commands connect to the relay and perform the
 `connect` handshake automatically on first use; call ``RemoteSigner/connect()`` explicitly to
@@ -79,7 +83,7 @@ let signer = try RemoteSigner(invitation: invitation, clientKeyPair: clientKeyPa
 // Resolves once the signer accepts. The response's secret is validated against the invitation, per
 // NIP-46, so a spoofed reply is ignored; a reply that never arrives throws
 // ``RemoteSignerError/timedOut``.
-let remoteSignerPubkey = try await signer.awaitConnection()
+let remoteSignerPubkey: PublicKey = try await signer.awaitConnection()
 ```
 
 Once ``RemoteSigner/awaitConnection()`` returns, the session is connected and the commands below work
@@ -89,11 +93,12 @@ exactly as for a `bunker://` session.
 
 ``RemoteSigner/userPublicKey()`` asks the signer which key it signs with. This may differ from
 ``RemoteSigner/remoteSignerPubkey`` — the signer's session identity — and it is cached after the
-first call:
+first call. A reply that is not a canonical hex key throws
+``RemoteSignerError/responseValidationFailed``:
 
 ```swift
-let userPubkey = try await signer.userPublicKey()
-print("Signing as \(userPubkey)")
+let userPubkey: PublicKey = try await signer.userPublicKey()
+print("Signing as \(userPubkey.npub)")
 ```
 
 ## Sign an Event
@@ -132,8 +137,12 @@ The signer can encrypt and decrypt with the user's key on the client's behalf, f
 legacy NIP-04:
 
 ```swift
+// recipientPubkey and senderPubkey are PublicKey values.
 let ciphertext = try await signer.nip44Encrypt("hello", to: recipientPubkey)
 let plaintext = try await signer.nip44Decrypt(ciphertext, from: senderPubkey)
+
+let legacyCiphertext = try await signer.nip04Encrypt("hello", to: recipientPubkey)
+let legacyPlaintext = try await signer.nip04Decrypt(legacyCiphertext, from: senderPubkey)
 ```
 
 ## Check Liveness and End the Session

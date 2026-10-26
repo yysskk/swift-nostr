@@ -13,6 +13,6 @@ extension RemoteSigner: NostrSigning {
     /// - Throws: ``RemoteSignerError/responseValidationFailed`` if the signer replies with anything
     ///   but a canonical hex public key.
     public var publicKey: PublicKey {
-        get async throws { try await fetchUserPublicKey() }
+        get async throws { try await userPublicKey() }
     }
 }

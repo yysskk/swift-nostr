@@ -40,6 +40,10 @@ let uri = try WalletConnectURI(string: "nostr+walletconnect://...")
 let connection = WalletConnection(uri: uri)
 ```
 
+The connection string's host is the wallet service's public key, held as a `PublicKey` in
+``WalletConnectURI/walletPubkey``. It must be canonical lowercase hex: anything else, uppercase hex
+included, throws ``WalletConnectError/invalidURI(reason:)``.
+
 The URI carries a per-client secret key, so the wallet connection signs and encrypts with a key
 dedicated to this app — the user's main Nostr identity is never exposed. Commands connect to the
 relay automatically on first use; call ``WalletConnection/connect()`` explicitly to surface

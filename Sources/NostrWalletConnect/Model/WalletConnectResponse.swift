@@ -76,7 +76,7 @@ public struct GetInfoResult: Codable, Sendable, Hashable {
     public let alias: String?
     /// The node color (hex).
     public let color: String?
-    /// The node public key (hex).
+    /// The Lightning node's public key (hex) — a node key, not a Nostr `PublicKey`.
     public let pubkey: String?
     /// The network, e.g. `"mainnet"`.
     public let network: String?

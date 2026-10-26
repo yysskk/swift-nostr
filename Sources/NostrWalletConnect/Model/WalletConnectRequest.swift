@@ -75,7 +75,7 @@ public struct MultiPayInvoiceParams: Codable, Sendable, Hashable {
 public struct PayKeysendParams: Codable, Sendable, Hashable {
     /// The amount to send in millisatoshis.
     public let amount: Int64
-    /// The recipient node's public key (hex).
+    /// The recipient Lightning node's public key (hex) — a node key, not a Nostr `PublicKey`.
     public let pubkey: String
     /// An optional preimage for the payment.
     public let preimage: String?
@@ -103,7 +103,7 @@ public struct MultiPayKeysendParams: Codable, Sendable, Hashable {
     public struct Keysend: Codable, Sendable, Hashable {
         /// An optional client-chosen id used to correlate this keysend's response.
         public let id: String?
-        /// The recipient node's public key (hex).
+        /// The recipient Lightning node's public key (hex) — a node key, not a Nostr `PublicKey`.
         public let pubkey: String
         /// The amount to send in millisatoshis.
         public let amount: Int64
