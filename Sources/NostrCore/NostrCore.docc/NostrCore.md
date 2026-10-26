@@ -69,6 +69,7 @@ let isValid = try event.verify()
 
 ### Relay Connection
 
+- ``RelayURL``
 - ``RelayConnection``
 - ``RelayConnectionConfig``
 - ``RelayConnectionState``

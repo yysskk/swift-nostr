@@ -5,8 +5,8 @@ import Foundation
 /// `expectedRelays` is nil until the subscribed relay set is known; an empty
 /// set is vacuously complete (nothing was subscribed, so nothing is pending).
 struct EOSETracker: Sendable {
-    private(set) var expectedRelays: Set<URL>?
-    private(set) var receivedRelays: Set<URL> = []
+    private(set) var expectedRelays: Set<RelayURL>?
+    private(set) var receivedRelays: Set<RelayURL> = []
 
     var isComplete: Bool {
         guard let expectedRelays else { return false }
@@ -14,13 +14,13 @@ struct EOSETracker: Sendable {
     }
 
     @discardableResult
-    mutating func setExpectedRelays(_ relays: Set<URL>) -> Bool {
+    mutating func setExpectedRelays(_ relays: Set<RelayURL>) -> Bool {
         expectedRelays = relays
         return isComplete
     }
 
     @discardableResult
-    mutating func recordEOSE(from relayURL: URL) -> Bool {
+    mutating func recordEOSE(from relayURL: RelayURL) -> Bool {
         receivedRelays.insert(relayURL)
         return isComplete
     }

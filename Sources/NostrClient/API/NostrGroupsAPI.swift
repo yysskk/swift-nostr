@@ -322,7 +322,7 @@ public struct NostrGroupsAPI: NostrGroupManaging {
         let pubkey = try await client.requiredPublicKey()
         let relayURL = try await ensureRelay(group)
         let event = try await client.activeSign(build(pubkey))
-        let result = try await client.pool.publish(event, toURLs: [relayURL], strategy: strategy)
+        let result = try await client.pool.publish(event, to: [relayURL], strategy: strategy)
         return PublishedEvent(event: event, result: result)
     }
 
@@ -331,17 +331,15 @@ public struct NostrGroupsAPI: NostrGroupManaging {
     /// A NIP-29 group lives on a single relay, so every group flow targets exactly that
     /// relay; targeting a URL the pool does not know throws
     /// ``NostrError/noMatchingRelays(_:)``, so this helper guarantees the relay is
-    /// present and connected first. The URL is normalized like every other routing key
-    /// (lowercased scheme and host, root trailing slash stripped, default ports
-    /// stripped), the relay is added when absent, and connecting is idempotent when it
-    /// already is connected.
+    /// present and connected first. The relay is added when absent, and connecting is
+    /// idempotent when it already is connected.
     ///
-    /// - Returns: The normalized URL to pass to the pool's targeting parameters.
+    /// - Returns: The group's relay URL, to pass to the pool's targeting parameters.
     /// - Throws: ``NostrError/invalidRelayURL(_:)`` when the URL is not a valid WebSocket
     ///   relay URL, or ``NostrError/connectionFailed(_:)`` when the relay cannot be connected.
-    private func ensureRelay(_ group: GroupReference) async throws -> URL {
-        let url = try RelayURL.requireTarget(group.relayURL)
-        let connection = try await client.pool.addRelay(url)
+    private func ensureRelay(_ group: GroupReference) async throws -> RelayURL {
+        let url = try RelayURL(string: group.relayURL)
+        let connection = await client.pool.addRelay(url)
         try await connection.connect()
         return url
     }

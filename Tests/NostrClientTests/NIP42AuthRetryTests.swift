@@ -12,7 +12,7 @@ import Testing
 @Suite("NIP-42 Auth-Required Retry Tests")
 struct NIP42AuthRetryTests {
 
-    private let relayURL = URL(string: "wss://relay.example.com")!
+    private let relayURL = RelayURL("wss://relay.example.com")!
 
     private func makeConnection(publishAckTimeout: TimeInterval = 5) -> (RelayConnection, MockWebSocketSession) {
         let mock = MockWebSocketSession()

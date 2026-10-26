@@ -24,24 +24,22 @@ public struct NostrRelaysAPI: NostrRelayManaging {
     // MARK: - Membership
 
     /// Adds a relay, optionally with a per-relay connection configuration.
-    /// - Throws: ``NostrError/invalidRelayURL(_:)`` when `urlString` is not a valid
-    ///   WebSocket relay URL.
+    ///
+    /// Relay URLs compare by their canonical form, so re-adding the same relay under a different
+    /// spelling returns the existing connection (its `config` is ignored).
     @discardableResult
-    public func add(_ urlString: String, config: RelayConnectionConfig? = nil) async throws -> RelayConnection {
-        try await client.pool.addRelay(urlString, config: config)
+    public func add(_ url: RelayURL, config: RelayConnectionConfig? = nil) async -> RelayConnection {
+        await client.pool.addRelay(url, config: config)
     }
 
-    /// Adds multiple relays.
-    /// - Throws: ``NostrError/invalidRelayURL(_:)`` on the first invalid string.
-    public func add(_ urlStrings: [String]) async throws {
-        try await client.pool.addRelays(urlStrings)
+    /// Adds multiple relays, each with the pool's default connection configuration.
+    public func add(_ urls: some Sequence<RelayURL>) async {
+        await client.pool.addRelays(Array(urls))
     }
 
     /// Removes a relay from the pool, disconnecting it; removing an absent relay is a no-op.
-    /// - Throws: ``NostrError/invalidRelayURL(_:)`` when `urlString` is not a valid
-    ///   WebSocket relay URL.
-    public func remove(_ urlString: String) async throws {
-        try await client.pool.removeRelay(urlString)
+    public func remove(_ url: RelayURL) async {
+        await client.pool.removeRelay(url)
     }
 
     // MARK: - Connection lifecycle
@@ -55,13 +53,15 @@ public struct NostrRelaysAPI: NostrRelayManaging {
     /// the one-step form of `add(_:)` followed by `connect()`.
     ///
     /// ```swift
-    /// try await client.relays.connect(to: ["wss://relay.example.com", "wss://relay2.example.com"])
+    /// try await client.relays.connect(to: [
+    ///     RelayURL(string: "wss://relay.example.com"),
+    ///     RelayURL(string: "wss://relay2.example.com"),
+    /// ])
     /// ```
-    /// - Throws: ``NostrError/invalidRelayURL(_:)`` if any URL string is invalid (before
-    ///   any connection attempt), or ``NostrError/connectionFailed(_:)`` if every relay
-    ///   in the pool fails to connect; partial connection failures are tolerated.
-    public func connect(to urlStrings: [String]) async throws {
-        try await add(urlStrings)
+    /// - Throws: ``NostrError/connectionFailed(_:)`` if every relay in the pool fails to
+    ///   connect; partial connection failures are tolerated.
+    public func connect(to urls: some Sequence<RelayURL>) async throws {
+        await add(urls)
         try await connect()
     }
 
@@ -94,7 +94,7 @@ public struct NostrRelaysAPI: NostrRelayManaging {
     }
 
     /// The pool's connection for a relay URL, or nil when it is not in the pool.
-    public func relay(for url: URL) async -> RelayConnection? {
+    public func relay(for url: RelayURL) async -> RelayConnection? {
         await client.pool.relay(for: url)
     }
 

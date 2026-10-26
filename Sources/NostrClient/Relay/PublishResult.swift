@@ -34,36 +34,35 @@ extension PublishRelayStatus: Equatable {
 /// strategy such as `.firstAck`, relays that were still in flight when the call
 /// returned are reported as ``PublishRelayStatus/pending``.
 public struct PublishResult: Sendable {
-    /// Outcome per targeted relay, keyed by the canonical (normalized) relay URL.
-    public let statuses: [URL: PublishRelayStatus]
+    /// Outcome per targeted relay.
+    public let statuses: [RelayURL: PublishRelayStatus]
 
-    /// The status for a relay URL string, normalized to the result's canonical keys.
-    /// Returns nil when the string is not a valid relay URL or the relay was not targeted.
-    public func status(for relayURL: String) -> PublishRelayStatus? {
-        guard let url = try? RelayURL.requireTarget(relayURL) else { return nil }
-        return statuses[url]
+    /// The status for a relay, or nil when the relay was not targeted.
+    public func status(for relayURL: RelayURL) -> PublishRelayStatus? {
+        statuses[relayURL]
     }
 
     /// Relays that acknowledged the event before the call returned.
-    public var acceptedRelays: Set<URL> {
+    public var acceptedRelays: Set<RelayURL> {
         relays { if case .accepted = $0 { return true } else { return false } }
     }
 
     /// Relays whose publish had failed before the call returned.
-    public var failedRelays: Set<URL> {
+    public var failedRelays: Set<RelayURL> {
         relays { if case .failed = $0 { return true } else { return false } }
     }
 
     /// Relays that were still in flight when the call returned.
-    public var pendingRelays: Set<URL> {
+    public var pendingRelays: Set<RelayURL> {
         relays { if case .pending = $0 { return true } else { return false } }
     }
 
-    public init(statuses: [URL: PublishRelayStatus]) {
+    /// Creates a result from per-relay outcomes.
+    public init(statuses: [RelayURL: PublishRelayStatus]) {
         self.statuses = statuses
     }
 
-    private func relays(matching predicate: (PublishRelayStatus) -> Bool) -> Set<URL> {
+    private func relays(matching predicate: (PublishRelayStatus) -> Bool) -> Set<RelayURL> {
         Set(statuses.filter { predicate($0.value) }.keys)
     }
 }

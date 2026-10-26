@@ -58,8 +58,8 @@ struct GiftWrappedRumorDeliveryTests {
 
     @Test("the recipient copy is routed to the recipient's cached DM inbox relays")
     func routesToRecipientInbox() async throws {
-        let poolURL = URL(string: "wss://pool.example.com")!
-        let inboxURL = URL(string: "wss://inbox.example.com")!
+        let poolURL = RelayURL("wss://pool.example.com")!
+        let inboxURL = RelayURL("wss://inbox.example.com")!
         let sockets = [MockWebSocketSession(), MockWebSocketSession()]
         let counter = SocketCounter()
         let pool = RelayPool(
@@ -73,7 +73,7 @@ struct GiftWrappedRumorDeliveryTests {
         let sender = try KeyPair(privateKeyHex: senderKey)
         let recipient = try KeyPair()
         await client.dmRelayListStore.store(
-            DirectMessageRelayList(relays: [inboxURL.absoluteString]), createdAt: 1, for: recipient.publicKey)
+            DirectMessageRelayList(relays: [inboxURL.description]), createdAt: 1, for: recipient.publicKey)
         // The sender advertised no list, so the self-copy falls back to the whole pool.
         await client.dmRelayListStore.markNoList(for: sender.publicKey)
         let rumor = makeRumor(pubkey: sender.publicKey, recipient: recipient.publicKey)

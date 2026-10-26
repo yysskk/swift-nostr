@@ -110,6 +110,17 @@ struct NIP27ContentReferenceTests {
         #expect(reference.tag.rawArray == ["p", pubkeyHex, "wss://relay.example.com"])
     }
 
+    @Test("an nprofile skips relay hints that are not relay URLs")
+    func nprofileSkipsMalformedRelayHints() throws {
+        let profile = try NProfile(
+            publicKey: PublicKey(pubkeyHex)!,
+            relays: ["https://not-a-relay.example.com", "WSS://Relay2.Example.com/"]
+        )
+        let uri = try NIP19Entity.nprofile(profile).nostrURI
+        let reference = try #require(NostrContentReference.references(in: uri).first)
+        #expect(reference.tag.rawArray == ["p", pubkeyHex, "wss://relay2.example.com"])
+    }
+
     @Test("a note maps to a q tag")
     func noteMapsToQuoteTag() {
         let content = "nostr:\(noteVector)"

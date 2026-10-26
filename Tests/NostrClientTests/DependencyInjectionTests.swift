@@ -25,8 +25,8 @@ struct DependencyInjectionTests {
     @Test("pool connects its relays through an injected fake transport")
     func poolConnectsThroughFakeTransport() async throws {
         let pool = RelayPool(config: noReconnectConfig, webSocketFactory: fakeFactory())
-        try await pool.addRelay(URL(string: "wss://relay.example.com")!)
-        try await pool.addRelay(URL(string: "wss://relay2.example.com")!)
+        await pool.addRelay(RelayURL("wss://relay.example.com")!)
+        await pool.addRelay(RelayURL("wss://relay2.example.com")!)
 
         let connected = try await pool.connectAll()
 
@@ -39,7 +39,9 @@ struct DependencyInjectionTests {
         let pool = RelayPool(config: noReconnectConfig, webSocketFactory: fakeFactory())
         let client = NostrClient(relayPool: pool)
 
-        try await client.relays.connect(to: ["wss://relay.example.com", "wss://relay2.example.com"])
+        try await client.relays.connect(to: [
+            RelayURL("wss://relay.example.com")!, RelayURL("wss://relay2.example.com")!,
+        ])
 
         #expect(await client.relays.pool.count == 2)
         // connect(to:) only throws when *every* relay fails, so assert both sockets
@@ -54,7 +56,9 @@ struct DependencyInjectionTests {
         // seam a host (e.g. Android) uses to supply a non-URLSession transport.
         let client = NostrClient(relayPoolConfig: noReconnectConfig, webSocketFactory: fakeFactory())
 
-        try await client.relays.connect(to: ["wss://relay.example.com", "wss://relay2.example.com"])
+        try await client.relays.connect(to: [
+            RelayURL("wss://relay.example.com")!, RelayURL("wss://relay2.example.com")!,
+        ])
 
         #expect(await client.relays.pool.connectedCount() == 2)
         await client.relays.disconnect()

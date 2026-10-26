@@ -102,6 +102,24 @@ struct ReplyThreadingTests {
         #expect(tags.contains(["e", rootID, "wss://hint.example.com", "root"]))
     }
 
+    /// The positional root's relay hint is the parent author's content, so it is re-emitted only
+    /// when it is a relay URL, and then in canonical form.
+    @Test("a positional root drops a malformed relay hint and canonicalizes a valid one")
+    func positionalRootRelayHintIsParsed() async throws {
+        let parentID = String(repeating: "22", count: 32)
+        let malformed = try await replyEventTags(toParentWith: [
+            ["e", rootID, "https://not-a-relay.example.com"],
+            ["e", parentID],
+        ])
+        #expect(malformed.contains(["e", rootID, "", "root"]))
+
+        let spelled = try await replyEventTags(toParentWith: [
+            ["e", rootID, "WSS://Hint.Example.com/"],
+            ["e", parentID],
+        ])
+        #expect(spelled.contains(["e", rootID, "wss://hint.example.com", "root"]))
+    }
+
     @Test("an event with no e tags is its own root")
     func noEventTagsMeansRoot() async throws {
         let tags = try await replyEventTags(toParentWith: [["p", String(repeating: "33", count: 32)]])

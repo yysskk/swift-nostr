@@ -376,9 +376,6 @@ extension RelayInformation {
 extension RelayInformation {
     /// Errors that can occur while fetching a NIP-11 information document.
     public enum FetchError: Error, LocalizedError, Sendable, Equatable {
-        /// The relay URL was malformed, or its scheme was not `ws` or `wss`.
-        case invalidRelayURL(String)
-
         /// A lower-level network error occurred.
         case networkError(String)
 
@@ -390,8 +387,6 @@ extension RelayInformation {
 
         public var errorDescription: String? {
             switch self {
-            case .invalidRelayURL(let reason):
-                return "Invalid relay URL: \(reason)"
             case .networkError(let message):
                 return "Network error: \(message)"
             case .invalidResponse:
@@ -406,45 +401,31 @@ extension RelayInformation {
 // MARK: - Fetching
 
 extension RelayInformation {
-    /// Converts a relay WebSocket URL to the HTTP(S) URL used for NIP-11 queries.
+    /// Converts a relay URL to the HTTP(S) URL used for NIP-11 queries.
     ///
     /// - `wss://` becomes `https://`
     /// - `ws://` becomes `http://`
-    /// - Any other scheme returns `nil`
     ///
     /// The host, port, path, and query are preserved.
-    public static func informationURL(from relayURL: URL) -> URL? {
-        guard var components = URLComponents(url: relayURL, resolvingAgainstBaseURL: false) else {
-            return nil
-        }
-        switch components.scheme?.lowercased() {
-        case "wss":
-            components.scheme = "https"
-        case "ws":
-            components.scheme = "http"
-        default:
-            return nil
-        }
-        return components.url
+    public static func informationURL(from relayURL: RelayURL) -> URL {
+        var components = URLComponents(url: relayURL.url, resolvingAgainstBaseURL: false)
+        components?.scheme = relayURL.url.scheme == "wss" ? "https" : "http"
+        // Unreachable fallback: a relay URL always has a ws or wss scheme and a host.
+        return components?.url ?? relayURL.url
     }
 
     /// Fetches the NIP-11 Information Document for a relay.
     ///
     /// - Parameters:
-    ///   - relayURL: The relay WebSocket URL (`wss://` or `ws://`).
+    ///   - relayURL: The relay's URL.
     ///   - urlSession: The URL session to use (defaults to `.shared`).
     /// - Returns: The decoded ``RelayInformation``.
-    /// - Throws: ``FetchError`` if the URL is invalid, the network request
-    ///   fails, or the response cannot be decoded.
+    /// - Throws: ``FetchError`` if the network request fails or the response cannot be decoded.
     public static func fetch(
-        from relayURL: URL,
+        from relayURL: RelayURL,
         urlSession: URLSession = .shared
     ) async throws -> RelayInformation {
-        guard let httpURL = informationURL(from: relayURL) else {
-            throw FetchError.invalidRelayURL(relayURL.absoluteString)
-        }
-
-        var request = URLRequest(url: httpURL)
+        var request = URLRequest(url: informationURL(from: relayURL))
         request.httpMethod = "GET"
         request.setValue("application/nostr+json", forHTTPHeaderField: "Accept")
 
@@ -475,23 +456,5 @@ extension RelayInformation {
         } catch {
             throw FetchError.decodingFailed(String(describing: error))
         }
-    }
-
-    /// Fetches the NIP-11 Information Document for a relay given its URL string.
-    ///
-    /// - Parameters:
-    ///   - urlString: The relay WebSocket URL string.
-    ///   - urlSession: The URL session to use (defaults to `.shared`).
-    /// - Returns: The decoded ``RelayInformation``.
-    /// - Throws: ``FetchError`` if the URL is invalid, the network request
-    ///   fails, or the response cannot be decoded.
-    public static func fetch(
-        fromRelayURLString urlString: String,
-        urlSession: URLSession = .shared
-    ) async throws -> RelayInformation {
-        guard let url = URL(string: urlString) else {
-            throw FetchError.invalidRelayURL(urlString)
-        }
-        return try await fetch(from: url, urlSession: urlSession)
     }
 }

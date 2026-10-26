@@ -35,7 +35,7 @@ struct RelayConnectionTests {
     private func makeConnection() -> (RelayConnection, MockWebSocketSession) {
         let mock = MockWebSocketSession()
         let connection = RelayConnection(
-            url: URL(string: "wss://relay.example.com")!,
+            url: RelayURL("wss://relay.example.com")!,
             webSocketFactory: MockWebSocketSessionFactory(makeSession: { mock }),
             // No auto-reconnect and a long ping interval keep the test's background
             // tasks inert; the connection is torn down explicitly at the end.
@@ -165,21 +165,13 @@ struct RelayConnectionTests {
     }
 }
 
-@Suite("Relay Connection URL Validation Tests")
-struct RelayConnectionURLValidationTests {
+@Suite("Relay Connection URL Tests")
+struct RelayConnectionURLTests {
 
-    @Test("init(urlString:) accepts a relay URL and normalizes it")
-    func initAcceptsAndNormalizes() throws {
-        let connection = try RelayConnection(urlString: "WSS://Relay.Example.com/")
-        #expect(connection.url == URL(string: "wss://relay.example.com")!)
-    }
-
-    @Test(
-        "init(urlString:) rejects non-relay URLs with invalidRelayURL",
-        arguments: ["https://relay.example.com", "wss:garbage"])
-    func initRejectsInvalidURL(urlString: String) {
-        #expect(throws: NostrError.invalidRelayURL(urlString)) {
-            _ = try RelayConnection(urlString: urlString)
-        }
+    @Test("a connection keeps its relay URL in canonical form")
+    func keepsCanonicalURL() throws {
+        let connection = RelayConnection(url: try RelayURL(string: "WSS://Relay.Example.com:443/"))
+        #expect(connection.url == RelayURL("wss://relay.example.com")!)
+        #expect(connection.url.url.absoluteString == "wss://relay.example.com")
     }
 }

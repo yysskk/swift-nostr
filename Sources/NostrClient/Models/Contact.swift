@@ -8,7 +8,7 @@ public struct Contact: Codable, Hashable, Sendable {
     public let pubkey: PublicKey
 
     /// The main relay URL where the client reads events from this contact
-    public let relayURL: String?
+    public let relayURL: RelayURL?
 
     /// A local name (petname) for this contact
     public let petname: String?
@@ -18,7 +18,7 @@ public struct Contact: Codable, Hashable, Sendable {
     ///   - pubkey: The contact's public key.
     ///   - relayURL: The main relay URL where the client reads events from this contact.
     ///   - petname: A local name for this contact.
-    public init(pubkey: PublicKey, relayURL: String? = nil, petname: String? = nil) {
+    public init(pubkey: PublicKey, relayURL: RelayURL? = nil, petname: String? = nil) {
         self.pubkey = pubkey
         self.relayURL = relayURL
         self.petname = petname
@@ -28,7 +28,7 @@ public struct Contact: Codable, Hashable, Sendable {
     public func toTag() -> [String] {
         var tag = ["p", pubkey.hex]
         if let relayURL = relayURL {
-            tag.append(relayURL)
+            tag.append(relayURL.description)
             if let petname = petname {
                 tag.append(petname)
             }
@@ -41,13 +41,15 @@ public struct Contact: Codable, Hashable, Sendable {
 
     /// Creates a Contact from a "p" tag array
     ///
-    /// Returns nil unless the tag is a `p` tag whose value is a canonical hex public key.
+    /// Returns nil unless the tag is a `p` tag whose value is a canonical hex public key. The
+    /// relay hint is the list author's own content, so one that is not a valid relay URL is read
+    /// as absent rather than failing the contact.
     public static func fromTag(_ tag: [String]) -> Contact? {
         guard tag.count >= 2, tag[0] == "p", let pubkey = PublicKey(tag[1]) else {
             return nil
         }
 
-        let relayURL = tag.count > 2 && !tag[2].isEmpty ? tag[2] : nil
+        let relayURL = tag.count > 2 ? RelayURL(tag[2]) : nil
         let petname = tag.count > 3 && !tag[3].isEmpty ? tag[3] : nil
 
         return Contact(pubkey: pubkey, relayURL: relayURL, petname: petname)

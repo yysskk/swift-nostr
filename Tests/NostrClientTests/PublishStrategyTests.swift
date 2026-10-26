@@ -7,9 +7,9 @@ import Testing
 @Suite("Publish Strategy Tests")
 struct PublishStrategyTests {
 
-    private let urlA = URL(string: "wss://a.example.com")!
-    private let urlB = URL(string: "wss://b.example.com")!
-    private let urlC = URL(string: "wss://c.example.com")!
+    private let urlA = RelayURL("wss://a.example.com")!
+    private let urlB = RelayURL("wss://b.example.com")!
+    private let urlC = RelayURL("wss://c.example.com")!
 
     private var dummyEvent: Event {
         Event(
@@ -25,9 +25,9 @@ struct PublishStrategyTests {
 
     private func makePool() async throws -> RelayPool {
         let pool = RelayPool()
-        try await pool.addRelay(urlA)
-        try await pool.addRelay(urlB)
-        try await pool.addRelay(urlC)
+        await pool.addRelay(urlA)
+        await pool.addRelay(urlB)
+        await pool.addRelay(urlC)
         return pool
     }
 

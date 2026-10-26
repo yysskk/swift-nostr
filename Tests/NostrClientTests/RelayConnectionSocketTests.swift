@@ -15,7 +15,7 @@ struct RelayConnectionSocketTests {
     private func makeConnection(pingError: (any Error)? = nil) -> (RelayConnection, MockWebSocketSession) {
         let mock = MockWebSocketSession(pingError: pingError)
         let connection = RelayConnection(
-            url: URL(string: "wss://relay.example.com")!,
+            url: RelayURL("wss://relay.example.com")!,
             webSocketFactory: MockWebSocketSessionFactory(makeSession: { mock }),
             // No auto-reconnect and a long ping interval keep the test's background
             // tasks inert; the connection is torn down explicitly at the end.

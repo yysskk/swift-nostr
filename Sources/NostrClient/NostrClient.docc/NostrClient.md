@@ -18,7 +18,10 @@ import NostrClient
 
 let client = NostrClient()
 try await client.identity.setNsec("nsec1...")
-try await client.relays.connect(to: ["wss://relay.example.com", "wss://relay2.example.com"])
+try await client.relays.connect(to: [
+    RelayURL(string: "wss://relay.example.com"),
+    RelayURL(string: "wss://relay2.example.com"),
+])
 
 let note = try await client.events.publishTextNote(content: "Hello, Nostr!")
 ```

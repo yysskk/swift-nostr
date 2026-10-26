@@ -12,7 +12,7 @@ import Testing
 @Suite("NIP-45 Count Tests")
 struct NIP45CountTests {
 
-    private let relayURL = URL(string: "wss://relay.example.com")!
+    private let relayURL = RelayURL("wss://relay.example.com")!
 
     private var noReconnectConfig: RelayConnectionConfig {
         RelayConnectionConfig(connectionTimeout: 1, pingInterval: 60, autoReconnect: false)
@@ -221,10 +221,10 @@ struct NIP45CountTests {
             webSocketFactory: MockWebSocketSessionFactory(makeSession: { mocks[counter.next()] })
         )
 
-        let urlA = URL(string: "wss://relay-a.example.com")!
-        let urlB = URL(string: "wss://relay-b.example.com")!
-        let connectionA = try await pool.addRelay(urlA)
-        let connectionB = try await pool.addRelay(urlB)
+        let urlA = RelayURL("wss://relay-a.example.com")!
+        let urlB = RelayURL("wss://relay-b.example.com")!
+        let connectionA = await pool.addRelay(urlA)
+        let connectionB = await pool.addRelay(urlB)
         // Connect sequentially so the factory pairs mockA with relay A.
         try await connectionA.connect()
         try await connectionB.connect()
@@ -257,10 +257,10 @@ struct NIP45CountTests {
             webSocketFactory: MockWebSocketSessionFactory(makeSession: { mocks[counter.next()] })
         )
 
-        let urlA = URL(string: "wss://relay-a.example.com")!
-        let urlB = URL(string: "wss://relay-b.example.com")!
-        let connectionA = try await pool.addRelay(urlA)
-        let connectionB = try await pool.addRelay(urlB)
+        let urlA = RelayURL("wss://relay-a.example.com")!
+        let urlB = RelayURL("wss://relay-b.example.com")!
+        let connectionA = await pool.addRelay(urlA)
+        let connectionB = await pool.addRelay(urlB)
         try await connectionA.connect()
         try await connectionB.connect()
 
@@ -290,8 +290,8 @@ struct NIP45CountTests {
             webSocketFactory: MockWebSocketSessionFactory(makeSession: { mocks[counter.next()] })
         )
 
-        let connectionA = try await pool.addRelay(URL(string: "wss://relay-a.example.com")!)
-        let connectionB = try await pool.addRelay(URL(string: "wss://relay-b.example.com")!)
+        let connectionA = await pool.addRelay(RelayURL("wss://relay-a.example.com")!)
+        let connectionB = await pool.addRelay(RelayURL("wss://relay-b.example.com")!)
         try await connectionA.connect()
         try await connectionB.connect()
 
@@ -316,15 +316,16 @@ struct NIP45CountTests {
         )
         let client = NostrClient(relayPool: pool)
 
-        let urlA = URL(string: "wss://relay-a.example.com")!
-        let connectionA = try await pool.addRelay(urlA)
-        let connectionB = try await pool.addRelay(URL(string: "wss://relay-b.example.com")!)
+        let urlA = RelayURL("wss://relay-a.example.com")!
+        let connectionA = await pool.addRelay(urlA)
+        let connectionB = await pool.addRelay(RelayURL("wss://relay-b.example.com")!)
         try await connectionA.connect()
         try await connectionB.connect()
 
         // Target relay A only, spelled differently from its pool key.
         let task = Task {
-            try await client.events.count(filters: [Filter(kinds: [.textNote])], to: ["WSS://Relay-A.example.com/"])
+            try await client.events.count(
+                filters: [Filter(kinds: [.textNote])], to: [RelayURL("WSS://Relay-A.example.com/")!])
         }
 
         try await pollUntil { mockA.sentTextFrames.contains { $0.hasPrefix("[\"COUNT\"") } }
@@ -336,14 +337,6 @@ struct NIP45CountTests {
         // The untargeted relay never saw a COUNT frame.
         #expect(!mockB.sentTextFrames.contains { $0.hasPrefix("[\"COUNT\"") })
         await client.relays.disconnect()
-    }
-
-    @Test("the client count rejects an invalid target string")
-    func clientCountRejectsInvalidTargetString() async throws {
-        let client = NostrClient()
-        await #expect(throws: NostrError.invalidRelayURL("https://relay.example.com")) {
-            _ = try await client.events.count(filters: [Filter()], to: ["https://relay.example.com"])
-        }
     }
 
     @Test("the client returns the maximum count across relays")
@@ -358,10 +351,10 @@ struct NIP45CountTests {
         )
         let client = NostrClient(relayPool: pool)
 
-        let urlA = URL(string: "wss://relay-a.example.com")!
-        let urlB = URL(string: "wss://relay-b.example.com")!
-        let connectionA = try await pool.addRelay(urlA)
-        let connectionB = try await pool.addRelay(urlB)
+        let urlA = RelayURL("wss://relay-a.example.com")!
+        let urlB = RelayURL("wss://relay-b.example.com")!
+        let connectionA = await pool.addRelay(urlA)
+        let connectionB = await pool.addRelay(urlB)
         try await connectionA.connect()
         try await connectionB.connect()
 

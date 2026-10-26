@@ -7,9 +7,9 @@ import Testing
 @Suite("Publish Result Tests")
 struct PublishResultTests {
 
-    private let urlA = URL(string: "wss://a.example.com")!
-    private let urlB = URL(string: "wss://b.example.com")!
-    private let urlC = URL(string: "wss://c.example.com")!
+    private let urlA = RelayURL("wss://a.example.com")!
+    private let urlB = RelayURL("wss://b.example.com")!
+    private let urlC = RelayURL("wss://c.example.com")!
 
     @Test("accessors partition relays by status")
     func accessorsPartitionByStatus() {
@@ -43,24 +43,19 @@ struct PublishResultTests {
         #expect(result.pendingRelays.isEmpty)
     }
 
-    @Test("status(for:) resolves strings against the canonical keys")
-    func statusForString() {
+    @Test("status(for:) finds a relay under any spelling of its URL")
+    func statusForEquivalentSpellings() throws {
         let result = PublishResult(statuses: [
             urlA: .accepted,
             urlB: .failed(NostrError.timeout),
         ])
 
-        // Exact and alternate spellings resolve to the canonical key.
-        #expect(result.status(for: "wss://a.example.com") == .accepted)
-        #expect(result.status(for: "WSS://A.Example.com/") == .accepted)
-        #expect(result.status(for: "wss://a.example.com:443") == .accepted)
-        #expect(result.status(for: "wss://b.example.com") == .failed(NostrError.timeout))
+        #expect(result.status(for: urlA) == .accepted)
+        #expect(result.status(for: try RelayURL(string: "WSS://A.Example.com/")) == .accepted)
+        #expect(result.status(for: try RelayURL(string: "wss://a.example.com:443")) == .accepted)
+        #expect(result.status(for: urlB) == .failed(NostrError.timeout))
 
-        // Untargeted relays and non-relay URLs report nil.
-        #expect(result.status(for: "wss://unknown.example.com") == nil)
-        #expect(result.status(for: "https://a.example.com") == nil)
-        #expect(result.status(for: "wss:garbage") == nil)
-        #expect(result.status(for: "wss://a.example.com/#frag") == nil)
-        #expect(result.status(for: "wss://user:pw@a.example.com") == nil)
+        // An untargeted relay reports nil.
+        #expect(result.status(for: try RelayURL(string: "wss://unknown.example.com")) == nil)
     }
 }

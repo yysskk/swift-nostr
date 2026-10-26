@@ -66,13 +66,13 @@ struct RelayListStoreTests {
         let writeURLs = await store.writeRelayURLs(for: pubkey)
         let readURLs = await store.readRelayURLs(for: pubkey)
 
-        let expectedWrite: Set<URL> = [
-            URL(string: "wss://both.example.com")!,
-            URL(string: "wss://write.example.com")!,
+        let expectedWrite: Set<RelayURL> = [
+            RelayURL("wss://both.example.com")!,
+            RelayURL("wss://write.example.com")!,
         ]
-        let expectedRead: Set<URL> = [
-            URL(string: "wss://both.example.com")!,
-            URL(string: "wss://read.example.com")!,
+        let expectedRead: Set<RelayURL> = [
+            RelayURL("wss://both.example.com")!,
+            RelayURL("wss://read.example.com")!,
         ]
         #expect(writeURLs == expectedWrite)
         #expect(readURLs == expectedRead)
@@ -117,7 +117,7 @@ struct RelayListStoreTests {
     @Test("requirePresent policy never opens absent relays")
     func requirePresentIgnoresAbsent() async {
         let store = makeStore(policy: .requirePresent)
-        let urls: Set<URL> = [URL(string: "wss://absent.example.com")!]
+        let urls: Set<RelayURL> = [RelayURL("wss://absent.example.com")!]
         let available = await store.ensureConnected(urls)
         #expect(available.isEmpty)
     }
@@ -133,17 +133,17 @@ struct RelayListStoreTests {
             })
         )
         let store = RelayListStore(pool: pool, policy: .addAndConnect)
-        let connection = try await pool.addRelay(URL(string: "wss://relay.example.com")!)
+        let connection = await pool.addRelay(RelayURL("wss://relay.example.com")!)
         try await connection.connect()
         #expect(socketCount.current == 1)
 
         // The same relay spelled with a trailing slash must route to the existing
         // connection instead of opening a duplicate socket, and the returned set
         // carries the canonical spelling, not the input's.
-        let alternate = URL(string: "wss://relay.example.com/")!
+        let alternate = RelayURL("wss://relay.example.com/")!
         let available = await store.ensureConnected([alternate])
 
-        #expect(available == [URL(string: "wss://relay.example.com")!])
+        #expect(available == [RelayURL("wss://relay.example.com")!])
         #expect(socketCount.current == 1)
         #expect(await pool.count == 1)
         await pool.disconnectAll()
@@ -157,32 +157,13 @@ struct RelayListStoreTests {
         )
         let store = RelayListStore(pool: pool, policy: .addAndConnect)
 
-        let available = await store.ensureConnected([URL(string: "wss://New.Example.com/")!])
+        let available = await store.ensureConnected([RelayURL("wss://New.Example.com/")!])
 
-        #expect(available == [URL(string: "wss://new.example.com")!])
-        #expect(await pool.relay(for: URL(string: "wss://new.example.com")!) != nil)
+        #expect(available == [RelayURL("wss://new.example.com")!])
+        #expect(await pool.relay(for: RelayURL("wss://new.example.com")!) != nil)
         await pool.disconnectAll()
     }
 
-    @Test("addAndConnect skips a URL the pool refuses without failing the route")
-    func addAndConnectSkipsRefusedURL() async {
-        let pool = RelayPool(
-            config: RelayPoolConfig(defaultRelayConfig: ConnectedClientFixture.noReconnectConfig),
-            webSocketFactory: MockWebSocketSessionFactory(makeSession: { MockWebSocketSession() })
-        )
-        let store = RelayListStore(pool: pool, policy: .addAndConnect)
-
-        // A non-WebSocket URL is refused by the pool's validation; the resolve
-        // must skip it (not throw) and keep the valid relay.
-        let available = await store.ensureConnected([
-            URL(string: "https://not-a-relay.example.com")!,
-            URL(string: "wss://good.example.com")!,
-        ])
-
-        #expect(available == [URL(string: "wss://good.example.com")!])
-        #expect(await pool.count == 1)
-        await pool.disconnectAll()
-    }
 }
 
 /// Counts how many sockets a mock factory has handed out.

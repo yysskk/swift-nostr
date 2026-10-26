@@ -8,7 +8,7 @@ import Testing
 @Suite("Subscription Sequence Tests")
 struct SubscriptionSequenceTests {
 
-    private let relayURL = URL(string: "wss://relay.example.com")!
+    private let relayURL = RelayURL("wss://relay.example.com")!
 
     private func makeEvent(content: String) throws -> Event {
         let keyPair = try KeyPair()
@@ -103,27 +103,12 @@ struct SubscriptionSequenceTests {
         #expect(await client.activeSubscriptionCount == 0)
     }
 
-    @Test("subscribe and events reject invalid target strings")
-    func subscribeRejectsInvalidTargetStrings() async throws {
-        let (client, _) = try await makeConnectedClient()
-
-        await #expect(throws: NostrError.invalidRelayURL("wss:garbage")) {
-            _ = try await client.subscriptions.subscribe(filters: [Filter()], to: ["wss:garbage"])
-        }
-        await #expect(throws: NostrError.invalidRelayURL("https://relay.example.com")) {
-            _ = try await client.subscriptions.events(filters: [Filter()], to: ["https://relay.example.com"])
-        }
-        // Validation happens before the subscription is registered.
-        #expect(await client.activeSubscriptionCount == 0)
-        await client.relays.disconnect()
-    }
-
     @Test("subscribe reaches the pooled relay via an alternate target spelling")
     func subscribeViaAlternateSpelling() async throws {
         let (client, socket) = try await makeConnectedClient()
 
         let subscription = try await client.subscriptions.subscribe(
-            filters: [Filter()], to: ["WSS://Relay.Example.COM/"])
+            filters: [Filter()], to: [RelayURL("WSS://Relay.Example.COM/")!])
         try await NIP42TestSupport.pollUntil {
             socket.sentTextFrames.contains { $0.hasPrefix("[\"REQ\"") }
         }
@@ -250,7 +235,7 @@ struct SubscriptionSequenceTests {
         try await client.identity.setPrivateKey(String(repeating: "1", count: 64))
         // Publishing our own relay list caches it, so no relay-list fetch is needed.
         try await PublishAckSupport.acknowledgingPublishes(on: socket) {
-            try await client.routing.publishRelayList(write: [self.relayURL.absoluteString])
+            try await client.routing.publishRelayList(write: [self.relayURL.description])
         }
         let author = await client.identity.publicKey!
 

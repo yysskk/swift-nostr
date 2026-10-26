@@ -34,7 +34,7 @@ public struct SubscriptionSequence: AsyncSequence, Sendable {
 
     /// The relays that accepted the REQ. EOSE completion is measured against
     /// this set (see ``NostrEventsAPI/fetch(filters:to:timeout:)``).
-    public let expectedRelays: Set<URL>
+    public let expectedRelays: Set<RelayURL>
 
     let stream: AsyncStream<SubscriptionEvent>
     let onClose: @Sendable () async -> Void
@@ -74,7 +74,7 @@ public struct SubscriptionSequence: AsyncSequence, Sendable {
         public var id: String { base.id }
 
         /// The relays that accepted the REQ.
-        public var expectedRelays: Set<URL> { base.expectedRelays }
+        public var expectedRelays: Set<RelayURL> { base.expectedRelays }
 
         /// Closes the subscription: sends CLOSE to the relays and ends iteration.
         public func close() async {

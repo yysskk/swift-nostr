@@ -8,8 +8,8 @@ import Testing
 @Suite("Relay Pool Deduplication Tests")
 struct RelayPoolDeduplicationTests {
 
-    private let urlA = URL(string: "wss://a.example.com")!
-    private let urlB = URL(string: "wss://b.example.com")!
+    private let urlA = RelayURL("wss://a.example.com")!
+    private let urlB = RelayURL("wss://b.example.com")!
 
     // MARK: - Fixtures
 
@@ -21,7 +21,7 @@ struct RelayPoolDeduplicationTests {
     /// A pool holding one connected relay per URL, paired with the socket driving it.
     /// Relays connect one at a time so each pairs with a known socket.
     private func makeConnectedPool(
-        relayURLs: [URL],
+        relayURLs: [RelayURL],
         maxDeduplicationCacheSize: Int = 10000,
         deduplicationCacheTTL: TimeInterval = 300
     ) async throws -> (pool: RelayPool, sockets: [MockWebSocketSession]) {

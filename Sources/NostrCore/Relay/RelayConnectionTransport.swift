@@ -25,7 +25,7 @@ public actor RelayConnectionTransport: RelayTransport {
     ///   - relayURLs: The relays to connect to (typically the URLs from a connection URI).
     ///   - urlSession: The URL session backing the WebSocket connections (defaults to `.shared`).
     ///   - config: Timeout, keepalive, and reconnection behavior for each relay.
-    public init(relayURLs: [URL], urlSession: URLSession = .shared, config: RelayConnectionConfig = .default) {
+    public init(relayURLs: [RelayURL], urlSession: URLSession = .shared, config: RelayConnectionConfig = .default) {
         self.relays = relayURLs.map { RelayConnection(url: $0, urlSession: urlSession, config: config) }
     }
 
@@ -39,7 +39,7 @@ public actor RelayConnectionTransport: RelayTransport {
     ///   - webSocketFactory: Creates the transport for each relay's connection attempts.
     ///   - config: Timeout, keepalive, and reconnection behavior for each relay.
     public init(
-        relayURLs: [URL],
+        relayURLs: [RelayURL],
         webSocketFactory: any WebSocketSessionFactory,
         config: RelayConnectionConfig = .default
     ) {

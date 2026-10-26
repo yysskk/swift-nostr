@@ -34,7 +34,7 @@ private struct MockRemoteSigner: NostrSigning {
 @Suite("NostrClient NostrSigning Tests")
 struct NostrSigningClientTests {
 
-    private let relayURL = URL(string: "wss://relay.example.com")!
+    private let relayURL = RelayURL("wss://relay.example.com")!
 
     private var noReconnectConfig: RelayConnectionConfig {
         RelayConnectionConfig(connectionTimeout: 1, pingInterval: 60, autoReconnect: false)
@@ -250,7 +250,7 @@ struct NostrSigningClientTests {
         let (client, mock) = makeClient()
         let keyPair = try KeyPair()
         try await client.identity.setSigner(MockRemoteSigner(keyPair: keyPair) as any NostrSigning)
-        try await client.relays.connect(to: [relayURL.absoluteString])
+        try await client.relays.connect(to: [relayURL])
 
         mock.deliver(.string(#"["AUTH","remote-challenge"]"#))
 
@@ -260,7 +260,7 @@ struct NostrSigningClientTests {
 
         #expect(sent.kind == .clientAuthentication)
         #expect(sent.pubkey == keyPair.publicKey)
-        #expect(sent.firstTagValue(named: "relay") == relayURL.absoluteString)
+        #expect(sent.firstTagValue(named: "relay") == relayURL.description)
         #expect(sent.firstTagValue(named: "challenge") == "remote-challenge")
         #expect(try sent.verify())
 
@@ -275,7 +275,7 @@ struct NostrSigningClientTests {
         let keyPair = try KeyPair()
         await client.identity.setAuthenticationMode(.manual)
         try await client.identity.setSigner(MockRemoteSigner(keyPair: keyPair) as any NostrSigning)
-        try await client.relays.connect(to: [relayURL.absoluteString])
+        try await client.relays.connect(to: [relayURL])
 
         mock.deliver(.string(#"["AUTH","manual-challenge"]"#))
         let connection = try #require(await client.relays.pool.relay(for: relayURL))

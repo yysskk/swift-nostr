@@ -12,9 +12,9 @@ public struct NostrSubscriptionsAPI: NostrSubscribing {
 
     /// Opens a subscription and returns it as an async sequence of relay-aware events.
     ///
-    /// Pass relay URL strings to scope the subscription to a subset of relays (NIP-65
-    /// outbox routing); the default `nil` subscribes on all relays in the pool. Targets
-    /// de-duplicate by their normalized routing key; an empty array always throws.
+    /// Pass relay URLs to scope the subscription to a subset of relays (NIP-65 outbox
+    /// routing); the default `nil` subscribes on all relays in the pool. Targets not in the
+    /// pool are skipped; an empty set always throws.
     ///
     /// Iteration termination (breaking out of the loop, task cancellation, or
     /// discarding the sequence) automatically sends CLOSE to the relays.
@@ -24,18 +24,17 @@ public struct NostrSubscriptionsAPI: NostrSubscribing {
     ///   - bufferingPolicy: How items are buffered while the consumer is
     ///     slower than the relays (default: `.unbounded`). Use
     ///     `.bufferingNewest(n)` for firehose subscriptions where memory matters.
-    /// - Throws: ``NostrError/invalidRelayURL(_:)`` for an invalid target string,
-    ///   ``NostrError/noRelaysInPool`` when the pool is empty,
+    /// - Throws: ``NostrError/noRelaysInPool`` when the pool is empty,
     ///   ``NostrError/noMatchingRelays(_:)`` when none of the targeted URLs are in the
     ///   pool, or ``NostrError/relayError(_:)`` when every relay fails to subscribe.
     public func subscribe(
         filters: [Filter],
-        to relayURLs: [String]? = nil,
+        to relayURLs: Set<RelayURL>? = nil,
         bufferingPolicy: AsyncStream<SubscriptionEvent>.Continuation.BufferingPolicy = .unbounded
     ) async throws -> SubscriptionSequence {
         try await client.subscribe(
             filters: filters,
-            toURLs: relayURLs.map(RelayURL.requireTargets),
+            toURLs: relayURLs,
             bufferingPolicy: bufferingPolicy
         )
     }
@@ -47,12 +46,12 @@ public struct NostrSubscriptionsAPI: NostrSubscribing {
     ///     print(event.content)
     /// }
     /// ```
-    /// - Throws: ``NostrError/invalidRelayURL(_:)``, ``NostrError/noRelaysInPool``,
-    ///   ``NostrError/noMatchingRelays(_:)``, or ``NostrError/relayError(_:)`` — see
+    /// - Throws: ``NostrError/noRelaysInPool``, ``NostrError/noMatchingRelays(_:)``, or
+    ///   ``NostrError/relayError(_:)`` — see
     ///   ``subscribe(filters:to:bufferingPolicy:)``.
     public func events(
         filters: [Filter],
-        to relayURLs: [String]? = nil,
+        to relayURLs: Set<RelayURL>? = nil,
         bufferingPolicy: AsyncStream<SubscriptionEvent>.Continuation.BufferingPolicy = .unbounded
     ) async throws -> SubscriptionSequence.Events {
         try await subscribe(filters: filters, to: relayURLs, bufferingPolicy: bufferingPolicy).events

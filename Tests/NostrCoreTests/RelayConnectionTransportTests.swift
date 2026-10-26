@@ -15,8 +15,8 @@ import Testing
 struct RelayConnectionTransportTests {
 
     private static let relayURLs = [
-        URL(string: "wss://relay-one.example.com")!,
-        URL(string: "wss://relay-two.example.com")!,
+        RelayURL("wss://relay-one.example.com")!,
+        RelayURL("wss://relay-two.example.com")!,
     ]
     private static let subscriptionId = "sub-1"
     private static let eventId = String(repeating: "a", count: 64)

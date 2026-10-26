@@ -8,16 +8,16 @@ import Testing
 @Suite("NostrClient Targeted Publish Tests")
 struct NostrClientTargetedPublishTests {
 
-    private let urlA = URL(string: "wss://a.example.com")!
-    private let urlB = URL(string: "wss://b.example.com")!
-    private let urlC = URL(string: "wss://c.example.com")!
+    private let urlA = RelayURL("wss://a.example.com")!
+    private let urlB = RelayURL("wss://b.example.com")!
+    private let urlC = RelayURL("wss://c.example.com")!
 
     // MARK: - Fixtures
 
     /// A client whose pool holds one connected relay per URL, paired with the socket driving it.
     /// Relays connect one at a time so each pairs with a known socket.
     private func makeClient(
-        relayURLs: [URL]
+        relayURLs: [RelayURL]
     ) async throws -> (client: NostrClient, sockets: [MockWebSocketSession]) {
         let sockets = relayURLs.map { _ in MockWebSocketSession() }
         let counter = SocketCounter()
@@ -44,7 +44,7 @@ struct NostrClientTargetedPublishTests {
 
         let task = Task {
             try await client.events.publish(
-                event, to: ["wss://a.example.com", "wss://c.example.com"], strategy: .allSettled)
+                event, to: [RelayURL("wss://a.example.com")!, RelayURL("wss://c.example.com")!], strategy: .allSettled)
         }
         let sentToA = try await PublishAckSupport.acknowledgePublish(on: sockets[0])
         let sentToC = try await PublishAckSupport.acknowledgePublish(on: sockets[2])
@@ -65,7 +65,7 @@ struct NostrClientTargetedPublishTests {
 
         // Upper-case host and a root trailing slash normalize to relay A's pool key.
         let result = try await PublishAckSupport.acknowledgingPublishes(on: sockets[0]) {
-            try await client.events.publish(event, to: ["wss://A.EXAMPLE.COM/"], strategy: .allSettled)
+            try await client.events.publish(event, to: [RelayURL("wss://A.EXAMPLE.COM/")!], strategy: .allSettled)
         }
 
         #expect(result.acceptedRelays == [urlA])
@@ -80,7 +80,8 @@ struct NostrClientTargetedPublishTests {
 
         let result = try await PublishAckSupport.acknowledgingPublishes(on: sockets[0]) {
             try await client.events.publish(
-                event, to: ["wss://a.example.com", "wss://unknown.example.com"], strategy: .allSettled)
+                event, to: [RelayURL("wss://a.example.com")!, RelayURL("wss://unknown.example.com")!],
+                strategy: .allSettled)
         }
 
         // The unknown relay is neither connected on demand nor reported.
@@ -124,24 +125,11 @@ struct NostrClientTargetedPublishTests {
         let (client, sockets) = try await makeClient(relayURLs: [urlA])
         let event = try makeEvent()
 
-        await #expect(throws: NostrError.noMatchingRelays(["wss://unknown.example.com"])) {
-            try await client.events.publish(event, to: ["wss://Unknown.Example.com/"])
+        await #expect(throws: NostrError.noMatchingRelays([RelayURL("wss://unknown.example.com")!])) {
+            try await client.events.publish(event, to: [RelayURL("wss://Unknown.Example.com/")!])
         }
         #expect(PublishAckSupport.eventFrames(in: sockets[0]).isEmpty)
         #expect(await client.relays.count == 1)
-        await client.relays.disconnect()
-    }
-
-    @Test("an invalid target string throws invalidRelayURL before any relay is touched")
-    func publishToInvalidTargetThrows() async throws {
-        let (client, sockets) = try await makeClient(relayURLs: [urlA])
-        let event = try makeEvent()
-
-        // Validation precedes targeting, so the valid pooled target is not published to either.
-        await #expect(throws: NostrError.invalidRelayURL("https://relay.example.com")) {
-            try await client.events.publish(event, to: ["wss://a.example.com", "https://relay.example.com"])
-        }
-        #expect(PublishAckSupport.eventFrames(in: sockets[0]).isEmpty)
         await client.relays.disconnect()
     }
 }

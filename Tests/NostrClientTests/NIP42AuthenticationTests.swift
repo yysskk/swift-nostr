@@ -12,9 +12,12 @@ import Testing
 @Suite("NIP-42 Authentication Event Tests")
 struct NIP42AuthenticationEventTests {
 
-    @Test("relay tag carries the relay URL")
-    func relayTag() {
-        #expect(Tag.relay("wss://relay.example.com/").rawArray == ["relay", "wss://relay.example.com/"])
+    @Test("relay tag carries the relay URL in canonical form")
+    func relayTag() throws {
+        #expect(
+            Tag.relay(try RelayURL(string: "wss://Relay.Example.com/")).rawArray == [
+                "relay", "wss://relay.example.com",
+            ])
     }
 
     @Test("challenge tag carries the challenge string")
@@ -25,13 +28,13 @@ struct NIP42AuthenticationEventTests {
     @Test("signClientAuthentication builds a valid kind-22242 event")
     func signClientAuthentication() throws {
         let signer = EventSigner(keyPair: try KeyPair())
-        let relayURL = URL(string: "wss://relay.example.com/")!
+        let relayURL = RelayURL("wss://relay.example.com")!
 
         let event = try signer.signClientAuthentication(relayURL: relayURL, challenge: "challengestringhere")
 
         #expect(event.kind == .clientAuthentication)
         #expect(event.pubkey == signer.publicKey)
-        #expect(event.firstTagValue(named: "relay") == "wss://relay.example.com/")
+        #expect(event.firstTagValue(named: "relay") == "wss://relay.example.com")
         #expect(event.firstTagValue(named: "challenge") == "challengestringhere")
         #expect(event.content.isEmpty)
         #expect(try event.verify())
@@ -42,7 +45,7 @@ struct NIP42AuthenticationEventTests {
         let signer = EventSigner(keyPair: try KeyPair())
 
         let event = try signer.signClientAuthentication(
-            relayURL: URL(string: "wss://relay.example.com")!,
+            relayURL: RelayURL("wss://relay.example.com")!,
             challenge: "abc"
         )
 
@@ -52,29 +55,25 @@ struct NIP42AuthenticationEventTests {
         #expect(abs(event.createdAt - now) < 60)
     }
 
-    @Test("the relay tag echoes the connection URL verbatim")
-    func relayTagIsNotNormalized() throws {
+    @Test("the relay tag is the URL the connection opens")
+    func relayTagMatchesConnectionURL() throws {
         let signer = EventSigner(keyPair: try KeyPair())
 
-        // NIP-42 says the relay tag is the URL "as used to connect". The URL is echoed
-        // verbatim — including a trailing slash — rather than normalized, since relays
-        // compare it against their own canonical form and lossy rewriting risks a mismatch.
-        let withSlash = try signer.signClientAuthentication(
-            relayURL: URL(string: "wss://relay.example.com/")!, challenge: "abc")
-        #expect(withSlash.firstTagValue(named: "relay") == "wss://relay.example.com/")
-
-        let withoutSlash = try signer.signClientAuthentication(
-            relayURL: URL(string: "wss://relay.example.com")!, challenge: "abc")
-        #expect(withoutSlash.firstTagValue(named: "relay") == "wss://relay.example.com")
+        // NIP-42 says the relay tag is the URL "as used to connect". A connection opens its
+        // relay URL's canonical form, so every spelling of the relay yields that same tag.
+        let connection = RelayConnection(url: try RelayURL(string: "WSS://Relay.Example.com/"))
+        let event = try signer.signClientAuthentication(relayURL: connection.url, challenge: "abc")
+        #expect(event.firstTagValue(named: "relay") == connection.url.url.absoluteString)
+        #expect(event.firstTagValue(named: "relay") == "wss://relay.example.com")
     }
 
     @Test("an authentication event must not be published")
     func authenticationEventCannotBePublished() async throws {
         let pool = RelayPool()
-        try await pool.addRelay(URL(string: "wss://relay.example.com")!)
+        await pool.addRelay(RelayURL("wss://relay.example.com")!)
         let signer = EventSigner(keyPair: try KeyPair())
         let authEvent = try signer.signClientAuthentication(
-            relayURL: URL(string: "wss://relay.example.com")!, challenge: "abc")
+            relayURL: RelayURL("wss://relay.example.com")!, challenge: "abc")
 
         await #expect(throws: NostrError.cannotPublishAuthenticationEvent) {
             _ = try await pool.publish(authEvent)
@@ -85,7 +84,7 @@ struct NIP42AuthenticationEventTests {
 @Suite("NIP-42 Relay Connection Authentication Tests")
 struct NIP42RelayConnectionTests {
 
-    private let relayURL = URL(string: "wss://relay.example.com")!
+    private let relayURL = RelayURL("wss://relay.example.com")!
 
     private func makeConnection(publishAckTimeout: TimeInterval = 30) -> (RelayConnection, MockWebSocketSession) {
         let mock = MockWebSocketSession()
@@ -248,7 +247,7 @@ struct NIP42RelayConnectionTests {
         let sent = try sentAuthEvent(in: mock)
         #expect(sent.kind == .clientAuthentication)
         #expect(sent.pubkey == signer.publicKey)
-        #expect(sent.firstTagValue(named: "relay") == relayURL.absoluteString)
+        #expect(sent.firstTagValue(named: "relay") == relayURL.description)
         #expect(sent.firstTagValue(named: "challenge") == "challengestringhere")
         #expect(try sent.verify())
 

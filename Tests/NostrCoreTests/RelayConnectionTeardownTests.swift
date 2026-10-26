@@ -10,7 +10,7 @@ import Testing
 /// come, subscriptions ready to be replayed, and NIP-42 state describing a session that was gone.
 @Suite("Relay Connection Teardown Tests")
 struct RelayConnectionTeardownTests {
-    private let relayURL = URL(string: "wss://relay.example.com")!
+    private let relayURL = RelayURL("wss://relay.example.com")!
 
     private func makeConnection(socket: MockWebSocketSession) -> RelayConnection {
         RelayConnection(

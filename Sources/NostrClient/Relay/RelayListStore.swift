@@ -44,19 +44,19 @@ actor RelayListStore {
     }
 
     /// Resolves the WRITE relays for a pubkey (where the user publishes) — use these to READ their events.
-    func writeRelayURLs(for pubkey: PublicKey) -> Set<URL> {
-        RelayURL.urlSet(cache.value(for: pubkey)?.writeRelays ?? [])
+    func writeRelayURLs(for pubkey: PublicKey) -> Set<RelayURL> {
+        Set(parsingValid: cache.value(for: pubkey)?.writeRelays ?? [])
     }
 
     /// Resolves the READ relays for a pubkey (their inbox) — use these to SEND them events they should see.
-    func readRelayURLs(for pubkey: PublicKey) -> Set<URL> {
-        RelayURL.urlSet(cache.value(for: pubkey)?.readRelays ?? [])
+    func readRelayURLs(for pubkey: PublicKey) -> Set<RelayURL> {
+        Set(parsingValid: cache.value(for: pubkey)?.readRelays ?? [])
     }
 
     /// Ensures the given relay URLs are present (and, for `.addAndConnect`, connected) in the pool,
     /// honoring the configured policy and per-resolve cap.
     /// - Returns: The subset of URLs available for routing.
-    func ensureConnected(_ urls: Set<URL>) async -> Set<URL> {
+    func ensureConnected(_ urls: Set<RelayURL>) async -> Set<RelayURL> {
         await connector.ensureConnected(urls)
     }
 }

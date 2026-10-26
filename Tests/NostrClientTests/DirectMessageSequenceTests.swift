@@ -29,7 +29,7 @@ private struct UnreachableSigner: NostrSigning {
 @Suite("Direct Message Sequence Tests")
 struct DirectMessageSequenceTests {
 
-    private let relayURL = URL(string: "wss://relay.example.com")!
+    private let relayURL = RelayURL("wss://relay.example.com")!
 
     private func makeSequence(
         items: [SubscriptionEvent],

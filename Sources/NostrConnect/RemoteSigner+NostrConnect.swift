@@ -38,7 +38,8 @@ extension RemoteSigner {
         self.init(
             clientKeyPair: clientKeyPair,
             expectedInvitationSecret: invitation.secret,
-            transport: transport ?? RelayConnectionTransport(relayURLs: invitation.relays),
+            transport: transport
+                ?? RelayConnectionTransport(relayURLs: invitation.relays.compactMap { try? RelayURL(url: $0) }),
             config: config)
     }
 
