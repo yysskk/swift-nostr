@@ -20,11 +20,11 @@ public struct RelayListEntry: Codable, Hashable, Sendable {
     public var tag: Tag {
         switch usage {
         case .readWrite:
-            return Tag(name: "r", values: [url.description])
+            return Tag(name: .reference, values: [url.description])
         case .read:
-            return Tag(name: "r", values: [url.description, "read"])
+            return Tag(name: .reference, values: [url.description, "read"])
         case .write:
-            return Tag(name: "r", values: [url.description, "write"])
+            return Tag(name: .reference, values: [url.description, "write"])
         }
     }
 
@@ -32,7 +32,7 @@ public struct RelayListEntry: Codable, Hashable, Sendable {
     /// Returns nil for non-"r" tags and for tags whose URL is not a valid relay URL. An unknown
     /// marker is treated leniently as read+write.
     public init?(tag: Tag) {
-        guard tag.name == "r", let url = tag.primaryValue.flatMap(RelayURL.init) else {
+        guard tag.name == .reference, let url = tag.primaryValue.flatMap(RelayURL.init) else {
             return nil
         }
 

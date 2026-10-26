@@ -42,7 +42,7 @@ public struct Contact: Codable, Hashable, Sendable {
     /// relay hint is the list author's own content, so one that is not a valid relay URL is read
     /// as absent rather than failing the contact.
     public init?(tag: Tag) {
-        guard tag.name == "p", let publicKey = tag.primaryValue.flatMap(PublicKey.init) else {
+        guard tag.name == .publicKey, let publicKey = tag.primaryValue.flatMap(PublicKey.init) else {
             return nil
         }
 

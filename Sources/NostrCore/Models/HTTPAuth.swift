@@ -174,17 +174,17 @@ extension HTTPAuth {
         guard skew <= tolerance, skew >= .zero - tolerance else {
             throw ValidationError.timestampOutOfTolerance(createdAt: event.createdAt)
         }
-        let urlTag = event.firstTagValue(named: "u")
+        let urlTag = event.firstTagValue(named: .url)
         guard urlTag == url.absoluteString else {
             throw ValidationError.urlMismatch(expected: url.absoluteString, actual: urlTag)
         }
-        let methodTag = event.firstTagValue(named: "method")
+        let methodTag = event.firstTagValue(named: .method)
         guard methodTag?.uppercased() == method.uppercased() else {
             throw ValidationError.methodMismatch(expected: method, actual: methodTag)
         }
         if let payload {
             let expected = Data(SHA256.hash(data: payload)).hexEncodedString()
-            let payloadTag = event.firstTagValue(named: "payload")
+            let payloadTag = event.firstTagValue(named: .payload)
             guard payloadTag?.lowercased() == expected else {
                 throw ValidationError.payloadHashMismatch(expected: expected, actual: payloadTag)
             }

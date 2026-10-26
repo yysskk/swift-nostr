@@ -12,7 +12,7 @@ extension EventTemplate {
     public static func report(_ publicKey: PublicKey, type: ReportType, reason: String = "") -> EventTemplate {
         EventTemplate(
             kind: .report,
-            tags: [Tag(name: "p", values: [publicKey.hex, type.rawValue])],
+            tags: [Tag(name: .publicKey, values: [publicKey.hex, type.rawValue])],
             content: reason
         )
     }
@@ -28,7 +28,7 @@ extension EventTemplate {
     public static func report(_ event: Event, type: ReportType, reason: String = "") -> EventTemplate {
         EventTemplate(
             kind: .report,
-            tags: [Tag(name: "e", values: [event.id.hex, type.rawValue]), .publicKey(event.publicKey)],
+            tags: [Tag(name: .event, values: [event.id.hex, type.rawValue]), .publicKey(event.publicKey)],
             content: reason
         )
     }

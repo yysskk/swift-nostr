@@ -120,19 +120,25 @@ public struct Filter: Codable, Sendable, Hashable {
         }
     }
 
-    /// Add a generic tag query (e.g., #t for hashtags)
-    public mutating func addTagQuery(_ tag: String, values: [String]) {
-        let key = tag.hasPrefix("#") ? tag : "#\(tag)"
-        tagQueries[key] = values
+    /// Adds a generic tag query, encoded as `#<name>` (e.g. `#t` for hashtags), replacing any
+    /// existing query for the same tag.
+    ///
+    /// A leading `#` in `name` is ignored: `addTagQuery(.hashtag, values:)` and
+    /// `addTagQuery("#t", values:)` set the same `#t` query.
+    public mutating func addTagQuery(_ name: Tag.Name, values: [String]) {
+        tagQueries[Self.tagQueryKey(for: name)] = values
     }
 
     /// Returns the values of a generic tag query (e.g. `#t` for hashtags).
     ///
-    /// The leading `#` may be omitted: `tagQuery("t")` and `tagQuery("#t")` look up
+    /// A leading `#` in `name` is ignored: `tagQuery(.hashtag)` and `tagQuery("#t")` look up
     /// the same query.
-    public func tagQuery(_ tag: String) -> [String]? {
-        let key = tag.hasPrefix("#") ? tag : "#\(tag)"
-        return tagQueries[key]
+    public func tagQuery(_ name: Tag.Name) -> [String]? {
+        tagQueries[Self.tagQueryKey(for: name)]
+    }
+
+    private static func tagQueryKey(for name: Tag.Name) -> String {
+        name.rawValue.hasPrefix("#") ? name.rawValue : "#\(name.rawValue)"
     }
 }
 
@@ -272,7 +278,7 @@ extension Filter {
             since: since,
             limit: limit
         )
-        filter.addTagQuery("h", values: [groupID])
+        filter.addTagQuery(.group, values: [groupID])
         return filter
     }
 
@@ -284,7 +290,7 @@ extension Filter {
         kinds: [Event.Kind] = [.groupMetadata, .groupAdmins, .groupMembers, .groupRoles, .groupPinList]
     ) -> Filter {
         var filter = Filter(kinds: kinds)
-        filter.addTagQuery("d", values: [groupID])
+        filter.addTagQuery(.identifier, values: [groupID])
         return filter
     }
 }

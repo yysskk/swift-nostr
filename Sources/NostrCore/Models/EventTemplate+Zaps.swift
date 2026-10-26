@@ -49,7 +49,7 @@ extension EventTemplate {
             tags.append(.event(eventID))
         }
         if let eventCoordinate {
-            tags.append(Tag(name: "a", values: [eventCoordinate]))
+            tags.append(Tag(name: .address, values: [eventCoordinate]))
         }
 
         return EventTemplate(kind: .zapRequest, tags: tags, content: comment)

@@ -85,6 +85,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Tag names are a typed `Tag.Name`** (breaking): `Tag.name` and `Tag(name:values:)` use
+  `Event.Tag.Name`, an open `RawRepresentable` string type that encodes as a bare string and is
+  `ExpressibleByStringLiteral`, so `Tag(name: "x")` and `tags(named: "x")` still compile. Constants
+  are named after the typed constructor that emits them (`.event` for "e", `.publicKey` for "p",
+  `.hashtag` for "t", `.identifier` for "d", `.inviteCode` for "code", `.simpleGroup` for "group",
+  and so on). `Event.tags(named:)`, `Event.firstTagValue(named:)`, `Filter.addTagQuery(_:values:)`,
+  `Filter.tagQuery(_:)`, and `Groups.ValidationError.missingTag(name:kind:)` take a `Tag.Name`;
+  the filter methods still ignore a leading `#`. Passing a `String` variable now needs
+  `Tag.Name(rawValue:)`.
 - **APIs that throw a single error type use typed throws** (breaking): callers now get the
   concrete error type without casting, so `catch .invalidBase64` or `error == .publicKeyMismatch`
   works directly. `HTTPAuth.validate(authorization:url:method:payload:tolerance:now:)` and

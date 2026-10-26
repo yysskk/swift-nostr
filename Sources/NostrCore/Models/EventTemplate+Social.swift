@@ -29,7 +29,7 @@ extension EventTemplate {
         // Carry over the thread root (NIP-10). The marker lives at a fixed position —
         // ["e", id, relay, marker] — so it is read there rather than searched for anywhere in
         // the tag: a relay hint or public key that happens to read "root" is not a marker.
-        let parentEventTags = event.tags(named: "e")
+        let parentEventTags = event.tags(named: .event)
         let markedRoot = parentEventTags.first {
             $0.values.count >= 3 && $0.values[2] == Tag.EventMarker.root.rawValue
         }
