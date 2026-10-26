@@ -39,7 +39,9 @@ struct SubscriptionCapabilityTests {
     @Test("subscribing without targets opens on the whole pool with unbounded buffering")
     func subscribeShortFormBroadcasts() async throws {
         let event = try note("live")
-        let stub = RecordingSubscriptionCapabilities(cannedItems: [.eose(relayURL: relayA), .event(relayURL: relayA, event: event)])
+        let stub = RecordingSubscriptionCapabilities(cannedItems: [
+            .eose(relayURL: relayA), .event(relayURL: relayA, event: event),
+        ])
         let subscriptions: any NostrSubscribing = stub
         let filter = Filter(kinds: [.textNote], limit: 10)
 
@@ -62,7 +64,8 @@ struct SubscriptionCapabilityTests {
         let stub = RecordingSubscriptionCapabilities()
         let subscriptions: any NostrSubscribing = stub
 
-        _ = try await subscriptions.subscribe(filters: [Filter(kinds: [.textNote])], bufferingPolicy: .bufferingNewest(5))
+        _ = try await subscriptions.subscribe(
+            filters: [Filter(kinds: [.textNote])], bufferingPolicy: .bufferingNewest(5))
 
         let recorded = try await onlySubscribe(stub)
         #expect(recorded.relayURLs == nil)
@@ -145,10 +148,11 @@ struct SubscriptionCapabilityTests {
             recorded.map(\.filters) == [
                 [.userNotes(publicKey: user, limit: 100)], [.userNotes(publicKey: user, limit: 7)],
             ])
-        #expect(recorded.map(\.filters) == [
-            [Filter(authors: [user], kinds: [.textNote], limit: 100)],
-            [Filter(authors: [user], kinds: [.textNote], limit: 7)],
-        ])
+        #expect(
+            recorded.map(\.filters) == [
+                [Filter(authors: [user], kinds: [.textNote], limit: 100)],
+                [Filter(authors: [user], kinds: [.textNote], limit: 7)],
+            ])
         #expect(recorded.allSatisfy { $0.relayURLs == nil && policy($0.bufferingPolicy) == "unbounded" })
     }
 
@@ -161,9 +165,10 @@ struct SubscriptionCapabilityTests {
         _ = try await subscriptions.globalFeed(limit: 20)
 
         let recorded = await stub.subscribes
-        #expect(recorded.map(\.filters) == [
-            [Filter(kinds: [.textNote], limit: 100)], [Filter(kinds: [.textNote], limit: 20)],
-        ])
+        #expect(
+            recorded.map(\.filters) == [
+                [Filter(kinds: [.textNote], limit: 100)], [Filter(kinds: [.textNote], limit: 20)],
+            ])
         #expect(recorded.allSatisfy { $0.relayURLs == nil && policy($0.bufferingPolicy) == "unbounded" })
     }
 
@@ -177,10 +182,11 @@ struct SubscriptionCapabilityTests {
         _ = try await subscriptions.mentions(publicKey: user, limit: 3)
 
         let recorded = await stub.subscribes
-        #expect(recorded.map(\.filters) == [
-            [Filter(kinds: [.textNote], publicKeyReferences: [user], limit: 100)],
-            [Filter(kinds: [.textNote], publicKeyReferences: [user], limit: 3)],
-        ])
+        #expect(
+            recorded.map(\.filters) == [
+                [Filter(kinds: [.textNote], publicKeyReferences: [user], limit: 100)],
+                [Filter(kinds: [.textNote], publicKeyReferences: [user], limit: 3)],
+            ])
         #expect(recorded.allSatisfy { $0.relayURLs == nil && policy($0.bufferingPolicy) == "unbounded" })
     }
 
