@@ -138,14 +138,16 @@ struct RemoteSignerPermissionRequestTests {
     /// Every `auth_url` replaced the request's timeout, so a signer that kept sending them held the
     /// caller suspended with no end. The first challenge now fixes a deadline and later ones may
     /// only postpone up to it, so the wait stays the window the caller configured.
-    @Test("repeated auth challenges cannot extend a request indefinitely")
+    @Test("repeated auth challenges cannot extend a request indefinitely", .timeLimit(.minutes(1)))
     func repeatedAuthChallengesAreBounded() async throws {
         let transport = FakeRemoteSignerTransport()
+        // requestTimeout outlasts the whole challenge run, so only the challenge window can end the
+        // request before the challenger gives up.
         let remote = try RemoteSigner(
             bunker: RemoteSignerFixtures.bunker(signer: signer),
             clientKeyPair: client,
             transport: transport,
-            config: .init(requestTimeout: .milliseconds(200), authChallengeTimeout: .milliseconds(500)))
+            config: .init(requestTimeout: .seconds(30), authChallengeTimeout: .milliseconds(500)))
 
         let connectTask = Task { try await remote.connect() }
         let connectSent = try await RemoteSignerFixtures.waitForSentEvents(transport, count: 1)
@@ -160,27 +162,30 @@ struct RemoteSignerPermissionRequestTests {
         let sent = try await RemoteSignerFixtures.waitForSentEvents(transport, count: 2)
         let request = try RemoteSignerFixtures.decryptRequest(sent[1], client: client, signer: signer)
 
-        // A signer that keeps challenging and never answers, for well past one challenge window.
-        let clock = ContinuousClock()
-        let start = clock.now
+        // A signer that keeps challenging and never answers, for twenty times one challenge window.
+        // It reports whether it was stopped while still challenging rather than running out.
         let challenger = Task {
-            for _ in 0..<10 {
+            for _ in 0..<50 {
                 await transport.deliver(
                     try RemoteSignerFixtures.response(
                         requestID: request.id, result: "auth_url", error: "https://auth.example",
                         client: client, signer: signer))
-                try await Task.sleep(for: .milliseconds(200))
+                do {
+                    try await Task.sleep(for: .milliseconds(200))
+                } catch {
+                    return true
+                }
             }
+            return false
         }
 
         await #expect(throws: RemoteSignerError.timedOut) { _ = try await publicKey.value }
-        let elapsed = clock.now - start
         challenger.cancel()
 
-        // Bounded, the request fails about one 0.5 s window in. Unbounded, each of the ten
-        // challenges pushed the deadline out again and it would survive the full ~2 s of them and
-        // then some, so the bound sits between the two.
-        #expect(elapsed < .seconds(1.5))
+        // Bounded, the request fails about one 0.5 s window after the first challenge, with the
+        // challenger still going. Unbounded, each challenge pushed the deadline out again and the
+        // request outlived the whole ~10 s run.
+        #expect(try await challenger.value)
 
         // The deadline is cleared when the request ends, however it ends. Tracked only until a
         // later non-channel response arrived, an abandoned prompt like this one left it behind for

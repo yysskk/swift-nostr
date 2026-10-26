@@ -233,7 +233,7 @@ struct RequestResponseSessionTests {
 
         let pending = Task {
             try await session.perform(
-                self.request("a"), key: "a", state: [], timeout: .milliseconds(300), partialResult: { $0 })
+                self.request("a"), key: "a", state: [], timeout: .seconds(2), partialResult: { $0 })
         }
         try await transport.waitForSends(1)
         // One part arrives before the deadline but does not complete the request, so the timeout
@@ -253,13 +253,15 @@ struct RequestResponseSessionTests {
         try await start(session)
 
         let pending = Task {
-            try await session.perform(self.request("a"), key: "a", state: [], timeout: .milliseconds(200))
+            try await session.perform(self.request("a"), key: "a", state: [], timeout: .seconds(2))
         }
         try await transport.waitForSends(1)
-        await session.withPendingRequest("a") { _ in .pendingFor(.seconds(5)) }
+        // The original timer started before the send, so it is due no later than this.
+        let originalTimeoutDue = ContinuousClock.now + .seconds(2)
+        await session.withPendingRequest("a") { _ in .pendingFor(.seconds(60)) }
 
         // Wait out the original timeout, then answer: the request is still waiting.
-        try await Task.sleep(for: .milliseconds(400))
+        try await Task.sleep(until: originalTimeoutDue + .milliseconds(500), clock: .continuous)
         await transport.deliver(response(for: "a", content: "late"))
         #expect(try await pending.value == ["late"])
     }

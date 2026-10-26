@@ -220,13 +220,15 @@ struct RemoteSignerSessionTests {
             bunker: RemoteSignerFixtures.bunker(signer: signer),
             clientKeyPair: client,
             transport: transport,
-            config: .init(requestTimeout: .milliseconds(300), authChallengeTimeout: .seconds(2)))
+            config: .init(requestTimeout: .seconds(2), authChallengeTimeout: .seconds(60)))
         try await connectHandshake(remote, transport: transport)
 
         let challenges = await remote.authChallenges()
 
         let publicKey = Task { try await remote.userPublicKey() }
         let sent = try await RemoteSignerFixtures.waitForSentEvents(transport, count: 2)
+        // The request's timer started before it was sent, so it is due no later than this.
+        let requestTimeoutDue = ContinuousClock.now + .seconds(2)
         let request = try RemoteSignerFixtures.decryptRequest(sent[1], client: client, signer: signer)
 
         // First the signer answers with an auth challenge for the same id.
@@ -241,9 +243,10 @@ struct RemoteSignerSessionTests {
         #expect(challenge?.method == .getPublicKey)
         #expect(challenge?.requestID == request.id)
 
-        // The request stays pending past the short requestTimeout; wait beyond it, then deliver the
-        // real response and confirm it completes.
-        try await Task.sleep(for: .milliseconds(500))
+        // The request stays pending past requestTimeout; wait beyond it, then deliver the real
+        // response and confirm it completes. requestTimeout only has to outlast the challenge's
+        // delivery and authChallengeTimeout dwarfs the wait, so a slow runner cannot time it out.
+        try await Task.sleep(until: requestTimeoutDue + .milliseconds(500), clock: .continuous)
         try await transport.deliver(
             RemoteSignerFixtures.response(
                 requestID: request.id, result: PublicKey.fixture("user").hex, client: client, signer: signer))

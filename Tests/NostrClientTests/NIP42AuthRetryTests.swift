@@ -129,7 +129,7 @@ struct NIP42AuthRetryTests {
 
     @Test("publish falls back to the original rejection when no authentication concludes")
     func publishTimesOutWaitingForAuthentication() async throws {
-        let (connection, mock) = makeConnection(publishAckTimeout: .milliseconds(100))
+        let (connection, mock) = makeConnection(publishAckTimeout: .seconds(2))
         let signer = EventSigner(keyPair: try KeyPair())
         await connection.setAuthenticationResponder(makeResponder(signer: signer))
         try await connection.connect()

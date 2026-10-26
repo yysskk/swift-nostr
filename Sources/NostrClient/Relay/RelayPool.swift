@@ -39,6 +39,10 @@ public actor RelayPool {
     /// The automatic AUTH-challenge responder applied to every relay (NIP-42)
     private var authenticationResponder: RelayConnection.AuthenticationResponder?
 
+    /// Runs inside a subscribe after its listeners are registered and before it checks it is still
+    /// the current generation (test hook: lets a test run an overlapping subscribe at that point).
+    private var listenersRegisteredHook: (@Sendable (String) async -> Void)?
+
     public init(config: RelayPoolConfig = .default) {
         self.init(config: config, webSocketFactory: URLSessionWebSocketFactory(urlSession: .shared))
     }
@@ -457,6 +461,7 @@ public actor RelayPool {
             }
             tasks.append(task)
         }
+        await listenersRegisteredHook?(subscriptionID)
 
         // Registering the stream suspends, so another subscribe on this id may have run to
         // completion in between. Publishing these tasks then would strand its listeners with no
@@ -586,6 +591,11 @@ public actor RelayPool {
 
     /// The number of subscriptions with live listener tasks (test hook).
     var subscriptionTaskCount: Int { subscriptionTasks.count }
+
+    /// Installs ``listenersRegisteredHook`` (test hook).
+    func setListenersRegisteredHook(_ hook: (@Sendable (String) async -> Void)?) {
+        listenersRegisteredHook = hook
+    }
 
     /// Returns the number of relays in the pool
     public var relayCount: Int {
