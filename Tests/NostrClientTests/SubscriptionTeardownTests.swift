@@ -63,7 +63,7 @@ struct SubscriptionTeardownTests {
         let counts = MessageCounts()
         for _ in 0..<3 {
             _ = try await pool.subscribe(
-                subscriptionId: "sub", filters: [Filter(kinds: [1])]
+                subscriptionID: "sub", filters: [Filter(kinds: [1])]
             ) { message in
                 if case .endOfStoredEvents = message { counts.bump() }
             }
@@ -90,7 +90,7 @@ struct SubscriptionTeardownTests {
         let storedJSON = String(decoding: try JSONEncoder().encode(stored), as: UTF8.self)
 
         let firstSeen = MessageCounts()
-        _ = try await pool.subscribe(subscriptionId: "sub", filters: [Filter(kinds: [1])]) { message in
+        _ = try await pool.subscribe(subscriptionID: "sub", filters: [Filter(kinds: [1])]) { message in
             if case .event = message { firstSeen.bump() }
         }
         socket.deliver(.string("[\"EVENT\",\"sub\",\(storedJSON)]"))
@@ -98,7 +98,7 @@ struct SubscriptionTeardownTests {
 
         // Re-subscribe under the same id; the relay resends the same stored event.
         let secondSeen = MessageCounts()
-        _ = try await pool.subscribe(subscriptionId: "sub", filters: [Filter(kinds: [1])]) { message in
+        _ = try await pool.subscribe(subscriptionID: "sub", filters: [Filter(kinds: [1])]) { message in
             if case .event = message { secondSeen.bump() }
         }
         socket.deliver(.string("[\"EVENT\",\"sub\",\(storedJSON)]"))
@@ -117,7 +117,7 @@ struct SubscriptionTeardownTests {
 
         let counts = MessageCounts()
         _ = try await pool.subscribe(
-            subscriptionId: "sub", filters: [Filter(kinds: [1])]
+            subscriptionID: "sub", filters: [Filter(kinds: [1])]
         ) { message in
             if case .endOfStoredEvents = message { counts.bump() }
         }
@@ -168,17 +168,17 @@ struct SubscriptionGenerationTests {
     /// Counting per id from zero and dropping the entry on unsubscribe issued generation 1 twice,
     /// so a straggler from the first set matched the second and delivered into it.
     @Test("a reused subscription id never reuses its generation")
-    func reusedIdGetsAFreshGeneration() async throws {
+    func reusedIDGetsAFreshGeneration() async throws {
         let (client, _) = try await makeClient()
         let pool = await client.pool
 
-        _ = try await pool.subscribe(subscriptionId: "sub", filters: [Filter(kinds: [1])]) { _ in }
+        _ = try await pool.subscribe(subscriptionID: "sub", filters: [Filter(kinds: [1])]) { _ in }
         let first = await pool.subscriptionGeneration(for: "sub")
 
-        await pool.unsubscribe(subscriptionId: "sub")
+        await pool.unsubscribe(subscriptionID: "sub")
         #expect(await pool.subscriptionGeneration(for: "sub") == nil)
 
-        _ = try await pool.subscribe(subscriptionId: "sub", filters: [Filter(kinds: [1])]) { _ in }
+        _ = try await pool.subscribe(subscriptionID: "sub", filters: [Filter(kinds: [1])]) { _ in }
         let second = await pool.subscriptionGeneration(for: "sub")
 
         #expect(first != nil)
@@ -194,8 +194,8 @@ struct SubscriptionGenerationTests {
         let (client, _) = try await makeClient()
         let pool = await client.pool
 
-        _ = try await pool.subscribe(subscriptionId: "a", filters: [Filter(kinds: [1])]) { _ in }
-        _ = try await pool.subscribe(subscriptionId: "b", filters: [Filter(kinds: [1])]) { _ in }
+        _ = try await pool.subscribe(subscriptionID: "a", filters: [Filter(kinds: [1])]) { _ in }
+        _ = try await pool.subscribe(subscriptionID: "b", filters: [Filter(kinds: [1])]) { _ in }
 
         let a = await pool.subscriptionGeneration(for: "a")
         let b = await pool.subscriptionGeneration(for: "b")
@@ -214,12 +214,12 @@ struct SubscriptionGenerationTests {
 
         let deliveries = MessageCounts()
         async let first: Void = {
-            _ = try? await pool.subscribe(subscriptionId: "sub", filters: [Filter(kinds: [1])]) { message in
+            _ = try? await pool.subscribe(subscriptionID: "sub", filters: [Filter(kinds: [1])]) { message in
                 if case .endOfStoredEvents = message { deliveries.bump() }
             }
         }()
         async let second: Void = {
-            _ = try? await pool.subscribe(subscriptionId: "sub", filters: [Filter(kinds: [1])]) { message in
+            _ = try? await pool.subscribe(subscriptionID: "sub", filters: [Filter(kinds: [1])]) { message in
                 if case .endOfStoredEvents = message { deliveries.bump() }
             }
         }()

@@ -13,8 +13,8 @@ struct RelayMessageTests {
 
         let message = try RelayMessage.parse(json)
 
-        if case .event(let subscriptionId, let event) = message {
-            #expect(subscriptionId == "sub1")
+        if case .event(let subscriptionID, let event) = message {
+            #expect(subscriptionID == "sub1")
             #expect(event.id.hex == String(repeating: "ab", count: 32))
             #expect(event.pubkey.hex == String(repeating: "cd", count: 32))
             #expect(event.signature?.hex == String(repeating: "ef", count: 64))
@@ -40,8 +40,8 @@ struct RelayMessageTests {
 
         let message = try RelayMessage.parse(json)
 
-        if case .endOfStoredEvents(let subscriptionId) = message {
-            #expect(subscriptionId == "sub1")
+        if case .endOfStoredEvents(let subscriptionID) = message {
+            #expect(subscriptionID == "sub1")
         } else {
             Issue.record("Expected EOSE message")
         }
@@ -127,8 +127,8 @@ struct RelayMessageTests {
 
         let message = try RelayMessage.parse(json)
 
-        if case .closed(let subscriptionId, let closedMessage) = message {
-            #expect(subscriptionId == "sub1")
+        if case .closed(let subscriptionID, let closedMessage) = message {
+            #expect(subscriptionID == "sub1")
             #expect(closedMessage == "subscription closed by relay")
         } else {
             Issue.record("Expected CLOSED message")
@@ -141,8 +141,8 @@ struct RelayMessageTests {
 
         let message = try RelayMessage.parse(json)
 
-        if case .count(let subscriptionId, let count, let approximate) = message {
-            #expect(subscriptionId == "sub1")
+        if case .count(let subscriptionID, let count, let approximate) = message {
+            #expect(subscriptionID == "sub1")
             #expect(count == 238)
             #expect(approximate == nil)
         } else {
@@ -156,8 +156,8 @@ struct RelayMessageTests {
 
         let message = try RelayMessage.parse(json)
 
-        if case .count(let subscriptionId, let count, let approximate) = message {
-            #expect(subscriptionId == "sub1")
+        if case .count(let subscriptionID, let count, let approximate) = message {
+            #expect(subscriptionID == "sub1")
             #expect(count == 93)
             #expect(approximate == true)
         } else {
@@ -229,7 +229,7 @@ struct ClientMessageTests {
     @Test("Serialize REQ message")
     func serializeReqMessage() throws {
         let filter = Filter(kinds: [1], limit: 10)
-        let message = ClientMessage.request(subscriptionId: "sub1", filters: [filter])
+        let message = ClientMessage.request(subscriptionID: "sub1", filters: [filter])
         let serialized = try message.serialize()
 
         #expect(serialized.contains("REQ"))
@@ -240,7 +240,7 @@ struct ClientMessageTests {
     @Test("Serialize REQ message with search filter")
     func serializeReqMessageWithSearch() throws {
         let filter = Filter.search("nostr", kinds: [.textNote], limit: 20)
-        let message = ClientMessage.request(subscriptionId: "sub1", filters: [filter])
+        let message = ClientMessage.request(subscriptionID: "sub1", filters: [filter])
         let serialized = try message.serialize()
 
         #expect(serialized.contains("REQ"))
@@ -250,7 +250,7 @@ struct ClientMessageTests {
 
     @Test("Serialize CLOSE message")
     func serializeCloseMessage() throws {
-        let message = ClientMessage.close(subscriptionId: "sub1")
+        let message = ClientMessage.close(subscriptionID: "sub1")
         let serialized = try message.serialize()
 
         #expect(serialized == #"["CLOSE","sub1"]"#)
@@ -259,7 +259,7 @@ struct ClientMessageTests {
     @Test("Serialize COUNT message (NIP-45)")
     func serializeCountMessage() throws {
         let filter = Filter(kinds: [.textNote])
-        let message = ClientMessage.count(subscriptionId: "sub1", filters: [filter])
+        let message = ClientMessage.count(subscriptionID: "sub1", filters: [filter])
         let serialized = try message.serialize()
 
         #expect(serialized.hasPrefix(#"["COUNT","sub1",{"#))

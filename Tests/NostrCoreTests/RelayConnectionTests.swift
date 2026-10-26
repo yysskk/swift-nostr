@@ -15,8 +15,8 @@ import Testing
 @Suite("Relay Connection Tests")
 struct RelayConnectionTests {
 
-    private static let subscriptionId = "sub-1"
-    private static let eventId = String(repeating: "a", count: 64)
+    private static let subscriptionID = "sub-1"
+    private static let eventID = String(repeating: "a", count: 64)
 
     /// Thread-safe recorder for the messages a ``RelayConnection/messages()`` consumer sees.
     private final class MessageLog: @unchecked Sendable {
@@ -67,9 +67,9 @@ struct RelayConnectionTests {
     }
 
     /// An `EVENT` frame as a relay would send it, carrying a syntactically complete event.
-    private static func eventFrame(subscriptionId: String, eventId: String) throws -> String {
+    private static func eventFrame(subscriptionID: String, eventID: String) throws -> String {
         let event: [String: Any] = [
-            "id": eventId,
+            "id": eventID,
             "pubkey": String(repeating: "b", count: 64),
             "created_at": 1_700_000_000,
             "kind": 1,
@@ -77,7 +77,7 @@ struct RelayConnectionTests {
             "content": "hello",
             "sig": String(repeating: "c", count: 128),
         ]
-        let frame: [Any] = ["EVENT", subscriptionId, event]
+        let frame: [Any] = ["EVENT", subscriptionID, event]
         return String(decoding: try JSONSerialization.data(withJSONObject: frame), as: UTF8.self)
     }
 
@@ -98,13 +98,13 @@ struct RelayConnectionTests {
         try await connection.connect()
 
         try await connection.subscribe(
-            subscriptionId: Self.subscriptionId,
+            subscriptionID: Self.subscriptionID,
             filters: [Filter(kinds: [.textNote], limit: 5)]
         )
 
         let frame = try #require(Self.sentFrame("REQ", in: mock))
         #expect(frame.count == 3)
-        #expect(frame[1] as? String == Self.subscriptionId)
+        #expect(frame[1] as? String == Self.subscriptionID)
         let filter = try #require(frame[2] as? [String: Any])
         #expect(filter["kinds"] as? [Int] == [Event.Kind.textNote.rawValue])
         #expect(filter["limit"] as? Int == 5)
@@ -124,17 +124,17 @@ struct RelayConnectionTests {
             }
         }
 
-        mock.deliver(.string(try Self.eventFrame(subscriptionId: Self.subscriptionId, eventId: Self.eventId)))
+        mock.deliver(.string(try Self.eventFrame(subscriptionID: Self.subscriptionID, eventID: Self.eventID)))
         try await pollUntil { !received.snapshot.isEmpty }
 
         let message = try #require(received.snapshot.first)
-        guard case .event(let subscriptionId, let event) = message else {
+        guard case .event(let subscriptionID, let event) = message else {
             Issue.record("expected an EVENT message, got \(message)")
             await connection.disconnect()
             return
         }
-        #expect(subscriptionId == Self.subscriptionId)
-        #expect(event.id.hex == Self.eventId)
+        #expect(subscriptionID == Self.subscriptionID)
+        #expect(event.id.hex == Self.eventID)
         #expect(event.content == "hello")
         await connection.disconnect()
     }
@@ -143,13 +143,13 @@ struct RelayConnectionTests {
     func unsubscribeSendsCloseFrame() async throws {
         let (connection, mock) = makeConnection()
         try await connection.connect()
-        try await connection.subscribe(subscriptionId: Self.subscriptionId, filters: [Filter(kinds: [.textNote])])
+        try await connection.subscribe(subscriptionID: Self.subscriptionID, filters: [Filter(kinds: [.textNote])])
 
-        try await connection.unsubscribe(subscriptionId: Self.subscriptionId)
+        try await connection.unsubscribe(subscriptionID: Self.subscriptionID)
 
         let frame = try #require(Self.sentFrame("CLOSE", in: mock))
         #expect(frame.count == 2)
-        #expect(frame[1] as? String == Self.subscriptionId)
+        #expect(frame[1] as? String == Self.subscriptionID)
         await connection.disconnect()
     }
 

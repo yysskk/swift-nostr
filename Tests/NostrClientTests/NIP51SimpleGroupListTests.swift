@@ -289,17 +289,17 @@ struct NIP51SimpleGroupListClientTests {
     }
 
     /// Extracts the subscription id and first filter of the first REQ frame sent on `socket`.
-    private func sentREQ(in socket: MockWebSocketSession) throws -> (subscriptionId: String, filter: [String: Any]) {
+    private func sentREQ(in socket: MockWebSocketSession) throws -> (subscriptionID: String, filter: [String: Any]) {
         guard let frame = socket.sentTextFrames.first(where: { $0.hasPrefix("[\"REQ\"") }),
             let data = frame.data(using: .utf8),
             let array = try JSONSerialization.jsonObject(with: data) as? [Any],
             array.count >= 3,
-            let subscriptionId = array[1] as? String,
+            let subscriptionID = array[1] as? String,
             let filter = array[2] as? [String: Any]
         else {
             throw NostrError.invalidMessageFormat
         }
-        return (subscriptionId, filter)
+        return (subscriptionID, filter)
     }
 
     /// Waits for the next EVENT frame on `socket`, delivers the relay's OK for it, and
@@ -312,10 +312,10 @@ struct NIP51SimpleGroupListClientTests {
         return sent
     }
 
-    /// A canned `["EVENT", subscriptionId, {...}]` relay frame for `event`.
-    private func eventFrame(subscriptionId: String, event: Event) throws -> String {
+    /// A canned `["EVENT", subscriptionID, {...}]` relay frame for `event`.
+    private func eventFrame(subscriptionID: String, event: Event) throws -> String {
         let json = String(decoding: try JSONEncoder().encode(event), as: UTF8.self)
-        return "[\"EVENT\",\"\(subscriptionId)\",\(json)]"
+        return "[\"EVENT\",\"\(subscriptionID)\",\(json)]"
     }
 
     /// Runs `fetch` while answering the socket's REQ with the canned `events` and an EOSE.
@@ -326,11 +326,11 @@ struct NIP51SimpleGroupListClientTests {
     ) async throws -> T {
         let task = Task { try await fetch() }
         try await NIP42TestSupport.pollUntil { socket.sentTextFrames.contains { $0.hasPrefix("[\"REQ\"") } }
-        let (subscriptionId, _) = try sentREQ(in: socket)
+        let (subscriptionID, _) = try sentREQ(in: socket)
         for event in events {
-            socket.deliver(.string(try eventFrame(subscriptionId: subscriptionId, event: event)))
+            socket.deliver(.string(try eventFrame(subscriptionID: subscriptionID, event: event)))
         }
-        socket.deliver(.string("[\"EOSE\",\"\(subscriptionId)\"]"))
+        socket.deliver(.string("[\"EOSE\",\"\(subscriptionID)\"]"))
         return try await task.value
     }
 

@@ -78,9 +78,9 @@ extension RelayConnection {
     /// Resubscribes to all active subscriptions after reconnection
     private func resubscribeAll() async {
         let currentSubscriptions = subscriptions
-        for (subscriptionId, filters) in currentSubscriptions {
+        for (subscriptionID, filters) in currentSubscriptions {
             do {
-                try await subscribe(subscriptionId: subscriptionId, filters: filters)
+                try await subscribe(subscriptionID: subscriptionID, filters: filters)
             } catch {
                 // Continue with other subscriptions even if one fails
             }

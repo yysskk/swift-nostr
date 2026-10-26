@@ -30,13 +30,13 @@ struct NIP57ZapReceiptTests {
     }
 
     /// Builds a JSON-encoded kind-9734 zap request with the given amount and, optionally, zapped event.
-    private func zapRequestJSON(recipient: String, amountMillisats: Int64?, eventId: String? = nil) throws
+    private func zapRequestJSON(recipient: String, amountMillisats: Int64?, eventID: String? = nil) throws
         -> String
     {
         let sender = EventSigner(keyPair: try KeyPair())
         let request = try sender.signZapRequest(
             recipientPubkey: try PublicKey(hex: recipient), relays: [RelayURL("wss://relay.example.com")!],
-            amountMillisats: amountMillisats, eventID: try eventId.map(EventID.init(hex:)))
+            amountMillisats: amountMillisats, eventID: try eventID.map(EventID.init(hex:)))
         return String(decoding: try JSONEncoder().encode(request), as: UTF8.self)
     }
 
@@ -397,7 +397,7 @@ struct NIP57ZapReceiptTests {
         let payee = try KeyPair()
         let recipient = try KeyPair().publicKey.hex
         let description = try zapRequestJSON(
-            recipient: recipient, amountMillisats: coffeeAmountMillisats, eventId: EventID.fixture("in request").hex)
+            recipient: recipient, amountMillisats: coffeeAmountMillisats, eventID: EventID.fixture("in request").hex)
         let receipt = try makeReceipt(
             signedBy: payee,
             tags: [

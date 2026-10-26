@@ -43,21 +43,21 @@ struct NIP45CountTests {
     }
 
     /// Reads the generated subscription id from a sent COUNT frame.
-    private func subscriptionId(fromCountFrame frame: String) throws -> String {
+    private func subscriptionID(fromCountFrame frame: String) throws -> String {
         guard let data = frame.data(using: .utf8),
             let array = try JSONSerialization.jsonObject(with: data) as? [Any],
             array.count >= 2,
-            let subscriptionId = array[1] as? String
+            let subscriptionID = array[1] as? String
         else {
             throw NostrError.invalidMessageFormat
         }
-        return subscriptionId
+        return subscriptionID
     }
 
     /// Waits for a COUNT frame, returning its generated subscription id.
-    private func awaitCountSubscriptionId(in mock: MockWebSocketSession) async throws -> String {
+    private func awaitCountSubscriptionID(in mock: MockWebSocketSession) async throws -> String {
         try await pollUntil { !countFrames(in: mock).isEmpty }
-        return try subscriptionId(fromCountFrame: countFrames(in: mock)[0])
+        return try subscriptionID(fromCountFrame: countFrames(in: mock)[0])
     }
 
     // MARK: - RelayConnection
@@ -69,8 +69,8 @@ struct NIP45CountTests {
 
         let task = Task { try await connection.count(filters: [Filter(kinds: [.textNote])]) }
 
-        let subId = try await awaitCountSubscriptionId(in: mock)
-        mock.deliver(.string("[\"COUNT\",\"\(subId)\",{\"count\":238}]"))
+        let receivedID = try await awaitCountSubscriptionID(in: mock)
+        mock.deliver(.string("[\"COUNT\",\"\(receivedID)\",{\"count\":238}]"))
 
         let result = try await task.value
         #expect(result == EventCount(value: 238, isApproximate: false))
@@ -84,8 +84,8 @@ struct NIP45CountTests {
 
         let task = Task { try await connection.count(filters: [Filter(kinds: [.textNote])]) }
 
-        let subId = try await awaitCountSubscriptionId(in: mock)
-        mock.deliver(.string("[\"COUNT\",\"\(subId)\",{\"count\":93,\"approximate\":true}]"))
+        let receivedID = try await awaitCountSubscriptionID(in: mock)
+        mock.deliver(.string("[\"COUNT\",\"\(receivedID)\",{\"count\":93,\"approximate\":true}]"))
 
         let result = try await task.value
         #expect(result == EventCount(value: 93, isApproximate: true))
@@ -110,8 +110,8 @@ struct NIP45CountTests {
 
         let task = Task { try await connection.count(filters: [Filter(kinds: [.textNote])]) }
 
-        let subId = try await awaitCountSubscriptionId(in: mock)
-        mock.deliver(.string("[\"CLOSED\",\"\(subId)\",\"error: count not supported\"]"))
+        let receivedID = try await awaitCountSubscriptionID(in: mock)
+        mock.deliver(.string("[\"CLOSED\",\"\(receivedID)\",\"error: count not supported\"]"))
 
         await #expect(throws: NostrError.relayError("error: count not supported")) {
             try await task.value
@@ -126,7 +126,7 @@ struct NIP45CountTests {
 
         let task = Task { try await connection.count(filters: [Filter(kinds: [.textNote])]) }
 
-        _ = try await awaitCountSubscriptionId(in: mock)
+        _ = try await awaitCountSubscriptionID(in: mock)
         await connection.disconnect()
 
         await #expect(throws: NostrError.notConnected) {
@@ -144,12 +144,12 @@ struct NIP45CountTests {
 
         try await pollUntil { countFrames(in: mock).count == 2 }
         let frames = countFrames(in: mock)
-        let subId0 = try subscriptionId(fromCountFrame: frames[0])
-        let subId1 = try subscriptionId(fromCountFrame: frames[1])
-        #expect(subId0 != subId1)
+        let firstID = try subscriptionID(fromCountFrame: frames[0])
+        let secondID = try subscriptionID(fromCountFrame: frames[1])
+        #expect(firstID != secondID)
 
-        mock.deliver(.string("[\"COUNT\",\"\(subId0)\",{\"count\":10}]"))
-        mock.deliver(.string("[\"COUNT\",\"\(subId1)\",{\"count\":20}]"))
+        mock.deliver(.string("[\"COUNT\",\"\(firstID)\",{\"count\":10}]"))
+        mock.deliver(.string("[\"COUNT\",\"\(secondID)\",{\"count\":20}]"))
 
         let counts = Set([try await taskA.value.value, try await taskB.value.value])
         #expect(counts == [10, 20])
@@ -173,12 +173,12 @@ struct NIP45CountTests {
         mock.deliver(.string("[\"COUNT\",\"unrelated-sub\",{\"count\":5}]"))
 
         let message = await observed.value
-        guard case .count(let subscriptionId, let count, _)? = message else {
+        guard case .count(let subscriptionID, let count, _)? = message else {
             Issue.record("Expected a COUNT message on the messages() stream")
             await connection.disconnect()
             return
         }
-        #expect(subscriptionId == "unrelated-sub")
+        #expect(subscriptionID == "unrelated-sub")
         #expect(count == 5)
         await connection.disconnect()
     }
@@ -189,14 +189,14 @@ struct NIP45CountTests {
         try await connection.connect()
 
         let task = Task { try await connection.count(filters: [Filter(kinds: [.textNote])]) }
-        let subId = try await awaitCountSubscriptionId(in: mock)
-        mock.deliver(.string("[\"COUNT\",\"\(subId)\",{\"count\":1}]"))
+        let receivedID = try await awaitCountSubscriptionID(in: mock)
+        mock.deliver(.string("[\"COUNT\",\"\(receivedID)\",{\"count\":1}]"))
         _ = try await task.value
 
         // The COUNT frame is a one-shot request: it is sent exactly once and never
         // registered as a subscription, so a reconnect would not replay it.
         #expect(countFrames(in: mock).count == 1)
-        #expect(await connection.hasSubscription(subId) == false)
+        #expect(await connection.hasSubscription(receivedID) == false)
         await connection.disconnect()
     }
 
@@ -235,8 +235,8 @@ struct NIP45CountTests {
             mockA.sentTextFrames.contains { $0.hasPrefix("[\"COUNT\"") }
                 && mockB.sentTextFrames.contains { $0.hasPrefix("[\"COUNT\"") }
         }
-        let subA = try subscriptionId(fromCountFrame: countFrames(in: mockA)[0])
-        let subB = try subscriptionId(fromCountFrame: countFrames(in: mockB)[0])
+        let subA = try subscriptionID(fromCountFrame: countFrames(in: mockA)[0])
+        let subB = try subscriptionID(fromCountFrame: countFrames(in: mockB)[0])
         mockA.deliver(.string("[\"COUNT\",\"\(subA)\",{\"count\":5}]"))
         mockB.deliver(.string("[\"COUNT\",\"\(subB)\",{\"count\":9}]"))
 
@@ -269,7 +269,7 @@ struct NIP45CountTests {
         let task = Task { try await pool.count(filters: [Filter(kinds: [.textNote])], timeout: 0.3) }
 
         try await pollUntil { mockA.sentTextFrames.contains { $0.hasPrefix("[\"COUNT\"") } }
-        let subA = try subscriptionId(fromCountFrame: countFrames(in: mockA)[0])
+        let subA = try subscriptionID(fromCountFrame: countFrames(in: mockA)[0])
         mockA.deliver(.string("[\"COUNT\",\"\(subA)\",{\"count\":7}]"))
 
         let results = try await task.value
@@ -329,7 +329,7 @@ struct NIP45CountTests {
         }
 
         try await pollUntil { mockA.sentTextFrames.contains { $0.hasPrefix("[\"COUNT\"") } }
-        let subA = try subscriptionId(fromCountFrame: countFrames(in: mockA)[0])
+        let subA = try subscriptionID(fromCountFrame: countFrames(in: mockA)[0])
         mockA.deliver(.string("[\"COUNT\",\"\(subA)\",{\"count\":3}]"))
 
         let result = try await task.value
@@ -364,8 +364,8 @@ struct NIP45CountTests {
             mockA.sentTextFrames.contains { $0.hasPrefix("[\"COUNT\"") }
                 && mockB.sentTextFrames.contains { $0.hasPrefix("[\"COUNT\"") }
         }
-        let subA = try subscriptionId(fromCountFrame: countFrames(in: mockA)[0])
-        let subB = try subscriptionId(fromCountFrame: countFrames(in: mockB)[0])
+        let subA = try subscriptionID(fromCountFrame: countFrames(in: mockA)[0])
+        let subB = try subscriptionID(fromCountFrame: countFrames(in: mockB)[0])
         mockA.deliver(.string("[\"COUNT\",\"\(subA)\",{\"count\":5}]"))
         mockB.deliver(.string("[\"COUNT\",\"\(subB)\",{\"count\":9}]"))
 

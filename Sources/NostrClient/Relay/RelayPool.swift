@@ -338,13 +338,13 @@ public actor RelayPool {
     ///   pool, or ``NostrError/relayError(_:)`` when every relay fails to subscribe.
     @discardableResult
     public func subscribe(
-        subscriptionId: String,
+        subscriptionID: String,
         filters: [Filter],
         to relayURLs: Set<RelayURL>? = nil,
         handler: @escaping @Sendable (RelayMessage) -> Void
     ) async throws -> Int {
         let successfulRelayURLs = try await subscribeWithRelayContext(
-            subscriptionId: subscriptionId,
+            subscriptionID: subscriptionID,
             filters: filters,
             to: relayURLs
         ) { relayMessage in
@@ -358,7 +358,7 @@ public actor RelayPool {
     /// relay-aware handler.
     @discardableResult
     func subscribeWithRelayContext(
-        subscriptionId: String,
+        subscriptionID: String,
         filters: [Filter],
         to relayURLs: Set<RelayURL>?,
         handler: @escaping @Sendable (RelaySubscriptionMessage) async -> Void
@@ -370,16 +370,16 @@ public actor RelayPool {
         // resolves the handler at delivery time, so a straggler would be handed to the *new*
         // handler and every control message delivered twice. The generation is what a straggler
         // fails, so only the current one delivers.
-        cancelListenerTasks(for: subscriptionId)
+        cancelListenerTasks(for: subscriptionID)
         nextSubscriptionGeneration &+= 1
         let generation = nextSubscriptionGeneration
-        subscriptionGeneration[subscriptionId] = generation
-        subscriptionHandlers[subscriptionId] = handler
+        subscriptionGeneration[subscriptionID] = generation
+        subscriptionHandlers[subscriptionID] = handler
         // The dedup cache is scoped to the id, not the generation, and a fresh REQ makes the relay
         // resend its stored events. Left in place, everything the previous generation already saw
         // would be discarded as a duplicate before the new handler — which never received it — had
         // a chance to.
-        eventCache.removeSubscription(subscriptionId)
+        eventCache.removeSubscription(subscriptionID)
 
         // Start listening for messages BEFORE sending the subscription request, so nothing that
         // arrives immediately after it is missed. `messages()` is awaited here rather than inside
@@ -393,17 +393,17 @@ public actor RelayPool {
                     guard !Task.isCancelled else { break }
                     let relayURL = connection.url
                     switch message {
-                    case .event(let subId, let event) where subId == subscriptionId:
+                    case .event(let incomingID, let event) where incomingID == subscriptionID:
                         // Deduplicate the copies of one event arriving from several relays,
                         // scoped to this subscription so a different subscription matching the
                         // same event still receives it.
                         let isNewToSubscription = self.recordEvent(
                             eventID: event.id,
-                            subscriptionId: subscriptionId
+                            subscriptionID: subscriptionID
                         )
                         if isNewToSubscription,
                             let currentHandler = self.handler(
-                                for: subscriptionId, generation: generation)
+                                for: subscriptionID, generation: generation)
                         {
                             await currentHandler(
                                 RelaySubscriptionMessage(
@@ -412,8 +412,8 @@ public actor RelayPool {
                                 )
                             )
                         }
-                    case .endOfStoredEvents(let subId) where subId == subscriptionId:
-                        if let currentHandler = self.handler(for: subscriptionId, generation: generation) {
+                    case .endOfStoredEvents(let incomingID) where incomingID == subscriptionID:
+                        if let currentHandler = self.handler(for: subscriptionID, generation: generation) {
                             await currentHandler(
                                 RelaySubscriptionMessage(
                                     relayURL: relayURL,
@@ -421,8 +421,8 @@ public actor RelayPool {
                                 )
                             )
                         }
-                    case .closed(let subId, _) where subId == subscriptionId:
-                        if let currentHandler = self.handler(for: subscriptionId, generation: generation) {
+                    case .closed(let incomingID, _) where incomingID == subscriptionID:
+                        if let currentHandler = self.handler(for: subscriptionID, generation: generation) {
                             await currentHandler(
                                 RelaySubscriptionMessage(
                                     relayURL: relayURL,
@@ -431,7 +431,7 @@ public actor RelayPool {
                             )
                         }
                     case .notice, .auth:
-                        if let currentHandler = self.handler(for: subscriptionId, generation: generation) {
+                        if let currentHandler = self.handler(for: subscriptionID, generation: generation) {
                             await currentHandler(
                                 RelaySubscriptionMessage(
                                     relayURL: relayURL,
@@ -450,11 +450,11 @@ public actor RelayPool {
         // Registering the stream suspends, so another subscribe on this id may have run to
         // completion in between. Publishing these tasks then would strand its listeners with no
         // way to cancel them; this generation is finished instead.
-        guard subscriptionGeneration[subscriptionId] == generation else {
+        guard subscriptionGeneration[subscriptionID] == generation else {
             for task in tasks { task.cancel() }
             throw NostrError.relayError("The subscription was superseded before it was established")
         }
-        subscriptionTasks[subscriptionId] = tasks
+        subscriptionTasks[subscriptionID] = tasks
 
         // Now send subscription requests to all relays, tolerating failures
         var successfulRelayURLs: Set<RelayURL> = []
@@ -463,7 +463,7 @@ public actor RelayPool {
             for connection in connections {
                 group.addTask {
                     do {
-                        try await connection.subscribe(subscriptionId: subscriptionId, filters: filters)
+                        try await connection.subscribe(subscriptionID: subscriptionID, filters: filters)
                         return connection.url
                     } catch {
                         return nil
@@ -483,11 +483,11 @@ public actor RelayPool {
         // Only tear down what this generation registered: a newer subscribe on the same id may
         // have replaced it while the REQs were in flight, and its state is not ours to remove.
         if successfulRelayURLs.isEmpty {
-            if subscriptionGeneration[subscriptionId] == generation {
-                subscriptionHandlers.removeValue(forKey: subscriptionId)
-                cancelListenerTasks(for: subscriptionId)
-                subscriptionGeneration.removeValue(forKey: subscriptionId)
-                eventCache.removeSubscription(subscriptionId)
+            if subscriptionGeneration[subscriptionID] == generation {
+                subscriptionHandlers.removeValue(forKey: subscriptionID)
+                cancelListenerTasks(for: subscriptionID)
+                subscriptionGeneration.removeValue(forKey: subscriptionID)
+                eventCache.removeSubscription(subscriptionID)
             }
             throw NostrError.relayError("Failed to subscribe on any relay")
         }
@@ -495,19 +495,19 @@ public actor RelayPool {
         return successfulRelayURLs
     }
 
-    /// The handler for `subscriptionId`, or nil when `generation` is no longer the current listener
+    /// The handler for `subscriptionID`, or nil when `generation` is no longer the current listener
     /// generation — the id has since been re-subscribed, and this frame belongs to the old one.
     private func handler(
-        for subscriptionId: String,
+        for subscriptionID: String,
         generation: UInt64
     ) -> (@Sendable (RelaySubscriptionMessage) async -> Void)? {
-        guard subscriptionGeneration[subscriptionId] == generation else { return nil }
-        return subscriptionHandlers[subscriptionId]
+        guard subscriptionGeneration[subscriptionID] == generation else { return nil }
+        return subscriptionHandlers[subscriptionID]
     }
 
-    /// Cancels and forgets the listener tasks for `subscriptionId`, if any.
-    private func cancelListenerTasks(for subscriptionId: String) {
-        guard let tasks = subscriptionTasks.removeValue(forKey: subscriptionId) else { return }
+    /// Cancels and forgets the listener tasks for `subscriptionID`, if any.
+    private func cancelListenerTasks(for subscriptionID: String) {
+        guard let tasks = subscriptionTasks.removeValue(forKey: subscriptionID) else { return }
         for task in tasks {
             task.cancel()
         }
@@ -515,17 +515,17 @@ public actor RelayPool {
 
     /// Unsubscribes from a subscription on all relays, discarding its deduplication cache.
     /// Tolerates partial failures - best effort unsubscription.
-    public func unsubscribe(subscriptionId: String) async {
-        subscriptionHandlers.removeValue(forKey: subscriptionId)
-        cancelListenerTasks(for: subscriptionId)
-        subscriptionGeneration.removeValue(forKey: subscriptionId)
+    public func unsubscribe(subscriptionID: String) async {
+        subscriptionHandlers.removeValue(forKey: subscriptionID)
+        cancelListenerTasks(for: subscriptionID)
+        subscriptionGeneration.removeValue(forKey: subscriptionID)
 
-        eventCache.removeSubscription(subscriptionId)
+        eventCache.removeSubscription(subscriptionID)
 
         await withTaskGroup(of: Void.self) { group in
             for connection in relays.values {
                 group.addTask {
-                    try? await connection.unsubscribe(subscriptionId: subscriptionId)
+                    try? await connection.unsubscribe(subscriptionID: subscriptionID)
                 }
             }
         }
@@ -563,14 +563,14 @@ public actor RelayPool {
     /// The number of registered subscription handlers (test hook).
     var subscriptionHandlerCount: Int { subscriptionHandlers.count }
 
-    /// The listener generation currently serving `subscriptionId` (for tests).
-    func subscriptionGeneration(for subscriptionId: String) -> UInt64? {
-        subscriptionGeneration[subscriptionId]
+    /// The listener generation currently serving `subscriptionID` (for tests).
+    func subscriptionGeneration(for subscriptionID: String) -> UInt64? {
+        subscriptionGeneration[subscriptionID]
     }
 
-    /// The number of listener tasks registered for `subscriptionId` (for tests).
-    func listenerTaskCount(for subscriptionId: String) -> Int {
-        subscriptionTasks[subscriptionId]?.count ?? 0
+    /// The number of listener tasks registered for `subscriptionID` (for tests).
+    func listenerTaskCount(for subscriptionID: String) -> Int {
+        subscriptionTasks[subscriptionID]?.count ?? 0
     }
 
     /// The number of subscriptions with live listener tasks (test hook).
@@ -605,11 +605,11 @@ extension RelayPool {
 
 // MARK: - Event Deduplication
 extension RelayPool {
-    /// Records that `subscriptionId` has seen `eventID`, returning whether it is new to that
+    /// Records that `subscriptionID` has seen `eventID`, returning whether it is new to that
     /// subscription — that is, whether this copy should be delivered to its handler.
-    private func recordEvent(eventID: EventID, subscriptionId: String) -> Bool {
+    private func recordEvent(eventID: EventID, subscriptionID: String) -> Bool {
         expireCachedEventsIfNeeded()
-        return eventCache.record(eventID: eventID, subscriptionId: subscriptionId)
+        return eventCache.record(eventID: eventID, subscriptionID: subscriptionID)
     }
 
     /// Sweeps expired entries, at most once a minute so the sweep never dominates event
@@ -639,7 +639,7 @@ extension RelayPool {
     }
 
     /// The number of cached event IDs for a single subscription (test hook).
-    func deduplicationCacheSize(forSubscription subscriptionId: String) -> Int {
-        eventCache.count(forSubscription: subscriptionId)
+    func deduplicationCacheSize(forSubscription subscriptionID: String) -> Int {
+        eventCache.count(forSubscription: subscriptionID)
     }
 }
