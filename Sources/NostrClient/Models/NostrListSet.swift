@@ -59,7 +59,7 @@ public struct NostrListSet: Sendable, Hashable {
 
     /// Reads the public face of a set event: its metadata tags plus every non-metadata public
     /// item. Private items stay empty (decrypting them needs the author's key — see
-    /// ``EventSigner/openSet(_:)``).
+    /// ``init(event:decryptingWith:)``).
     /// - Throws: ``NostrError/invalidData`` when the event has no `d` identifier tag.
     public init(event: Event) throws {
         let tags = event.structuredTags
@@ -74,6 +74,21 @@ public struct NostrListSet: Sendable, Hashable {
         // Everything except the metadata tags is a public item, preserving unmodeled tags.
         self.publicItems = tags.filter { !Self.reservedTagNames.contains($0.name) }
         self.privateItems = []
+    }
+
+    /// Reads a set event authored by `signer`, decrypting its private items.
+    ///
+    /// Works with any signer, local or remote; empty content means there are no private items.
+    /// - Parameters:
+    ///   - event: The set event.
+    ///   - signer: The author's signer, which encrypted the private items to itself.
+    /// - Throws: ``NostrError/invalidData`` if the event has no `d` identifier tag;
+    ///   ``NostrError/decryptionFailed`` if the decrypted content is not a JSON tag array; anything
+    ///   resolving the signer's public key or decrypting throws — for example when the content was
+    ///   not encrypted by `signer` to itself.
+    public init(event: Event, decryptingWith signer: some NostrSigning) async throws {
+        try self.init(event: event)
+        privateItems = try await ListItemCipher.open(event.content, with: signer)
     }
 
     /// Tag names carried by dedicated properties (`d`, `title`, `image`, `description`)

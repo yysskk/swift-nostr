@@ -28,22 +28,47 @@ public struct NostrList: Sendable, Hashable {
     }
 
     /// Reads the public items of a list event; private items stay empty (decrypting them
-    /// needs the author's key — see ``EventSigner/openList(_:)``).
+    /// needs the author's key — see ``init(event:decryptingWith:)``).
     public init(event: Event) {
         self.kind = event.kind
         self.publicItems = event.structuredTags
         self.privateItems = []
     }
+
+    /// Reads a list event authored by `signer`, decrypting its private items.
+    ///
+    /// Works with any signer, local or remote; empty content means there are no private items.
+    /// - Parameters:
+    ///   - event: The list event.
+    ///   - signer: The author's signer, which encrypted the private items to itself.
+    /// - Throws: ``NostrError/decryptionFailed`` if the decrypted content is not a JSON tag array;
+    ///   anything resolving the signer's public key or decrypting throws — for example when the
+    ///   content was not encrypted by `signer` to itself.
+    public init(event: Event, decryptingWith signer: some NostrSigning) async throws {
+        self.init(event: event)
+        privateItems = try await ListItemCipher.open(event.content, with: signer)
+    }
 }
 
-/// The plaintext form of a NIP-51 list's private items: a JSON tag array, self-encrypted with
-/// NIP-44 into the event content.
+/// The private items of a NIP-51 list or set: a JSON tag array, NIP-44-encrypted to the author's
+/// own key in the event content.
 ///
-/// Only the encoding lives here; the sealing itself goes through the signer, synchronously for a
-/// local key and over a relay round-trip for a remote one. The private items of both the standard
-/// lists and the 30000-series sets share this representation, so this helper is deliberately kept
-/// independent of ``NostrList``.
+/// The encryption goes through the signer, synchronously for a local key and over a relay
+/// round-trip for a remote one. The standard lists and the 30000-series sets share this
+/// representation, so this helper is deliberately kept independent of ``NostrList``.
 enum ListItemCipher {
+    /// Encrypts `items` to `signer`'s own public key, or returns empty content when there are none.
+    static func seal(_ items: [Tag], with signer: some NostrSigning) async throws -> String {
+        guard let json = try plaintext(items) else { return "" }
+        return try await signer.nip44Encrypt(json, to: signer.publicKey)
+    }
+
+    /// Decrypts content `signer` encrypted to itself into items (empty content → []).
+    static func open(_ content: String, with signer: some NostrSigning) async throws -> [Tag] {
+        guard !content.isEmpty else { return [] }
+        return try items(fromJSON: await signer.nip44Decrypt(content, from: signer.publicKey))
+    }
+
     /// The JSON to seal for `items`, or nil when there is nothing to seal.
     ///
     /// NIP-44 sealing enforces a minimum plaintext size, so an empty item set is represented by

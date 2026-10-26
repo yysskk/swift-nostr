@@ -46,9 +46,7 @@ public struct NostrRoutingAPI: NostrRelayRouting {
         _ relayList: RelayListMetadata,
         strategy: PublishStrategy? = nil
     ) async throws -> PublishedEvent {
-        let event = try await client.withSigner { signer, publicKey in
-            try await signer.sign(.relayListMetadata(publicKey: publicKey, relayList))
-        }
+        let event = try await client.sign(.relayListMetadata(relayList))
         let result = try await client.pool.publish(event, strategy: strategy)
         await client.relayListStore.store(relayList, createdAt: event.createdAt, for: event.publicKey)
         return PublishedEvent(event: event, result: result)
@@ -158,9 +156,7 @@ public struct NostrRoutingAPI: NostrRelayRouting {
         _ relayList: DirectMessageRelayList,
         strategy: PublishStrategy? = nil
     ) async throws -> PublishedEvent {
-        let event = try await client.withSigner { signer, publicKey in
-            try await signer.sign(.directMessageRelayList(publicKey: publicKey, relayList))
-        }
+        let event = try await client.sign(.directMessageRelayList(relayList))
         let result = try await client.pool.publish(event, strategy: strategy)
         await client.dmRelayListStore.store(relayList, createdAt: event.createdAt, for: event.publicKey)
         return PublishedEvent(event: event, result: result)

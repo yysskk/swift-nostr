@@ -19,7 +19,10 @@ public struct RelayListMetadata: Codable, Hashable, Sendable {
     /// A relay listed more than once collapses into a single entry carrying every usage the
     /// caller asked for. Entries keep the order of their first appearance, matching how a parsed
     /// list de-duplicates.
-    package init(read: [RelayURL], write: [RelayURL]) {
+    /// - Parameters:
+    ///   - read: The relays the author reads from.
+    ///   - write: The relays the author writes to.
+    public init(read: [RelayURL], write: [RelayURL]) {
         let readSet = Set(read)
         let writeSet = Set(write)
 

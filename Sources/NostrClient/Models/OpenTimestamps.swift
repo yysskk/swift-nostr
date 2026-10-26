@@ -46,30 +46,27 @@ extension Event {
     }
 }
 
-// MARK: - UnsignedEvent Extension for OpenTimestamps
-extension UnsignedEvent {
-    /// Creates a new unsigned event with an OpenTimestamps tag added
-    public func withOpenTimestamps(_ ots: OpenTimestamps) -> UnsignedEvent {
-        var newTags = tags
-        // Remove existing ots tag if present
-        newTags.removeAll { $0.first == "ots" }
-        newTags.append(ots.tag.rawArray)
-
-        return UnsignedEvent(
-            publicKey: publicKey,
-            createdAt: createdAt,
-            kind: kind,
-            rawTags: newTags,
-            content: content
-        )
-    }
-}
-
-// MARK: - EventSigner Extension for OpenTimestamps
-extension EventSigner {
-    /// Signs an event and attaches an OpenTimestamps attestation
-    public func sign(_ unsignedEvent: UnsignedEvent, withOTS ots: OpenTimestamps) throws -> Event {
-        let eventWithOTS = unsignedEvent.withOpenTimestamps(ots)
-        return try sign(eventWithOTS)
+// MARK: - EventTemplate Extension for OpenTimestamps
+extension EventTemplate {
+    /// The OpenTimestamps attestation carried by the template's `ots` tag, if any.
+    ///
+    /// Setting an attestation replaces any existing `ots` tag with one at the end of ``tags``;
+    /// setting nil removes it:
+    ///
+    /// ```swift
+    /// var note = EventTemplate.textNote("timestamped")
+    /// note.openTimestamps = OpenTimestamps(otsFileData: otsFile)
+    /// let event = try signer.sign(note)
+    /// ```
+    public var openTimestamps: OpenTimestamps? {
+        get {
+            tags.first { $0.name == "ots" }?.primaryValue.map(OpenTimestamps.init(base64EncodedOTS:))
+        }
+        set {
+            tags.removeAll { $0.name == "ots" }
+            if let newValue {
+                tags.append(newValue.tag)
+            }
+        }
     }
 }

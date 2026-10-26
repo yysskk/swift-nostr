@@ -47,6 +47,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `NostrSigning.sign(_:)` signs a template as the signer's public key, so it works with a local
   `EventSigner` and a remote `RemoteSigner` alike, and `EventSigner.sign(_:)` does the same
   synchronously. `UnsignedEvent(_:publicKey:)` builds the unsigned event from a template.
+- **NostrClient's models build `EventTemplate`s**: `metadata(_:)`, `contactList(_:)`,
+  `relayListMetadata(_:)`, `directMessageRelayList(_:)`, `report(_:type:reason:)` for a public key or
+  an event, and `longFormContent(_:draft:)`. NIP-51 lists and sets come from
+  `list(_:encryptingWith:)` and `set(_:encryptingWith:)`, which NIP-44-encrypt the private items to
+  the given signer's own key, and are read back with `NostrList(event:decryptingWith:)` and
+  `NostrListSet(event:decryptingWith:)`; both take any `NostrSigning`, so a remote signer can now
+  build and read lists without a `NostrClient`. `EventTemplate.openTimestamps` reads and sets a
+  template's NIP-03 `ots` tag, replacing any existing one.
+- **`RelayListMetadata(read:write:)` is public**, building a NIP-65 list from read and write relay
+  URLs (a URL in both is read+write).
 
 ### Changed
 
@@ -373,6 +383,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   key, instead of an `UnsignedEvent` the caller had to key with `identity.publicKey`.
 - **`RelayConnection.authenticate(using:)` takes any `NostrSigning`**, so a remote signer can answer
   a relay's AUTH challenge on a direct connection too.
+- **NostrClient's models are signed from `EventTemplate`s** (breaking):
+  `EventSigner.signMetadata(_:)`, `signContactList(_:)`, `signContactList(publicKeys:)`,
+  `signRelayListMetadata(_:)`, `signRelayListMetadata(read:write:)`, `signDirectMessageRelayList(_:)`,
+  `signDirectMessageRelayList(relays:)`, `signReport(publicKey:type:reason:)`,
+  `signReport(event:type:reason:)`, `signLongFormContent(_:draft:)`, `signList(_:)`, and `signSet(_:)`
+  are removed. Sign the matching template instead — `signer.sign(.metadata(profile))`,
+  `.contactList(publicKeys.map { Contact(publicKey: $0) })`,
+  `.relayListMetadata(RelayListMetadata(read:write:))`,
+  `.directMessageRelayList(DirectMessageRelayList(relays:))`, `.report(publicKey, type:)`, and so on;
+  a list or set is `try await signer.sign(EventTemplate.list(list, encryptingWith: signer))`.
+- **NIP-51 private items are decrypted by an initializer** (breaking): `EventSigner.openList(_:)` and
+  `openSet(_:)` are replaced by `NostrList(event:decryptingWith:)` and
+  `NostrListSet(event:decryptingWith:)`, which take any `NostrSigning`.
+- **OpenTimestamps attach to a template** (breaking): `UnsignedEvent.withOpenTimestamps(_:)` and
+  `EventSigner.sign(_:withOTS:)` are replaced by setting `EventTemplate.openTimestamps` before
+  signing.
 
 ## [0.8.0] - 2026-10-25
 

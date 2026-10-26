@@ -195,10 +195,10 @@ struct NIP51SimpleGroupListTests {
         }
     }
 
-    // MARK: - Private entries through signList/openList
+    // MARK: - Private entries through list(_:encryptingWith:) / init(event:decryptingWith:)
 
     @Test("Private entries and additional private tags survive sign and open")
-    func privateEntriesRoundTrip() throws {
+    func privateEntriesRoundTrip() async throws {
         let signer = EventSigner(keyPair: try KeyPair())
         let typed = SimpleGroupList(
             publicEntries: [GroupListEntry(groupID: groupID, relayURL: groupRelay)],
@@ -210,7 +210,7 @@ struct NIP51SimpleGroupListTests {
             additionalPrivateTags: [Event.Tag(name: "note", values: ["private-marker"])]
         )
 
-        let event = try signer.signList(typed.list)
+        let event = try await signer.sign(EventTemplate.list(typed.list, encryptingWith: signer))
         #expect(event.kind == .simpleGroupList)
         #expect(try event.verify())
         // The private entries are encrypted: the content leaks neither ("-" and " " are
@@ -220,7 +220,7 @@ struct NIP51SimpleGroupListTests {
         #expect(!event.content.contains("Secret Kitchen"))
         #expect(!event.content.contains("private-marker"))
 
-        let reread = try SimpleGroupList(list: signer.openList(event))
+        let reread = try SimpleGroupList(list: await NostrList(event: event, decryptingWith: signer))
         #expect(reread == typed)
 
         // Without the author's key only the public face is visible.
@@ -440,7 +440,7 @@ struct NIP51SimpleGroupListClientTests {
             privateEntries: [GroupListEntry(groupID: "5ec4e7", relayURL: RelayURL("wss://hidden.example.com")!)],
             relayURLs: [groupRelay]
         )
-        let event = try signer.signList(typed.list)
+        let event = try await signer.sign(EventTemplate.list(typed.list, encryptingWith: signer))
 
         let fetched = try await answering(socket, with: [event]) {
             try await client.groups.fetchSimpleGroupList()

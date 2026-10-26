@@ -93,8 +93,9 @@ struct RelayListStoreTests {
         let keyPair = try KeyPair()
         let signer = EventSigner(keyPair: keyPair)
 
-        let event = try signer.signRelayListMetadata(
-            RelayListMetadata(entries: [RelayListEntry(url: RelayURL("wss://a.example.com")!, usage: .write)])
+        let event = try await signer.sign(
+            .relayListMetadata(
+                RelayListMetadata(entries: [RelayListEntry(url: RelayURL("wss://a.example.com")!, usage: .write)]))
         )
         let ingested = await store.ingest(event)
         #expect(ingested != nil)

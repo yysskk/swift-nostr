@@ -59,7 +59,7 @@ struct NIP23LongFormTests {
             hashtags: ["a", "b"],
             content: "Body text"
         )
-        let event = try makeSigner().signLongFormContent(article)
+        let event = try makeSigner().sign(.longFormContent(article))
 
         let parsed = try #require(LongFormContent(event: event))
         #expect(parsed.identifier == "round-trip")
@@ -107,16 +107,16 @@ struct NIP23LongFormTests {
 
     // MARK: - Signing
 
-    @Test("signLongFormContent(draft: true) signs a kind 30024 event")
+    @Test("longFormContent(_:draft: true) signs a kind 30024 event")
     func signDraftKind() throws {
-        let event = try makeSigner().signLongFormContent(LongFormContent(identifier: "d"), draft: true)
+        let event = try makeSigner().sign(.longFormContent(LongFormContent(identifier: "d"), draft: true))
         #expect(event.kind == .longFormDraft)
         #expect(try event.verify())
     }
 
-    @Test("signLongFormContent(draft: false) signs a kind 30023 event")
+    @Test("longFormContent(_:draft: false) signs a kind 30023 event")
     func signArticleKind() throws {
-        let event = try makeSigner().signLongFormContent(LongFormContent(identifier: "d"), draft: false)
+        let event = try makeSigner().sign(.longFormContent(LongFormContent(identifier: "d"), draft: false))
         #expect(event.kind == .longFormContent)
         #expect(try event.verify())
     }
@@ -124,7 +124,7 @@ struct NIP23LongFormTests {
     @Test("publishedAt is auto-filled when nil")
     func publishedAtAutoFilled() throws {
         let before = Timestamp.now
-        let event = try makeSigner().signLongFormContent(LongFormContent(identifier: "d"))
+        let event = try makeSigner().sign(.longFormContent(LongFormContent(identifier: "d")))
         let after = Timestamp.now
         let publishedAt = try #require(LongFormContent(event: event)?.publishedAt)
         #expect(publishedAt >= before)
@@ -134,9 +134,7 @@ struct NIP23LongFormTests {
     @Test("publishedAt is preserved when set")
     func publishedAtPreserved() throws {
         let published = Timestamp(rawValue: 1_650_000_000)
-        let event = try makeSigner().signLongFormContent(
-            LongFormContent(identifier: "d", publishedAt: published)
-        )
+        let event = try makeSigner().sign(.longFormContent(LongFormContent(identifier: "d", publishedAt: published)))
         #expect(LongFormContent(event: event)?.publishedAt == published)
         #expect(event.firstTagValue(named: "published_at") == "1650000000")
     }
@@ -171,7 +169,7 @@ struct NIP23LongFormTests {
     func naddrRoundTrips() throws {
         let signer = try makeSigner()
         let article = LongFormContent(identifier: "addressable-id")
-        let event = try signer.signLongFormContent(article, draft: false)
+        let event = try signer.sign(.longFormContent(article, draft: false))
 
         let naddr = try article.naddr(author: signer.publicKey)
         let decoded = try NAddr(bech32String: naddr.encoded)
@@ -190,7 +188,7 @@ struct NIP23LongFormTests {
     @Test("Event.longFormContent is non-nil for an article and nil for a text note")
     func eventLongFormContentProperty() throws {
         let signer = try makeSigner()
-        let article = try signer.signLongFormContent(LongFormContent(identifier: "d", title: "T"))
+        let article = try signer.sign(.longFormContent(LongFormContent(identifier: "d", title: "T")))
         #expect(article.longFormContent?.title == "T")
 
         let note = try signer.sign(.textNote("hi"))
@@ -244,13 +242,14 @@ struct NIP23LongFormTests {
     @Test("fetchLongFormContent(author:identifier:) keeps the newest version across relays")
     func fetchNewestWins() async throws {
         let signer = try makeSigner()
-        let older = try signer.signLongFormContent(
-            LongFormContent(
-                identifier: "same-d",
-                title: "Old",
-                publishedAt: Timestamp(rawValue: 1_600_000_000)
-            )
-        )
+        let older = try await signer.sign(
+            .longFormContent(
+                LongFormContent(
+                    identifier: "same-d",
+                    title: "Old",
+                    publishedAt: Timestamp(rawValue: 1_600_000_000)
+                )
+            ))
         // A distinct newer event for the same identifier (later createdAt wins).
         let newerBase = LongFormContent(
             identifier: "same-d",
@@ -300,7 +299,7 @@ struct NIP23LongFormTests {
     func fetchByNAddr() async throws {
         let signer = try makeSigner()
         let article = LongFormContent(identifier: "coord-d", title: "Coordinated")
-        let event = try signer.signLongFormContent(article, draft: false)
+        let event = try await signer.sign(.longFormContent(article, draft: false))
 
         let mock = MockWebSocketSession()
         let pool = RelayPool(

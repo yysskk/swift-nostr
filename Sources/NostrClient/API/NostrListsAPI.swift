@@ -16,10 +16,10 @@ public struct NostrListsAPI: NostrListManaging {
     /// - Returns: The signed event together with the per-relay publish outcome.
     @discardableResult
     public func publish(_ list: NostrList, strategy: PublishStrategy? = nil) async throws -> PublishedEvent {
-        let event = try await client.withSigner { signer, publicKey in
-            let content = try await Self.sealPrivateItems(list.privateItems, with: signer, ownPublicKey: publicKey)
-            return try await signer.sign(.list(publicKey: publicKey, list, encryptedContent: content))
+        let template = try await client.withSigner { signer, _ in
+            try await EventTemplate.list(list, encryptingWith: signer)
         }
+        let event = try await client.sign(template)
         let result = try await client.pool.publish(event, strategy: strategy)
         return PublishedEvent(event: event, result: result)
     }
@@ -51,7 +51,9 @@ public struct NostrListsAPI: NostrListManaging {
         // own list, and surface a decrypt failure so a subsequent republish cannot silently
         // drop the private items.
         if publicKey == nil, await client.hasSigner {
-            return try await openList(newest)
+            return try await client.withSigner { signer, _ in
+                try await NostrList(event: newest, decryptingWith: signer)
+            }
         }
         return NostrList(event: newest)
     }
@@ -66,10 +68,10 @@ public struct NostrListsAPI: NostrListManaging {
         _ set: NostrListSet,
         strategy: PublishStrategy? = nil
     ) async throws -> PublishedEvent {
-        let event = try await client.withSigner { signer, publicKey in
-            let content = try await Self.sealPrivateItems(set.privateItems, with: signer, ownPublicKey: publicKey)
-            return try await signer.sign(.set(publicKey: publicKey, set, encryptedContent: content))
+        let template = try await client.withSigner { signer, _ in
+            try await EventTemplate.set(set, encryptingWith: signer)
         }
+        let event = try await client.sign(template)
         let result = try await client.pool.publish(event, strategy: strategy)
         return PublishedEvent(event: event, result: result)
     }
@@ -101,7 +103,7 @@ public struct NostrListsAPI: NostrListManaging {
             return nil
         }
         if publicKey == nil, await client.hasSigner {
-            return try await openSet(newest)
+            return try await decryptedSet(newest)
         }
         return try NostrListSet(event: newest)
     }
@@ -136,7 +138,7 @@ public struct NostrListsAPI: NostrListManaging {
         let decrypt = publicKey == nil ? await client.hasSigner : false
         var sets: [NostrListSet] = []
         for event in newestByIdentifier.values {
-            sets.append(decrypt ? try await openSet(event) : try NostrListSet(event: event))
+            sets.append(decrypt ? try await decryptedSet(event) : try NostrListSet(event: event))
         }
         return sets
     }
@@ -164,7 +166,7 @@ public struct NostrListsAPI: NostrListManaging {
         return try NostrListSet(event: newest)
     }
 
-    // MARK: - Private items (NIP-44 to the author's own key)
+    // MARK: - Private
 
     /// The author to query: the given public key, or the signer's own when none is given.
     /// - Throws: ``NostrError/signerNotSet`` when neither is available.
@@ -173,35 +175,8 @@ public struct NostrListsAPI: NostrListManaging {
         return try await client.requiredPublicKey()
     }
 
-    /// Reads a list event authored by the current user, decrypting its private items.
-    private func openList(_ event: Event) async throws -> NostrList {
-        var list = NostrList(event: event)
-        list.privateItems = try await openPrivateItems(event.content)
-        return list
-    }
-
     /// Reads a set event authored by the current user, decrypting its private items.
-    private func openSet(_ event: Event) async throws -> NostrListSet {
-        var set = try NostrListSet(event: event)
-        set.privateItems = try await openPrivateItems(event.content)
-        return set
-    }
-
-    /// Seals a list's or set's private items to the author's own key, or returns empty content
-    /// when there are none. Goes through the signer, so a remote NIP-46 signer seals them too.
-    private static func sealPrivateItems(
-        _ items: [Tag], with signer: any NostrSigning, ownPublicKey: PublicKey
-    ) async throws -> String {
-        guard let json = try ListItemCipher.plaintext(items) else { return "" }
-        return try await signer.nip44Encrypt(json, to: ownPublicKey)
-    }
-
-    /// Opens the self-encrypted private items of a list or set event (empty content → []).
-    private func openPrivateItems(_ content: String) async throws -> [Tag] {
-        guard !content.isEmpty else { return [] }
-        let json = try await client.withSigner { signer, publicKey in
-            try await signer.nip44Decrypt(content, from: publicKey)
-        }
-        return try ListItemCipher.items(fromJSON: json)
+    private func decryptedSet(_ event: Event) async throws -> NostrListSet {
+        try await client.withSigner { signer, _ in try await NostrListSet(event: event, decryptingWith: signer) }
     }
 }
