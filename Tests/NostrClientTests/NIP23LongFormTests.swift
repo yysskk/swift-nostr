@@ -153,7 +153,7 @@ struct NIP23LongFormTests {
 
         let article = try #require(LongFormContent(event: event))
         #expect(article.publishedAt == Timestamp(rawValue: .max))
-        #expect(article.toTags().contains(["published_at", "9223372036854775807"]))
+        #expect(article.tags.contains(["published_at", "9223372036854775807"]))
     }
 
     @Test("a published_at that is not an integer is ignored")
