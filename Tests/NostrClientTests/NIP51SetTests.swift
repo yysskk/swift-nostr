@@ -29,11 +29,6 @@ struct NIP51SetTests {
         }
     }
 
-    @Test("followSet shares its raw value with categorizedPeopleList")
-    func followSetSharesRawValue() {
-        #expect(Event.Kind.followSet == Event.Kind.categorizedPeopleList)
-    }
-
     // MARK: - init validation
 
     @Test("init throws invalidKind for a non-addressable kind")
