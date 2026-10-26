@@ -42,8 +42,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `createdAt` — everything but the public key, id, and signature — as mutable properties, so a
   template can be adjusted before signing. Static factories build the NostrCore events:
   `textNote(_:tags:)`, `reaction(to:content:)`, `repost(of:relayURL:)`, `deletion(of:reason:)`,
-  `clientAuthentication(relayURL:challenge:)`, and
-  `zapRequest(to:relays:amountMillisats:lnurl:eventID:eventCoordinate:comment:)`.
+  `clientAuthentication(relayURL:challenge:)`,
+  `zapRequest(to:relays:amountMillisats:lnurl:eventID:eventCoordinate:comment:)`, the NIP-29
+  `groupJoinRequest(groupID:inviteCode:reason:)`, `groupLeaveRequest(groupID:reason:)`,
+  `groupContent(groupID:kind:content:tags:previous:)`, and `groupModeration(_:groupID:previous:reason:)`,
+  and the NIP-98 `httpAuthorization(url:method:payload:)`.
   `NostrSigning.sign(_:)` signs a template as the signer's public key, so it works with a local
   `EventSigner` and a remote `RemoteSigner` alike, and `EventSigner.sign(_:)` does the same
   synchronously. `UnsignedEvent(_:publicKey:)` builds the unsigned event from a template.
@@ -399,6 +402,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **OpenTimestamps attach to a template** (breaking): `UnsignedEvent.withOpenTimestamps(_:)` and
   `EventSigner.sign(_:withOTS:)` are replaced by setting `EventTemplate.openTimestamps` before
   signing.
+- **NIP-29 group and NIP-98 authorization events are built as `EventTemplate`s** (breaking):
+  `Groups.joinRequest`, `leaveRequest`, `contentEvent`, and `moderationEvent` — both the `publicKey:`
+  variants returning an `UnsignedEvent` and the `signer:` variants returning a signed `Event` — are
+  removed, as are `HTTPAuth.authorizationEvent(url:method:payload:createdAt:signer:)` and
+  `HTTPAuth.authorizationHeaderValue(url:method:payload:createdAt:signer:)`. Sign the matching
+  template instead — `signer.sign(.groupJoinRequest(groupID: id))`,
+  `.groupModeration(action, groupID: id)`, and so on, setting the template's `createdAt` for a custom
+  time — and encode a signed `.httpAuthorization(url:method:payload:)` event with
+  `HTTPAuth.authorizationHeaderValue(for:)`. `URLRequest.setNostrAuthorization(signer:)` is unchanged.
 
 ## [0.8.0] - 2026-10-25
 

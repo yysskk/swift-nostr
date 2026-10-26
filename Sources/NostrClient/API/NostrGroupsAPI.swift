@@ -39,14 +39,11 @@ public struct NostrGroupsAPI: NostrGroupManaging {
         reason: String? = nil,
         strategy: PublishStrategy? = nil
     ) async throws -> PublishedEvent {
-        try await publish(to: group, strategy: strategy) { publicKey in
-            Groups.joinRequest(
-                groupID: group.id,
-                inviteCode: inviteCode ?? group.inviteCode,
-                reason: reason,
-                publicKey: publicKey
-            )
-        }
+        try await publish(
+            .groupJoinRequest(groupID: group.id, inviteCode: inviteCode ?? group.inviteCode, reason: reason),
+            to: group,
+            strategy: strategy
+        )
     }
 
     /// Requests to leave a group (kind 9022), publishing only to the group's relay; the
@@ -68,9 +65,7 @@ public struct NostrGroupsAPI: NostrGroupManaging {
         reason: String? = nil,
         strategy: PublishStrategy? = nil
     ) async throws -> PublishedEvent {
-        try await publish(to: group, strategy: strategy) { publicKey in
-            Groups.leaveRequest(groupID: group.id, reason: reason, publicKey: publicKey)
-        }
+        try await publish(.groupLeaveRequest(groupID: group.id, reason: reason), to: group, strategy: strategy)
     }
 
     // MARK: - Posting
@@ -106,16 +101,11 @@ public struct NostrGroupsAPI: NostrGroupManaging {
         previous: [String] = [],
         strategy: PublishStrategy? = nil
     ) async throws -> PublishedEvent {
-        try await publish(to: group, strategy: strategy) { publicKey in
-            Groups.contentEvent(
-                groupID: group.id,
-                kind: kind,
-                content: content,
-                tags: tags,
-                previous: previous,
-                publicKey: publicKey
-            )
-        }
+        try await publish(
+            .groupContent(groupID: group.id, kind: kind, content: content, tags: tags, previous: previous),
+            to: group,
+            strategy: strategy
+        )
     }
 
     /// Publishes a moderation action (kinds 9000-9002, 9005, 9007-9010), only to the group's relay,
@@ -145,9 +135,11 @@ public struct NostrGroupsAPI: NostrGroupManaging {
         reason: String? = nil,
         strategy: PublishStrategy? = nil
     ) async throws -> PublishedEvent {
-        try await publish(to: group, strategy: strategy) { publicKey in
-            Groups.moderationEvent(action, groupID: group.id, previous: previous, reason: reason, publicKey: publicKey)
-        }
+        try await publish(
+            .groupModeration(action, groupID: group.id, previous: previous, reason: reason),
+            to: group,
+            strategy: strategy
+        )
     }
 
     // MARK: - Reading
@@ -312,16 +304,18 @@ public struct NostrGroupsAPI: NostrGroupManaging {
 
     // MARK: - Private
 
-    /// Signs an event built for the group and publishes it to the group's relay only —
+    /// Signs `template` with the configured signer and publishes it to the group's relay only —
     /// the shape every write flow above shares.
+    ///
+    /// Signing comes first, so without a signer ``NostrError/signerNotSet`` is thrown before the
+    /// group's relay is touched.
     private func publish(
+        _ template: EventTemplate,
         to group: GroupReference,
-        strategy: PublishStrategy?,
-        _ build: (_ publicKey: PublicKey) -> UnsignedEvent
+        strategy: PublishStrategy?
     ) async throws -> PublishedEvent {
-        let publicKey = try await client.requiredPublicKey()
+        let event = try await client.sign(template)
         let relayURL = try await ensureRelay(group)
-        let event = try await client.activeSign(build(publicKey))
         let result = try await client.pool.publish(event, to: [relayURL], strategy: strategy)
         return PublishedEvent(event: event, result: result)
     }

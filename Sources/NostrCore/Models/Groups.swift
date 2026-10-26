@@ -8,200 +8,25 @@ import Foundation
 /// members, roles) as relay-signed kind-39xxx events that clients only parse. Private
 /// groups additionally require NIP-42 AUTH before the relay serves their events.
 ///
+/// `Groups` holds the timeline-reference helpers and the parsers for relay-generated state and
+/// moderation events; the events a user sends are ``EventTemplate`` factories such as
+/// ``EventTemplate/groupJoinRequest(groupID:inviteCode:reason:)`` and
+/// ``EventTemplate/groupContent(groupID:kind:content:tags:previous:)``:
+///
 /// ```swift
-/// let join = try await Groups.joinRequest(groupID: "abcdef", signer: signer)
-/// let message = try await Groups.contentEvent(
-///     groupID: "abcdef",
-///     kind: .chatMessage,
-///     content: "hello",
-///     previous: Groups.previousReferences(from: recentEvents),
-///     signer: signer
+/// let join = try await signer.sign(.groupJoinRequest(groupID: "abcdef"))
+/// let message = try await signer.sign(
+///     .groupContent(
+///         groupID: "abcdef",
+///         kind: .chatMessage,
+///         content: "hello",
+///         previous: Groups.previousReferences(from: recentEvents)
+///     )
 /// )
 /// ```
 ///
 /// https://github.com/nostr-protocol/nips/blob/master/29.md
 public enum Groups {
-    // MARK: - Membership Requests
-
-    /// Builds an unsigned kind-9021 request to join a group.
-    ///
-    /// The event's first tag is the group's "h" tag, followed by a "code" tag when
-    /// `inviteCode` is given. Closed groups accept the request automatically for a valid
-    /// invite code; otherwise an admin decides.
-    ///
-    /// - Parameters:
-    ///   - groupID: The group's id on its relay.
-    ///   - inviteCode: An invite code to join a closed group without admin approval, if any.
-    ///   - reason: An optional free-form message to the group's admins; becomes the event
-    ///     content ("" when nil).
-    ///   - publicKey: The requesting user's public key.
-    ///   - createdAt: The event timestamp. Defaults to now.
-    /// - Returns: The unsigned kind-9021 event.
-    public static func joinRequest(
-        groupID: String,
-        inviteCode: String? = nil,
-        reason: String? = nil,
-        publicKey: PublicKey,
-        createdAt: Timestamp = .now
-    ) -> UnsignedEvent {
-        var tags: [Tag] = [.group(groupID)]
-        if let inviteCode {
-            tags.append(.inviteCode(inviteCode))
-        }
-        return UnsignedEvent(
-            publicKey: publicKey,
-            createdAt: createdAt,
-            kind: .groupJoinRequest,
-            tags: tags,
-            content: reason ?? ""
-        )
-    }
-
-    /// Builds and signs a kind-9021 request to join a group.
-    ///
-    /// See ``joinRequest(groupID:inviteCode:reason:publicKey:createdAt:)`` for the event
-    /// layout; the author is resolved from `signer`.
-    ///
-    /// - Returns: The signed kind-9021 event.
-    /// - Throws: Whatever `signer` throws while resolving its public key or signing.
-    public static func joinRequest(
-        groupID: String,
-        inviteCode: String? = nil,
-        reason: String? = nil,
-        createdAt: Timestamp = .now,
-        signer: some NostrSigning
-    ) async throws -> Event {
-        try await signer.sign(
-            joinRequest(
-                groupID: groupID,
-                inviteCode: inviteCode,
-                reason: reason,
-                publicKey: try await signer.publicKey,
-                createdAt: createdAt
-            )
-        )
-    }
-
-    /// Builds an unsigned kind-9022 request to leave a group.
-    ///
-    /// The event carries the group's "h" tag; the relay answers by issuing a kind-9001
-    /// removal for the author.
-    ///
-    /// - Parameters:
-    ///   - groupID: The group's id on its relay.
-    ///   - reason: An optional free-form message; becomes the event content ("" when nil).
-    ///   - publicKey: The leaving user's public key.
-    ///   - createdAt: The event timestamp. Defaults to now.
-    /// - Returns: The unsigned kind-9022 event.
-    public static func leaveRequest(
-        groupID: String,
-        reason: String? = nil,
-        publicKey: PublicKey,
-        createdAt: Timestamp = .now
-    ) -> UnsignedEvent {
-        UnsignedEvent(
-            publicKey: publicKey,
-            createdAt: createdAt,
-            kind: .groupLeaveRequest,
-            tags: [.group(groupID)],
-            content: reason ?? ""
-        )
-    }
-
-    /// Builds and signs a kind-9022 request to leave a group.
-    ///
-    /// See ``leaveRequest(groupID:reason:publicKey:createdAt:)`` for the event layout; the
-    /// author is resolved from `signer`.
-    ///
-    /// - Returns: The signed kind-9022 event.
-    /// - Throws: Whatever `signer` throws while resolving its public key or signing.
-    public static func leaveRequest(
-        groupID: String,
-        reason: String? = nil,
-        createdAt: Timestamp = .now,
-        signer: some NostrSigning
-    ) async throws -> Event {
-        try await signer.sign(
-            leaveRequest(
-                groupID: groupID,
-                reason: reason,
-                publicKey: try await signer.publicKey,
-                createdAt: createdAt
-            )
-        )
-    }
-
-    // MARK: - Group-Scoped Content
-
-    /// Builds an unsigned event of any kind scoped to a group.
-    ///
-    /// NIP-29 defines no content kinds of its own — pass e.g. ``Event/Kind/chatMessage``
-    /// (NIP-C7) or ``Event/Kind/thread`` (NIP-7D). The event's first tag is the group's "h"
-    /// tag, followed by `tags` in order, then a "previous" tag only when `previous` is
-    /// non-empty.
-    ///
-    /// - Parameters:
-    ///   - groupID: The group's id on its relay.
-    ///   - kind: The content kind, e.g. ``Event/Kind/chatMessage``.
-    ///   - content: The event content.
-    ///   - tags: Additional tags, appended after the "h" tag in order.
-    ///   - previous: Timeline references for a trailing "previous" tag, e.g. from
-    ///     ``previousReferences(from:excludingAuthor:maxCount:)``. Omitted when empty.
-    ///   - publicKey: The author's public key.
-    ///   - createdAt: The event timestamp. Defaults to now.
-    /// - Returns: The unsigned group-scoped event.
-    public static func contentEvent(
-        groupID: String,
-        kind: Event.Kind,
-        content: String,
-        tags: [Tag] = [],
-        previous: [String] = [],
-        publicKey: PublicKey,
-        createdAt: Timestamp = .now
-    ) -> UnsignedEvent {
-        var allTags: [Tag] = [.group(groupID)]
-        allTags.append(contentsOf: tags)
-        if !previous.isEmpty {
-            allTags.append(.previous(previous))
-        }
-        return UnsignedEvent(
-            publicKey: publicKey,
-            createdAt: createdAt,
-            kind: kind,
-            tags: allTags,
-            content: content
-        )
-    }
-
-    /// Builds and signs an event of any kind scoped to a group.
-    ///
-    /// See ``contentEvent(groupID:kind:content:tags:previous:publicKey:createdAt:)`` for the
-    /// event layout; the author is resolved from `signer`.
-    ///
-    /// - Returns: The signed group-scoped event.
-    /// - Throws: Whatever `signer` throws while resolving its public key or signing.
-    public static func contentEvent(
-        groupID: String,
-        kind: Event.Kind,
-        content: String,
-        tags: [Tag] = [],
-        previous: [String] = [],
-        createdAt: Timestamp = .now,
-        signer: some NostrSigning
-    ) async throws -> Event {
-        try await signer.sign(
-            contentEvent(
-                groupID: groupID,
-                kind: kind,
-                content: content,
-                tags: tags,
-                previous: previous,
-                publicKey: try await signer.publicKey,
-                createdAt: createdAt
-            )
-        )
-    }
-
     // MARK: - Timeline References ("previous")
 
     /// The NIP-29 timeline reference for an event id: the first 8 characters of its hex form.

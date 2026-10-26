@@ -258,7 +258,7 @@ struct NostrSigningClientTests {
         let connection = try #require(await client.relays.pool.relay(for: relayURL))
         try await pollUntil { await connection.authenticationChallenge != nil }
 
-        // Manual mode: the remote signer must still be able to answer via activeSign.
+        // Manual mode: the remote signer must still be able to answer through the client.
         // authenticate(relayURL:) awaits the relay's OK, so drive it concurrently and settle it.
         let authTask = Task { try await client.identity.authenticate(relayURL: relayURL) }
         try await pollUntil { mock.sentTextFrames.contains { $0.hasPrefix("[\"AUTH\"") } }

@@ -27,6 +27,15 @@ import Foundation
 /// try await request.setNostrAuthorization(signer: signer)
 /// ```
 ///
+/// Without a `URLRequest`, sign
+/// ``EventTemplate/httpAuthorization(url:method:payload:)`` and encode the
+/// event with ``authorizationHeaderValue(for:)``:
+///
+/// ```swift
+/// let event = try await signer.sign(.httpAuthorization(url: uploadURL, method: "POST", payload: body))
+/// let header = try HTTPAuth.authorizationHeaderValue(for: event)
+/// ```
+///
 /// https://github.com/nostr-protocol/nips/blob/master/98.md
 public enum HTTPAuth {
     /// The HTTP header field a NIP-98 event travels in: "Authorization".
@@ -35,82 +44,17 @@ public enum HTTPAuth {
     /// The `Authorization` scheme identifying a NIP-98 credential: "Nostr".
     public static let scheme = "Nostr"
 
-    /// Builds and signs a kind-27235 authorization event for an HTTP request.
-    ///
-    /// The event's "u" tag is the exact absolute URL — servers compare it
-    /// including query parameters — and the "method" tag is `method`
-    /// uppercased. When `payload` is given, a "payload" tag carries its
-    /// lowercase hex SHA-256; include the body of POST/PUT/PATCH requests so
-    /// servers can bind the authorization to it.
-    ///
-    /// - Parameters:
-    ///   - url: The absolute request URL, including any query parameters.
-    ///   - method: The HTTP request method, e.g. "GET" or "POST".
-    ///   - payload: The request body to commit to in a "payload" tag, if any.
-    ///   - createdAt: The event timestamp; servers reject events outside a
-    ///     small window around their clock (the NIP suggests 60 seconds), so
-    ///     sign immediately before sending. Defaults to now.
-    ///   - signer: The identity to sign as; a remote signer resolves the
-    ///     signature via a relay round-trip.
-    /// - Returns: The signed kind-27235 event.
-    /// - Throws: Whatever `signer` throws while resolving its public key or
-    ///   signing.
-    public static func authorizationEvent(
-        url: URL,
-        method: String,
-        payload: Data? = nil,
-        createdAt: Timestamp = .now,
-        signer: some NostrSigning
-    ) async throws -> Event {
-        var tags: [Tag] = [
-            .url(url.absoluteString),
-            .method(method.uppercased()),
-        ]
-        if let payload {
-            tags.append(.payload(sha256: Data(SHA256.hash(data: payload)).hexEncodedString()))
-        }
-        let unsigned = UnsignedEvent(
-            publicKey: try await signer.publicKey,
-            createdAt: createdAt,
-            kind: .httpAuth,
-            tags: tags,
-            content: ""
-        )
-        return try await signer.sign(unsigned)
-    }
-
     /// Encodes a signed kind-27235 event as an `Authorization` header value:
     /// the scheme "Nostr", a space, and the base64-encoded event JSON.
     ///
-    /// - Parameter event: A signed NIP-98 event, e.g. from
-    ///   ``authorizationEvent(url:method:payload:createdAt:signer:)``.
+    /// - Parameter event: A signed NIP-98 event, e.g. signed from
+    ///   ``EventTemplate/httpAuthorization(url:method:payload:)``.
     /// - Returns: The header value, e.g. `"Nostr eyJpZCI6…"`.
     /// - Throws: ``NostrError/invalidData`` when `event` is not kind 27235.
     public static func authorizationHeaderValue(for event: Event) throws -> String {
         guard event.kind == .httpAuth else { throw NostrError.invalidData }
         let json = try JSONEncoder().encode(event)
         return "\(scheme) \(json.base64EncodedString())"
-    }
-
-    /// Builds, signs, and encodes an authorization event in one call.
-    ///
-    /// See ``authorizationEvent(url:method:payload:createdAt:signer:)`` for
-    /// the parameters and ``authorizationHeaderValue(for:)`` for the header
-    /// format.
-    ///
-    /// - Returns: The `Authorization` header value, e.g. `"Nostr eyJpZCI6…"`.
-    public static func authorizationHeaderValue(
-        url: URL,
-        method: String,
-        payload: Data? = nil,
-        createdAt: Timestamp = .now,
-        signer: some NostrSigning
-    ) async throws -> String {
-        try authorizationHeaderValue(
-            for: await authorizationEvent(
-                url: url, method: method, payload: payload, createdAt: createdAt, signer: signer
-            )
-        )
     }
 }
 
@@ -278,12 +222,9 @@ extension URLRequest {
     ///   whatever `signer` throws.
     public mutating func setNostrAuthorization(signer: some NostrSigning) async throws {
         guard let url else { throw NostrError.invalidData }
-        let value = try await HTTPAuth.authorizationHeaderValue(
-            url: url,
-            method: httpMethod ?? "GET",
-            payload: httpBody,
-            signer: signer
+        let event = try await signer.sign(
+            .httpAuthorization(url: url, method: httpMethod ?? "GET", payload: httpBody)
         )
-        setValue(value, forHTTPHeaderField: HTTPAuth.headerField)
+        setValue(try HTTPAuth.authorizationHeaderValue(for: event), forHTTPHeaderField: HTTPAuth.headerField)
     }
 }

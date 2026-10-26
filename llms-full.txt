@@ -463,6 +463,8 @@ EventTemplate.clientAuthentication(relayURL: relay, challenge: "challenge")  // 
 try EventTemplate.zapRequest(                                // kind 9734 (NIP-57); throws invalidData for no relays
     to: recipient, relays: [relay], amountMillisats: 21_000, lnurl: lnurl,
     eventID: nil, eventCoordinate: nil, comment: "great post")
+EventTemplate.httpAuthorization(url: url, method: "post", payload: body)  // kind 27235 (NIP-98)
+EventTemplate.groupJoinRequest(groupID: "abcdef")           // NIP-29 group factories: see Groups
 
 var note = EventTemplate.textNote("expiring")
 note.tags.append(.expiration(.now.advanced(by: .seconds(3600))))
@@ -710,8 +712,8 @@ CustomStringConvertible). `rawValue: Int64` is the number exactly as on the wire
 re-encoding never changes an event or its id; the JSON encoding is a bare integer and decoding a
 non-integer fails. `description` is the decimal seconds. Used by `Event.createdAt`,
 `UnsignedEvent.createdAt`, `Filter.since`/`until`, `Tag.expiration`, `Event.expiration`,
-`isExpired(asOf:)`, the `createdAt:` parameters of `Groups` and `HTTPAuth` (default `.now`), the
-`now:` of `HTTPAuth.validate` (default `.now`, checked against a `Duration` `tolerance:`),
+`isExpired(asOf:)`, `EventTemplate.createdAt` (default `.now`), the `now:` of `HTTPAuth.validate`
+(default `.now`, checked against a `Duration` `tolerance:`),
 `DirectMessage`/`DirectMessageReaction`/`DirectMessageFile` `createdAt` and `expiresAt`, the
 `expiration:` parameters of `client.messages`, `DirectMessageBuilder`, and `GiftWrap.wrap`,
 `LongFormContent.publishedAt`, `client.groups.timeline(_:kinds:since:limit:)`,
@@ -1164,29 +1166,31 @@ relay-signed kind-39xxx events (group id in the "d" tag) that clients only parse
 groups require NIP-42 AUTH. `event.groupID` reads the "h" tag value, or the "d" tag for kinds
 39000-39005.
 
-### Event Builders
+### Event Templates
 
-Every builder has an unsigned variant (pass `publicKey:`, returns `UnsignedEvent`) and a signing
-variant (pass `signer:`, any `NostrSigning` — local or NIP-46 remote — returns `Event`):
+The events a user sends are `EventTemplate` factories; sign them with any `NostrSigning` — local or
+NIP-46 remote — and set `createdAt` on the template for a custom time:
 
 ```swift
 // Join (kind 9021; invite code joins a closed group without admin approval) and leave (9022).
-let join = try await Groups.joinRequest(groupID: "abcdef", inviteCode: "A7fjq2", signer: signer)
-let leave = try await Groups.leaveRequest(groupID: "abcdef", reason: "bye", signer: signer)
+let join = try await signer.sign(.groupJoinRequest(groupID: "abcdef", inviteCode: "A7fjq2"))
+let leave = try await signer.sign(.groupLeaveRequest(groupID: "abcdef", reason: "bye"))
 
 // Group-scoped content of any kind — NIP-29 defines no content kinds of its own; kind 9
-// (NIP-C7 chat) and kind 11 (NIP-7D thread) are common. First tag is ["h", groupID].
-let message = try await Groups.contentEvent(
-    groupID: "abcdef", kind: .chatMessage, content: "hello",
-    previous: Groups.previousReferences(from: recentEvents, excludingAuthor: signer.publicKey),
-    signer: signer)
+// (NIP-C7 chat) and kind 11 (NIP-7D thread) are common. First tag is ["h", groupID], then
+// `tags:`, then ["previous", ...] only when `previous:` is non-empty.
+let message = try await signer.sign(
+    .groupContent(
+        groupID: "abcdef", kind: .chatMessage, content: "hello",
+        previous: Groups.previousReferences(from: recentEvents, excludingAuthor: signer.publicKey)))
 
 // Moderation (kinds 9000-9002, 9005, 9007-9010) via Groups.ModerationAction: .putUser(publicKey:roles:),
 // .removeUser(publicKey:), .editMetadata(Metadata), .deleteEvent(id:), .createGroup,
-// .deleteGroup, .createInvite(code:), .updatePinList([PinnedItem]).
-let promote = try await Groups.moderationEvent(
-    .putUser(publicKey: memberPublicKey, roles: ["moderator"]),
-    groupID: "abcdef", reason: "welcome", signer: signer)
+// .deleteGroup, .createInvite(code:), .updatePinList([PinnedItem]). `reason:` is the content.
+let promote = try await signer.sign(
+    .groupModeration(
+        .putUser(publicKey: memberPublicKey, roles: ["moderator"]),
+        groupID: "abcdef", reason: "welcome"))
 ```
 
 ### Timeline References ("previous")

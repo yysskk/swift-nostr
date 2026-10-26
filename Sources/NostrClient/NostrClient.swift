@@ -117,12 +117,6 @@ public actor NostrClient {
         return cachedPublicKey
     }
 
-    /// Signs `unsignedEvent` with the active signer (local synchronously, remote via relay
-    /// round-trip), throwing ``NostrError/signerNotSet`` if none is set.
-    func activeSign(_ unsignedEvent: UnsignedEvent) async throws -> Event {
-        try await withSigner { signer, _ in try await signer.sign(unsignedEvent) }
-    }
-
     /// Signs `template` as the active signer's public key (local synchronously, remote via relay
     /// round-trip), throwing ``NostrError/signerNotSet`` if none is set.
     ///

@@ -7,8 +7,8 @@ extension Groups {
     ///
     /// Sending an action asks the relay to apply it: the relay checks the author's role
     /// permissions and answers with an OK message. Build the event for an action with
-    /// ``Groups/moderationEvent(_:groupID:previous:reason:publicKey:createdAt:)`` and parse
-    /// received ones with ``Groups/ModerationRequest``.
+    /// ``EventTemplate/groupModeration(_:groupID:previous:reason:)`` and parse received ones with
+    /// ``Groups/ModerationRequest``.
     /// https://github.com/nostr-protocol/nips/blob/master/29.md
     public enum ModerationAction: Sendable, Hashable {
         /// kind 9000 — adds `publicKey` to the group and/or replaces their role names.
@@ -53,7 +53,7 @@ extension Groups {
         }
 
         /// The action-specific tags, emitted between the "h" tag and any "previous" tag.
-        fileprivate var actionTags: [Tag] {
+        var actionTags: [Tag] {
             switch self {
             case .putUser(let publicKey, let roles):
                 return [.publicKey(publicKey, roles: roles)]
@@ -78,77 +78,6 @@ extension Groups {
                 }
             }
         }
-    }
-
-    /// Builds an unsigned NIP-29 moderation event.
-    ///
-    /// The event's first tag is the group's "h" tag, followed by the action's tags —
-    /// `["p", publicKey, role...]` for ``ModerationAction/putUser(publicKey:roles:)``,
-    /// `["p", publicKey]` for ``ModerationAction/removeUser(publicKey:)``, the metadata's
-    /// ``Metadata/fieldTags`` for ``ModerationAction/editMetadata(_:)``, `["e", id]` for
-    /// ``ModerationAction/deleteEvent(id:)``, `["code", code]` for
-    /// ``ModerationAction/createInvite(code:)``, the "e"/"a" tags in pin order for
-    /// ``ModerationAction/updatePinList(_:)``, and none for ``ModerationAction/createGroup``
-    /// and ``ModerationAction/deleteGroup`` — then a "previous" tag only when `previous` is
-    /// non-empty.
-    ///
-    /// - Parameters:
-    ///   - action: The moderation action to request.
-    ///   - groupID: The group's id on its relay.
-    ///   - previous: Timeline references for a trailing "previous" tag, e.g. from
-    ///     ``previousReferences(from:excludingAuthor:maxCount:)``. Omitted when empty.
-    ///   - reason: An optional human-readable reason for the action; becomes the event
-    ///     content ("" when nil).
-    ///   - publicKey: The acting admin's public key.
-    ///   - createdAt: The event timestamp. Defaults to now.
-    /// - Returns: The unsigned moderation event of ``ModerationAction/kind``.
-    public static func moderationEvent(
-        _ action: ModerationAction,
-        groupID: String,
-        previous: [String] = [],
-        reason: String? = nil,
-        publicKey: PublicKey,
-        createdAt: Timestamp = .now
-    ) -> UnsignedEvent {
-        var tags: [Tag] = [.group(groupID)]
-        tags.append(contentsOf: action.actionTags)
-        if !previous.isEmpty {
-            tags.append(.previous(previous))
-        }
-        return UnsignedEvent(
-            publicKey: publicKey,
-            createdAt: createdAt,
-            kind: action.kind,
-            tags: tags,
-            content: reason ?? ""
-        )
-    }
-
-    /// Builds and signs a NIP-29 moderation event.
-    ///
-    /// See ``moderationEvent(_:groupID:previous:reason:publicKey:createdAt:)`` for the event
-    /// layout; the author is resolved from `signer`.
-    ///
-    /// - Returns: The signed moderation event of ``ModerationAction/kind``.
-    /// - Throws: Whatever `signer` throws while resolving its public key or signing.
-    public static func moderationEvent(
-        _ action: ModerationAction,
-        groupID: String,
-        previous: [String] = [],
-        reason: String? = nil,
-        createdAt: Timestamp = .now,
-        signer: some NostrSigning
-    ) async throws -> Event {
-        try await signer.sign(
-            moderationEvent(
-                action,
-                groupID: groupID,
-                previous: previous,
-                reason: reason,
-                publicKey: try await signer.publicKey,
-                createdAt: createdAt
-            )
-        )
     }
 }
 

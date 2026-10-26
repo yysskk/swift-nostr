@@ -13,10 +13,11 @@ struct HTTPAuthValidationTests {
         method: String = "GET",
         payload: Data? = nil,
         createdAt: Timestamp = Timestamp(rawValue: 1_700_000_000)
-    ) async throws -> (header: String, now: Timestamp, signer: EventSigner) {
+    ) throws -> (header: String, now: Timestamp, signer: EventSigner) {
         let signer = EventSigner(keyPair: try KeyPair())
-        let header = try await HTTPAuth.authorizationHeaderValue(
-            url: url, method: method, payload: payload, createdAt: createdAt, signer: signer)
+        var template = EventTemplate.httpAuthorization(url: url, method: method, payload: payload)
+        template.createdAt = createdAt
+        let header = try HTTPAuth.authorizationHeaderValue(for: try signer.sign(template))
         return (header, createdAt, signer)
     }
 
@@ -29,8 +30,8 @@ struct HTTPAuthValidationTests {
     // MARK: Happy Paths
 
     @Test("a signed GET round-trips through validation")
-    func getRoundTrip() async throws {
-        let (header, now, signer) = try await signedHeader()
+    func getRoundTrip() throws {
+        let (header, now, signer) = try signedHeader()
 
         let event = try HTTPAuth.validate(
             authorization: header, url: url, method: "GET", now: now)
@@ -40,9 +41,9 @@ struct HTTPAuthValidationTests {
     }
 
     @Test("a signed POST with a body round-trips through validation")
-    func postRoundTrip() async throws {
+    func postRoundTrip() throws {
         let body = Data("{\"name\":\"nostr\"}".utf8)
-        let (header, now, signer) = try await signedHeader(method: "POST", payload: body)
+        let (header, now, signer) = try signedHeader(method: "POST", payload: body)
 
         let event = try HTTPAuth.validate(
             authorization: header, url: url, method: "POST", payload: body, now: now)
@@ -82,8 +83,8 @@ struct HTTPAuthValidationTests {
     }
 
     @Test("the scheme is matched case-insensitively")
-    func schemeCaseInsensitive() async throws {
-        let (header, now, _) = try await signedHeader()
+    func schemeCaseInsensitive() throws {
+        let (header, now, _) = try signedHeader()
         let lowercased = "nostr" + header.dropFirst("Nostr".count)
 
         #expect(throws: Never.self) {
@@ -92,8 +93,8 @@ struct HTTPAuthValidationTests {
     }
 
     @Test("the request method is matched case-insensitively")
-    func methodCaseInsensitive() async throws {
-        let (header, now, _) = try await signedHeader()
+    func methodCaseInsensitive() throws {
+        let (header, now, _) = try signedHeader()
 
         #expect(throws: Never.self) {
             try HTTPAuth.validate(authorization: header, url: url, method: "get", now: now)
@@ -101,8 +102,8 @@ struct HTTPAuthValidationTests {
     }
 
     @Test("unpadded base64 is accepted")
-    func unpaddedBase64() async throws {
-        let (header, now, _) = try await signedHeader()
+    func unpaddedBase64() throws {
+        let (header, now, _) = try signedHeader()
         let unpadded = header.replacingOccurrences(of: "=", with: "")
 
         #expect(throws: Never.self) {
@@ -111,8 +112,8 @@ struct HTTPAuthValidationTests {
     }
 
     @Test("without a payload argument, a payload tag is not checked")
-    func payloadCheckSkippedWhenNil() async throws {
-        let (header, now, _) = try await signedHeader(method: "POST", payload: Data("body".utf8))
+    func payloadCheckSkippedWhenNil() throws {
+        let (header, now, _) = try signedHeader(method: "POST", payload: Data("body".utf8))
 
         // Validating without the body skips the payload comparison.
         #expect(throws: Never.self) {
@@ -152,7 +153,7 @@ struct HTTPAuthValidationTests {
     }
 
     @Test("an event of the wrong kind is rejected")
-    func wrongKind() async throws {
+    func wrongKind() throws {
         let signer = EventSigner(keyPair: try KeyPair())
         let note = try signer.sign(
             UnsignedEvent(publicKey: signer.publicKey, kind: .textNote, content: ""))
@@ -164,8 +165,8 @@ struct HTTPAuthValidationTests {
     }
 
     @Test("a tampered event is rejected")
-    func tamperedEvent() async throws {
-        let (header, now, _) = try await signedHeader()
+    func tamperedEvent() throws {
+        let (header, now, _) = try signedHeader()
         let original = try HTTPAuth.event(fromAuthorizationHeader: header)
         // Re-target the signed event at a different URL without re-signing.
         let tampered = Event(
@@ -189,9 +190,9 @@ struct HTTPAuthValidationTests {
     }
 
     @Test("a timestamp outside the tolerance is rejected, at the boundary it passes")
-    func timestampTolerance() async throws {
+    func timestampTolerance() throws {
         let createdAt = Timestamp(rawValue: 1_700_000_000)
-        let (header, _, _) = try await signedHeader(createdAt: createdAt)
+        let (header, _, _) = try signedHeader(createdAt: createdAt)
 
         // Exactly at the tolerance edge, in both directions: accepted.
         #expect(throws: Never.self) {
@@ -221,9 +222,9 @@ struct HTTPAuthValidationTests {
         "an out-of-range timestamp is rejected rather than trapping",
         arguments: [Int64.max, Int64.min]
     )
-    func extremeTimestampIsRejected(seconds: Int64) async throws {
+    func extremeTimestampIsRejected(seconds: Int64) throws {
         let createdAt = Timestamp(rawValue: seconds)
-        let (header, _, _) = try await signedHeader(createdAt: createdAt)
+        let (header, _, _) = try signedHeader(createdAt: createdAt)
 
         #expect(throws: HTTPAuth.ValidationError.timestampOutOfTolerance(createdAt: createdAt)) {
             try HTTPAuth.validate(
@@ -233,9 +234,9 @@ struct HTTPAuthValidationTests {
     }
 
     @Test("a custom tolerance widens the accepted window")
-    func customTolerance() async throws {
+    func customTolerance() throws {
         let createdAt = Timestamp(rawValue: 1_700_000_000)
-        let (header, _, _) = try await signedHeader(createdAt: createdAt)
+        let (header, _, _) = try signedHeader(createdAt: createdAt)
 
         #expect(throws: Never.self) {
             try HTTPAuth.validate(
@@ -245,9 +246,9 @@ struct HTTPAuthValidationTests {
     }
 
     @Test("a sub-second tolerance accepts only an exact match")
-    func subSecondTolerance() async throws {
+    func subSecondTolerance() throws {
         let createdAt = Timestamp(rawValue: 1_700_000_000)
-        let (header, _, _) = try await signedHeader(createdAt: createdAt)
+        let (header, _, _) = try signedHeader(createdAt: createdAt)
 
         #expect(throws: Never.self) {
             try HTTPAuth.validate(
@@ -262,8 +263,8 @@ struct HTTPAuthValidationTests {
     }
 
     @Test("a URL mismatch is rejected, including a query difference")
-    func urlMismatch() async throws {
-        let (header, now, _) = try await signedHeader()
+    func urlMismatch() throws {
+        let (header, now, _) = try signedHeader()
         let otherURL = URL(string: "https://api.example.com/upload?type=other")!
 
         #expect(
@@ -275,8 +276,8 @@ struct HTTPAuthValidationTests {
     }
 
     @Test("a method mismatch is rejected")
-    func methodMismatch() async throws {
-        let (header, now, _) = try await signedHeader(method: "GET")
+    func methodMismatch() throws {
+        let (header, now, _) = try signedHeader(method: "GET")
 
         #expect(throws: HTTPAuth.ValidationError.methodMismatch(expected: "POST", actual: "GET")) {
             try HTTPAuth.validate(authorization: header, url: url, method: "POST", now: now)
@@ -284,13 +285,13 @@ struct HTTPAuthValidationTests {
     }
 
     @Test("a payload hash mismatch and a missing payload tag are rejected")
-    func payloadMismatch() async throws {
+    func payloadMismatch() throws {
         let signedBody = Data("signed body".utf8)
         let receivedBody = Data("different body".utf8)
         let expectedHash = Data(SHA256.hash(data: receivedBody)).hexEncodedString()
         let signedHash = Data(SHA256.hash(data: signedBody)).hexEncodedString()
 
-        let (header, now, _) = try await signedHeader(method: "POST", payload: signedBody)
+        let (header, now, _) = try signedHeader(method: "POST", payload: signedBody)
         #expect(
             throws: HTTPAuth.ValidationError.payloadHashMismatch(
                 expected: expectedHash, actual: signedHash)
@@ -299,7 +300,7 @@ struct HTTPAuthValidationTests {
                 authorization: header, url: url, method: "POST", payload: receivedBody, now: now)
         }
 
-        let (noPayloadHeader, sameNow, _) = try await signedHeader(method: "POST")
+        let (noPayloadHeader, sameNow, _) = try signedHeader(method: "POST")
         #expect(
             throws: HTTPAuth.ValidationError.payloadHashMismatch(
                 expected: expectedHash, actual: nil)
@@ -313,8 +314,8 @@ struct HTTPAuthValidationTests {
     // MARK: Header Decoding
 
     @Test("event(fromAuthorizationHeader:) decodes without validating")
-    func decodeWithoutValidation() async throws {
-        let (header, _, signer) = try await signedHeader()
+    func decodeWithoutValidation() throws {
+        let (header, _, signer) = try signedHeader()
 
         // Succeeds even though the event is long expired against the real clock.
         let event = try HTTPAuth.event(fromAuthorizationHeader: header)
