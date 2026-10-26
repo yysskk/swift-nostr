@@ -41,7 +41,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`EventTemplate` describes an event before it is signed**: its `kind`, `tags`, `content`, and
   `createdAt` — everything but the public key, id, and signature — as mutable properties, so a
   template can be adjusted before signing. Static factories build the NostrCore events:
-  `textNote(_:tags:)`, `reaction(to:content:)`, `repost(of:relayURL:)`, `deletion(of:reason:)`,
+  `textNote(_:tags:)`, `reply(to:content:relayURL:)` (a NIP-10 reply carrying the parent's thread
+  root, marked, and its author), `reaction(to:content:)`, `repost(of:relayURL:)`, `deletion(of:reason:)`,
   `clientAuthentication(relayURL:challenge:)`,
   `zapRequest(to:relays:amountMillisats:lnurl:eventID:eventCoordinate:comment:)`, the NIP-29
   `groupJoinRequest(groupID:inviteCode:reason:)`, `groupLeaveRequest(groupID:reason:)`,
@@ -60,6 +61,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   template's NIP-03 `ots` tag, replacing any existing one.
 - **`RelayListMetadata(read:write:)` is public**, building a NIP-65 list from read and write relay
   URLs (a URL in both is read+write).
+- **`events.publish(_:to:strategy:)` signs and publishes an `EventTemplate`**: the template is
+  signed by the configured signer, local or remote, then sent to the whole pool or — with `to:` — to
+  chosen relays, with the same targeting rules as publishing a signed event (an empty set throws,
+  relays not in the pool are skipped). It returns a `PublishedEvent`. `publish(_:strategy:)` is the
+  whole-pool short form.
 
 ### Changed
 
@@ -411,6 +417,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `.groupModeration(action, groupID: id)`, and so on, setting the template's `createdAt` for a custom
   time — and encode a signed `.httpAuthorization(url:method:payload:)` event with
   `HTTPAuth.authorizationHeaderValue(for:)`. `URLRequest.setNostrAuthorization(signer:)` is unchanged.
+
+- **`NostrEventPublishing` and `NostrEventFetching` require only their primitives** (breaking):
+  `NostrEventPublishing` requires `publish(_:to:strategy:)` for an `EventTemplate` and for a signed
+  `Event`, and `NostrEventFetching` requires `fetch(filters:from:timeout:)` and
+  `countEvents(matching:from:timeout:)`. `publishTextNote`, `publishReply`, `publishMetadata`,
+  `publishReaction`, `publishRepost`, `publishDeletion`, both `publishReport` overloads,
+  `publishLongFormContent`, `fetchEvent`, `fetchMetadata`, and both `fetchLongFormContent` overloads
+  move to protocol extensions built on those primitives, with the same signatures and defaults, as do
+  the short forms `publish(_:strategy:)`, `fetch(filters:timeout:)`, and
+  `countEvents(matching:timeout:)`. A conformer implements the four primitives and inherits the rest,
+  and a call through `any NostrEventPublishing` takes the same defaults as one through
+  `client.events`. The targeted short forms take a non-optional `Set<RelayURL>`, so
+  `publish(event, to: nil)` without a `strategy:` and `fetch(filters:from: nil)` without a `timeout:`
+  no longer compile: omit `to:` / `from:` to reach the whole pool.
+
+### Fixed
+
+- **A subscription or fetch whose targets are not in the pool no longer sends a stray CLOSE**:
+  when none of the targeted relays was in the pool (`noMatchingRelays`), the client still sent `CLOSE`
+  for the never-opened subscription to every relay in the pool. Nothing is sent now, so `fetchLongFormContent(naddr:)` falling back from relay
+  hints that are not in the pool to the whole pool sends a single `REQ`.
 
 ## [0.8.0] - 2026-10-25
 

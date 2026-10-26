@@ -33,7 +33,7 @@ public struct SubscriptionSequence: AsyncSequence, Sendable {
     public let id: String
 
     /// The relays that accepted the REQ. EOSE completion is measured against
-    /// this set (see ``NostrEventsAPI/fetch(filters:from:timeout:)``).
+    /// this set (see ``NostrEventFetching/fetch(filters:from:timeout:)-(_,Set<RelayURL>?,_)``).
     public let expectedRelays: Set<RelayURL>
 
     let stream: AsyncStream<SubscriptionEvent>

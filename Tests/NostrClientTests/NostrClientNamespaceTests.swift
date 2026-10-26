@@ -50,10 +50,9 @@ struct NostrClientNamespaceTests {
         let publishing: any NostrEventPublishing = client.events
 
         let published = try await PublishAckSupport.acknowledgingPublishes(on: socket) {
-            // Through the protocol every argument is explicit: Swift forbids default
-            // values on protocol requirements, so the namespace supplies them and the
-            // existential does not.
-            try await publishing.publishTextNote(content: "via a capability", tags: [], strategy: nil)
+            // The helpers live in a protocol extension that carries the defaults, so a call
+            // through the existential is as short as one through the namespace.
+            try await publishing.publishTextNote(content: "via a capability")
         }
 
         #expect(published.event.content == "via a capability")
@@ -134,7 +133,7 @@ struct NostrClientNamespaceTests {
         let note = try await EventSigner(keyPair: author).sign(.textNote("stored"))
 
         let events = try await answering(socket, with: [note]) {
-            try await fetching.fetch(filters: [Filter(kinds: [.textNote])], from: nil, timeout: .seconds(5))
+            try await fetching.fetch(filters: [Filter(kinds: [.textNote])], timeout: .seconds(5))
         }
 
         #expect(events.map(\.content) == ["stored"])

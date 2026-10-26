@@ -106,7 +106,42 @@ struct NostrClientTargetedPublishTests {
         await client.relays.disconnect()
     }
 
+    @Test("a template published to chosen relays is signed by the client's signer and reaches only those relays")
+    func templatePublishReachesOnlyTargetedRelays() async throws {
+        let (client, sockets) = try await makeClient(relayURLs: [urlA, urlB, urlC])
+        let keyPair = try KeyPair()
+        try await client.identity.setPrivateKey(keyPair.privateKeyHex)
+
+        let task = Task {
+            try await client.events.publish(.textNote("templated"), to: [urlA, urlC], strategy: .allSettled)
+        }
+        let sentToA = try await PublishAckSupport.acknowledgePublish(on: sockets[0])
+        let sentToC = try await PublishAckSupport.acknowledgePublish(on: sockets[2])
+        let published = try await task.value
+
+        #expect(published.event.content == "templated")
+        #expect(published.event.publicKey == keyPair.publicKey)
+        #expect(try published.event.verify())
+        #expect(sentToA == published.event)
+        #expect(sentToC == published.event)
+        #expect(published.result.acceptedRelays == [urlA, urlC])
+        #expect(PublishAckSupport.eventFrames(in: sockets[1]).isEmpty)
+        await client.relays.disconnect()
+    }
+
     // MARK: - Failures
+
+    @Test("a template published to an empty target list throws instead of broadcasting")
+    func templatePublishToEmptyTargetsThrows() async throws {
+        let (client, sockets) = try await makeClient(relayURLs: [urlA, urlB])
+        try await client.identity.setPrivateKey(try KeyPair().privateKeyHex)
+
+        await #expect(throws: NostrError.noMatchingRelays([])) {
+            try await client.events.publish(.textNote("nowhere"), to: [])
+        }
+        #expect(sockets.allSatisfy { PublishAckSupport.eventFrames(in: $0).isEmpty })
+        await client.relays.disconnect()
+    }
 
     @Test("an empty target list throws instead of broadcasting")
     func publishToEmptyTargetsThrows() async throws {

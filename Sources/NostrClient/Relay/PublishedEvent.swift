@@ -3,8 +3,8 @@ import NostrCore
 
 /// A signed event together with the per-relay outcome of its publish.
 ///
-/// Returned by the convenience publish methods on ``NostrClient`` (for example
-/// ``NostrEventsAPI/publishTextNote(content:tags:strategy:)``) so callers get both
+/// Returned by the convenience publish methods of ``NostrEventPublishing`` (for example
+/// ``NostrEventPublishing/publishTextNote(content:tags:strategy:)``) so callers get both
 /// the event that was sent and the ``PublishResult`` describing which relays
 /// accepted it.
 ///

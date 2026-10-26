@@ -15,7 +15,7 @@ public struct NostrRelaysAPI: NostrRelayManaging {
     ///
     /// Use it for the per-relay detail this namespace deliberately flattens — for example
     /// ``RelayPool/countEvents(matching:from:timeout:)`` per relay rather than
-    /// ``NostrEventsAPI/countEvents(matching:from:timeout:)``'s single best estimate.
+    /// ``NostrEventFetching/countEvents(matching:from:timeout:)-(_,Set<RelayURL>?,_)``'s single best estimate.
     ///
     /// Only on the concrete namespace, not on ``NostrRelayManaging``: the pool carries publish,
     /// subscribe, and count too, which a relay-management dependency has no business reaching.

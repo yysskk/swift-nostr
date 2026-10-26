@@ -13,10 +13,13 @@ import NostrCore
 //
 //     ChatViewModel(messages: client.messages)
 //
-// Swift does not allow default argument values on protocol requirements, so the requirements
-// below spell out every parameter. The concrete namespaces still supply the defaults, so a call
-// through `client.messages` stays short; only a call through the protocol passes the full
-// argument list.
+// A protocol's requirements are its primitives: the minimal operations everything else is built
+// from, each spelling out every parameter, since Swift does not allow default argument values on
+// protocol requirements. The conveniences — NIP helpers and short forms of the primitives — live
+// in a public extension of the protocol (`Capabilities+<Feature>.swift`), carry the defaults, and
+// are built only on the primitives. The concrete namespaces inherit them, so a stub implements only
+// the primitives and a call through `any NostrEventPublishing` is as short as one through
+// `client.events`.
 
 // MARK: - Identity
 
@@ -90,69 +93,88 @@ public protocol NostrRelayManaging: Sendable {
 // MARK: - Events
 
 /// Authoring and publishing events. Implemented by ``NostrEventsAPI``.
+///
+/// The requirements are the two publish primitives; the NIP helpers (``publishTextNote(content:tags:strategy:)``,
+/// ``publishReply(to:content:relayURL:strategy:)``, …) and the short forms of the primitives are
+/// provided by an extension built on them.
 public protocol NostrEventPublishing: Sendable {
-    /// Publishes a text note.
+    /// Signs `template` with the configured signer and publishes it to the whole pool (nil) or to the
+    /// given relays.
+    ///
+    /// Targeting follows ``publish(_:to:strategy:)-(Event,Set<RelayURL>?,_)``: an empty set always throws, and
+    /// targets not in the pool are skipped.
+    /// - Parameters:
+    ///   - template: The event to sign and publish.
+    ///   - relayURLs: The relays to publish to, or nil for the whole pool.
+    ///   - strategy: How many relay acknowledgments to wait for before returning, or nil for the
+    ///     pool config's ``RelayPoolConfig/defaultPublishStrategy``.
+    /// - Returns: The signed event together with the per-relay publish outcome.
+    /// - Throws: ``NostrError/signerNotSet`` if no signer is set, anything the signer throws, or the
+    ///   errors of ``publish(_:to:strategy:)-(Event,Set<RelayURL>?,_)``.
     @discardableResult
-    func publishTextNote(content: String, tags: [Tag], strategy: PublishStrategy?) async throws -> PublishedEvent
-    /// Publishes a NIP-10 reply.
-    @discardableResult
-    func publishReply(
-        to event: Event, content: String, relayURL: RelayURL?, strategy: PublishStrategy?
+    func publish(
+        _ template: EventTemplate, to relayURLs: Set<RelayURL>?, strategy: PublishStrategy?
     ) async throws -> PublishedEvent
-    /// Publishes user metadata.
-    @discardableResult
-    func publishMetadata(_ metadata: UserMetadata, strategy: PublishStrategy?) async throws -> PublishedEvent
-    /// Publishes a reaction.
-    @discardableResult
-    func publishReaction(to event: Event, content: String, strategy: PublishStrategy?) async throws -> PublishedEvent
-    /// Publishes a repost.
-    @discardableResult
-    func publishRepost(
-        of event: Event, relayURL: RelayURL?, strategy: PublishStrategy?
-    ) async throws -> PublishedEvent
-    /// Publishes a deletion request.
-    @discardableResult
-    func publishDeletion(
-        eventIDs: [EventID], reason: String, strategy: PublishStrategy?
-    ) async throws -> PublishedEvent
-    /// Publishes a NIP-56 report of a public key.
-    @discardableResult
-    func publishReport(
-        publicKey: PublicKey, type: ReportType, reason: String, strategy: PublishStrategy?
-    ) async throws -> PublishedEvent
-    /// Publishes a NIP-56 report of an event.
-    @discardableResult
-    func publishReport(
-        event: Event, type: ReportType, reason: String, strategy: PublishStrategy?
-    ) async throws -> PublishedEvent
+
     /// Publishes an already-signed event to the whole pool (nil) or to the given relays.
+    ///
+    /// Pass relays to target a subset — for example, an event signed by a separate key that should
+    /// reach only a few named relays. An empty set always throws, so an accidentally-empty computed
+    /// list never fans out to the whole pool. Targets not in the pool are skipped, not connected on
+    /// demand: add them with ``NostrRelaysAPI/add(_:config:)`` first.
+    /// - Parameters:
+    ///   - event: The already-signed event to publish.
+    ///   - relayURLs: The relays to publish to, or nil for the whole pool.
+    ///   - strategy: How many relay acknowledgments to wait for before returning, or nil for the
+    ///     pool config's ``RelayPoolConfig/defaultPublishStrategy``.
+    /// - Returns: The per-relay outcome of the publish, keyed by relay URL.
+    /// - Throws: ``NostrError/noRelaysInPool`` when broadcasting to an empty pool,
+    ///   ``NostrError/noMatchingRelays(_:)`` when none of the targeted URLs are in the pool
+    ///   (including an empty set), the last relay error if no targeted relay accepts the event,
+    ///   or ``NostrError/relayError(_:)`` if a `.quorum` strategy cannot be satisfied.
     @discardableResult
     func publish(_ event: Event, to relayURLs: Set<RelayURL>?, strategy: PublishStrategy?) async throws -> PublishResult
-
-    /// Publishes a NIP-23 long-form article or draft.
-    @discardableResult
-    func publishLongFormContent(
-        _ article: LongFormContent, draft: Bool, strategy: PublishStrategy?
-    ) async throws -> PublishedEvent
 }
 
 /// Reading stored events one time, without holding a subscription open.
 /// Implemented by ``NostrEventsAPI``.
+///
+/// The requirements are the fetch and count primitives; the lookups (``fetchEvent(id:timeout:)``,
+/// ``fetchMetadata(publicKey:timeout:)``, …) and the short forms of the primitives are provided by
+/// an extension built on them.
 public protocol NostrEventFetching: Sendable {
-    /// Fetches events matching `filters`, ending at EOSE or `timeout`.
+    /// Fetches events matching `filters` from the whole pool (nil) or the given relays, waiting for
+    /// every targeted relay to send EOSE or for `timeout`, whichever comes first.
+    ///
+    /// Targets not in the pool are skipped; an empty set always throws.
+    /// - Parameters:
+    ///   - filters: The filters to match.
+    ///   - relayURLs: The relays to fetch from, or nil for the whole pool.
+    ///   - timeout: How long to wait for relays to finish, or nil for
+    ///     ``RelayPoolConfig/queryTimeout``.
+    /// - Returns: The events received, deduplicated across relays.
+    /// - Throws: ``NostrError/noRelaysInPool`` when the pool is empty, or
+    ///   ``NostrError/noMatchingRelays(_:)`` when none of the targeted URLs are in the pool
+    ///   (including an empty set). Both are thrown before anything is sent to a relay.
     func fetch(filters: [Filter], from relayURLs: Set<RelayURL>?, timeout: Duration?) async throws -> [Event]
-    /// Requests the NIP-45 count of events matching `filters`.
+
+    /// Requests the number of events matching `filters` (NIP-45 COUNT) from the whole pool (nil) or
+    /// the given relays.
+    ///
+    /// Returns the maximum count the targeted relays report — each relay's count is a lower bound on
+    /// the events it holds, so the maximum is the best single estimate. Targets not in the pool are
+    /// skipped; an empty set always throws. For per-relay results use
+    /// ``RelayPool/countEvents(matching:from:timeout:)`` on ``NostrRelaysAPI/pool``.
+    /// - Parameters:
+    ///   - filters: The filters to count.
+    ///   - relayURLs: The relays to query, or nil for the whole pool.
+    ///   - timeout: How long to wait for relays to finish, or nil for
+    ///     ``RelayPoolConfig/queryTimeout``.
+    /// - Returns: The highest count any targeted relay reported.
+    /// - Throws: ``NostrError/noRelaysInPool`` when the pool is empty,
+    ///   ``NostrError/noMatchingRelays(_:)`` when none of the targeted URLs are in the pool, or the
+    ///   last relay error when no targeted relay answered.
     func countEvents(matching filters: [Filter], from relayURLs: Set<RelayURL>?, timeout: Duration?) async throws -> Int
-    /// Fetches a single event by id.
-    func fetchEvent(id: EventID, timeout: Duration?) async throws -> Event?
-    /// Fetches a user's metadata.
-    func fetchMetadata(publicKey: PublicKey, timeout: Duration?) async throws -> UserMetadata?
-    /// Fetches a NIP-23 article by author and identifier.
-    func fetchLongFormContent(
-        author: PublicKey, identifier: String, timeout: Duration?
-    ) async throws -> LongFormContent?
-    /// Fetches the NIP-23 article addressed by an `naddr`.
-    func fetchLongFormContent(naddr: NAddr, timeout: Duration?) async throws -> LongFormContent?
 }
 
 // MARK: - Subscriptions

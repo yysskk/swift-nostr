@@ -330,4 +330,33 @@ struct NIP23LongFormTests {
         #expect(result?.identifier == "coord-d")
         await client.relays.disconnect()
     }
+
+    /// No hint is in the pool, so targeting them fails before anything is sent and the fetch falls
+    /// back to the whole pool — with one REQ, and no CLOSE for the subscription that never opened.
+    @Test("fetchLongFormContent(naddr:) falls back to the pool when no relay hint is in it")
+    func fetchByNAddrFallsBackToThePool() async throws {
+        let signer = try makeSigner()
+        let article = LongFormContent(identifier: "fallback-d", title: "Fallback")
+        let event = try await signer.sign(.longFormContent(article, draft: false))
+        let (client, mock) = try await ConnectedClientFixture.make(relayURL: relayURL)
+        let naddr = try article.naddr(author: signer.publicKey, relays: [RelayURL("wss://elsewhere.example.com")!])
+
+        let task = Task { try await client.events.fetchLongFormContent(naddr: naddr, timeout: .seconds(2)) }
+
+        try await pollUntil { mock.sentTextFrames.contains { $0.hasPrefix("[\"REQ\"") } }
+        let reqFrame = try #require(mock.sentTextFrames.first { $0.hasPrefix("[\"REQ\"") })
+        let receivedID = try subscriptionID(fromReqFrame: reqFrame)
+
+        mock.deliver(.string(try eventFrame(subscriptionID: receivedID, event: event)))
+        mock.deliver(.string("[\"EOSE\",\"\(receivedID)\"]"))
+
+        let result = try await task.value
+        #expect(result?.title == "Fallback")
+        #expect(mock.sentTextFrames.filter { $0.hasPrefix("[\"REQ\"") }.count == 1)
+        // The only CLOSE is the one ending the fallback fetch's own subscription.
+        #expect(
+            mock.sentTextFrames.filter { $0.hasPrefix("[\"CLOSE\"") }.allSatisfy { $0.contains("\"\(receivedID)\"") })
+        #expect(await client.relays.relayCount == 1)
+        await client.relays.disconnect()
+    }
 }

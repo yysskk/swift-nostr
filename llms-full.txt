@@ -98,10 +98,16 @@ struct ChatViewModel {
 ChatViewModel(messages: client.messages)
 ```
 
-Swift forbids default arguments on protocol requirements, so the protocols spell out every
-parameter; the concrete namespaces still supply the defaults, and only calls made through the
-protocol pass the full argument list. `NostrRelayManaging` deliberately omits `pool`: the pool
-carries publish, subscribe, and count too, so it stays on the concrete `NostrRelaysAPI`.
+Swift forbids default arguments on protocol requirements. `NostrEventPublishing` and
+`NostrEventFetching` therefore require only their primitives — `publish(_:to:strategy:)` for an
+`EventTemplate` and for a signed `Event`, `fetch(filters:from:timeout:)`, and
+`countEvents(matching:from:timeout:)`, every parameter spelled out — and provide the `publish*` /
+`fetch*` helpers and the short forms (`publish(_:)`, `fetch(filters:)`, …) with their defaults in
+protocol extensions, so a stub implements four methods and a call through the protocol is as short
+as one through `client.events`. The other protocols still spell out every parameter of every
+requirement; the concrete namespaces supply the defaults, and calls through those protocols pass the
+full argument list. `NostrRelayManaging` deliberately omits `pool`: the pool carries publish,
+subscribe, and count too, so it stays on the concrete `NostrRelaysAPI`.
 
 `NostrClient` itself exposes only its initializers and these namespaces.
 
@@ -121,7 +127,7 @@ and cached, so `identity.publicKey` stays a single actor hop even for a remote s
 Setting a signer also starts answering NIP-42 AUTH challenges automatically (see Authentication).
 
 Every feature runs through the signer, so a remote one is a drop-in for a local key: `sign(_:)`,
-`publish(_:to:strategy:)`, the convenience `publish*` helpers, NIP-17 direct messages, NIP-51 private
+`publish(_:to:strategy:)` (a template or a signed event), the convenience `publish*` helpers, NIP-17 direct messages, NIP-51 private
 list items, and NIP-42 authentication all work unchanged:
 
 ```swift
@@ -129,7 +135,8 @@ try await client.identity.setSigner(remoteSigner)   // a RemoteSigner or any Nos
 try await client.events.publishTextNote(content: "Signed remotely")
 try await client.messages.send("gift-wrapped by the bunker", to: recipientPublicKey)
 
-// Or author an event with no helper: describe it with an EventTemplate and sign it as the signer.
+// Or author an event with no helper: describe it with an EventTemplate; publishing signs it first.
+try await client.events.publish(EventTemplate(kind: .textNote, content: "Signed remotely"))
 let signed = try await client.identity.sign(EventTemplate(kind: .textNote, content: "Signed remotely"))
 try await client.events.publish(signed)           // generic publish of a pre-signed event
 ```
@@ -199,7 +206,8 @@ try await client.events.publishReport(publicKey: author, type: .impersonation)  
 try await client.events.publishReport(event: note.event, type: .spam, reason: "unsolicited")  // report an event and its author
 try await client.events.publishTextNote(content: "Important!", strategy: .quorum(2))
 try await client.events.publish(signedEvent)  // publish any pre-signed event
-try await client.events.publish(signedEvent, to: [relay])  // Set<RelayURL>? targets; [] throws
+try await client.events.publish(signedEvent, to: [relay])  // Set<RelayURL> targets; [] throws
+let published = try await client.events.publish(.textNote("gm"), to: [relay])  // sign a template, then publish
 ```
 
 ### Subscriptions
@@ -248,8 +256,8 @@ results. With zero resolved relays they throw (`NostrError.noRelaysInPool` /
 let events = try await client.events.fetch(filters: [filter])
 let event = try await client.events.fetchEvent(id: eventID)      // EventID
 let metadata = try await client.events.fetchMetadata(publicKey: alice)
-// Scope a fetch to a subset of relays (e.g. naddr relay hints): `from:` is a Set<RelayURL>?;
-// nil (default) uses the whole pool, [] throws, and relays not in the pool are skipped.
+// Scope a fetch to a subset of relays (e.g. naddr relay hints): `from:` is a Set<RelayURL>;
+// omit it for the whole pool. [] throws, and relays not in the pool are skipped.
 let scoped = try await client.events.fetch(filters: [filter], from: [relay])
 ```
 
@@ -456,6 +464,7 @@ signer's public key, so one template works with a local `EventSigner` and a remo
 ```swift
 EventTemplate(kind: .textNote, tags: [.hashtag("nostr")], content: "gm")  // createdAt defaults to .now
 EventTemplate.textNote("Hello", tags: [])                    // kind 1
+EventTemplate.reply(to: parent, content: "Agreed", relayURL: relay)  // kind 1, NIP-10 root/reply e tags + p tag
 EventTemplate.reaction(to: event, content: "🤙")              // kind 7, e + p tags; content defaults to "+"
 try EventTemplate.repost(of: event, relayURL: relay)         // kind 6, event JSON as content; RelayURL? hint
 EventTemplate.deletion(of: [event.id], reason: "mistake")    // kind 5, one e tag per id (NIP-09)

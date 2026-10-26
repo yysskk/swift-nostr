@@ -119,6 +119,9 @@ let note = try await client.events.publishTextNote(content: "Hello, Nostr!")
 print("Accepted by \(note.result.acceptedRelays.count) relay(s)")
 
 try await client.events.publishReaction(to: note.event, content: "🤙")
+
+// Any EventTemplate is signed with the configured signer, then sent to the whole pool or chosen relays.
+try await client.events.publish(.textNote("Only on relay 2"), to: [RelayURL(string: "wss://relay2.example.com")])
 ```
 
 A `RelayURL` is a validated `ws`/`wss` URL in canonical form (lowercased scheme and host, no root slash or default port), so every spelling of a relay names the same pool entry; `RelayURL(string:)` throws `NostrError.invalidRelayURL` for anything else.
@@ -228,8 +231,7 @@ A `RemoteSigner` can also drive a `NostrClient`: `client.identity.setSigner(_:)`
 
 ```swift
 try await client.identity.setSigner(signer)   // any NostrSigning — a RemoteSigner or a local EventSigner
-let signed = try await client.identity.sign(.textNote("Signed by my bunker"))
-try await client.events.publish(signed)
+try await client.events.publish(.textNote("Signed by my bunker"))   // signs the template, then publishes it
 ```
 
 ### Authorize an HTTP request (NIP-98)
