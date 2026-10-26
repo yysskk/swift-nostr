@@ -90,7 +90,9 @@ extension RelayConnection {
     /// Goes through ``RelayConnection/disconnect()``, so existing
     /// ``RelayConnection/messages()`` streams finish — obtain a new stream
     /// after reconnecting.
-    public func reconnect() async throws {
+    ///
+    /// - Throws: Everything ``RelayConnection/connect()`` throws.
+    public func reconnect() async throws(Error) {
         disconnect()
         resetReconnectState()
         try await connect()

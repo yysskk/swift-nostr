@@ -67,6 +67,7 @@ let isValid = try event.verify()
 - ``RelayMessage``
 - ``EventCount``
 - ``RelayResponsePrefix``
+- ``RelayRejection``
 - ``RelayInformation``
 
 ### Relay Connection
@@ -99,6 +100,7 @@ let isValid = try event.verify()
 ### Errors
 
 - ``NostrError``
+- ``RelayConnection/Error``
 - ``Bech32/Error``
 - ``PublicKey/Error``
 - ``EventID/Error``

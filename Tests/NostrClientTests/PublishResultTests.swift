@@ -15,7 +15,7 @@ struct PublishResultTests {
     func accessorsPartitionByStatus() {
         let result = PublishResult(statuses: [
             urlA: .accepted,
-            urlB: .failed(NostrError.timeout),
+            urlB: .failed(RelayConnection.Error.timedOut),
             urlC: .pending,
         ])
 
@@ -30,9 +30,10 @@ struct PublishResultTests {
     func statusEquality() {
         #expect(PublishRelayStatus.accepted == .accepted)
         #expect(PublishRelayStatus.pending == .pending)
-        #expect(PublishRelayStatus.failed(NostrError.timeout) == .failed(NostrError.notConnected))
+        #expect(
+            PublishRelayStatus.failed(RelayConnection.Error.timedOut) == .failed(RelayConnection.Error.notConnected))
         #expect(PublishRelayStatus.accepted != .pending)
-        #expect(PublishRelayStatus.failed(NostrError.timeout) != .accepted)
+        #expect(PublishRelayStatus.failed(RelayConnection.Error.timedOut) != .accepted)
     }
 
     @Test("accessors are empty for an empty result")
@@ -47,13 +48,13 @@ struct PublishResultTests {
     func statusForEquivalentSpellings() throws {
         let result = PublishResult(statuses: [
             urlA: .accepted,
-            urlB: .failed(NostrError.timeout),
+            urlB: .failed(RelayConnection.Error.timedOut),
         ])
 
         #expect(result.status(for: urlA) == .accepted)
         #expect(result.status(for: try RelayURL(string: "WSS://A.Example.com/")) == .accepted)
         #expect(result.status(for: try RelayURL(string: "wss://a.example.com:443")) == .accepted)
-        #expect(result.status(for: urlB) == .failed(NostrError.timeout))
+        #expect(result.status(for: urlB) == .failed(RelayConnection.Error.timedOut))
 
         // An untargeted relay reports nil.
         #expect(result.status(for: try RelayURL(string: "wss://unknown.example.com")) == nil)

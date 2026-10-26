@@ -34,7 +34,7 @@ struct NIP45CountTests {
             if await condition() { return }
             try await Task.sleep(for: .milliseconds(5))
         }
-        throw NostrError.timeout
+        throw RelayConnection.Error.timedOut
     }
 
     /// The COUNT frames the connection has sent so far.
@@ -97,7 +97,7 @@ struct NIP45CountTests {
         let (connection, _) = makeConnection()
         try await connection.connect()
 
-        await #expect(throws: NostrError.timeout) {
+        await #expect(throws: RelayConnection.Error.timedOut) {
             try await connection.countEvents(matching: [Filter(kinds: [.textNote])], timeout: .milliseconds(200))
         }
         await connection.disconnect()
@@ -117,7 +117,7 @@ struct NIP45CountTests {
         try await connection.connect()
 
         let start = ContinuousClock.now
-        await #expect(throws: NostrError.timeout) {
+        await #expect(throws: RelayConnection.Error.timedOut) {
             try await connection.countEvents(matching: [Filter(kinds: [.textNote])])
         }
         let elapsed = ContinuousClock.now - start
@@ -136,7 +136,7 @@ struct NIP45CountTests {
         let receivedID = try await awaitCountSubscriptionID(in: mock)
         mock.deliver(.string("[\"CLOSED\",\"\(receivedID)\",\"error: count not supported\"]"))
 
-        await #expect(throws: NostrError.relayError("error: count not supported")) {
+        await #expect(throws: RelayRejection(prefix: .error, message: "count not supported")) {
             try await task.value
         }
         await connection.disconnect()
@@ -152,7 +152,7 @@ struct NIP45CountTests {
         _ = try await awaitCountSubscriptionID(in: mock)
         await connection.disconnect()
 
-        await #expect(throws: NostrError.notConnected) {
+        await #expect(throws: RelayConnection.Error.notConnected) {
             try await task.value
         }
     }
@@ -321,7 +321,7 @@ struct NIP45CountTests {
         try await connectionB.connect()
 
         // Neither relay replies; every per-relay count times out, so the pool surfaces the error.
-        await #expect(throws: NostrError.timeout) {
+        await #expect(throws: RelayConnection.Error.timedOut) {
             try await pool.countEvents(matching: [Filter(kinds: [.textNote])], timeout: .milliseconds(200))
         }
         await pool.disconnectAll()
@@ -342,7 +342,7 @@ struct NIP45CountTests {
 
         // The relay never replies: the pool's 50 ms governs, not the connection's 30 s.
         let start = ContinuousClock.now
-        await #expect(throws: NostrError.timeout) {
+        await #expect(throws: RelayConnection.Error.timedOut) {
             try await pool.countEvents(matching: [Filter(kinds: [.textNote])])
         }
         #expect(ContinuousClock.now - start < .seconds(5))
@@ -360,7 +360,7 @@ struct NIP45CountTests {
         try await connection.connect()
 
         let start = ContinuousClock.now
-        await #expect(throws: NostrError.timeout) {
+        await #expect(throws: RelayConnection.Error.timedOut) {
             try await pool.countEvents(matching: [Filter(kinds: [.textNote])], timeout: .milliseconds(50))
         }
         #expect(ContinuousClock.now - start < .seconds(5))

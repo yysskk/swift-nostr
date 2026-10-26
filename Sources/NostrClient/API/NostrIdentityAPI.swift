@@ -110,19 +110,20 @@ public struct NostrIdentityAPI: NostrIdentityProviding {
     ///
     /// In the unlikely case that the relay rotates its challenge between this
     /// call reading it and the relay receiving the answer, the relay rejects
-    /// the stale answer and this throws ``NostrError/authenticationFailed(_:)``
+    /// the stale answer and this throws ``RelayConnection/Error/authenticationRejected(_:)``
     /// — simply call it again to answer the fresh challenge.
     ///
     /// - Parameter relayURL: The relay to authenticate to; must be in the pool.
     /// - Throws: ``NostrError/noMatchingRelays(_:)`` when the relay is not in the
-    ///   pool, ``NostrError/signerNotSet`` without a signer, and everything
+    ///   pool, ``RelayConnection/Error/missingAuthenticationChallenge`` when the relay has not sent
+    ///   a challenge, ``NostrError/signerNotSet`` without a signer, and everything
     ///   ``RelayConnection/authenticate(with:)`` throws.
     public func authenticate(relayURL: RelayURL) async throws {
         guard let connection = await client.pool.relay(for: relayURL) else {
             throw NostrError.noMatchingRelays([relayURL])
         }
         guard let challenge = await connection.authenticationChallenge else {
-            throw NostrError.authenticationFailed("The relay has not sent an AUTH challenge")
+            throw RelayConnection.Error.missingAuthenticationChallenge
         }
         let event = try await client.clientAuthenticationEvent(relayURL: connection.url, challenge: challenge)
         try await connection.authenticate(with: event)

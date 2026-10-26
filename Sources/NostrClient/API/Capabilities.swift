@@ -151,8 +151,9 @@ public protocol NostrEventPublishing: Sendable {
     /// - Returns: The per-relay outcome of the publish, keyed by relay URL.
     /// - Throws: ``NostrError/noRelaysInPool`` when broadcasting to an empty pool,
     ///   ``NostrError/noMatchingRelays(_:)`` when none of the targeted URLs are in the pool
-    ///   (including an empty set), the last relay error if no targeted relay accepts the event,
-    ///   or ``NostrError/relayError(_:)`` if a `.quorum` strategy cannot be satisfied.
+    ///   (including an empty set), the last relay's error (a ``RelayRejection`` or a
+    ///   ``RelayConnection/Error``) if no targeted relay accepts the event, or
+    ///   ``NostrError/relayError(_:)`` if a `.quorum` strategy cannot be satisfied.
     @discardableResult
     func publish(_ event: Event, to relayURLs: Set<RelayURL>?, strategy: PublishStrategy?) async throws -> PublishResult
 }
@@ -194,7 +195,8 @@ public protocol NostrEventFetching: Sendable {
     /// - Returns: The highest count any targeted relay reported.
     /// - Throws: ``NostrError/noRelaysInPool`` when the pool is empty,
     ///   ``NostrError/noMatchingRelays(_:)`` when none of the targeted URLs are in the pool, or the
-    ///   last relay error when no targeted relay answered.
+    ///   last relay's error (a ``RelayRejection`` or a ``RelayConnection/Error``) when no targeted
+    ///   relay answered.
     func countEvents(matching filters: [Filter], from relayURLs: Set<RelayURL>?, timeout: Duration?) async throws -> Int
 }
 

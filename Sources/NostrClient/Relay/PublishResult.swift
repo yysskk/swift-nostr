@@ -6,7 +6,9 @@ public enum PublishRelayStatus: Sendable {
     /// The relay acknowledged the event (OK with accepted: true).
     case accepted
 
-    /// Publishing to the relay failed (rejected, timed out, or not connected).
+    /// Publishing to the relay failed: a ``RelayRejection`` when the relay answered OK `false`,
+    /// or a ``RelayConnection/Error`` such as ``RelayConnection/Error/timedOut`` or
+    /// ``RelayConnection/Error/notConnected``.
     case failed(any Error)
 
     /// The relay had not settled yet when the publish strategy was satisfied.

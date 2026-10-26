@@ -13,7 +13,7 @@ enum NIP42TestSupport {
             if await condition() { return }
             try await Task.sleep(for: .milliseconds(5))
         }
-        throw NostrError.timeout
+        throw RelayConnection.Error.timedOut
     }
 
     /// Extracts the event of the first AUTH frame sent on `mock`.

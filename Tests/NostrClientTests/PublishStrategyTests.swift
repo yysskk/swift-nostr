@@ -96,7 +96,7 @@ struct PublishStrategyTests {
     @Test("publish on a disconnected connection fails fast with notConnected")
     func connectionPublishFailsFastWhenDisconnected() async {
         let connection = RelayConnection(url: urlA)
-        await #expect(throws: NostrError.notConnected) {
+        await #expect(throws: RelayConnection.Error.notConnected) {
             try await connection.publish(self.dummyEvent)
         }
     }
@@ -106,7 +106,7 @@ struct PublishStrategyTests {
         arguments: [PublishStrategy.firstAck, .quorum(2), .allSettled])
     func poolPublishThrowsWhenAllRelaysDisconnected(strategy: PublishStrategy) async throws {
         let pool = try await makePool()
-        await #expect(throws: NostrError.notConnected) {
+        await #expect(throws: RelayConnection.Error.notConnected) {
             try await pool.publish(self.dummyEvent, strategy: strategy)
         }
     }
@@ -116,28 +116,28 @@ struct PublishStrategyTests {
     @Test("all relays failing surfaces the last error")
     func publishFailureSurfacesLastError() {
         let error = RelayPool.publishFailure(
-            successCount: 0, requiredAcks: 1, lastError: NostrError.timeout)
-        #expect(error as? NostrError == .timeout)
+            successCount: 0, requiredAcks: 1, lastError: RelayConnection.Error.timedOut)
+        #expect(error as? RelayConnection.Error == .timedOut)
     }
 
     @Test("partial success below the quorum fails with the quorum error")
     func publishFailureWhenQuorumNotMet() {
         let error = RelayPool.publishFailure(
-            successCount: 1, requiredAcks: 2, lastError: NostrError.timeout)
+            successCount: 1, requiredAcks: 2, lastError: RelayConnection.Error.timedOut)
         #expect(error as? NostrError == .relayError("Publish quorum not met: 1/2 relays acknowledged"))
     }
 
     @Test("meeting the quorum succeeds despite other failures")
     func publishFailureNilWhenQuorumMet() {
         let error = RelayPool.publishFailure(
-            successCount: 2, requiredAcks: 2, lastError: NostrError.timeout)
+            successCount: 2, requiredAcks: 2, lastError: RelayConnection.Error.timedOut)
         #expect(error == nil)
     }
 
     @Test("allSettled succeeds when at least one relay accepted")
     func publishFailureNilForAllSettledWithOneSuccess() {
         let error = RelayPool.publishFailure(
-            successCount: 1, requiredAcks: nil, lastError: NostrError.timeout)
+            successCount: 1, requiredAcks: nil, lastError: RelayConnection.Error.timedOut)
         #expect(error == nil)
     }
 }

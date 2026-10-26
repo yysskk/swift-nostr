@@ -31,7 +31,7 @@ struct RelayConnectionSocketTests {
             if condition() { return }
             try await Task.sleep(for: .milliseconds(5))
         }
-        throw NostrError.timeout
+        throw RelayConnection.Error.timedOut
     }
 
     private static func eventFrame(subscriptionID: String, eventID: String) -> String {
@@ -64,7 +64,7 @@ struct RelayConnectionSocketTests {
     func connectFailsOnPingError() async {
         let (connection, _) = makeConnection(pingError: URLError(.cannotConnectToHost))
 
-        await #expect(throws: NostrError.self) {
+        await #expect(throws: RelayConnection.Error.connectionFailed) {
             try await connection.connect()
         }
         #expect(await connection.state != .connected)

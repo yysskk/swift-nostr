@@ -85,8 +85,7 @@ struct NIP42AuthRetryTests {
         mock.deliver(.string("[\"OK\",\"\(note.id)\",false,\"auth-required: we only serve registered users\"]"))
 
         await #expect(
-            throws: NostrError.relayError(
-                "Relay rejected event \(note.id): auth-required: we only serve registered users")
+            throws: RelayRejection(prefix: .authRequired, message: "we only serve registered users")
         ) {
             try await publishTask.value
         }
@@ -118,7 +117,10 @@ struct NIP42AuthRetryTests {
         let auth = try NIP42TestSupport.sentAuthEvent(in: mock)
         mock.deliver(.string("[\"OK\",\"\(auth.id)\",false,\"restricted: pubkey not on whitelist\"]"))
 
-        await #expect(throws: NostrError.authenticationFailed("restricted: pubkey not on whitelist")) {
+        await #expect(
+            throws: RelayConnection.Error.authenticationRejected(
+                RelayRejection(prefix: .restricted, message: "pubkey not on whitelist"))
+        ) {
             try await publishTask.value
         }
         #expect(eventFrames(in: mock).count == 1)
@@ -141,8 +143,7 @@ struct NIP42AuthRetryTests {
         mock.deliver(.string("[\"OK\",\"\(note.id)\",false,\"auth-required: we only serve registered users\"]"))
 
         await #expect(
-            throws: NostrError.relayError(
-                "Relay rejected event \(note.id): auth-required: we only serve registered users")
+            throws: RelayRejection(prefix: .authRequired, message: "we only serve registered users")
         ) {
             try await publishTask.value
         }
@@ -164,7 +165,7 @@ struct NIP42AuthRetryTests {
         mock.deliver(.string("[\"OK\",\"\(note.id)\",false,\"blocked: you are banned\"]"))
 
         await #expect(
-            throws: NostrError.relayError("Relay rejected event \(note.id): blocked: you are banned")
+            throws: RelayRejection(prefix: .blocked, message: "you are banned")
         ) {
             try await publishTask.value
         }

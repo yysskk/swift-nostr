@@ -48,24 +48,28 @@ public actor RelayConnectionTransport: RelayTransport {
         }
     }
 
-    public func connect() async throws {
+    /// Connects to every relay.
+    /// - Throws: ``RelayConnection/Error/notConnected`` when no relay connects.
+    public func connect() async throws(RelayConnection.Error) {
         var connected = 0
         for relay in relays {
             if (try? await relay.connect()) != nil {
                 connected += 1
             }
         }
-        guard connected > 0 else { throw NostrError.notConnected }
+        guard connected > 0 else { throw .notConnected }
     }
 
-    public func subscribe(id: String, filters: [Filter]) async throws {
+    /// Opens the subscription on every relay.
+    /// - Throws: ``RelayConnection/Error/notConnected`` when no relay accepts the request.
+    public func subscribe(id: String, filters: [Filter]) async throws(RelayConnection.Error) {
         var subscribed = 0
         for relay in relays {
             if (try? await relay.subscribe(subscriptionID: id, filters: filters)) != nil {
                 subscribed += 1
             }
         }
-        guard subscribed > 0 else { throw NostrError.notConnected }
+        guard subscribed > 0 else { throw .notConnected }
     }
 
     public func unsubscribe(id: String) async {
@@ -74,14 +78,16 @@ public actor RelayConnectionTransport: RelayTransport {
         }
     }
 
-    public func send(_ event: Event) async throws {
+    /// Sends the event to every relay.
+    /// - Throws: ``RelayConnection/Error/notConnected`` when no relay accepts the send.
+    public func send(_ event: Event) async throws(RelayConnection.Error) {
         var sent = 0
         for relay in relays {
             if (try? await relay.send(.event(event))) != nil {
                 sent += 1
             }
         }
-        guard sent > 0 else { throw NostrError.notConnected }
+        guard sent > 0 else { throw .notConnected }
     }
 
     public func events() -> AsyncStream<Event> {

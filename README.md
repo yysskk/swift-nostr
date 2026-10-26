@@ -149,7 +149,7 @@ try await client.events.publish(.textNote("Only on relay 2"), to: [RelayURL(stri
 
 A `RelayURL` is a validated `ws`/`wss` URL in canonical form (lowercased scheme and host, no root slash or default port), so every spelling of a relay names the same pool entry; `RelayURL(string:)` throws a `RelayURL.Error` naming why anything else is rejected.
 
-`PublishStrategy` controls how many acknowledgments a publish waits for (`.firstAck`, `.quorum(n)`, `.allSettled`); the returned `PublishResult` reports the per-relay outcome.
+`PublishStrategy` controls how many acknowledgments a publish waits for (`.firstAck`, `.quorum(n)`, `.allSettled`); the returned `PublishResult` reports the per-relay outcome. A relay that refuses the event reports a `RelayRejection`, whose `prefix` (`.pow`, `.rateLimited`, `.authRequired`, …) says why.
 
 ### Subscribe and fetch
 

@@ -126,7 +126,7 @@ struct NIP51ListTests {
     func encryptionFailurePropagates() async throws {
         let list = NostrList(kind: .muteList, privateItems: [.word("secret-word")])
 
-        await #expect(throws: NostrError.timeout) {
+        await #expect(throws: RelayConnection.Error.timedOut) {
             try await EventTemplate.list(list, encryptingWith: FailingSigner())
         }
     }
@@ -161,7 +161,7 @@ struct NIP51ListTests {
         let signer = EventSigner(keyPair: try KeyPair())
         let event = try await sign(NostrList(kind: .muteList, privateItems: [.word("secret-word")]), with: signer)
 
-        await #expect(throws: NostrError.timeout) {
+        await #expect(throws: RelayConnection.Error.timedOut) {
             try await NostrList(event: event, decryptingWith: FailingSigner())
         }
     }

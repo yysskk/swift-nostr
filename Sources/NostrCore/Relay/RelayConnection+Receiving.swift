@@ -33,7 +33,7 @@ extension RelayConnection {
                                         waiter.finish()
                                     } else {
                                         waiter.finish(
-                                            throwing: EventRejection(eventID: eventID, message: message))
+                                            throwing: RelayRejection(status: message))
                                     }
                                 }
                             case .auth(let challenge):
@@ -56,7 +56,7 @@ extension RelayConnection {
                                 // A relay lacking NIP-45 often answers a COUNT with CLOSED;
                                 // fail the waiter fast rather than let it time out.
                                 if let waiter = pendingCountWaiters.removeValue(forKey: subscriptionID) {
-                                    waiter.finish(throwing: NostrError.relayError(message))
+                                    waiter.finish(throwing: RelayRejection(status: message))
                                 }
                             case .count(let subscriptionID, let count, let approximate):
                                 if let waiter = pendingCountWaiters.removeValue(forKey: subscriptionID) {

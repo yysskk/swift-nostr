@@ -10,9 +10,7 @@ public enum NostrError: Error, LocalizedError, Sendable, Equatable {
     case noRelaysInPool
     /// None of the requested relay URLs are in the pool (payload: the requested URLs, sorted).
     case noMatchingRelays([RelayURL])
-    case authenticationFailed(String)
     case cannotPublishAuthenticationEvent
-    case timeout
 
     public var errorDescription: String? {
         switch self {
@@ -32,13 +30,9 @@ public enum NostrError: Error, LocalizedError, Sendable, Equatable {
             }
             return
                 "None of the targeted relays are in the pool: \(requested.map(\.description).joined(separator: ", "))"
-        case .authenticationFailed(let message):
-            return "Authentication failed: \(message)"
         case .cannotPublishAuthenticationEvent:
             return
                 "NIP-42 authentication events (kind 22242) must not be published; they are only sent as AUTH responses"
-        case .timeout:
-            return "Operation timed out"
         }
     }
 }

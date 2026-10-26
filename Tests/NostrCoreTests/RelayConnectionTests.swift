@@ -51,7 +51,7 @@ struct RelayConnectionTests {
             if condition() { return }
             try await Task.sleep(for: .milliseconds(5))
         }
-        throw NostrError.timeout
+        throw RelayConnection.Error.timedOut
     }
 
     /// The first frame the connection sent whose message type is `type` (`"REQ"`, `"CLOSE"`, …),

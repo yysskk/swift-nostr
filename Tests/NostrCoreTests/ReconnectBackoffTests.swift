@@ -169,7 +169,7 @@ struct ReconnectBackoffTests {
             if await condition() { return }
             try await Task.sleep(for: .milliseconds(5))
         }
-        throw NostrError.timeout
+        throw RelayConnection.Error.timedOut
     }
 }
 

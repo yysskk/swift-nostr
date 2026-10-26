@@ -219,7 +219,7 @@ struct NostrSigningClientTests {
             if await condition() { return }
             try await Task.sleep(for: .milliseconds(5))
         }
-        throw NostrError.timeout
+        throw RelayConnection.Error.timedOut
     }
 
     @Test("a remote signer answers an AUTH challenge with a kind-22242 event")
