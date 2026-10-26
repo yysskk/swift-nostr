@@ -31,7 +31,7 @@ public struct NostrListsAPI: NostrListManaging {
     /// - Returns: The list, or nil if none was found.
     public func fetch(
         kind: Event.Kind,
-        for pubkey: String? = nil,
+        for pubkey: PublicKey? = nil,
         timeout: TimeInterval = 10
     ) async throws -> NostrList? {
         let target = try await author(pubkey)
@@ -81,7 +81,7 @@ public struct NostrListsAPI: NostrListManaging {
     public func fetchSet(
         kind: Event.Kind,
         identifier: String,
-        for pubkey: String? = nil,
+        for pubkey: PublicKey? = nil,
         timeout: TimeInterval = 10
     ) async throws -> NostrListSet? {
         let target = try await author(pubkey)
@@ -109,7 +109,7 @@ public struct NostrListsAPI: NostrListManaging {
     ///   decrypted.
     public func fetchSets(
         kind: Event.Kind,
-        for pubkey: String? = nil,
+        for pubkey: PublicKey? = nil,
         timeout: TimeInterval = 10
     ) async throws -> [NostrListSet] {
         let target = try await author(pubkey)
@@ -141,15 +141,14 @@ public struct NostrListsAPI: NostrListManaging {
     /// ``fetchSet(kind:identifier:for:timeout:)`` with no `pubkey`.
     /// - Returns: The set, or nil if none was found.
     public func fetchSet(naddr: NAddr, timeout: TimeInterval = 10) async throws -> NostrListSet? {
-        let author = try PublicKey(callerHex: naddr.author)
-        var filter = Filter(authors: [author], kinds: [Event.Kind(rawValue: naddr.kind)])
+        var filter = Filter(authors: [naddr.author], kinds: [Event.Kind(rawValue: naddr.kind)])
         filter.addTagQuery("d", values: [naddr.identifier])
         let events = try await client.fetch(filters: [filter], toURLs: nil, timeout: timeout)
         guard
             let newest = VerifiedEventSelection.newest(
                 in: events,
                 kind: Event.Kind(rawValue: naddr.kind),
-                author: author,
+                author: naddr.author,
                 identifier: naddr.identifier)
         else {
             return nil
@@ -161,9 +160,8 @@ public struct NostrListsAPI: NostrListManaging {
 
     /// The author to query: the given pubkey, or the signer's own when none is given.
     /// - Throws: ``NostrError/signerNotSet`` when neither is available.
-    /// - Throws: ``NostrError/invalidPublicKey`` when `pubkey` is not a hex public key.
-    private func author(_ pubkey: String?) async throws -> PublicKey {
-        if let pubkey { return try PublicKey(callerHex: pubkey) }
+    private func author(_ pubkey: PublicKey?) async throws -> PublicKey {
+        if let pubkey { return pubkey }
         return try await client.requiredPublicKey()
     }
 

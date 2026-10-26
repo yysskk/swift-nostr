@@ -14,7 +14,7 @@ struct NIP21Tests {
     let noteURI = "nostr:note1fntxtkcy9pjwucqwa9mddn7v03wwwsu9j330jj350nvhpky2tuaspk6nqc"
 
     let pubkeyHex = "3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d"
-    let eventIdHex = "5c83da77af1dec6d7289834998ad7aafbd9e2191396d75ec3cc27f5a77226f36"
+    let eventID = EventID("5c83da77af1dec6d7289834998ad7aafbd9e2191396d75ec3cc27f5a77226f36")!
 
     // MARK: - spec examples round-trip
 
@@ -53,9 +53,9 @@ struct NIP21Tests {
     @Test("nevent round-trips through its nostr: URI")
     func neventRoundTrip() throws {
         let event = try NEvent(
-            eventId: eventIdHex,
+            eventID: eventID,
             relays: ["wss://relay.example.com"],
-            author: pubkeyHex,
+            author: PublicKey(pubkeyHex)!,
             kind: 1
         )
         let uri = try NIP19Entity.nevent(event).nostrURI
@@ -67,7 +67,7 @@ struct NIP21Tests {
     func naddrRoundTrip() throws {
         let addr = try NAddr(
             identifier: "1700847963",
-            author: pubkeyHex,
+            author: PublicKey(pubkeyHex)!,
             kind: 30023,
             relays: ["wss://relay3.example.com"]
         )

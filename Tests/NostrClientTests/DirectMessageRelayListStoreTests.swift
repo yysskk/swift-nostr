@@ -1,5 +1,6 @@
 import Foundation
 import NostrCore
+import NostrTestSupport
 import Testing
 
 @testable import NostrClient
@@ -14,7 +15,7 @@ struct DirectMessageRelayListStoreTests {
     @Test("Newer DM relay list wins (replaceable event)")
     func newerWins() async {
         let store = makeStore()
-        let pubkey = "pubkey1"
+        let pubkey = PublicKey.fixture("pubkey1")
 
         await store.store(DirectMessageRelayList(relays: ["wss://a.example.com"]), createdAt: 100, for: pubkey)
         // older → ignored
@@ -31,7 +32,7 @@ struct DirectMessageRelayListStoreTests {
     @Test("Equal createdAt keeps existing entry")
     func equalCreatedAtKeepsExisting() async {
         let store = makeStore()
-        let pubkey = "pubkey1"
+        let pubkey = PublicKey.fixture("pubkey1")
 
         await store.store(DirectMessageRelayList(relays: ["wss://a.example.com"]), createdAt: 100, for: pubkey)
         await store.store(DirectMessageRelayList(relays: ["wss://b.example.com"]), createdAt: 100, for: pubkey)
@@ -43,7 +44,7 @@ struct DirectMessageRelayListStoreTests {
     @Test("Resolves inbox relay URLs")
     func inboxURLResolution() async {
         let store = makeStore()
-        let pubkey = "pubkey1"
+        let pubkey = PublicKey.fixture("pubkey1")
 
         await store.store(
             DirectMessageRelayList(relays: ["wss://inbox.example.com", "wss://dm.example.com"]),
@@ -62,14 +63,14 @@ struct DirectMessageRelayListStoreTests {
     @Test("Unknown pubkey resolves to an empty inbox set")
     func unknownPubkeyResolvesEmpty() async {
         let store = makeStore()
-        let inbox = await store.inboxRelayURLs(for: "nobody")
+        let inbox = await store.inboxRelayURLs(for: PublicKey.fixture("nobody"))
         #expect(inbox.isEmpty)
     }
 
     @Test("An empty DM relay list resolves to an empty inbox set")
     func emptyListResolvesEmptyInbox() async {
         let store = makeStore()
-        let pubkey = "pubkey1"
+        let pubkey = PublicKey.fixture("pubkey1")
 
         await store.store(DirectMessageRelayList(relays: []), createdAt: 1, for: pubkey)
 
@@ -84,13 +85,13 @@ struct DirectMessageRelayListStoreTests {
     @Test("A fresh pubkey is unresolved until looked up")
     func freshPubkeyIsUnresolved() async {
         let store = makeStore()
-        #expect(await store.isResolved(for: "nobody") == false)
+        #expect(await store.isResolved(for: PublicKey.fixture("nobody")) == false)
     }
 
     @Test("markNoList resolves a pubkey without caching a list")
     func markNoListResolvesWithoutCaching() async {
         let store = makeStore()
-        let pubkey = "pubkey1"
+        let pubkey = PublicKey.fixture("pubkey1")
 
         await store.markNoList(for: pubkey)
 
@@ -103,7 +104,7 @@ struct DirectMessageRelayListStoreTests {
     @Test("A cached list counts as resolved")
     func cachedListIsResolved() async {
         let store = makeStore()
-        let pubkey = "pubkey1"
+        let pubkey = PublicKey.fixture("pubkey1")
 
         await store.store(DirectMessageRelayList(relays: ["wss://a.example.com"]), createdAt: 1, for: pubkey)
         #expect(await store.isResolved(for: pubkey) == true)
@@ -112,7 +113,7 @@ struct DirectMessageRelayListStoreTests {
     @Test("Storing a real list clears a prior no-list mark")
     func storingClearsNoListMark() async {
         let store = makeStore()
-        let pubkey = "pubkey1"
+        let pubkey = PublicKey.fixture("pubkey1")
 
         await store.markNoList(for: pubkey)
         await store.store(DirectMessageRelayList(relays: ["wss://a.example.com"]), createdAt: 1, for: pubkey)
@@ -131,7 +132,7 @@ struct DirectMessageRelayListStoreTests {
         let ingested = await store.ingest(event)
         #expect(ingested != nil)
 
-        let cached = await store.cachedList(for: keyPair.publicKey.hex)
+        let cached = await store.cachedList(for: keyPair.publicKey)
         #expect(cached?.relays == ["wss://inbox.example.com"])
     }
 
@@ -161,34 +162,34 @@ struct ReplaceableCacheTests {
     @Test("Newer value wins")
     func newerWins() {
         var cache = ReplaceableCache<String>()
-        cache.store("a", createdAt: 100, for: "k")
-        cache.store("b", createdAt: 50, for: "k")  // older → ignored
-        #expect(cache.value(for: "k") == "a")
-        cache.store("c", createdAt: 200, for: "k")  // newer → wins
-        #expect(cache.value(for: "k") == "c")
+        cache.store("a", createdAt: 100, for: .fixture("k"))
+        cache.store("b", createdAt: 50, for: .fixture("k"))  // older → ignored
+        #expect(cache.value(for: .fixture("k")) == "a")
+        cache.store("c", createdAt: 200, for: .fixture("k"))  // newer → wins
+        #expect(cache.value(for: .fixture("k")) == "c")
     }
 
     @Test("Equal createdAt keeps existing value and returns it")
     func equalKeepsExisting() {
         var cache = ReplaceableCache<String>()
-        cache.store("a", createdAt: 100, for: "k")
-        let effective = cache.store("b", createdAt: 100, for: "k")
+        cache.store("a", createdAt: 100, for: .fixture("k"))
+        let effective = cache.store("b", createdAt: 100, for: .fixture("k"))
         #expect(effective == "a")
-        #expect(cache.value(for: "k") == "a")
+        #expect(cache.value(for: .fixture("k")) == "a")
     }
 
     @Test("Missing key returns nil")
     func missingReturnsNil() {
         let cache = ReplaceableCache<Int>()
-        #expect(cache.value(for: "absent") == nil)
+        #expect(cache.value(for: .fixture("absent")) == nil)
     }
 
     @Test("Keys are independent")
     func keysIndependent() {
         var cache = ReplaceableCache<String>()
-        cache.store("a", createdAt: 1, for: "k1")
-        cache.store("b", createdAt: 1, for: "k2")
-        #expect(cache.value(for: "k1") == "a")
-        #expect(cache.value(for: "k2") == "b")
+        cache.store("a", createdAt: 1, for: .fixture("k1"))
+        cache.store("b", createdAt: 1, for: .fixture("k2"))
+        #expect(cache.value(for: .fixture("k1")) == "a")
+        #expect(cache.value(for: .fixture("k2")) == "b")
     }
 }

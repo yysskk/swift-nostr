@@ -14,17 +14,15 @@ public struct NostrRoutingAPI: NostrRelayRouting {
 
     /// Fetches a user's NIP-65 relay list (kind 10002), caching it (newer wins).
     /// - Returns: The relay list, or nil if none was found.
-    /// - Throws: ``NostrError/invalidPublicKey`` if `pubkey` is not a hex public key.
-    public func fetchRelayList(for pubkey: String, timeout: TimeInterval = 10) async throws -> RelayListMetadata? {
-        let author = try PublicKey(callerHex: pubkey)
+    public func fetchRelayList(for pubkey: PublicKey, timeout: TimeInterval = 10) async throws -> RelayListMetadata? {
         let events = try await client.fetch(
-            filters: [.relayListMetadata(pubkey: author)], toURLs: nil, timeout: timeout
+            filters: [.relayListMetadata(pubkey: pubkey)], toURLs: nil, timeout: timeout
         )
         // Replaceable event: the newest list this pubkey actually signed. Taking the newest of
         // whatever arrived let any relay install a list for someone else by dating it far ahead.
         guard
             let newest = VerifiedEventSelection.newest(
-                in: events, kind: .relayListMetadata, author: author),
+                in: events, kind: .relayListMetadata, author: pubkey),
             let list = newest.relayListMetadata
         else {
             return nil
@@ -34,7 +32,7 @@ public struct NostrRoutingAPI: NostrRelayRouting {
     }
 
     /// Returns the cached relay list for a pubkey without performing a network fetch.
-    public func cachedRelayList(for pubkey: String) async -> RelayListMetadata? {
+    public func cachedRelayList(for pubkey: PublicKey) async -> RelayListMetadata? {
         await client.relayListStore.cachedList(for: pubkey)
     }
 
@@ -48,7 +46,7 @@ public struct NostrRoutingAPI: NostrRelayRouting {
     ) async throws -> PublishedEvent {
         let event = try await client.signEvent { .relayListMetadata(pubkey: $0, relayList) }
         let result = try await client.pool.publish(event, strategy: strategy)
-        await client.relayListStore.store(relayList, createdAt: event.createdAt, for: event.pubkey.hex)
+        await client.relayListStore.store(relayList, createdAt: event.createdAt, for: event.pubkey)
         return PublishedEvent(event: event, result: result)
     }
 
@@ -69,16 +67,14 @@ public struct NostrRoutingAPI: NostrRelayRouting {
     /// connects them per the gossip policy, and issues a single subscription scoped to those relays.
     /// If any author has no known relay list, the subscription falls back to the full relay pool so
     /// no author is silently dropped; the fallback throws ``NostrError/noRelaysInPool`` when the
-    /// pool is also empty. Throws ``NostrError/invalidPublicKey`` if an author is not a hex public
-    /// key.
+    /// pool is also empty.
     public func subscribeOutbox(
-        authors: [String],
+        authors: [PublicKey],
         kinds: [Event.Kind] = [.textNote],
         limit: Int? = nil
     ) async throws -> SubscriptionSequence {
-        let typedAuthors = try authors.map(PublicKey.init(callerHex:))
         let routeSet = await resolveOutboxRelays(authors: authors)
-        let filter = Filter(authors: typedAuthors, kinds: kinds, limit: limit)
+        let filter = Filter(authors: authors, kinds: kinds, limit: limit)
         return try await client.subscribe(filters: [filter], toURLs: routeSet)
     }
 
@@ -97,14 +93,14 @@ public struct NostrRoutingAPI: NostrRelayRouting {
     public func publishGossip(_ event: Event, strategy: PublishStrategy? = nil) async throws -> PublishResult {
         var targets: Set<URL> = []
 
-        targets.formUnion(await writeRelays(for: event.pubkey.hex))
+        targets.formUnion(await writeRelays(for: event.pubkey))
 
         let referencedPubkeys = Set(event.referencedPubkeys)
         for pubkey in referencedPubkeys {
-            if await cachedRelayList(for: pubkey.hex) == nil {
-                _ = try? await fetchRelayList(for: pubkey.hex)
+            if await cachedRelayList(for: pubkey) == nil {
+                _ = try? await fetchRelayList(for: pubkey)
             }
-            targets.formUnion(await client.relayListStore.readRelayURLs(for: pubkey.hex))
+            targets.formUnion(await client.relayListStore.readRelayURLs(for: pubkey))
         }
 
         let available = await client.relayListStore.ensureConnected(targets)
@@ -120,12 +116,11 @@ public struct NostrRoutingAPI: NostrRelayRouting {
     /// Look this up to learn where to deliver a recipient's gift-wrapped direct messages.
     /// - Returns: The DM relay list, or nil if none was found.
     public func fetchDirectMessageRelayList(
-        for pubkey: String,
+        for pubkey: PublicKey,
         timeout: TimeInterval = 10
     ) async throws -> DirectMessageRelayList? {
-        let author = try PublicKey(callerHex: pubkey)
         let events = try await client.fetch(
-            filters: [.directMessageRelayList(pubkey: author)], toURLs: nil, timeout: timeout
+            filters: [.directMessageRelayList(pubkey: pubkey)], toURLs: nil, timeout: timeout
         )
         // Replaceable event: the newest list this pubkey actually signed. This one decides where
         // their private messages are delivered, so an unverified copy would let a relay redirect
@@ -133,7 +128,7 @@ public struct NostrRoutingAPI: NostrRelayRouting {
         // whoever forged the list.
         guard
             let newest = VerifiedEventSelection.newest(
-                in: events, kind: .directMessageRelayList, author: author),
+                in: events, kind: .directMessageRelayList, author: pubkey),
             let list = newest.directMessageRelayList
         else {
             return nil
@@ -143,7 +138,7 @@ public struct NostrRoutingAPI: NostrRelayRouting {
     }
 
     /// Returns the cached DM relay list for a pubkey without performing a network fetch.
-    public func cachedDirectMessageRelayList(for pubkey: String) async -> DirectMessageRelayList? {
+    public func cachedDirectMessageRelayList(for pubkey: PublicKey) async -> DirectMessageRelayList? {
         await client.dmRelayListStore.cachedList(for: pubkey)
     }
 
@@ -159,7 +154,7 @@ public struct NostrRoutingAPI: NostrRelayRouting {
     ) async throws -> PublishedEvent {
         let event = try await client.signEvent { .directMessageRelayList(pubkey: $0, relayList) }
         let result = try await client.pool.publish(event, strategy: strategy)
-        await client.dmRelayListStore.store(relayList, createdAt: event.createdAt, for: event.pubkey.hex)
+        await client.dmRelayListStore.store(relayList, createdAt: event.createdAt, for: event.pubkey)
         return PublishedEvent(event: event, result: result)
     }
 
@@ -183,7 +178,7 @@ public struct NostrRoutingAPI: NostrRelayRouting {
     /// - Throws: ``NostrError/signerNotSet`` if no signer is configured.
     @discardableResult
     public func connectDirectMessageInboxRelays() async throws -> Set<URL> {
-        await connectedInboxRelays(for: try await client.requiredPublicKey().hex)
+        await connectedInboxRelays(for: try await client.requiredPublicKey())
     }
 
     // MARK: - Internal
@@ -194,7 +189,7 @@ public struct NostrRoutingAPI: NostrRelayRouting {
     /// Shared by the send path (routing a recipient's gift wrap) and the receive path
     /// (``connectDirectMessageInboxRelays()``).
     /// - Returns: The connected inbox relay URLs (empty if none are known or reachable).
-    func connectedInboxRelays(for pubkey: String) async -> Set<URL> {
+    func connectedInboxRelays(for pubkey: PublicKey) async -> Set<URL> {
         // Fetch only once per pubkey: skip it when the list is already resolved — cached, or a
         // prior lookup confirmed there is none — so repeated sends don't refetch. Discovery also
         // needs at least one connected relay to query, which avoids a blocking fetch against a
@@ -219,7 +214,7 @@ public struct NostrRoutingAPI: NostrRelayRouting {
     /// Resolves the WRITE relays of the given authors for outbox routing.
     /// - Returns: The connected target set, or `nil` to fall back to the full pool
     ///   when an author is unresolved or nothing could be connected.
-    private func resolveOutboxRelays(authors: [String]) async -> Set<URL>? {
+    private func resolveOutboxRelays(authors: [PublicKey]) async -> Set<URL>? {
         var targets: Set<URL> = []
         var hasUnresolved = false
 
@@ -237,7 +232,7 @@ public struct NostrRoutingAPI: NostrRelayRouting {
     }
 
     /// A pubkey's WRITE relays, discovering its relay list first when nothing is cached.
-    private func writeRelays(for pubkey: String) async -> Set<URL> {
+    private func writeRelays(for pubkey: PublicKey) async -> Set<URL> {
         if await cachedRelayList(for: pubkey) == nil {
             _ = try? await fetchRelayList(for: pubkey)
         }

@@ -73,9 +73,8 @@ public struct NostrSubscriptionsAPI: NostrSubscribing {
     // MARK: - Convenience subscriptions
 
     /// Subscribes to a user's timeline.
-    /// - Throws: ``NostrError/invalidPublicKey`` if `pubkey` is not a hex public key.
-    public func userTimeline(pubkey: String, limit: Int = 100) async throws -> SubscriptionSequence {
-        try await subscribe(filters: [.userNotes(pubkey: PublicKey(callerHex: pubkey), limit: limit)])
+    public func userTimeline(pubkey: PublicKey, limit: Int = 100) async throws -> SubscriptionSequence {
+        try await subscribe(filters: [.userNotes(pubkey: pubkey, limit: limit)])
     }
 
     /// Subscribes to the global feed.
@@ -84,14 +83,12 @@ public struct NostrSubscriptionsAPI: NostrSubscribing {
     }
 
     /// Subscribes to mentions of a user.
-    /// - Throws: ``NostrError/invalidPublicKey`` if `pubkey` is not a hex public key.
-    public func mentions(pubkey: String, limit: Int = 100) async throws -> SubscriptionSequence {
-        try await subscribe(filters: [.mentions(pubkey: PublicKey(callerHex: pubkey), limit: limit)])
+    public func mentions(pubkey: PublicKey, limit: Int = 100) async throws -> SubscriptionSequence {
+        try await subscribe(filters: [.mentions(pubkey: pubkey, limit: limit)])
     }
 
     /// Subscribes to metadata updates for a list of pubkeys.
-    /// - Throws: ``NostrError/invalidPublicKey`` if a pubkey is not a hex public key.
-    public func metadata(pubkeys: [String]) async throws -> SubscriptionSequence {
-        try await subscribe(filters: [.metadata(pubkeys: pubkeys.map(PublicKey.init(callerHex:)))])
+    public func metadata(pubkeys: [PublicKey]) async throws -> SubscriptionSequence {
+        try await subscribe(filters: [.metadata(pubkeys: pubkeys)])
     }
 }

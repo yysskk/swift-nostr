@@ -86,7 +86,7 @@ struct NIP51SimpleGroupListTests {
     @Test("An entry built from a reference keeps only the list fields")
     func entryFromReference() {
         let reference = GroupReference(
-            relayURL: groupRelay, id: groupID, relayPubkey: "aabbcc", inviteCode: "welcome")
+            relayURL: groupRelay, id: groupID, relayPubkey: .fixture("relay"), inviteCode: "welcome")
         let entry = GroupListEntry(reference, name: "Cooking")
         #expect(entry.groupID == groupID)
         #expect(entry.relayURL == groupRelay)
@@ -406,7 +406,7 @@ struct NIP51SimpleGroupListClientTests {
         )
 
         let fetched = try await answering(socket, with: [stale, newer]) {
-            try await client.groups.fetchSimpleGroupList(for: author.publicKey.hex)
+            try await client.groups.fetchSimpleGroupList(for: author.publicKey)
         }
 
         let list = try #require(fetched)

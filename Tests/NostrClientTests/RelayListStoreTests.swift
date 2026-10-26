@@ -15,7 +15,7 @@ struct RelayListStoreTests {
     @Test("Newer relay list wins (replaceable event)")
     func newerWins() async {
         let store = makeStore()
-        let pubkey = "pubkey1"
+        let pubkey = PublicKey.fixture("pubkey1")
 
         let listA = RelayListMetadata(entries: [RelayListEntry(url: "wss://a.example.com")])
         let listB = RelayListMetadata(entries: [RelayListEntry(url: "wss://b.example.com")])
@@ -34,7 +34,7 @@ struct RelayListStoreTests {
     @Test("Equal createdAt keeps existing entry")
     func equalCreatedAtKeepsExisting() async {
         let store = makeStore()
-        let pubkey = "pubkey1"
+        let pubkey = PublicKey.fixture("pubkey1")
 
         await store.store(
             RelayListMetadata(entries: [RelayListEntry(url: "wss://a.example.com")]),
@@ -54,7 +54,7 @@ struct RelayListStoreTests {
     @Test("Resolves write and read relay URLs")
     func writeReadURLResolution() async {
         let store = makeStore()
-        let pubkey = "pubkey1"
+        let pubkey = PublicKey.fixture("pubkey1")
 
         let list = RelayListMetadata(entries: [
             RelayListEntry(url: "wss://both.example.com", usage: .readWrite),
@@ -81,8 +81,8 @@ struct RelayListStoreTests {
     @Test("Unknown pubkey resolves to empty relay sets")
     func unknownPubkeyResolvesEmpty() async {
         let store = makeStore()
-        let writeURLs = await store.writeRelayURLs(for: "nobody")
-        let readURLs = await store.readRelayURLs(for: "nobody")
+        let writeURLs = await store.writeRelayURLs(for: PublicKey.fixture("nobody"))
+        let readURLs = await store.readRelayURLs(for: PublicKey.fixture("nobody"))
         #expect(writeURLs.isEmpty)
         #expect(readURLs.isEmpty)
     }
@@ -99,7 +99,7 @@ struct RelayListStoreTests {
         let ingested = await store.ingest(event)
         #expect(ingested != nil)
 
-        let cached = await store.cachedList(for: keyPair.publicKey.hex)
+        let cached = await store.cachedList(for: keyPair.publicKey)
         #expect(cached?.writeRelays == ["wss://a.example.com"])
     }
 

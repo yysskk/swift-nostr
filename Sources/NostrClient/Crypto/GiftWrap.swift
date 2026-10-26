@@ -13,7 +13,7 @@ public struct GiftWrap: Sendable {
     /// Unwrapped gift wrap result containing the sender and the original event
     public struct UnwrappedMessage: Sendable {
         /// The actual sender's public key (from the seal)
-        public let senderPubkey: String
+        public let senderPubkey: PublicKey
         /// The original unwrapped event (rumor)
         public let event: Event
     }
@@ -26,28 +26,15 @@ public struct GiftWrap: Sendable {
     /// - Parameters:
     ///   - event: The event to wrap (will be converted to rumor if signed)
     ///   - signer: The sender's signer, local or remote
-    ///   - recipientPubkey: The recipient's public key (hex)
+    ///   - recipientPubkey: The recipient's public key
     ///   - expiration: Optional NIP-40 expiration. Applied to the outer gift wrap (the stored
     ///     kind-1059 event relays act on) so the message disappears after the given time. The
     ///     inner rumor is unaffected, keeping the plaintext content private until then.
     /// - Returns: The gift-wrapped event ready for publishing
-    /// - Throws: ``NostrError/invalidPublicKey`` if `recipientPubkey` is not a hex public key.
     public static func wrap(
         event: Event,
         signer: any NostrSigning,
-        recipientPubkey: String,
-        expiration: Date? = nil
-    ) async throws -> Event {
-        try await wrap(
-            event: event, signer: signer, recipient: PublicKey(callerHex: recipientPubkey),
-            expiration: expiration)
-    }
-
-    /// ``wrap(event:signer:recipientPubkey:expiration:)`` for an already-parsed recipient key.
-    static func wrap(
-        event: Event,
-        signer: any NostrSigning,
-        recipient recipientPubkey: PublicKey,
+        recipientPubkey: PublicKey,
         expiration: Date? = nil
     ) async throws -> Event {
         // 1. Create rumor (unsigned event JSON)
@@ -134,7 +121,7 @@ public struct GiftWrap: Sendable {
 
         // 3. Return the unwrapped message
         return UnwrappedMessage(
-            senderPubkey: seal.pubkey.hex,
+            senderPubkey: seal.pubkey,
             event: rumor
         )
     }
@@ -166,7 +153,7 @@ public struct GiftWrap: Sendable {
     /// Decodes a rumor from JSON string, checking that its id is the hash of its own contents.
     ///
     /// A rumor carries no signature, so its id is not attested by anything — but callers use it as
-    /// the message's identity: `DirectMessage.rumorId` keys storage and correlates reactions. Left
+    /// the message's identity: `DirectMessage.rumorID` keys storage and correlates reactions. Left
     /// unchecked, a sender could choose an id that collides with a message from another
     /// conversation and overwrite it.
     private static func decodeRumor(_ json: String) throws -> Event {

@@ -69,18 +69,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   pinned event whose value is not canonical hex, and a moderation event whose `p` or `e` target is
   malformed throws `missingTag` as if it were absent.
 - **`ProofOfWork.difficulty(ofHexId:)` is now `difficulty(of:)`**, taking an `EventID` (breaking).
-- **NostrClient's string-typed key and id parameters are validated** (breaking): APIs that still
-  take a hex public key or event id as a `String` — among them `subscriptions.userTimeline`,
-  `mentions`, and `metadata`, `events.fetchEvent(id:)`, `fetchMetadata(pubkey:)`,
-  `fetchLongFormContent(author:…)`, and `publishDeletion(eventIds:…)`, the `routing` and `lists`
-  fetches, `groups.fetchMetadata` / `fetchState`, `identity.nip44Encrypt` / `nip44Decrypt`,
-  `DirectMessageBuilder`, `GiftWrap.wrap`, and `EventSigner.signContactList` — throw
-  `invalidPublicKey` or `invalidEventID` for a value that is not 64 hex digits instead of sending it
-  on. Either case is still accepted.
+- **NostrClient takes and returns typed keys and event ids** (breaking): every `NostrClient` API
+  that passed a public key or event id as a `String` now uses `PublicKey` or `EventID`, so there is
+  no string left to validate at the boundary. `identity.publicKey` (and the `NostrIdentityProviding`
+  requirement) is a `PublicKey?`; `identity.npub` is removed in favor of `publicKey?.npub`, and
+  `identity.nip44Encrypt(_:to:)` / `nip44Decrypt(_:from:)` take a `PublicKey`. The `subscriptions`
+  conveniences (`userTimeline`, `mentions`, `metadata(pubkeys:)`), `events.fetchEvent(id:)`,
+  `fetchMetadata(pubkey:)`, `fetchLongFormContent(author:identifier:timeout:)`, and
+  `publishReport(pubkey:…)`, the `routing` relay-list fetches, caches, and `subscribeOutbox(authors:)`,
+  the `lists` fetches' `for:`, `groups.fetchMetadata` / `fetchState(authorPubkey:)` and
+  `fetchSimpleGroupList(for:)`, `messages.send` / `sendFile` / `sendGiftWrapped(to:)` and
+  `send(replyTo:)`, `DirectMessageBuilder`, `GiftWrap.wrap(recipientPubkey:)` and
+  `UnwrappedMessage.senderPubkey`, `EventSigner.signContactList(pubkeys:)` and `signReport(pubkey:)`,
+  `LongFormContent.naddr(author:)`, and `NostrListSet.naddr(author:)` / `coordinate(author:)` all take
+  or return the typed values. `events.publishDeletion(eventIds:reason:strategy:)` is now
+  `publishDeletion(eventIDs:reason:strategy:)` taking `[EventID]`.
+- **NostrClient models hold typed keys and event ids** (breaking): `Contact.pubkey`,
+  `GroupReference.relayPubkey`, `InternetIdentifier.VerificationResult.pubkey`, and the
+  `senderPubkey` / `recipientPubkey` of `DirectMessage` and `DirectMessageFile` are `PublicKey`;
+  `DirectMessage.rumorId` is now `rumorID: EventID` (also its `Identifiable` id) and `replyTo` is an
+  `EventID?`. `DirectMessageReaction` has `rumorID`, `messageID: EventID` (was `messageId`), and a
+  typed `senderPubkey` and `messageAuthorPubkey`; `DirectMessageFile.rumorId` is now `rumorID`.
+  `Contact.init(npub:relayURL:petname:)` is removed in favor of `Contact(pubkey: PublicKey(npub:))`.
+- **NIP-19 entities hold typed values** (breaking): `NIP19Entity.npub` carries a `PublicKey` and
+  `.note` an `EventID` (`nsec` keeps its hex string), `NProfile.publicKey` and `NAddr.author` are
+  `PublicKey`, and `NEvent.eventId` / `author` are now `eventID: EventID` and `author: PublicKey?`,
+  with `NEvent.init(eventID:relays:author:kind:)`. Their initializers no longer throw `invalidHex`;
+  decoding a key or id payload that is not 32 bytes throws `invalidNIP19Entity`.
+- **NostrClient reads public keys and event ids from third-party data leniently** (breaking):
+  `Contact.fromTag(_:)` returns nil, and `Event.contacts` skips the tag, for a `p` value that is not
+  canonical hex. NIP-05 resolution treats a `nostr.json` key that is not canonical hex as absent, so
+  `InternetIdentifier.verify` and `lookupPubkey` (which now returns a `PublicKey`) throw
+  `pubkeyNotFound`, and `verify(_:expectedPubkey:)` compares typed keys rather than case-folded
+  strings. `ZapReceipt.recipientPubkey`, `senderPubkey`, and `zappedEventId` (now `zappedEventID`)
+  are typed and nil for a malformed tag, so `validate(lnurlProviderPubkey:…)` — which takes a
+  `PublicKey` — reports a malformed `p` as `missingRecipient`. A received direct message whose `p`
+  tag is malformed, or a reaction whose `e` or `p` tag is, fails to parse as `invalidData`; a reply
+  marker with a malformed id leaves `replyTo` nil.
 - **`KeyPair.publicKey` is a `PublicKey`** (breaking): `KeyPair.publicKeyHex` and `KeyPair.npub`
   are removed in favor of `publicKey.hex` and `publicKey.npub`; the raw bytes are `publicKey.data`.
-- **`EventSigner.npub` and `NostrIdentityAPI.npub` no longer throw** (breaking for conformers of
-  `NostrIdentityProviding`, whose `npub` requirement is now `get async`).
+- **`EventSigner.npub` no longer throws** (breaking).
 - **`NostrError.invalidEventId` is renamed `invalidEventID`** (breaking).
 
 ## [0.8.0] - 2026-10-25

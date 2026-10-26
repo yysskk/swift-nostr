@@ -70,8 +70,7 @@ struct NostrClientNamespaceTests {
         #expect(await identity.publicKey == nil)
         try await identity.setPrivateKey(keyPair.privateKeyHex)
 
-        #expect(await identity.publicKey == keyPair.publicKey.hex)
-        #expect(await identity.npub == keyPair.publicKey.npub)
+        #expect(await identity.publicKey == keyPair.publicKey)
         #expect(await identity.authenticationMode == .automatic)
 
         await identity.setAuthenticationMode(.manual)
@@ -83,9 +82,9 @@ struct NostrClientNamespaceTests {
         #expect(try signed.verify())
 
         let peer = try KeyPair()
-        let payload = try await identity.nip44Encrypt("sealed", to: peer.publicKey.hex)
+        let payload = try await identity.nip44Encrypt("sealed", to: peer.publicKey)
         #expect(try EventSigner(keyPair: peer).nip44Decrypt(payload, from: keyPair.publicKey) == "sealed")
-        #expect(try await identity.nip44Decrypt(payload, from: peer.publicKey.hex) == "sealed")
+        #expect(try await identity.nip44Decrypt(payload, from: peer.publicKey) == "sealed")
 
         await client.relays.disconnect()
     }
@@ -156,7 +155,7 @@ struct NostrClientNamespaceTests {
 
         #expect(published.event.kind == .relayListMetadata)
         // Publishing seeds the cache, so the author's list resolves without a network round trip.
-        let cached = await routing.cachedRelayList(for: published.event.pubkey.hex)
+        let cached = await routing.cachedRelayList(for: published.event.pubkey)
         #expect(cached?.writeRelays == ["wss://write.example.com"])
         await client.relays.disconnect()
     }
@@ -170,12 +169,12 @@ struct NostrClientNamespaceTests {
 
         let sender = try KeyPair()
         let sent = try await DirectMessageBuilder(signer: EventSigner(keyPair: sender))
-            .createMessageWithSelfCopy(content: "through the protocol", to: recipient.publicKey.hex)
+            .createMessageWithSelfCopy(content: "through the protocol", to: recipient.publicKey)
 
         let parsed = try await messaging.parse(sent.recipientGiftWrap)
 
         #expect(parsed.content == "through the protocol")
-        #expect(parsed.senderPubkey == sender.publicKey.hex)
+        #expect(parsed.senderPubkey == sender.publicKey)
         await client.relays.disconnect()
     }
 

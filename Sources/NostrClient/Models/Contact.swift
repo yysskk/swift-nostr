@@ -4,8 +4,8 @@ import NostrCore
 /// Contact information for NIP-02 Contact List
 /// https://github.com/nostr-protocol/nips/blob/master/02.md
 public struct Contact: Codable, Hashable, Sendable {
-    /// The public key of the contact (hex-encoded)
-    public let pubkey: String
+    /// The public key of the contact
+    public let pubkey: PublicKey
 
     /// The main relay URL where the client reads events from this contact
     public let relayURL: String?
@@ -13,33 +13,20 @@ public struct Contact: Codable, Hashable, Sendable {
     /// A local name (petname) for this contact
     public let petname: String?
 
-    /// Creates a contact from a hex-encoded public key.
+    /// Creates a contact.
     /// - Parameters:
-    ///   - pubkey: The contact's hex-encoded public key.
+    ///   - pubkey: The contact's public key.
     ///   - relayURL: The main relay URL where the client reads events from this contact.
     ///   - petname: A local name for this contact.
-    public init(pubkey: String, relayURL: String? = nil, petname: String? = nil) {
+    public init(pubkey: PublicKey, relayURL: String? = nil, petname: String? = nil) {
         self.pubkey = pubkey
-        self.relayURL = relayURL
-        self.petname = petname
-    }
-
-    /// Creates a Contact from an npub
-    /// - Parameters:
-    ///   - npub: The contact's public key in bech32 `npub` form (NIP-19).
-    ///   - relayURL: The main relay URL where the client reads events from this contact.
-    ///   - petname: A local name for this contact.
-    /// - Throws: ``NostrError`` if `npub` is not a valid npub string.
-    public init(npub: String, relayURL: String? = nil, petname: String? = nil) throws {
-        let publicKey = try PublicKey(npub: npub)
-        self.pubkey = publicKey.hex
         self.relayURL = relayURL
         self.petname = petname
     }
 
     /// Converts to a tag array for NIP-02 event
     public func toTag() -> [String] {
-        var tag = ["p", pubkey]
+        var tag = ["p", pubkey.hex]
         if let relayURL = relayURL {
             tag.append(relayURL)
             if let petname = petname {
@@ -53,12 +40,13 @@ public struct Contact: Codable, Hashable, Sendable {
     }
 
     /// Creates a Contact from a "p" tag array
+    ///
+    /// Returns nil unless the tag is a `p` tag whose value is a canonical hex public key.
     public static func fromTag(_ tag: [String]) -> Contact? {
-        guard tag.count >= 2, tag[0] == "p" else {
+        guard tag.count >= 2, tag[0] == "p", let pubkey = PublicKey(tag[1]) else {
             return nil
         }
 
-        let pubkey = tag[1]
         let relayURL = tag.count > 2 && !tag[2].isEmpty ? tag[2] : nil
         let petname = tag.count > 3 && !tag[3].isEmpty ? tag[3] : nil
 
@@ -69,7 +57,8 @@ public struct Contact: Codable, Hashable, Sendable {
 // MARK: - Contact List Helpers
 extension Event {
     /// Extracts contacts from a kind 3 (contacts) event
-    /// Returns nil if the event is not a contact list event
+    /// Returns nil if the event is not a contact list event. A `p` tag whose value is not a
+    /// canonical hex public key is skipped.
     public var contacts: [Contact]? {
         guard kind == .contacts else {
             return nil

@@ -65,9 +65,9 @@ struct DirectMessageSequenceTests {
         // A message addressed to Bob, one addressed to Carol (undecryptable by
         // Bob), a plain text note, and a notice — only Bob's DM should emerge.
         let toBob = try await DirectMessageBuilder(signer: EventSigner(keyPair: alice))
-            .createMessageWithSelfCopy(content: "hi bob", to: bob.publicKey.hex, subject: "greetings")
+            .createMessageWithSelfCopy(content: "hi bob", to: bob.publicKey, subject: "greetings")
         let toCarol = try await DirectMessageBuilder(signer: EventSigner(keyPair: alice))
-            .createMessageWithSelfCopy(content: "hi carol", to: carol.publicKey.hex)
+            .createMessageWithSelfCopy(content: "hi carol", to: carol.publicKey)
         let plainNote = try EventSigner(keyPair: alice).signTextNote(content: "public note")
 
         let sequence = makeSequence(
@@ -88,10 +88,10 @@ struct DirectMessageSequenceTests {
 
         #expect(received.count == 1)
         #expect(received.first?.content == "hi bob")
-        #expect(received.first?.senderPubkey == alice.publicKey.hex)
-        #expect(received.first?.recipientPubkey == bob.publicKey.hex)
+        #expect(received.first?.senderPubkey == alice.publicKey)
+        #expect(received.first?.recipientPubkey == bob.publicKey)
         #expect(received.first?.subject == "greetings")
-        #expect(received.first?.rumorId == toBob.rumor.id.hex)
+        #expect(received.first?.rumorID == toBob.rumor.id)
     }
 
     @Test("a signer that cannot attempt the read throws instead of dropping the message")
@@ -103,7 +103,7 @@ struct DirectMessageSequenceTests {
         // nothing about the event — treating it like a foreign wrap would consume the message from
         // the stream and leave the caller unable to notice, let alone resubscribe.
         let toBob = try await DirectMessageBuilder(signer: EventSigner(keyPair: alice))
-            .createMessageWithSelfCopy(content: "hi bob", to: bob.publicKey.hex)
+            .createMessageWithSelfCopy(content: "hi bob", to: bob.publicKey)
 
         let sequence = makeSequence(
             items: [.event(relayURL: relayURL, event: toBob.recipientGiftWrap)],
@@ -123,7 +123,7 @@ struct DirectMessageSequenceTests {
         let bob = try KeyPair()
 
         let toBob = try await DirectMessageBuilder(signer: EventSigner(keyPair: alice))
-            .createMessageWithSelfCopy(content: "hi bob", to: bob.publicKey.hex)
+            .createMessageWithSelfCopy(content: "hi bob", to: bob.publicKey)
 
         let (stream, continuation) = AsyncStream.makeStream(of: SubscriptionEvent.self)
         continuation.yield(.event(relayURL: relayURL, event: toBob.recipientGiftWrap))
@@ -148,9 +148,9 @@ struct DirectMessageSequenceTests {
         let carol = try KeyPair()
 
         let toCarol = try await DirectMessageBuilder(signer: EventSigner(keyPair: alice))
-            .createMessageWithSelfCopy(content: "hi carol", to: carol.publicKey.hex)
+            .createMessageWithSelfCopy(content: "hi carol", to: carol.publicKey)
         let toBob = try await DirectMessageBuilder(signer: EventSigner(keyPair: alice))
-            .createMessageWithSelfCopy(content: "hi bob", to: bob.publicKey.hex)
+            .createMessageWithSelfCopy(content: "hi bob", to: bob.publicKey)
 
         // Carol's wrap fails to decrypt for Bob — routine on a shared gift-wrap stream, so it must
         // be skipped rather than ending the subscription before Bob's own message arrives.

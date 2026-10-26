@@ -8,7 +8,7 @@ import Testing
 struct GroupReferenceTests {
 
     /// A valid 32-byte hex pubkey standing in for a group relay's key.
-    private let relayPubkey = "3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d"
+    private let relayPubkey = try! PublicKey(hex: "3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d")
 
     private func groupNAddr(
         identifier: String = "abcdef",

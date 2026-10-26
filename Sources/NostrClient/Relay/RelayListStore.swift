@@ -24,7 +24,7 @@ actor RelayListStore {
     /// An equal `createdAt` keeps the existing entry.
     /// - Returns: The effective (possibly pre-existing) list.
     @discardableResult
-    func store(_ list: RelayListMetadata, createdAt: Int64, for pubkey: String) -> RelayListMetadata {
+    func store(_ list: RelayListMetadata, createdAt: Int64, for pubkey: PublicKey) -> RelayListMetadata {
         cache.store(list, createdAt: createdAt, for: pubkey)
     }
 
@@ -35,21 +35,21 @@ actor RelayListStore {
         guard let list = event.relayListMetadata else {
             return nil
         }
-        return store(list, createdAt: event.createdAt, for: event.pubkey.hex)
+        return store(list, createdAt: event.createdAt, for: event.pubkey)
     }
 
     /// Returns the cached relay list for a pubkey, if any.
-    func cachedList(for pubkey: String) -> RelayListMetadata? {
+    func cachedList(for pubkey: PublicKey) -> RelayListMetadata? {
         cache.value(for: pubkey)
     }
 
     /// Resolves the WRITE relays for a pubkey (where the user publishes) — use these to READ their events.
-    func writeRelayURLs(for pubkey: String) -> Set<URL> {
+    func writeRelayURLs(for pubkey: PublicKey) -> Set<URL> {
         RelayURL.urlSet(cache.value(for: pubkey)?.writeRelays ?? [])
     }
 
     /// Resolves the READ relays for a pubkey (their inbox) — use these to SEND them events they should see.
-    func readRelayURLs(for pubkey: String) -> Set<URL> {
+    func readRelayURLs(for pubkey: PublicKey) -> Set<URL> {
         RelayURL.urlSet(cache.value(for: pubkey)?.readRelays ?? [])
     }
 

@@ -450,7 +450,7 @@ public actor RelayPool {
                         // scoped to this subscription so a different subscription matching the
                         // same event still receives it.
                         let isNewToSubscription = self.recordEvent(
-                            eventId: event.id.hex,
+                            eventID: event.id,
                             subscriptionId: subscriptionId
                         )
                         if isNewToSubscription,
@@ -658,11 +658,11 @@ extension RelayPool {
 
 // MARK: - Event Deduplication
 extension RelayPool {
-    /// Records that `subscriptionId` has seen `eventId`, returning whether it is new to that
+    /// Records that `subscriptionId` has seen `eventID`, returning whether it is new to that
     /// subscription — that is, whether this copy should be delivered to its handler.
-    private func recordEvent(eventId: String, subscriptionId: String) -> Bool {
+    private func recordEvent(eventID: EventID, subscriptionId: String) -> Bool {
         expireCachedEventsIfNeeded()
-        return eventCache.record(eventId: eventId, subscriptionId: subscriptionId)
+        return eventCache.record(eventID: eventID, subscriptionId: subscriptionId)
     }
 
     /// Sweeps expired entries, at most once a minute so the sweep never dominates event

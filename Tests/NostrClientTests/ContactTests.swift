@@ -7,25 +7,26 @@ import Testing
 
 @Suite("Contact Tests (NIP-02)")
 struct ContactTests {
+    private let alice = PublicKey.fixture("alice")
 
     @Test("Create contact with all fields")
     func createContactWithAllFields() {
         let contact = Contact(
-            pubkey: "abc123",
+            pubkey: alice,
             relayURL: "wss://relay.example.com",
             petname: "alice"
         )
 
-        #expect(contact.pubkey == "abc123")
+        #expect(contact.pubkey == alice)
         #expect(contact.relayURL == "wss://relay.example.com")
         #expect(contact.petname == "alice")
     }
 
     @Test("Create contact with only pubkey")
     func createContactWithOnlyPubkey() {
-        let contact = Contact(pubkey: "abc123")
+        let contact = Contact(pubkey: alice)
 
-        #expect(contact.pubkey == "abc123")
+        #expect(contact.pubkey == alice)
         #expect(contact.relayURL == nil)
         #expect(contact.petname == nil)
     }
@@ -33,72 +34,72 @@ struct ContactTests {
     @Test("Contact to tag - all fields")
     func contactToTagAllFields() {
         let contact = Contact(
-            pubkey: "abc123",
+            pubkey: alice,
             relayURL: "wss://relay.example.com",
             petname: "alice"
         )
 
         let tag = contact.toTag()
-        #expect(tag == ["p", "abc123", "wss://relay.example.com", "alice"])
+        #expect(tag == ["p", alice.hex, "wss://relay.example.com", "alice"])
     }
 
     @Test("Contact to tag - pubkey only")
     func contactToTagPubkeyOnly() {
-        let contact = Contact(pubkey: "abc123")
+        let contact = Contact(pubkey: alice)
         let tag = contact.toTag()
-        #expect(tag == ["p", "abc123"])
+        #expect(tag == ["p", alice.hex])
     }
 
     @Test("Contact to tag - with relay only")
     func contactToTagWithRelayOnly() {
-        let contact = Contact(pubkey: "abc123", relayURL: "wss://relay.example.com")
+        let contact = Contact(pubkey: alice, relayURL: "wss://relay.example.com")
         let tag = contact.toTag()
-        #expect(tag == ["p", "abc123", "wss://relay.example.com"])
+        #expect(tag == ["p", alice.hex, "wss://relay.example.com"])
     }
 
     @Test("Contact to tag - with petname only")
     func contactToTagWithPetnameOnly() {
-        let contact = Contact(pubkey: "abc123", petname: "alice")
+        let contact = Contact(pubkey: alice, petname: "alice")
         let tag = contact.toTag()
-        #expect(tag == ["p", "abc123", "", "alice"])
+        #expect(tag == ["p", alice.hex, "", "alice"])
     }
 
     @Test("Contact from tag - all fields")
     func contactFromTagAllFields() {
-        let tag = ["p", "abc123", "wss://relay.example.com", "alice"]
+        let tag = ["p", alice.hex, "wss://relay.example.com", "alice"]
         let contact = Contact.fromTag(tag)
 
         #expect(contact != nil)
-        #expect(contact?.pubkey == "abc123")
+        #expect(contact?.pubkey == alice)
         #expect(contact?.relayURL == "wss://relay.example.com")
         #expect(contact?.petname == "alice")
     }
 
     @Test("Contact from tag - pubkey only")
     func contactFromTagPubkeyOnly() {
-        let tag = ["p", "abc123"]
+        let tag = ["p", alice.hex]
         let contact = Contact.fromTag(tag)
 
         #expect(contact != nil)
-        #expect(contact?.pubkey == "abc123")
+        #expect(contact?.pubkey == alice)
         #expect(contact?.relayURL == nil)
         #expect(contact?.petname == nil)
     }
 
     @Test("Contact from tag - with empty relay")
     func contactFromTagWithEmptyRelay() {
-        let tag = ["p", "abc123", "", "alice"]
+        let tag = ["p", alice.hex, "", "alice"]
         let contact = Contact.fromTag(tag)
 
         #expect(contact != nil)
-        #expect(contact?.pubkey == "abc123")
+        #expect(contact?.pubkey == alice)
         #expect(contact?.relayURL == nil)
         #expect(contact?.petname == "alice")
     }
 
     @Test("Contact from tag - invalid tag type")
     func contactFromTagInvalidType() {
-        let tag = ["e", "abc123"]
+        let tag = ["e", alice.hex]
         let contact = Contact.fromTag(tag)
         #expect(contact == nil)
     }
@@ -110,19 +111,17 @@ struct ContactTests {
         #expect(contact == nil)
     }
 
-    @Test("Create contact from npub")
-    func createContactFromNpub() throws {
-        let keyPair = try KeyPair()
-        let contact = try Contact(npub: keyPair.publicKey.npub, petname: "test")
-
-        #expect(contact.pubkey == keyPair.publicKey.hex)
-        #expect(contact.petname == "test")
+    @Test(
+        "Contact from tag - rejects a pubkey that is not canonical hex",
+        arguments: ["abc123", String(repeating: "A", count: 64), "", String(repeating: "a", count: 66)])
+    func contactFromTagRejectsMalformedPubkey(pubkey: String) {
+        #expect(Contact.fromTag(["p", pubkey, "wss://relay.example.com", "alice"]) == nil)
     }
 
     @Test("Contact encodes the relay URL under the relayURL key")
     func contactEncodesRelayURLKey() throws {
         let contact = Contact(
-            pubkey: "abc123",
+            pubkey: alice,
             relayURL: "wss://relay.example.com",
             petname: "alice"
         )
@@ -132,7 +131,7 @@ struct ContactTests {
 
         #expect(
             object == [
-                "pubkey": "abc123",
+                "pubkey": alice.hex,
                 "relayURL": "wss://relay.example.com",
                 "petname": "alice",
             ])
@@ -141,7 +140,7 @@ struct ContactTests {
     @Test("Contact round-trips through Codable")
     func contactRoundTripsThroughCodable() throws {
         let contact = Contact(
-            pubkey: "abc123",
+            pubkey: alice,
             relayURL: "wss://relay.example.com",
             petname: "alice"
         )
@@ -150,13 +149,22 @@ struct ContactTests {
 
         #expect(decoded == contact)
     }
+
+    @Test("Contact decoding rejects a pubkey that is not canonical hex")
+    func contactDecodingRejectsMalformedPubkey() {
+        let json = Data(#"{"pubkey":"\#(alice.hex.uppercased())"}"#.utf8)
+
+        #expect(throws: DecodingError.self) {
+            try JSONDecoder().decode(Contact.self, from: json)
+        }
+    }
 }
 
 @Suite("Contact List Event Tests")
 struct ContactListEventTests {
-    private let pubkey1Hex = PublicKey.fixture("pubkey1").hex
-    private let pubkey2Hex = PublicKey.fixture("pubkey2").hex
-    private let pubkey3Hex = PublicKey.fixture("pubkey3").hex
+    private let pubkey1 = PublicKey.fixture("pubkey1")
+    private let pubkey2 = PublicKey.fixture("pubkey2")
+    private let pubkey3 = PublicKey.fixture("pubkey3")
 
     @Test("Sign contact list event")
     func signContactListEvent() throws {
@@ -164,9 +172,9 @@ struct ContactListEventTests {
         let signer = EventSigner(keyPair: keyPair)
 
         let contacts = [
-            Contact(pubkey: pubkey1Hex, relayURL: "wss://relay1.com", petname: "alice"),
-            Contact(pubkey: pubkey2Hex, relayURL: "wss://relay2.com"),
-            Contact(pubkey: pubkey3Hex),
+            Contact(pubkey: pubkey1, relayURL: "wss://relay1.com", petname: "alice"),
+            Contact(pubkey: pubkey2, relayURL: "wss://relay2.com"),
+            Contact(pubkey: pubkey3),
         ]
 
         let event = try signer.signContactList(contacts)
@@ -174,19 +182,10 @@ struct ContactListEventTests {
         #expect(event.kind == 3)
         #expect(event.content == "")
         #expect(event.tags.count == 3)
-        #expect(event.tags[0] == ["p", pubkey1Hex, "wss://relay1.com", "alice"])
-        #expect(event.tags[1] == ["p", pubkey2Hex, "wss://relay2.com"])
-        #expect(event.tags[2] == ["p", pubkey3Hex])
+        #expect(event.tags[0] == ["p", pubkey1.hex, "wss://relay1.com", "alice"])
+        #expect(event.tags[1] == ["p", pubkey2.hex, "wss://relay2.com"])
+        #expect(event.tags[2] == ["p", pubkey3.hex])
         #expect(try event.verify())
-    }
-
-    @Test("Sign contact list rejects a contact whose pubkey is not hex")
-    func signContactListRejectsMalformedPubkey() throws {
-        let signer = EventSigner(keyPair: try KeyPair())
-
-        #expect(throws: NostrError.invalidPublicKey) {
-            try signer.signContactList([Contact(pubkey: pubkey1Hex), Contact(pubkey: "pubkey2")])
-        }
     }
 
     @Test("Sign contact list from pubkeys")
@@ -194,14 +193,14 @@ struct ContactListEventTests {
         let keyPair = try KeyPair()
         let signer = EventSigner(keyPair: keyPair)
 
-        let pubkeys = [pubkey1Hex, pubkey2Hex, pubkey3Hex]
+        let pubkeys = [pubkey1, pubkey2, pubkey3]
         let event = try signer.signContactList(pubkeys: pubkeys)
 
         #expect(event.kind == 3)
         #expect(event.tags.count == 3)
-        #expect(event.tags[0] == ["p", pubkey1Hex])
-        #expect(event.tags[1] == ["p", pubkey2Hex])
-        #expect(event.tags[2] == ["p", pubkey3Hex])
+        #expect(event.tags[0] == ["p", pubkey1.hex])
+        #expect(event.tags[1] == ["p", pubkey2.hex])
+        #expect(event.tags[2] == ["p", pubkey3.hex])
     }
 
     @Test("Extract contacts from event")
@@ -210,8 +209,8 @@ struct ContactListEventTests {
         let signer = EventSigner(keyPair: keyPair)
 
         let contacts = [
-            Contact(pubkey: pubkey1Hex, relayURL: "wss://relay1.com", petname: "alice"),
-            Contact(pubkey: pubkey2Hex),
+            Contact(pubkey: pubkey1, relayURL: "wss://relay1.com", petname: "alice"),
+            Contact(pubkey: pubkey2),
         ]
 
         let event = try signer.signContactList(contacts)
@@ -219,11 +218,30 @@ struct ContactListEventTests {
         let extractedContacts = event.contacts
         #expect(extractedContacts != nil)
         #expect(extractedContacts?.count == 2)
-        #expect(extractedContacts?[0].pubkey == pubkey1Hex)
+        #expect(extractedContacts?[0].pubkey == pubkey1)
         #expect(extractedContacts?[0].relayURL == "wss://relay1.com")
         #expect(extractedContacts?[0].petname == "alice")
-        #expect(extractedContacts?[1].pubkey == pubkey2Hex)
+        #expect(extractedContacts?[1].pubkey == pubkey2)
         #expect(extractedContacts?[1].relayURL == nil)
+    }
+
+    @Test("Extract contacts skips p tags whose pubkey is not canonical hex")
+    func extractContactsSkipsMalformedPubkeys() throws {
+        let signer = EventSigner(keyPair: try KeyPair())
+        let event = try signer.sign(
+            UnsignedEvent(
+                pubkey: signer.publicKey,
+                kind: .contacts,
+                rawTags: [
+                    ["p", pubkey1.hex],
+                    ["p", "pubkey2"],
+                    ["p", pubkey3.hex.uppercased()],
+                    ["p", pubkey3.hex, "", "carol"],
+                ],
+                content: ""
+            ))
+
+        #expect(event.contacts == [Contact(pubkey: pubkey1), Contact(pubkey: pubkey3, petname: "carol")])
     }
 
     @Test("isContactList property")
@@ -231,7 +249,7 @@ struct ContactListEventTests {
         let keyPair = try KeyPair()
         let signer = EventSigner(keyPair: keyPair)
 
-        let contactEvent = try signer.signContactList([Contact(pubkey: pubkey1Hex)])
+        let contactEvent = try signer.signContactList([Contact(pubkey: pubkey1)])
         let textNote = try signer.signTextNote(content: "Hello")
 
         #expect(contactEvent.isContactList == true)

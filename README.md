@@ -126,19 +126,20 @@ Subscriptions are async sequences — iterate them with `for await`. The subscri
 
 ```swift
 // Live timeline
-let timeline = try await client.subscriptions.userTimeline(pubkey: "...")
+let alice = try PublicKey(npub: "npub1...")
+let timeline = try await client.subscriptions.userTimeline(pubkey: alice)
 for await event in timeline.events {
     print(event.content)
 }
 
 // Custom filter
-let filter = Filter(authors: [try PublicKey(npub: "npub1...")], kinds: [1], limit: 100)
+let filter = Filter(authors: [alice], kinds: [1], limit: 100)
 for await event in try await client.subscriptions.events(filters: [filter]) {
     print(event.id)
 }
 
 // One-shot fetch
-let metadata = try await client.events.fetchMetadata(pubkey: "...")
+let metadata = try await client.events.fetchMetadata(pubkey: alice)
 print(metadata?.name ?? "Unknown")
 ```
 
@@ -158,10 +159,10 @@ for try await message in try await client.messages.subscribe() {
 }
 
 // Send (encrypted, gift-wrapped, routed to each party's DM relays).
-try await client.messages.send("Hello privately!", to: "recipientPubkeyHex")
+try await client.messages.send("Hello privately!", to: alice)
 
 // Any other rumor kind, wrapped and routed the same way.
-try await client.messages.sendGiftWrapped(rumor, to: "recipientPubkeyHex")
+try await client.messages.sendGiftWrapped(rumor, to: alice)
 ```
 
 Reactions (NIP-25), encrypted file messages (kind 15), and disappearing messages (NIP-40) build on the same flow — see [Advanced Usage](https://yysskk.github.io/swift-nostr/documentation/nostrclient/advancedusage).
@@ -274,7 +275,7 @@ try await client.groups.publishMessage(
     "Hello, group!",
     in: group,
     previous: Groups.previousReferences(
-        from: recent, excludingAuthor: (await client.identity.publicKey).flatMap(PublicKey.init))
+        from: recent, excludingAuthor: await client.identity.publicKey)
 )
 ```
 

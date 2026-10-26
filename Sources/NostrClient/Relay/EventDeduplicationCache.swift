@@ -1,4 +1,5 @@
 import Foundation
+import NostrCore
 
 /// Remembers which events each subscription has already delivered, so the copies of one event
 /// arriving from several relays collapse into a single delivery.
@@ -21,16 +22,16 @@ struct EventDeduplicationCache {
     /// One recorded delivery.
     private struct Entry {
         let subscriptionId: String
-        let eventId: String
+        let eventID: EventID
         let recordedAt: Date
     }
 
-    /// The event IDs each subscription has seen: the membership test on the hot path, and what
+    /// The event ids each subscription has seen: the membership test on the hot path, and what
     /// lets a whole subscription be forgotten at once.
-    private var seenEventIds: [String: Set<String>] = [:]
+    private var seenEventIDs: [String: Set<EventID>] = [:]
 
     /// Every entry in the order it was recorded, oldest first, so eviction and expiry take from
-    /// the front rather than searching for the oldest. Holds exactly what `seenEventIds` holds,
+    /// the front rather than searching for the oldest. Holds exactly what `seenEventIDs` holds,
     /// which is what lets ``count`` be read off it directly.
     private var entries: [Entry] = []
 
@@ -53,18 +54,18 @@ struct EventDeduplicationCache {
 
     /// The number of entries held for `subscriptionId`.
     func count(forSubscription subscriptionId: String) -> Int {
-        seenEventIds[subscriptionId]?.count ?? 0
+        seenEventIDs[subscriptionId]?.count ?? 0
     }
 
-    /// Records that `subscriptionId` has seen `eventId`, returning whether it is new to that
+    /// Records that `subscriptionId` has seen `eventID`, returning whether it is new to that
     /// subscription — that is, whether this copy should be delivered.
     ///
     /// Recording beyond ``maxSize`` evicts as many of the oldest entries as it takes to stay
     /// within the limit, so the bound holds on return.
-    mutating func record(eventId: String, subscriptionId: String, now: Date = Date()) -> Bool {
-        guard seenEventIds[subscriptionId]?.contains(eventId) != true else { return false }
-        seenEventIds[subscriptionId, default: []].insert(eventId)
-        entries.append(Entry(subscriptionId: subscriptionId, eventId: eventId, recordedAt: now))
+    mutating func record(eventID: EventID, subscriptionId: String, now: Date = Date()) -> Bool {
+        guard seenEventIDs[subscriptionId]?.contains(eventID) != true else { return false }
+        seenEventIDs[subscriptionId, default: []].insert(eventID)
+        entries.append(Entry(subscriptionId: subscriptionId, eventID: eventID, recordedAt: now))
         while count > maxSize {
             removeOldest()
         }
@@ -78,7 +79,7 @@ struct EventDeduplicationCache {
     /// leaving its entries behind as tombstones would make every ``count`` a sum instead of a
     /// subtraction.
     mutating func removeSubscription(_ subscriptionId: String) {
-        guard seenEventIds.removeValue(forKey: subscriptionId) != nil else { return }
+        guard seenEventIDs.removeValue(forKey: subscriptionId) != nil else { return }
         entries = entries[oldestIndex...].filter { $0.subscriptionId != subscriptionId }
         oldestIndex = 0
     }
@@ -93,7 +94,7 @@ struct EventDeduplicationCache {
 
     /// Forgets every subscription's history.
     mutating func removeAll() {
-        seenEventIds.removeAll()
+        seenEventIDs.removeAll()
         entries.removeAll()
         oldestIndex = 0
     }
@@ -102,9 +103,9 @@ struct EventDeduplicationCache {
     private mutating func removeOldest() {
         let oldest = entries[oldestIndex]
         oldestIndex += 1
-        seenEventIds[oldest.subscriptionId]?.remove(oldest.eventId)
-        if seenEventIds[oldest.subscriptionId]?.isEmpty == true {
-            seenEventIds.removeValue(forKey: oldest.subscriptionId)
+        seenEventIDs[oldest.subscriptionId]?.remove(oldest.eventID)
+        if seenEventIDs[oldest.subscriptionId]?.isEmpty == true {
+            seenEventIDs.removeValue(forKey: oldest.subscriptionId)
         }
         compact()
     }

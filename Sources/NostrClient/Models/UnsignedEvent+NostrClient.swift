@@ -31,12 +31,12 @@ extension UnsignedEvent {
     /// A report of `target` (kind 1984, NIP-56). The report type rides on the "p" tag;
     /// `reason` becomes the content.
     package static func report(
-        pubkey: PublicKey, target: String, type: ReportType, reason: String
+        pubkey: PublicKey, target: PublicKey, type: ReportType, reason: String
     ) -> UnsignedEvent {
         UnsignedEvent(
             pubkey: pubkey,
             kind: .report,
-            tags: [Tag(name: "p", values: [target, type.rawValue])],
+            tags: [Tag(name: "p", values: [target.hex, type.rawValue])],
             content: reason
         )
     }

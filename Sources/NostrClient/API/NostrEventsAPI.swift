@@ -122,17 +122,15 @@ public struct NostrEventsAPI: NostrEventPublishing, NostrEventFetching {
         try await signAndPublish(strategy: strategy) { try .repost(pubkey: $0, of: event, relayURL: relayURL) }
     }
 
-    /// Publishes a deletion request
+    /// Publishes a deletion request (kind 5, NIP-09) for events the signer authored.
     /// - Returns: The signed event together with the per-relay publish outcome.
-    /// - Throws: ``NostrError/invalidEventID`` if an id is not a hex event id.
     @discardableResult
     public func publishDeletion(
-        eventIds: [String],
+        eventIDs: [EventID],
         reason: String = "",
         strategy: PublishStrategy? = nil
     ) async throws -> PublishedEvent {
-        let eventIDs = try eventIds.map(EventID.init(callerHex:))
-        return try await signAndPublish(strategy: strategy) {
+        try await signAndPublish(strategy: strategy) {
             .deletion(pubkey: $0, eventIDs: eventIDs, reason: reason)
         }
     }
@@ -141,7 +139,7 @@ public struct NostrEventsAPI: NostrEventPublishing, NostrEventFetching {
     /// - Returns: The signed event together with the per-relay publish outcome.
     @discardableResult
     public func publishReport(
-        pubkey: String,
+        pubkey: PublicKey,
         type: ReportType,
         reason: String = "",
         strategy: PublishStrategy? = nil
@@ -209,13 +207,11 @@ public struct NostrEventsAPI: NostrEventPublishing, NostrEventFetching {
 
     /// Fetches an article by author and identifier, keeping the newest copy across relays.
     /// - Returns: The article, or nil if none was found.
-    /// - Throws: ``NostrError/invalidPublicKey`` if `author` is not a hex public key.
     public func fetchLongFormContent(
-        author: String,
+        author: PublicKey,
         identifier: String,
         timeout: TimeInterval = 10
     ) async throws -> LongFormContent? {
-        let author = try PublicKey(callerHex: author)
         var filter = Filter(authors: [author], kinds: [.longFormContent])
         filter.addTagQuery("d", values: [identifier])
         let events = try await client.fetch(filters: [filter], toURLs: nil, timeout: timeout)
@@ -235,8 +231,7 @@ public struct NostrEventsAPI: NostrEventPublishing, NostrEventFetching {
     /// otherwise the whole pool is queried.
     /// - Returns: The article, or nil if none was found.
     public func fetchLongFormContent(naddr: NAddr, timeout: TimeInterval = 10) async throws -> LongFormContent? {
-        let author = try PublicKey(callerHex: naddr.author)
-        var filter = Filter(authors: [author], kinds: [Event.Kind(rawValue: naddr.kind)])
+        var filter = Filter(authors: [naddr.author], kinds: [Event.Kind(rawValue: naddr.kind)])
         filter.addTagQuery("d", values: [naddr.identifier])
 
         // Use the coordinate's relay hints only where they are already connected in the pool.
@@ -257,7 +252,7 @@ public struct NostrEventsAPI: NostrEventPublishing, NostrEventFetching {
             let newest = VerifiedEventSelection.newest(
                 in: events,
                 kind: Event.Kind(rawValue: naddr.kind),
-                author: author,
+                author: naddr.author,
                 identifier: naddr.identifier)
         else {
             return nil
@@ -315,9 +310,7 @@ public struct NostrEventsAPI: NostrEventPublishing, NostrEventFetching {
     ///
     /// The returned event is the one that was asked for: a relay that ignores the id filter can
     /// answer with anything, and its signature is checked before it is handed back.
-    /// - Throws: ``NostrError/invalidEventID`` if `id` is not a hex event id.
-    public func fetchEvent(id: String, timeout: TimeInterval = 10) async throws -> Event? {
-        let id = try EventID(callerHex: id)
+    public func fetchEvent(id: EventID, timeout: TimeInterval = 10) async throws -> Event? {
         let events = try await client.fetch(filters: [Filter(ids: [id])], toURLs: nil, timeout: timeout)
         return VerifiedEventSelection.event(withID: id, in: events)
     }
@@ -326,9 +319,7 @@ public struct NostrEventsAPI: NostrEventPublishing, NostrEventFetching {
     ///
     /// Kind 0 is replaceable, so the newest profile the named pubkey signed wins; taking whichever
     /// copy arrived first made the result depend on which relay answered soonest.
-    /// - Throws: ``NostrError/invalidPublicKey`` if `pubkey` is not a hex public key.
-    public func fetchMetadata(pubkey: String, timeout: TimeInterval = 10) async throws -> UserMetadata? {
-        let pubkey = try PublicKey(callerHex: pubkey)
+    public func fetchMetadata(pubkey: PublicKey, timeout: TimeInterval = 10) async throws -> UserMetadata? {
         let events = try await client.fetch(
             filters: [.metadata(pubkeys: [pubkey])], toURLs: nil, timeout: timeout
         )

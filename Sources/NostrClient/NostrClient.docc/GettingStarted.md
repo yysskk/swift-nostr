@@ -79,13 +79,14 @@ the subscription automatically.
 
 ```swift
 // User timeline
-let timeline = try await client.subscriptions.userTimeline(pubkey: "...")
+let alice = try PublicKey(npub: "npub1...")
+let timeline = try await client.subscriptions.userTimeline(pubkey: alice)
 for await event in timeline.events {
     print("Note: \(event.content)")
 }
 
 // Custom filter, events only
-let filter = Filter(authors: [try PublicKey(npub: "npub1...")], kinds: [1], limit: 100)
+let filter = Filter(authors: [alice], kinds: [1], limit: 100)
 for await event in try await client.subscriptions.events(filters: [filter]) {
     print("Received: \(event.id)")
 }
@@ -101,14 +102,14 @@ await subscription.close()
 
 ```swift
 // Fetch a specific event by ID
-let event = try await client.events.fetchEvent(id: "eventid...")
+let event = try await client.events.fetchEvent(id: try EventID(note: "note1..."))
 
 // Fetch user metadata
-let metadata = try await client.events.fetchMetadata(pubkey: "...")
+let metadata = try await client.events.fetchMetadata(pubkey: alice)
 print("Name: \(metadata?.name ?? "Unknown")")
 
 // Fetch with custom filters
 let events = try await client.events.fetch(filters: [
-    Filter(authors: [try PublicKey(npub: "npub1...")], kinds: [1], limit: 50)
+    Filter(authors: [alice], kinds: [1], limit: 50)
 ])
 ```

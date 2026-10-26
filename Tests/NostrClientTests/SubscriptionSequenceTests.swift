@@ -227,33 +227,16 @@ struct SubscriptionSequenceTests {
     func convenienceSubscriptionsReturnSequences() async throws {
         let (client, _) = try await makeConnectedClient()
 
-        let pubkey = PublicKey.fixture("author").hex
+        let pubkey = PublicKey.fixture("author")
         let timeline = try await client.subscriptions.userTimeline(pubkey: pubkey)
         let global = try await client.subscriptions.globalFeed(limit: 10)
         let mentions = try await client.subscriptions.mentions(pubkey: pubkey)
-        let metadata = try await client.subscriptions.metadata(pubkeys: [pubkey.uppercased()])
+        let metadata = try await client.subscriptions.metadata(pubkeys: [pubkey])
 
         #expect(await client.activeSubscriptionCount == 4)
 
         for subscription in [timeline, global, mentions, metadata] {
             await subscription.close()
-        }
-        #expect(await client.activeSubscriptionCount == 0)
-        await client.relays.disconnect()
-    }
-
-    @Test("convenience subscriptions reject a pubkey that is not hex without subscribing")
-    func convenienceSubscriptionsRejectMalformedPubkeys() async throws {
-        let (client, _) = try await makeConnectedClient()
-
-        await #expect(throws: NostrError.invalidPublicKey) {
-            _ = try await client.subscriptions.userTimeline(pubkey: "abc")
-        }
-        await #expect(throws: NostrError.invalidPublicKey) {
-            _ = try await client.subscriptions.mentions(pubkey: "abc")
-        }
-        await #expect(throws: NostrError.invalidPublicKey) {
-            _ = try await client.subscriptions.metadata(pubkeys: [PublicKey.fixture("author").hex, "abc"])
         }
         #expect(await client.activeSubscriptionCount == 0)
         await client.relays.disconnect()
