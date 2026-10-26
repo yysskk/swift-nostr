@@ -88,6 +88,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `RemoteSignerError.signerError(message:)` for an error response and `responseDecodingFailed` when
   the response has no result, so a method this package does not model can be called without a
   typed wrapper.
+- **`WalletConnection.send(_:)` sends any NIP-47 command**: a `WalletConnectRequest` is a value that
+  encodes as the request's `params`, naming its `WalletConnectMethod` and the `Response` type its
+  `result` decodes into. `send(_:)` sends any conforming request, a command this package does not
+  define included, over the same path as the typed commands: it waits for one response, rejects a
+  `result_type` naming another method, and throws `WalletConnectError` as they do. The typed
+  commands are now implemented on top of it.
 
 ### Changed
 
@@ -621,6 +627,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   recognized or not, and `WalletInfo.unknownMethods` is removed.
   `WalletConnectError.unexpectedResultType(expected:received:)` carries `WalletConnectMethod`
   values instead of strings.
+- **NIP-47 parameter types are request types** (breaking): each single-response command's
+  parameters conform to `WalletConnectRequest`. `PayInvoiceParams` is `PayInvoiceRequest`,
+  `PayKeysendParams` is `PayKeysendRequest`, `MakeInvoiceParams` is `MakeInvoiceRequest`,
+  `LookupInvoiceParams` is `LookupInvoiceRequest`, and `ListTransactionsParams` is
+  `ListTransactionsRequest`; `EmptyParams` is replaced by `GetBalanceRequest` and `GetInfoRequest`.
+  The multi-payment bodies draw one response per item, so they do not conform and are no longer
+  public: `MultiPayInvoiceParams.Invoice` is `MultiPayInvoiceItem` and
+  `MultiPayKeysendParams.Keysend` is `MultiPayKeysendItem`, which `multiPayInvoice(_:)` and
+  `multiPayKeysend(_:)` take in arrays as before.
 
 - **`RemoteSignerMethod` is an open struct** (breaking): it was a closed `enum` and is now a
   `RawRepresentable` struct over the wire token, with a non-failable `init(rawValue:)` and the same

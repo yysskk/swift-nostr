@@ -1,6 +1,7 @@
 # Advanced Usage
 
-Encryption negotiation, the full command set, notifications, custom transports, and error handling.
+Encryption negotiation, the full command set, sending other commands, notifications, custom
+transports, and error handling.
 
 ## Connection Configuration
 
@@ -70,7 +71,7 @@ if info.supports(WalletConnectMethod(rawValue: "sign_message")) {
 ```swift
 // Create an invoice to receive a payment.
 let created = try await connection.makeInvoice(
-    MakeInvoiceParams(amount: 21_000, description: "coffee", expiry: .seconds(3600)))
+    MakeInvoiceRequest(amount: 21_000, description: "coffee", expiry: .seconds(3600)))
 print(created.invoice ?? "")   // a WalletConnectTransaction
 
 // Look up an invoice — by payment hash or by BOLT-11 string. The type guarantees exactly one key.
@@ -93,7 +94,7 @@ paid/unpaid, and paginate with `limit` / `offset`. A transaction's `createdAt`, 
 ```swift
 let lastWeek = Timestamp.now.advanced(by: .seconds(-7 * 24 * 60 * 60))
 let outgoing = try await connection.listTransactions(
-    ListTransactionsParams(from: lastWeek, limit: 50, type: .outgoing))
+    ListTransactionsRequest(from: lastWeek, limit: 50, type: .outgoing))
 for tx in outgoing {
     print("\(tx.type) \(tx.amount) msat — \(tx.state ?? "?")")
 }
@@ -107,7 +108,7 @@ A keysend is a spontaneous payment to a node's public key, with no invoice. The
 
 ```swift
 let result = try await connection.payKeysend(
-    PayKeysendParams(
+    PayKeysendRequest(
         amount: 10_000,
         nodePublicKey: "<lightning-node-public-key-hex>",
         tlvRecords: [TLVRecord(type: 696969, value: "68656c6c6f")]))
@@ -144,6 +145,44 @@ Unlike single commands, a multi-payment does not throw on timeout — it returns
 arrived, so a slow or unreachable item does not lose the payments that already settled. Items that
 never got a response are ``MultiPayOutcome/noResponse``, and
 ``MultiPayResults/indicesWithoutResponse`` lists them.
+
+## Sending Other Commands
+
+Every single-response command is a ``WalletConnectRequest``: a value that encodes as the request's
+`params`, with the ``WalletConnectMethod`` it is sent under and the `Response` its `result` decodes
+into. The typed commands above send the built-in request types (``PayInvoiceRequest``,
+``GetBalanceRequest``, and so on) through ``WalletConnection/send(_:)``, which sends any conforming
+value. To call a command this package does not wrap — a wallet extension or a later NIP-47
+revision — define the request and response types and send it:
+
+```swift
+struct GetBudgetRequest: WalletConnectRequest {
+    typealias Response = GetBudgetResult
+    static let method = WalletConnectMethod(rawValue: "get_budget")
+}
+
+struct GetBudgetResult: Decodable, Sendable {
+    let usedBudget: Int64
+    let totalBudget: Int64?
+
+    enum CodingKeys: String, CodingKey {
+        case usedBudget = "used_budget"
+        case totalBudget = "total_budget"
+    }
+}
+
+let info = try await connection.fetchInfo()
+if info.supports(GetBudgetRequest.method) {
+    let budget = try await connection.send(GetBudgetRequest())
+    print("\(budget.usedBudget) msat used")
+}
+```
+
+``WalletConnection/send(_:)`` behaves like the typed commands: it waits for one response, rejects
+one whose `result_type` names another method with
+``WalletConnectError/unexpectedResultType(expected:received:)``, and throws a wallet's error as
+``WalletConnectError/walletError(code:message:)``. Commands that draw one response per item, like
+`multi_pay_invoice`, do not fit this shape and are sent with their dedicated methods.
 
 ## Notifications
 

@@ -823,8 +823,8 @@ non-integer fails. `description` is the decimal seconds. Used by `Event.createdA
 `expiration:` parameters of `client.messages`, `DirectMessageBuilder`, and `GiftWrap.wrap`,
 `LongFormContent.publishedAt`, `client.groups.timeline(_:kinds:since:limit:)`,
 `Bolt11Invoice.timestamp`, and the NIP-47 `WalletConnectTransaction` times and
-`ListTransactionsParams` `from`/`until`. Periods, by contrast, are `Duration`: `Bolt11Invoice.expiry`,
-`MakeInvoiceParams.expiry` (whole seconds on the wire, truncated toward zero), and the NIP-11
+`ListTransactionsRequest` `from`/`until`. Periods, by contrast, are `Duration`: `Bolt11Invoice.expiry`,
+`MakeInvoiceRequest.expiry` (whole seconds on the wire, truncated toward zero), and the NIP-11
 `Limitation.createdAtLowerLimit`/`createdAtUpperLimit` offsets.
 
 ```swift

@@ -103,6 +103,14 @@ print("Node alias: \(info.alias ?? "unknown")")
 print("Supported methods: \(info.methods)")
 ```
 
+Each of these commands sends a ``WalletConnectRequest`` value through ``WalletConnection/send(_:)``,
+which you can call directly — with a built-in request such as ``GetBalanceRequest``, or with a
+request type of your own for a command this package does not wrap (see <doc:AdvancedUsage>):
+
+```swift
+let balance = try await connection.send(GetBalanceRequest())
+```
+
 ## Listen for Notifications
 
 ``WalletConnection/notifications()`` streams wallet notifications (e.g. `payment_received`,

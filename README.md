@@ -220,7 +220,7 @@ let zap = try await connection.payZap(
 print(zap.preimage)
 ```
 
-`get_balance`, `get_info`, `make_invoice`, `lookup_invoice`, `list_transactions`, keysend, and multi-payments are available too, along with a `notifications()` stream.
+`get_balance`, `get_info`, `make_invoice`, `lookup_invoice`, `list_transactions`, keysend, and multi-payments are available too, along with a `notifications()` stream; `send(_:)` sends any other single-response command defined as a `WalletConnectRequest`.
 
 ### Sign remotely with a bunker (NIP-46)
 
