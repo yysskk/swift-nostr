@@ -130,7 +130,7 @@ struct NIP57ZapRequestTests {
     }
 
     @Test("decodes the LUD-06 lnurl test vector")
-    func decodeKnownLnurl() throws {
+    func decodeKnownLNURL() throws {
         let lnurl =
             "LNURL1DP68GURN8GHJ7UM9WFMXJCM99E3K7MF0V9CXJ0M385EKVCENXC6R2C35XVUKXEFCV5MKVV34X5EKZD3EV56NYD3HXQURZEPEXEJXXEPNXSCRVWFNV9NXZCN9XQ6XYEFHVGCXXCMYXYMNSERXFQ5FNS"
         let url = try LNURL.decode(lnurl)

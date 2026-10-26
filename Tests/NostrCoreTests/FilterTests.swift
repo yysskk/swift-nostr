@@ -99,7 +99,7 @@ struct FilterTests {
     }
 
     @Test("Filter JSON encoding")
-    func filterJsonEncoding() throws {
+    func filterJSONEncoding() throws {
         let filter = Filter(
             authors: [alice],
             kinds: [1],
@@ -118,7 +118,7 @@ struct FilterTests {
     }
 
     @Test("Filter JSON decoding")
-    func filterJsonDecoding() throws {
+    func filterJSONDecoding() throws {
         let json = """
             {
                 "ids": ["\(reply.hex)"],
@@ -144,7 +144,7 @@ struct FilterTests {
     @Test(
         "Filter JSON decoding rejects a malformed id or public key",
         arguments: ["ids", "authors", "#e", "#p"])
-    func filterJsonDecodingRejectsMalformedValues(key: String) {
+    func filterJSONDecodingRejectsMalformedValues(key: String) {
         let json = #"{"\#(key)": ["not-hex"]}"#
 
         #expect(throws: DecodingError.self) {
@@ -195,7 +195,7 @@ struct FilterTests {
     }
 
     @Test("Filter JSON encoding includes search")
-    func filterJsonEncodingIncludesSearch() throws {
+    func filterJSONEncodingIncludesSearch() throws {
         let filter = Filter(kinds: [1], search: "nostr")
 
         let encoder = JSONEncoder()
@@ -206,7 +206,7 @@ struct FilterTests {
     }
 
     @Test("Filter JSON encoding omits search when nil")
-    func filterJsonEncodingOmitsSearchWhenNil() throws {
+    func filterJSONEncodingOmitsSearchWhenNil() throws {
         let filter = Filter(kinds: [1], limit: 10)
 
         let encoder = JSONEncoder()
@@ -217,7 +217,7 @@ struct FilterTests {
     }
 
     @Test("Filter JSON decoding reads search")
-    func filterJsonDecodingReadsSearch() throws {
+    func filterJSONDecodingReadsSearch() throws {
         let json = """
             {
                 "kinds": [1],

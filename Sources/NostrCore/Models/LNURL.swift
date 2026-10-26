@@ -172,8 +172,8 @@ public struct LNURLPayResponse: Decodable, Sendable, Hashable {
         var items = components.percentEncodedQueryItems ?? []
         items.append(URLQueryItem(name: "amount", value: String(amountMillisats)))
         items.append(URLQueryItem(name: "nostr", value: encodedZap))
-        if let lnurl, let encodedLnurl = Self.percentEncodedQueryValue(lnurl) {
-            items.append(URLQueryItem(name: "lnurl", value: encodedLnurl))
+        if let lnurl, let encodedLNURL = Self.percentEncodedQueryValue(lnurl) {
+            items.append(URLQueryItem(name: "lnurl", value: encodedLNURL))
         }
         components.percentEncodedQueryItems = items
         return components.url
