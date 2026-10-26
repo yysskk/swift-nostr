@@ -13,7 +13,7 @@ extension NostrClient {
     /// Backs ``NostrEventsAPI/fetch(filters:to:timeout:)``.
     func fetch(
         filters: [Filter],
-        toURLs relayURLs: Set<URL>?,
+        toURLs relayURLs: Set<RelayURL>?,
         timeout: TimeInterval
     ) async throws -> [Event] {
         let subscription = try await subscribe(filters: filters, toURLs: relayURLs)

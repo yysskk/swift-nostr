@@ -17,6 +17,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   nil, and decoding fails with `DecodingError.dataCorrupted`. `PublicKey.npub` and `EventID.note`
   give the NIP-19 forms and no longer throw. `EventID` is `Comparable` in byte order, the order
   NIP-01 breaks `created_at` ties by.
+- **`RelayURL` is a typed relay URL**: a `ws` or `wss` URL held in canonical form — lowercased
+  scheme and host, root trailing slash and default port removed, path case and a non-root trailing
+  slash kept — so every spelling of a relay is the same value, and equality and hashing follow it.
+  `RelayURL(string:)` and `RelayURL(url:)` throw `NostrError.invalidRelayURL` carrying the input for
+  an unparseable string, another scheme, an empty host, a fragment, or a user or password; the
+  failable `init?(_:)` returns nil. `description` and the JSON encoding are the canonical string,
+  `url` is the `URL` the WebSocket opens, and decoding an invalid string fails with
+  `DecodingError.dataCorrupted`.
 
 ### Changed
 
@@ -124,6 +132,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   are removed in favor of `publicKey.hex` and `publicKey.npub`; the raw bytes are `publicKey.data`.
 - **`EventSigner.npub` no longer throws** (breaking).
 - **`NostrError.invalidEventId` is renamed `invalidEventID`** (breaking).
+- **Relay and pool APIs take and return `RelayURL`** (breaking): there is no relay URL string left to
+  validate past the boundary, and no `String`/`URL` overload pair. `RelayConnection(url:)` (both
+  initializers) takes a `RelayURL` and `RelayConnection.url` is one; `RelayConnection(urlString:)` is
+  removed in favor of `RelayConnection(url: RelayURL(string:))`. `RelayConnectionTransport(relayURLs:)`
+  takes `[RelayURL]`, and `AuthenticationResponder` receives a `RelayURL`. On the pool,
+  `RelayPool.addRelay(_:config:)`, `removeRelay(_:)`, `relay(for:)`, and `client.relays.add(_:config:)`,
+  `remove(_:)`, and `relay(for:)` each take one `RelayURL`, and `addRelays(_:)`, `relays.add(_:)`, and
+  `relays.connect(to:)` take any sequence of them; none of the membership calls throws any more.
+- **Relay targets are a `Set<RelayURL>?`** (breaking): the `to:` parameter of `RelayPool.publish`,
+  `count`, and `subscribe`, of `client.events.publish`, `fetch`, and `count`, and of
+  `client.subscriptions.subscribe` and `events` (and their capability-protocol requirements) was
+  `[String]?`. Nil still broadcasts to the whole pool, an empty set still throws, and targets not in
+  the pool are still skipped; an invalid target can no longer reach these calls, so they no longer
+  throw `invalidRelayURL`. `NostrError.noMatchingRelays` carries `[RelayURL]`, sorted by canonical
+  string.
+- **Relay results are keyed by `RelayURL`** (breaking): `PublishResult.statuses` is
+  `[RelayURL: PublishRelayStatus]`, `acceptedRelays` / `failedRelays` / `pendingRelays` are
+  `Set<RelayURL>`, and `status(for:)` takes a `RelayURL` (it took a string and returned nil for an
+  invalid one). `RelayPool.count(filters:to:timeout:)` returns `[RelayURL: EventCount]`;
+  `SubscriptionSequence.expectedRelays` and the direct-message sequences' are `Set<RelayURL>`; every
+  `SubscriptionEvent` case and its `relayURL` carry a `RelayURL`; and
+  `routing.connectDirectMessageInboxRelays()` returns `Set<RelayURL>`.
+- **NIP-42 authentication takes a `RelayURL`** (breaking): `identity.authenticate(relayURL:)`,
+  `EventSigner.signClientAuthentication(relayURL:challenge:)`, and `Tag.relay(_:)`. The `relay` tag is
+  the canonical URL, which is the URL the connection opens.
+- **NIP-11 fetches take a `RelayURL`** (breaking): `RelayInformation.fetch(from:urlSession:)` takes one,
+  `fetch(fromRelayURLString:urlSession:)` is removed, `informationURL(from:)` takes a `RelayURL` and
+  no longer returns an optional, and `RelayInformation.FetchError.invalidRelayURL` is removed.
+- **Relay hints are `RelayURL?`** (breaking): the `relayURL:` hint of `Tag.event`, `Tag.quote`,
+  `Tag.pubkey(_:relayURL:petname:)`, and `Tag.address`, of `EventSigner.signRepost(of:relayURL:)`, and
+  of `events.publishReply` and `publishRepost` is written in canonical form. `Contact.relayURL` is a
+  `RelayURL?`, and `Contact.fromTag(_:)` reads a hint that is not a valid relay URL as nil rather than
+  keeping the string. Hints read from other authors' events are parsed the same way: a reply to an
+  event in NIP-10's positional form carries over its root's relay hint only when it is valid, and a
+  `nostr:` `nprofile` / `nevent` / `naddr` reference's tag carries its first valid relay hint.
 
 ## [0.8.0] - 2026-10-25
 

@@ -9,7 +9,7 @@ import NostrTestSupport
 enum ConnectedClientFixture {
 
     /// The relay URL used when the caller does not supply one.
-    static let defaultRelayURL = URL(string: "wss://relay.example.com")!
+    static let defaultRelayURL = RelayURL("wss://relay.example.com")!
 
     /// A relay config that fails fast and never reconnects, keeping tests deterministic.
     static var noReconnectConfig: RelayConnectionConfig {
@@ -19,7 +19,7 @@ enum ConnectedClientFixture {
     /// Returns a client whose pool holds one connected relay at `relayURL`; every
     /// socket the pool opens is the returned mock.
     static func make(
-        relayURL: URL = defaultRelayURL,
+        relayURL: RelayURL = defaultRelayURL,
         gossipPolicy: GossipRelayPolicy = .addAndConnect
     ) async throws -> (client: NostrClient, socket: MockWebSocketSession) {
         let socket = MockWebSocketSession()
@@ -28,7 +28,7 @@ enum ConnectedClientFixture {
             webSocketFactory: MockWebSocketSessionFactory(makeSession: { socket })
         )
         let client = NostrClient(relayPool: pool, gossipPolicy: gossipPolicy)
-        let connection = try await pool.addRelay(relayURL)
+        let connection = await pool.addRelay(relayURL)
         try await connection.connect()
         return (client, socket)
     }

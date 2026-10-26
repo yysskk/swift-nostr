@@ -9,7 +9,7 @@ import Testing
 /// flight or an authentication was established; the receive loop answered every frame regardless.
 @Suite("NIP-42 Re-challenge Tests")
 struct AuthReChallengeTests {
-    private let relayURL = URL(string: "wss://relay.example.com")!
+    private let relayURL = RelayURL("wss://relay.example.com")!
 
     private func makeConnection(socket: MockWebSocketSession) -> RelayConnection {
         RelayConnection(

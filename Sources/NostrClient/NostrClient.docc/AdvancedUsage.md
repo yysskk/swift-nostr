@@ -303,7 +303,7 @@ let parsed = try NEvent(bech32String: nevent)
 
 ```swift
 let contacts = [
-    Contact(pubkey: alice, relayURL: "wss://relay.example.com", petname: "alice"),
+    Contact(pubkey: alice, relayURL: try RelayURL(string: "wss://relay.example.com"), petname: "alice"),
     Contact(pubkey: bob)
 ]
 // A contact list is built and signed by the signer, then published like any event.
@@ -337,7 +337,7 @@ Fetch a relay's information document — name, supported NIPs, limits, fees —
 over HTTP before or after connecting:
 
 ```swift
-let info = try await RelayInformation.fetch(fromRelayURLString: "wss://relay.example.com")
+let info = try await RelayInformation.fetch(from: try RelayURL(string: "wss://relay.example.com"))
 print(info.name ?? "unknown")
 print(info.supportedNIPs ?? [])
 print(info.limitation?.maxSubscriptions ?? 0)
@@ -390,7 +390,7 @@ for await event in try await client.subscriptions.subscribe(filters: [filter]) {
 ``RelayConnection/authenticatedPubkeys`` for the session's authenticated identities.
 
 ```swift
-let connection = try RelayConnection(urlString: "wss://relay.example.com")
+let connection = RelayConnection(url: try RelayURL(string: "wss://relay.example.com"))
 try await connection.connect()
 // ... the relay sends ["AUTH", "<challenge>"] ...
 try await connection.authenticate(using: signer)
@@ -690,7 +690,7 @@ let config = RelayConnectionConfig(
     maxReconnectDelay: 60,
     reconnectBackoffMultiplier: 2
 )
-try await client.relays.add("wss://relay.example.com", config: config)
+await client.relays.add(try RelayURL(string: "wss://relay.example.com"), config: config)
 ```
 
 Liveness is detected with periodic WebSocket pings (`pingInterval`); an idle relay
@@ -739,12 +739,13 @@ print("still in flight:", result.pendingRelays)
 ```
 
 To send an already-signed event to chosen relays rather than the whole pool, pass `to:`.
-Targets must already be in the pool; ones that are not are skipped, and an empty list throws
+Targets must already be in the pool; ones that are not are skipped, and an empty set throws
 rather than broadcasting:
 
 ```swift
-try await client.relays.add("wss://relay.example.com")
-try await client.events.publish(event, to: ["wss://relay.example.com"], strategy: .allSettled)
+let relay = try RelayURL(string: "wss://relay.example.com")
+await client.relays.add(relay)
+try await client.events.publish(event, to: [relay], strategy: .allSettled)
 ```
 
 The convenience publish methods (``NostrEventsAPI/publishTextNote(content:tags:strategy:)``,
@@ -767,7 +768,7 @@ connected — the publish path never connects inline. Connect relays up front wi
 ### Direct Relay Connection
 
 ```swift
-let connection = try RelayConnection(urlString: "wss://relay.example.com")
+let connection = RelayConnection(url: try RelayURL(string: "wss://relay.example.com"))
 await connection.connect()
 
 try await connection.subscribe(

@@ -13,7 +13,7 @@ extension NostrClient {
     /// Backs ``NostrSubscriptionsAPI/subscribe(filters:to:bufferingPolicy:)``.
     func subscribe(
         filters: [Filter],
-        toURLs relayURLs: Set<URL>?,
+        toURLs relayURLs: Set<RelayURL>?,
         bufferingPolicy: AsyncStream<SubscriptionEvent>.Continuation.BufferingPolicy = .unbounded
     ) async throws -> SubscriptionSequence {
         let (stream, continuation) = AsyncStream.makeStream(
@@ -21,7 +21,7 @@ extension NostrClient {
             bufferingPolicy: bufferingPolicy
         )
 
-        let opened: (id: String, expectedRelays: Set<URL>)
+        let opened: (id: String, expectedRelays: Set<RelayURL>)
         do {
             opened = try await openSubscription(filters: filters, toURLs: relayURLs) { subscriptionEvent in
                 continuation.yield(subscriptionEvent)
@@ -58,9 +58,9 @@ extension NostrClient {
     /// Backs the stream-based ``subscribe(filters:toURLs:bufferingPolicy:)``.
     func openSubscription(
         filters: [Filter],
-        toURLs relayURLs: Set<URL>?,
+        toURLs relayURLs: Set<RelayURL>?,
         handler: @escaping @Sendable (SubscriptionEvent) -> Void
-    ) async throws -> (id: String, expectedRelays: Set<URL>) {
+    ) async throws -> (id: String, expectedRelays: Set<RelayURL>) {
         subscriptionCounter += 1
         let subscriptionId = "sub_\(subscriptionCounter)"
 
@@ -74,7 +74,7 @@ extension NostrClient {
             let expectedRelayURLs = try await pool.subscribeWithRelayContext(
                 subscriptionId: subscriptionId,
                 filters: filters,
-                toURLs: relayURLs
+                to: relayURLs
             ) { [weak self] relayMessage in
                 guard let self else { return }
                 await self.handleMessage(
@@ -130,7 +130,7 @@ extension NostrClient {
         await pool.disconnectAll()
     }
 
-    private func handleMessage(_ message: RelayMessage, from relayURL: URL, subscriptionId: String) {
+    private func handleMessage(_ message: RelayMessage, from relayURL: RelayURL, subscriptionId: String) {
         guard let subscription = openSubscriptions[subscriptionId] else { return }
 
         switch message {

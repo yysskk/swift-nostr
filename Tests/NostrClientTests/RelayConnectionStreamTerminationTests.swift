@@ -15,7 +15,7 @@ import Testing
 @Suite("Relay Connection Stream Termination Tests")
 struct RelayConnectionStreamTerminationTests {
 
-    private let relayURL = URL(string: "wss://relay.example.com")!
+    private let relayURL = RelayURL("wss://relay.example.com")!
 
     /// Thread-safe flag set by consumer tasks when their stream ends.
     private final class Flag: @unchecked Sendable {

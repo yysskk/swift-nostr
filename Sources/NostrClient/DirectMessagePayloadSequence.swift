@@ -35,7 +35,7 @@ public struct DirectMessagePayloadSequence: AsyncSequence, Sendable {
     public var id: String { base.id }
 
     /// The relays that accepted the REQ.
-    public var expectedRelays: Set<URL> { base.expectedRelays }
+    public var expectedRelays: Set<RelayURL> { base.expectedRelays }
 
     /// Closes the subscription: sends CLOSE to the relays and ends iteration.
     public func close() async {

@@ -12,7 +12,7 @@ import Testing
 @Suite("NIP-42 Automatic Authentication Tests")
 struct NIP42AutomaticAuthenticationTests {
 
-    private let relayURL = URL(string: "wss://relay.example.com")!
+    private let relayURL = RelayURL("wss://relay.example.com")!
 
     private var noReconnectConfig: RelayConnectionConfig {
         RelayConnectionConfig(connectionTimeout: 1, pingInterval: 60, autoReconnect: false)
@@ -290,14 +290,14 @@ struct NIP42AutomaticAuthenticationTests {
         )
         let signer = EventSigner(keyPair: try KeyPair())
 
-        let urlA = URL(string: "wss://relay-a.example.com")!
-        let urlB = URL(string: "wss://relay-b.example.com")!
+        let urlA = RelayURL("wss://relay-a.example.com")!
+        let urlB = RelayURL("wss://relay-b.example.com")!
 
-        let connectionA = try await pool.addRelay(urlA)
+        let connectionA = await pool.addRelay(urlA)
         await pool.setAuthenticationResponder { relayURL, challenge in
             try? signer.signClientAuthentication(relayURL: relayURL, challenge: challenge)
         }
-        let connectionB = try await pool.addRelay(urlB)
+        let connectionB = await pool.addRelay(urlB)
         // Connect sequentially so the factory pairs mockA with relay A and
         // mockB with relay B deterministically.
         try await connectionA.connect()
@@ -309,7 +309,7 @@ struct NIP42AutomaticAuthenticationTests {
         for (mock, url) in [(mockA, urlA), (mockB, urlB)] {
             let connection = try #require(await pool.relay(for: url))
             let sent = try await acknowledgeAuth(on: connection, mock: mock)
-            #expect(sent.firstTagValue(named: "relay") == url.absoluteString)
+            #expect(sent.firstTagValue(named: "relay") == url.description)
         }
         await pool.disconnectAll()
     }
@@ -330,14 +330,14 @@ struct NIP42AutomaticAuthenticationTests {
         let (client, mock) = makeClient()
         let keyPair = try KeyPair()
         await client.identity.setSigner(EventSigner(keyPair: keyPair))
-        try await client.relays.connect(to: [relayURL.absoluteString])
+        try await client.relays.connect(to: [relayURL])
 
         mock.deliver(.string(#"["AUTH","challengestringhere"]"#))
 
         let connection = try #require(await client.relays.pool.relay(for: relayURL))
         let sent = try await acknowledgeAuth(on: connection, mock: mock)
         #expect(sent.pubkey == keyPair.publicKey)
-        #expect(sent.firstTagValue(named: "relay") == relayURL.absoluteString)
+        #expect(sent.firstTagValue(named: "relay") == relayURL.description)
         #expect(sent.firstTagValue(named: "challenge") == "challengestringhere")
         await client.relays.disconnect()
     }
@@ -346,7 +346,7 @@ struct NIP42AutomaticAuthenticationTests {
     func clientSignerBeforeRelays() async throws {
         let (client, mock) = makeClient()
         await client.identity.setSigner(EventSigner(keyPair: try KeyPair()))
-        try await client.relays.connect(to: [relayURL.absoluteString])
+        try await client.relays.connect(to: [relayURL])
 
         mock.deliver(.string(#"["AUTH","early-signer"]"#))
 
@@ -361,7 +361,7 @@ struct NIP42AutomaticAuthenticationTests {
         let (client, mock) = makeClient()
         await client.identity.setSigner(EventSigner(keyPair: try KeyPair()))
         await client.identity.setAuthenticationMode(.manual)
-        try await client.relays.connect(to: [relayURL.absoluteString])
+        try await client.relays.connect(to: [relayURL])
 
         mock.deliver(.string(#"["AUTH","challengestringhere"]"#))
         let connection = try #require(await client.relays.pool.relay(for: relayURL))
@@ -370,10 +370,13 @@ struct NIP42AutomaticAuthenticationTests {
         try await Task.sleep(for: .milliseconds(50))
         #expect(!mock.sentTextFrames.contains { $0.hasPrefix("[\"AUTH\"") })
 
-        async let authentication: Void = client.identity.authenticate(relayURL: relayURL)
+        // Any spelling of the pooled relay reaches its connection.
+        let spelledURL = try RelayURL(string: "WSS://Relay.Example.com:443/")
+        async let authentication: Void = client.identity.authenticate(relayURL: spelledURL)
         let sent = try await acknowledgeAuth(on: connection, mock: mock)
         try await authentication
         #expect(sent.firstTagValue(named: "challenge") == "challengestringhere")
+        #expect(sent.firstTagValue(named: "relay") == "wss://relay.example.com")
         #expect(await connection.isAuthenticated)
         await client.relays.disconnect()
     }
@@ -383,7 +386,7 @@ struct NIP42AutomaticAuthenticationTests {
         let (client, mock) = makeClient()
         await client.identity.setSigner(EventSigner(keyPair: try KeyPair()))
         await client.identity.setAuthenticationMode(.manual)
-        try await client.relays.connect(to: [relayURL.absoluteString])
+        try await client.relays.connect(to: [relayURL])
 
         mock.deliver(.string(#"["AUTH","challengestringhere"]"#))
         let connection = try #require(await client.relays.pool.relay(for: relayURL))
@@ -400,8 +403,8 @@ struct NIP42AutomaticAuthenticationTests {
         let (client, _) = makeClient()
         await client.identity.setSigner(EventSigner(keyPair: try KeyPair()))
 
-        await #expect(throws: NostrError.noMatchingRelays(["wss://unknown.example.com"])) {
-            try await client.identity.authenticate(relayURL: URL(string: "wss://Unknown.Example.com/")!)
+        await #expect(throws: NostrError.noMatchingRelays([RelayURL("wss://unknown.example.com")!])) {
+            try await client.identity.authenticate(relayURL: RelayURL("wss://Unknown.Example.com/")!)
         }
     }
 
@@ -409,7 +412,7 @@ struct NIP42AutomaticAuthenticationTests {
     func clientAuthenticateWithoutChallenge() async throws {
         let (client, _) = makeClient()
         await client.identity.setSigner(EventSigner(keyPair: try KeyPair()))
-        try await client.relays.connect(to: [relayURL.absoluteString])
+        try await client.relays.connect(to: [relayURL])
 
         await #expect(throws: NostrError.authenticationFailed("The relay has not sent an AUTH challenge")) {
             try await client.identity.authenticate(relayURL: relayURL)
@@ -420,7 +423,7 @@ struct NIP42AutomaticAuthenticationTests {
     @Test("authenticate(relayURL:) requires a signer")
     func clientAuthenticateWithoutSigner() async throws {
         let (client, mock) = makeClient()
-        try await client.relays.connect(to: [relayURL.absoluteString])
+        try await client.relays.connect(to: [relayURL])
 
         mock.deliver(.string(#"["AUTH","challengestringhere"]"#))
         let connection = try #require(await client.relays.pool.relay(for: relayURL))
@@ -435,7 +438,7 @@ struct NIP42AutomaticAuthenticationTests {
     @Test("without a signer, challenges go unanswered")
     func clientWithoutSignerDoesNotAnswer() async throws {
         let (client, mock) = makeClient()
-        try await client.relays.connect(to: [relayURL.absoluteString])
+        try await client.relays.connect(to: [relayURL])
 
         mock.deliver(.string(#"["AUTH","challengestringhere"]"#))
         let connection = try #require(await client.relays.pool.relay(for: relayURL))

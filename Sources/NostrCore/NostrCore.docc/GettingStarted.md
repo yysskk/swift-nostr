@@ -106,8 +106,10 @@ print(metadata.name ?? metadata.groupID, metadata.isPrivate ? "private" : "publi
 
 ``RelayConnection`` is one actor-isolated relay socket with its own connect/keepalive/reconnect state machine. Open it, publish, and read messages as an async stream.
 
+Relays are addressed by ``RelayURL``: a `ws` or `wss` URL that ``RelayURL/init(string:)`` validates and normalizes to its canonical form — lowercased scheme and host, no root trailing slash, no default port — so every spelling of a relay compares equal. Anything else throws ``NostrError/invalidRelayURL(_:)``.
+
 ```swift
-let relay = RelayConnection(url: URL(string: "wss://relay.example.com")!)
+let relay = RelayConnection(url: try RelayURL(string: "wss://relay.example.com"))
 try await relay.connect()
 
 try await relay.send(.event(note))

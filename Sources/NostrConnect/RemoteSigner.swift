@@ -128,7 +128,8 @@ public actor RemoteSigner {
         self.requestedPermissions = permissions
         self.config = config
         self.session = Session(
-            transport: transport ?? RelayConnectionTransport(relayURLs: bunker.relays),
+            transport: transport
+                ?? RelayConnectionTransport(relayURLs: bunker.relays.compactMap { try? RelayURL(url: $0) }),
             timedOut: RemoteSignerError.timedOut,
             notConnected: RemoteSignerError.notConnected)
     }

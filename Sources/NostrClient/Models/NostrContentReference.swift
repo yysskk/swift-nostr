@@ -74,28 +74,35 @@ public struct NostrContentReference: Sendable, Hashable {
 
     /// The tag this reference contributes to the referencing event per NIP-27/NIP-18:
     /// `p` for npub/nprofile mentions, `q` for note/nevent quotes, `a` for `naddr` —
-    /// each carrying the entity's first relay hint when present.
+    /// each carrying the entity's first valid relay hint when present (hints that are not
+    /// WebSocket relay URLs are skipped).
     public var tag: Tag {
         switch entity {
         case .npub(let publicKey):
             return .pubkey(publicKey)
         case .nprofile(let profile):
-            return .pubkey(profile.publicKey, relayURL: profile.relays.first)
+            return .pubkey(profile.publicKey, relayURL: Self.firstValidRelay(in: profile.relays))
         case .note(let eventID):
             return .quote(eventID)
         case .nevent(let event):
-            return .quote(event.eventID, relayURL: event.relays.first, pubkey: event.author)
+            return .quote(event.eventID, relayURL: Self.firstValidRelay(in: event.relays), pubkey: event.author)
         case .naddr(let addr):
             return .address(
                 kind: Event.Kind(rawValue: addr.kind),
                 pubkey: addr.author,
                 identifier: addr.identifier,
-                relayURL: addr.relays.first
+                relayURL: Self.firstValidRelay(in: addr.relays)
             )
         case .nsec:
             // Unreachable: the initializer rejects nsec, so a stored entity is never a private key.
             preconditionFailure("NostrContentReference never stores an nsec entity")
         }
+    }
+
+    /// The first of `relays` that parses as a relay URL. NIP-19 relay hints are third-party
+    /// content, so a malformed one is skipped rather than written into a tag.
+    private static func firstValidRelay(in relays: [String]) -> RelayURL? {
+        relays.lazy.compactMap(RelayURL.init).first
     }
 
     /// The deduplicated tags for every `nostr:` reference in `content`, in first-seen order.

@@ -216,7 +216,8 @@ platform whose Foundation has none, or an in-memory fake in tests — hand it a
 ```swift
 let connection = WalletConnection(
     uri: uri,
-    transport: RelayConnectionTransport(relayURLs: uri.relays, webSocketFactory: OkHttpWebSocketFactory()))
+    transport: RelayConnectionTransport(
+        relayURLs: try uri.relays.map(RelayURL.init(url:)), webSocketFactory: OkHttpWebSocketFactory()))
 ```
 
 NIP-47 request events are ephemeral, so `RelayTransport`'s `send(_:)` is fire-and-forget: the

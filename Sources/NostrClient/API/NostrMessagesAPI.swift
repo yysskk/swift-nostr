@@ -279,7 +279,7 @@ public struct NostrMessagesAPI: NostrMessaging {
 
         async let selfCopyDelivery = publishBestEffort(result.selfGiftWrap, toURLs: senderTargets)
         let recipientResult = try await client.pool.publish(
-            result.recipientGiftWrap, toURLs: recipientTargets, strategy: strategy
+            result.recipientGiftWrap, to: recipientTargets, strategy: strategy
         )
         let selfCopyResult = await selfCopyDelivery
 
@@ -297,15 +297,15 @@ public struct NostrMessagesAPI: NostrMessaging {
     /// never makes the best-effort publish block the primary send.
     /// - Parameter relayURLs: The canonical relays to target, or nil to broadcast to the full pool.
     /// - Returns: The per-relay outcome, or nil if the publish failed outright.
-    private func publishBestEffort(_ event: Event, toURLs relayURLs: Set<URL>?) async -> PublishResult? {
-        try? await client.pool.publish(event, toURLs: relayURLs, strategy: nil)
+    private func publishBestEffort(_ event: Event, toURLs relayURLs: Set<RelayURL>?) async -> PublishResult? {
+        try? await client.pool.publish(event, to: relayURLs, strategy: nil)
     }
 
     /// Resolves the kind-10050 DM inbox relays to route a gift wrap to for `pubkey`, connecting
     /// them per the gossip policy.
     /// - Returns: The connected inbox relays, or nil when the addressee advertised no DM relay
     ///   list (or none could be connected) — signalling a fall back to the full relay pool.
-    private func inboxTargets(for pubkey: PublicKey) async -> Set<URL>? {
+    private func inboxTargets(for pubkey: PublicKey) async -> Set<RelayURL>? {
         let connected = await client.routing.connectedInboxRelays(for: pubkey)
         return connected.isEmpty ? nil : connected
     }

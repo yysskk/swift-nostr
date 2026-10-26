@@ -1,16 +1,104 @@
 import Foundation
 
-/// Helpers for working with Nostr relay URLs.
-package enum RelayURL {
-    /// Normalizes a relay URL into a canonical routing key: lowercased scheme and host
-    /// (the only RFC-case-insensitive parts — the key also opens the WebSocket, so path
-    /// case is preserved), a root trailing slash stripped, and default ports removed.
+/// The URL of a Nostr relay: a validated `ws` or `wss` WebSocket URL in its canonical form.
+///
+/// The canonical form lowercases the scheme and host (the only parts URLs treat
+/// case-insensitively — the path is preserved, since the same URL also opens the WebSocket),
+/// strips a root trailing slash, and drops the scheme's default port (`443` for `wss`, `80` for
+/// `ws`). A non-root trailing slash is kept: `wss://host/a/` and `wss://host/a` stay distinct.
+/// Two relay URLs are equal exactly when their canonical forms are, so `wss://Relay.Example.com/`
+/// and `wss://relay.example.com:443` name the same relay, which makes the value a routing key for
+/// the relay pool, publish results, and relay sets.
+///
+/// ``description`` is the canonical string, and the value encodes to and from JSON as it.
+public struct RelayURL: Sendable {
+    /// The canonical URL string, ``description``.
+    private let canonical: String
+
+    /// The relay's canonical URL, used to open its WebSocket.
+    public let url: URL
+
+    /// Creates a relay URL from a string, normalizing it to its canonical form.
+    /// - Throws: ``NostrError/invalidRelayURL(_:)`` carrying `string` when it does not parse,
+    ///   its scheme is not `ws` or `wss`, its host is empty, or it has a fragment or a user or
+    ///   password.
+    public init(string: String) throws {
+        guard let components = URLComponents(string: string),
+            let scheme = components.scheme?.lowercased(), scheme == "wss" || scheme == "ws",
+            let host = components.host, !host.isEmpty,
+            components.fragment == nil,
+            components.user == nil, components.password == nil
+        else {
+            throw NostrError.invalidRelayURL(string)
+        }
+        let canonical = Self.normalize(string)
+        guard let url = URL(string: canonical) else {
+            throw NostrError.invalidRelayURL(string)
+        }
+        self.canonical = canonical
+        self.url = url
+    }
+
+    /// Creates a relay URL from a URL, normalizing it to its canonical form.
+    /// - Throws: ``NostrError/invalidRelayURL(_:)`` carrying `url.absoluteString` when its scheme
+    ///   is not `ws` or `wss`, its host is empty, or it has a fragment or a user or password.
+    public init(url: URL) throws {
+        try self.init(string: url.absoluteString)
+    }
+}
+
+extension RelayURL: Hashable {
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.canonical == rhs.canonical
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(canonical)
+    }
+}
+
+extension RelayURL: CustomStringConvertible, LosslessStringConvertible {
+    /// The relay URL's canonical string.
+    public var description: String {
+        canonical
+    }
+
+    /// Creates a relay URL from a string, normalizing it to its canonical form, or returns `nil`
+    /// when ``init(string:)`` would throw.
+    public init?(_ description: String) {
+        try? self.init(string: description)
+    }
+}
+
+extension RelayURL: Codable {
+    /// Decodes a relay URL from a string, normalizing it to its canonical form.
+    /// - Throws: `DecodingError.dataCorrupted` if the string is not a valid WebSocket relay URL.
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        guard let value = RelayURL(try container.decode(String.self)) else {
+            throw DecodingError.dataCorruptedError(
+                in: container, debugDescription: "A relay URL must be a ws:// or wss:// URL with a host")
+        }
+        self = value
+    }
+
+    /// Encodes the relay URL as its canonical string.
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(canonical)
+    }
+}
+
+extension RelayURL {
+    /// Normalizes a relay URL string into its canonical form without validating it: lowercased
+    /// scheme and host, a root trailing slash stripped, and default ports removed. A string that
+    /// does not parse as a URL with a host is lowercased and loses one trailing slash instead.
     ///
-    /// Used only for de-duplication and pool routing — never to mutate a stored
-    /// URL, so relay tags round-trip exactly.
-    package static func normalize(_ url: String) -> String {
-        guard var components = URLComponents(string: url), let host = components.host, !host.isEmpty else {
-            var normalized = url.lowercased()  // unparseable: legacy whole-string rule
+    /// Used to build ``RelayURL`` values and to de-duplicate relay-list entries that are stored
+    /// as strings — never to rewrite those entries, so relay tags round-trip exactly.
+    package static func normalize(_ string: String) -> String {
+        guard var components = URLComponents(string: string), let host = components.host, !host.isEmpty else {
+            var normalized = string.lowercased()  // unparseable: legacy whole-string rule
             if normalized.hasSuffix("/") { normalized.removeLast() }
             return normalized
         }
@@ -21,44 +109,15 @@ package enum RelayURL {
         case ("wss", 443), ("ws", 80): components.port = nil
         default: break
         }
-        return components.string ?? url
+        return components.string ?? string
     }
+}
 
-    /// Parses `string` into a URL under its canonical routing key (see ``normalize(_:)``).
-    package static func normalizedURL(_ string: String) -> URL? { URL(string: normalize(string)) }
-
-    /// Rebuilds `url` under its canonical routing key, falling back to `url` itself
-    /// when the normalized form does not re-parse.
-    package static func normalizedURL(_ url: URL) -> URL { normalizedURL(url.absoluteString) ?? url }
-
-    /// Parses a relay URL string into its canonical routing key, enforcing that it is
-    /// usable as a WebSocket relay endpoint.
-    /// - Throws: ``NostrError/invalidRelayURL(_:)`` when the string does not parse, the
-    ///   scheme is not `ws`/`wss`, the host is empty, or a fragment or user/password is present.
-    package static func requireTarget(_ string: String) throws -> URL {
-        guard let components = URLComponents(string: string),
-            let scheme = components.scheme?.lowercased(), scheme == "wss" || scheme == "ws",
-            let host = components.host, !host.isEmpty,
-            components.fragment == nil,
-            components.user == nil, components.password == nil,
-            let url = normalizedURL(string)
-        else {
-            throw NostrError.invalidRelayURL(string)
-        }
-        return url
-    }
-
-    /// Parses each string via ``requireTarget(_:)`` into a de-duplicated target set,
-    /// throwing on the first invalid entry.
-    package static func requireTargets(_ strings: [String]) throws -> Set<URL> {
-        Set(try strings.map(requireTarget))
-    }
-
-    /// Parses relay URL strings into a de-duplicated `Set<URL>`, skipping entries that
-    /// are not valid WebSocket relay URLs (see ``requireTarget(_:)``). Lenient by
-    /// design: it ingests third-party relay-list tag content (NIP-65 / NIP-17), where
-    /// one garbage entry must not discard the rest.
-    package static func urlSet(_ strings: [String]) -> Set<URL> {
-        Set(strings.compactMap { try? requireTarget($0) })
+extension Set<RelayURL> {
+    /// Parses relay URL strings into a set, skipping every entry that is not a valid WebSocket
+    /// relay URL. Lenient by design: it ingests third-party relay lists (NIP-65 / NIP-17 tag
+    /// content), where one malformed entry must not discard the rest.
+    package init(parsingValid strings: some Sequence<String>) {
+        self.init(strings.compactMap(RelayURL.init))
     }
 }

@@ -76,7 +76,7 @@ struct PublishedEventTests {
             try await client.events.publishReply(
                 to: root,
                 content: "a reply",
-                relayURL: "wss://hint.example.com"
+                relayURL: RelayURL("wss://hint.example.com")!
             )
         }
 
@@ -112,7 +112,7 @@ struct PublishedEventTests {
             try await client.events.publishTextNote(content: "note")
         }.event
         let repost = try await PublishAckSupport.acknowledgingPublishes(on: socket) {
-            try await client.events.publishRepost(of: note, relayURL: "wss://hint.example.com")
+            try await client.events.publishRepost(of: note, relayURL: RelayURL("wss://hint.example.com")!)
         }
 
         #expect(repost.event.kind == .repost)

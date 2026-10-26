@@ -47,7 +47,7 @@ public protocol NostrIdentityProviding: Sendable {
     /// Sets how the client reacts to relay AUTH challenges.
     func setAuthenticationMode(_ mode: AuthenticationMode) async
     /// Answers one relay's pending AUTH challenge.
-    func authenticate(relayURL: URL) async throws
+    func authenticate(relayURL: RelayURL) async throws
 }
 
 // MARK: - Relays
@@ -62,16 +62,16 @@ public protocol NostrIdentityProviding: Sendable {
 public protocol NostrRelayManaging: Sendable {
     /// Adds a relay, optionally with a per-relay connection configuration.
     @discardableResult
-    func add(_ urlString: String, config: RelayConnectionConfig?) async throws -> RelayConnection
+    func add(_ url: RelayURL, config: RelayConnectionConfig?) async -> RelayConnection
     /// Adds multiple relays.
-    func add(_ urlStrings: [String]) async throws
+    func add(_ urls: some Sequence<RelayURL>) async
     /// Removes a relay from the pool, disconnecting it.
-    func remove(_ urlString: String) async throws
+    func remove(_ url: RelayURL) async
 
     /// Connects to all relays in the pool.
     func connect() async throws
     /// Adds the given relays, then connects to all relays in the pool.
-    func connect(to urlStrings: [String]) async throws
+    func connect(to urls: some Sequence<RelayURL>) async throws
     /// Disconnects from all relays.
     func disconnect() async
 
@@ -82,7 +82,7 @@ public protocol NostrRelayManaging: Sendable {
     /// The number of relays currently connected.
     func connectedCount() async -> Int
     /// The pool's connection for a relay URL, or nil when it is not in the pool.
-    func relay(for url: URL) async -> RelayConnection?
+    func relay(for url: RelayURL) async -> RelayConnection?
     /// Clears every subscription's event deduplication cache in the relay pool.
     func clearDeduplicationCache() async
 }
@@ -97,7 +97,7 @@ public protocol NostrEventPublishing: Sendable {
     /// Publishes a NIP-10 reply.
     @discardableResult
     func publishReply(
-        to event: Event, content: String, relayURL: String?, strategy: PublishStrategy?
+        to event: Event, content: String, relayURL: RelayURL?, strategy: PublishStrategy?
     ) async throws -> PublishedEvent
     /// Publishes user metadata.
     @discardableResult
@@ -108,7 +108,7 @@ public protocol NostrEventPublishing: Sendable {
     /// Publishes a repost.
     @discardableResult
     func publishRepost(
-        of event: Event, relayURL: String?, strategy: PublishStrategy?
+        of event: Event, relayURL: RelayURL?, strategy: PublishStrategy?
     ) async throws -> PublishedEvent
     /// Publishes a deletion request.
     @discardableResult
@@ -127,7 +127,7 @@ public protocol NostrEventPublishing: Sendable {
     ) async throws -> PublishedEvent
     /// Publishes an already-signed event to the whole pool (nil) or to the given relays.
     @discardableResult
-    func publish(_ event: Event, to relayURLs: [String]?, strategy: PublishStrategy?) async throws -> PublishResult
+    func publish(_ event: Event, to relayURLs: Set<RelayURL>?, strategy: PublishStrategy?) async throws -> PublishResult
 
     /// Publishes a NIP-23 long-form article or draft.
     @discardableResult
@@ -140,9 +140,9 @@ public protocol NostrEventPublishing: Sendable {
 /// Implemented by ``NostrEventsAPI``.
 public protocol NostrEventFetching: Sendable {
     /// Fetches events matching `filters`, ending at EOSE or `timeout`.
-    func fetch(filters: [Filter], to relayURLs: [String]?, timeout: TimeInterval) async throws -> [Event]
+    func fetch(filters: [Filter], to relayURLs: Set<RelayURL>?, timeout: TimeInterval) async throws -> [Event]
     /// Requests the NIP-45 count of events matching `filters`.
-    func count(filters: [Filter], to relayURLs: [String]?, timeout: TimeInterval) async throws -> Int
+    func count(filters: [Filter], to relayURLs: Set<RelayURL>?, timeout: TimeInterval) async throws -> Int
     /// Fetches a single event by id.
     func fetchEvent(id: EventID, timeout: TimeInterval) async throws -> Event?
     /// Fetches a user's metadata.
@@ -162,13 +162,13 @@ public protocol NostrSubscribing: Sendable {
     /// Opens a subscription as a sequence of relay-aware events.
     func subscribe(
         filters: [Filter],
-        to relayURLs: [String]?,
+        to relayURLs: Set<RelayURL>?,
         bufferingPolicy: AsyncStream<SubscriptionEvent>.Continuation.BufferingPolicy
     ) async throws -> SubscriptionSequence
     /// Opens a subscription as a sequence of event payloads only.
     func events(
         filters: [Filter],
-        to relayURLs: [String]?,
+        to relayURLs: Set<RelayURL>?,
         bufferingPolicy: AsyncStream<SubscriptionEvent>.Continuation.BufferingPolicy
     ) async throws -> SubscriptionSequence.Events
     /// Closes one subscription.
@@ -231,7 +231,7 @@ public protocol NostrRelayRouting: Sendable {
     ) async throws -> PublishedEvent
     /// Connects the current user's own DM inbox relays so messages sent there arrive.
     @discardableResult
-    func connectDirectMessageInboxRelays() async throws -> Set<URL>
+    func connectDirectMessageInboxRelays() async throws -> Set<RelayURL>
 }
 
 // MARK: - Messages

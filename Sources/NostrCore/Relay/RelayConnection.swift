@@ -8,14 +8,14 @@ import Foundation
 public actor RelayConnection {
     /// Produces a signed kind-22242 event answering an AUTH challenge, or
     /// `nil` to leave the challenge unanswered (NIP-42).
-    public typealias AuthenticationResponder = @Sendable (_ relayURL: URL, _ challenge: String) async -> Event?
+    public typealias AuthenticationResponder = @Sendable (_ relayURL: RelayURL, _ challenge: String) async -> Event?
 
     /// The relay URL.
     ///
     /// `nonisolated` because it is an immutable `Sendable` value fixed at init:
     /// callers (e.g. the relay pool, now in a separate module) read it
     /// synchronously without hopping onto the actor.
-    public nonisolated let url: URL
+    public nonisolated let url: RelayURL
 
     /// Current connection state
     public private(set) var state: RelayConnectionState = .disconnected
@@ -162,22 +162,17 @@ public actor RelayConnection {
         isAuthenticated || !pendingAuthentications.isEmpty || authenticationResponder != nil
     }
 
-    /// Creates a connection to `url`, trusting it as given (no validation or normalization);
-    /// use ``init(urlString:config:)`` for validated input.
-    public init(url: URL, urlSession: URLSession = .shared, config: RelayConnectionConfig = .default) {
+    /// Creates a connection to `url` whose sockets come from `urlSession`.
+    /// - Parameters:
+    ///   - url: The relay's URL.
+    ///   - urlSession: The URL session backing the WebSocket (defaults to `.shared`).
+    ///   - config: Timeout, keepalive, and reconnection behavior (defaults to `.default`).
+    public init(url: RelayURL, urlSession: URLSession = .shared, config: RelayConnectionConfig = .default) {
         self.init(
             url: url,
             webSocketFactory: URLSessionWebSocketFactory(urlSession: urlSession),
             config: config
         )
-    }
-
-    /// Creates a connection to `urlString`, validating it as a WebSocket relay URL and
-    /// normalizing it to its canonical form.
-    /// - Throws: ``NostrError/invalidRelayURL(_:)`` when the string does not parse, the
-    ///   scheme is not `ws`/`wss`, the host is empty, or a fragment or user/password is present.
-    public init(urlString: String, config: RelayConnectionConfig = .default) throws {
-        self.init(url: try RelayURL.requireTarget(urlString), config: config)
     }
 
     /// Designated initializer, creating a connection whose sockets come from `webSocketFactory`.
@@ -187,11 +182,11 @@ public actor RelayConnection {
     /// support — or on an in-memory fake in tests. The whole connect/receive/keepalive/reconnect
     /// state machine then runs on that transport, without a network.
     /// - Parameters:
-    ///   - url: The relay's WebSocket URL.
+    ///   - url: The relay's URL.
     ///   - webSocketFactory: Creates the transport for each connection attempt.
     ///   - config: Timeout, keepalive, and reconnection behavior (defaults to `.default`).
     public init(
-        url: URL,
+        url: RelayURL,
         webSocketFactory: any WebSocketSessionFactory,
         config: RelayConnectionConfig = .default
     ) {
@@ -204,7 +199,7 @@ public actor RelayConnection {
     /// Creates a connection whose reconnect delays are randomized by `jitter` instead of the
     /// system generator, so a test can assert the backoff bounds without depending on chance.
     init(
-        url: URL,
+        url: RelayURL,
         webSocketFactory: any WebSocketSessionFactory,
         config: RelayConnectionConfig,
         jitter: @escaping ReconnectJitter
@@ -279,7 +274,7 @@ public actor RelayConnection {
         // session; a fresh socket starts unauthenticated with no challenge.
         resetAuthenticationState()
 
-        var request = URLRequest(url: url)
+        var request = URLRequest(url: url.url)
         request.setValue("websocket", forHTTPHeaderField: "Upgrade")
         request.timeoutInterval = config.connectionTimeout
 
@@ -966,8 +961,7 @@ extension RelayConnection {
     ///
     /// - Parameter urlSession: The URL session to use (defaults to `.shared`).
     /// - Returns: The decoded ``RelayInformation``.
-    /// - Throws: ``RelayInformation/FetchError`` on URL, network, or
-    ///   decoding errors.
+    /// - Throws: ``RelayInformation/FetchError`` on network or decoding errors.
     public nonisolated func fetchInformation(urlSession: URLSession = .shared) async throws -> RelayInformation {
         try await RelayInformation.fetch(from: url, urlSession: urlSession)
     }

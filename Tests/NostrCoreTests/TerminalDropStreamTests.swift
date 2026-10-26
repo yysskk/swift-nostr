@@ -15,7 +15,7 @@ struct TerminalDropStreamTests {
         autoReconnect: Bool
     ) -> RelayConnection {
         RelayConnection(
-            url: URL(string: "wss://relay.example.com")!,
+            url: RelayURL("wss://relay.example.com")!,
             webSocketFactory: MockWebSocketSessionFactory(makeSession: { socket }),
             config: RelayConnectionConfig(
                 connectionTimeout: 0.2, pingInterval: 0.1, autoReconnect: autoReconnect)

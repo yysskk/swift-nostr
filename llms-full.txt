@@ -39,7 +39,10 @@ let client = NostrClient()
 try await client.identity.setNsec("nsec1...")
 
 // Add relays and connect in one step
-try await client.relays.connect(to: ["wss://relay.example.com", "wss://relay2.example.com"])
+try await client.relays.connect(to: [
+    RelayURL(string: "wss://relay.example.com"),
+    RelayURL(string: "wss://relay2.example.com"),
+])
 
 // Publish a text note — returns the signed event plus the per-relay outcome
 let note = try await client.events.publishTextNote(content: "Hello, Nostr!")
@@ -150,23 +153,30 @@ with `auth-required:` retry once after the AUTH round-trip, and subscriptions cl
 
 ```swift
 await client.identity.setAuthenticationMode(.manual)   // or .automatic (default)
-try await client.identity.authenticate(relayURL: url)  // answer a pending challenge explicitly
+try await client.identity.authenticate(relayURL: relay)  // answer a pending challenge explicitly
 ```
 
 ### Relay Management
 
-Relay URLs are strings everywhere, validated strictly: an unparseable string, a
-non-`ws(s)` scheme, a missing host, or a fragment/userinfo throws
-`NostrError.invalidRelayURL`. Any spelling of the same relay (case, root slash,
-default port) routes to one pooled connection.
+Every API that takes or returns a relay URL uses `RelayURL` (NostrCore): a validated
+`ws`/`wss` URL in canonical form — lowercased scheme and host, root trailing slash and
+default port removed, path case and a non-root trailing slash kept. `RelayURL(string:)` /
+`RelayURL(url:)` throw `NostrError.invalidRelayURL(input)` for an unparseable string, a
+non-`ws(s)` scheme, an empty host, or a fragment/user/password; `RelayURL(_:)` is the failable
+form. Equality and hashing use the canonical form, so any spelling of the same relay routes
+to one pooled connection. `description` (and the JSON encoding) is the canonical string;
+`url` is the `URL` the WebSocket opens. Relay hints read from third-party tags (contact lists,
+NIP-10 positional roots, NIP-19 references) are parsed leniently: a malformed one is dropped.
 
 ```swift
-try await client.relays.add("wss://relay.example.com")
-try await client.relays.add("wss://relay.example.com", config: customConfig)
-try await client.relays.add(["wss://relay1.example.com", "wss://relay2.example.com"])
-try await client.relays.remove("wss://relay.example.com")  // absent relay: no-op
+let relay = try RelayURL(string: "wss://relay.example.com")
+await client.relays.add(relay)
+await client.relays.add(relay, config: customConfig)
+await client.relays.add([relay, try RelayURL(string: "wss://relay2.example.com")])  // any Sequence
+await client.relays.remove(try RelayURL(string: "wss://Relay.Example.com/"))  // same relay; absent: no-op
+let connection = await client.relays.relay(for: relay)  // RelayConnection?
 try await client.relays.connect()
-try await client.relays.connect(to: ["wss://relay.example.com"])  // add + connect in one step
+try await client.relays.connect(to: [relay])  // add + connect in one step
 await client.relays.disconnect()
 ```
 
@@ -185,12 +195,13 @@ print(note.event.id, note.result.acceptedRelays)
 try await client.events.publishReply(to: parentEvent, content: "Nice post!")
 try await client.events.publishMetadata(UserMetadata(name: "Alice", about: "Nostr user"))
 try await client.events.publishReaction(to: note.event, content: "🤙")
-try await client.events.publishRepost(of: note.event, relayURL: "wss://relay.example.com")
+try await client.events.publishRepost(of: note.event, relayURL: relay)  // RelayURL? hint
 try await client.events.publishDeletion(eventIDs: [note.event.id], reason: "posted by mistake")
 try await client.events.publishReport(pubkey: author, type: .impersonation)  // report a pubkey (NIP-56)
 try await client.events.publishReport(event: note.event, type: .spam, reason: "unsolicited")  // report an event and its author
 try await client.events.publishTextNote(content: "Important!", strategy: .quorum(2))
 try await client.events.publish(signedEvent)  // publish any pre-signed event
+try await client.events.publish(signedEvent, to: [relay])  // Set<RelayURL>? targets; [] throws
 ```
 
 ### Subscriptions
@@ -223,7 +234,7 @@ for await item in subscription {
     }
 }
 
-// subscription.id / subscription.expectedRelays are available;
+// subscription.id / subscription.expectedRelays (Set<RelayURL>) are available;
 // close explicitly with await subscription.close(), or:
 await client.subscriptions.unsubscribe(subscriptionId: subscription.id)
 await client.subscriptions.unsubscribeAll()
@@ -239,9 +250,9 @@ results. With zero resolved relays they throw (`NostrError.noRelaysInPool` /
 let events = try await client.events.fetch(filters: [filter])
 let event = try await client.events.fetchEvent(id: eventID)      // EventID
 let metadata = try await client.events.fetchMetadata(pubkey: alice)
-// Scope a fetch to a subset of relays (e.g. naddr relay hints); nil (default) uses the
-// whole pool, [] throws, and an invalid string throws NostrError.invalidRelayURL.
-let scoped = try await client.events.fetch(filters: [filter], to: ["wss://relay.example"])
+// Scope a fetch to a subset of relays (e.g. naddr relay hints): `to:` is a Set<RelayURL>?;
+// nil (default) uses the whole pool, [] throws, and relays not in the pool are skipped.
+let scoped = try await client.events.fetch(filters: [filter], to: [relay])
 ```
 
 ### Event Counts (NIP-45)
@@ -254,9 +265,9 @@ count fails fast.
 // Max count across relays (each relay's count is a lower bound):
 let total = try await client.events.count(filters: [filter])
 // Scope to a subset of relays (same to: semantics as fetch):
-let scoped = try await client.events.count(filters: [filter], to: ["wss://relay.example"])
+let scoped = try await client.events.count(filters: [filter], to: [relay])
 // Per-relay counts:
-let byRelay = try await client.relays.pool.count(filters: [filter])  // [URL: EventCount]
+let byRelay = try await client.relays.pool.count(filters: [filter])  // [RelayURL: EventCount]
 ```
 
 ### Direct Messages (NIP-17)
@@ -345,10 +356,11 @@ Typed tag value (`Event.Tag`, top-level alias `Tag`). Event-construction APIs
 (`UnsignedEvent`, `signTextNote`, `events.publishTextNote`) take `[Tag]`; `Event.tags`
 stays `[[String]]` (the hashed wire form). `Tag` is array-literal expressible, so
 `tags: [["t", "nostr"]]` still compiles. Builders that reference an event or a key take an
-`EventID` (`id`) or `PublicKey` (`pk`) and write its hex form.
+`EventID` (`id`) or `PublicKey` (`pk`) and write its hex form; relay hints are `RelayURL?`
+(`relay`) and written in canonical form.
 
 ```swift
-Tag.event(id, relayURL: "wss://r", marker: .reply)  // ["e", id, "wss://r", "reply"]
+Tag.event(id, relayURL: relay, marker: .reply)  // ["e", id, "wss://r", "reply"]
 Tag.event(id, marker: .root)     // ["e", id, "", "root"] (placeholder padded)
 Tag.pubkey(pk, petname: "alice") // ["p", pk, "", "alice"]
 Tag.hashtag("nostr")             // ["t", "nostr"]
@@ -427,10 +439,10 @@ itself is required.
 ```swift
 let published = try await client.events.publishTextNote(content: "hi")
 published.event          // Event
-published.result         // PublishResult (statuses keyed by canonical relay URL)
+published.result         // PublishResult (statuses: [RelayURL: PublishRelayStatus])
 published.id             // forwarded from Event
-published.result.acceptedRelays / .failedRelays / .pendingRelays
-published.result.status(for: "wss://Relay.Example.com/")  // any spelling; nil if not targeted
+published.result.acceptedRelays / .failedRelays / .pendingRelays  // Set<RelayURL>
+published.result.status(for: try RelayURL(string: "wss://Relay.Example.com/"))  // any spelling; nil if not targeted
 ```
 
 ## UnsignedEvent
@@ -493,11 +505,11 @@ High-level subscription events from NostrClient (enum: Sendable).
 
 ### Cases
 
-- `.event(relayURL: URL, event: Event)` -- event delivered from a relay
-- `.eose(relayURL: URL)` -- end of stored events signal
-- `.closed(relayURL: URL, message: String)` -- subscription closed by relay
-- `.notice(relayURL: URL, message: String)` -- relay notice message
-- `.auth(relayURL: URL, challenge: String)` -- relay auth challenge (NIP-42)
+- `.event(relayURL: RelayURL, event: Event)` -- event delivered from a relay
+- `.eose(relayURL: RelayURL)` -- end of stored events signal
+- `.closed(relayURL: RelayURL, message: String)` -- subscription closed by relay
+- `.notice(relayURL: RelayURL, message: String)` -- relay notice message
+- `.auth(relayURL: RelayURL, challenge: String)` -- relay auth challenge (NIP-42)
 
 All cases expose `relayURL` property to identify the source relay.
 
@@ -507,7 +519,7 @@ A live subscription as an `AsyncSequence` of `SubscriptionEvent` (struct: Sendab
 Returned by `subscribe(filters:to:bufferingPolicy:)` and the convenience subscriptions.
 
 - `id: String` -- subscription ID (usable with `unsubscribe(subscriptionId:)`)
-- `expectedRelays: Set<URL>` -- relays that accepted the REQ
+- `expectedRelays: Set<RelayURL>` -- relays that accepted the REQ
 - `close() async` -- sends CLOSE and ends iteration (idempotent)
 - `events: SubscriptionSequence.Events` -- view yielding only `Event` payloads
 
@@ -709,11 +721,11 @@ let signed = try signer.sign(unsignedEvent)
 let note = try signer.signTextNote(content: "Hello", tags: [])
 let meta = try signer.signMetadata(UserMetadata(name: "Alice"))
 let reaction = try signer.signReaction(to: event, content: "🤙")
-let repost = try signer.signRepost(of: event, relayURL: "wss://...")
+let repost = try signer.signRepost(of: event, relayURL: relay)  // RelayURL? hint
 let deletion = try signer.signDeletion(eventIDs: [event.id], reason: "mistake")
 let contacts = try signer.signContactList([Contact(pubkey: alice)])
 let relayList = try signer.signRelayListMetadata(read: ["wss://in.example"], write: ["wss://out.example"])
-let auth = try signer.signClientAuthentication(relayURL: url, challenge: "challenge")  // kind 22242, NIP-42
+let auth = try signer.signClientAuthentication(relayURL: relay, challenge: "challenge")  // kind 22242, NIP-42
 let pow = try await signer.sign(unsignedEvent, proofOfWork: 20)  // mine to 20 leading zero bits, then sign (NIP-13)
 let listEvent = try signer.signList(list)   // NIP-51: private items NIP-44-self-encrypted into content
 let opened = try signer.openList(listEvent) // decrypts private items (throws if not decryptable with this key)
@@ -909,13 +921,13 @@ Contact information for NIP-02 (struct: Codable, Hashable, Sendable).
 ### Properties
 
 - `pubkey: PublicKey` -- public key
-- `relayURL: String?` -- recommended relay URL
+- `relayURL: RelayURL?` -- recommended relay URL (`fromTag` reads a malformed hint as nil)
 - `petname: String?` -- local nickname
 
 ### Usage
 
 ```swift
-let contact = Contact(pubkey: try PublicKey(npub: "npub1..."), relayURL: "wss://...", petname: "alice")
+let contact = Contact(pubkey: try PublicKey(npub: "npub1..."), relayURL: relay, petname: "alice")
 let tag = contact.toTag()           // ["p", pubkey hex, relayURL, petname]
 let parsed = Contact.fromTag(tag)   // nil unless a "p" tag with a canonical hex key
 
@@ -1251,8 +1263,8 @@ try await "alice@example.com".verifyAsInternetIdentifier()
 NIP-11 Relay Information Document (struct: Codable, Sendable, Hashable). All fields optional.
 
 ```swift
-// Fetch from a URL
-let info = try await RelayInformation.fetch(fromRelayURLString: "wss://relay.example.com")
+// Fetch for a relay URL
+let info = try await RelayInformation.fetch(from: try RelayURL(string: "wss://relay.example.com"))
 print(info.name)            // String?
 print(info.supportedNIPs)   // [Int]?
 print(info.pubkey)          // PublicKey? -- nil when absent or not canonical hex (decoded leniently)
@@ -1262,12 +1274,12 @@ print(info.limitation?.authRequired)
 let info = try await connection.fetchInformation()
 
 // URL scheme conversion helper (wss->https, ws->http)
-let httpURL = RelayInformation.informationURL(from: relayURL)
+let httpURL = RelayInformation.informationURL(from: relay)  // URL
 ```
 
 Nested types: `Limitation`, `Fees`, `FeeSchedule`, `Retention`, `KindSpec` (`.single(Int)` / `.range(Int, Int)`).
 
-Errors: `FetchError.invalidRelayURL(String)`, `.networkError(String)`, `.invalidResponse`, `.decodingFailed(String)`.
+Errors: `FetchError.networkError(String)`, `.invalidResponse`, `.decodingFailed(String)`.
 
 ## OpenTimestamps
 
@@ -1283,6 +1295,25 @@ let raw = ots.rawData               // Data?
 let ots = event.openTimestamps      // OpenTimestamps?
 let has = event.hasOpenTimestamps   // Bool
 ```
+
+## RelayURL
+
+A Nostr relay URL (struct: Sendable, Hashable, Codable, LosslessStringConvertible), used by every
+API that takes or returns one. Holds a validated `ws`/`wss` URL in canonical form: lowercased
+scheme and host, root trailing slash stripped, default port (443 for wss, 80 for ws) removed;
+path case and a non-root trailing slash are kept. Equal and hashed by that canonical form.
+
+```swift
+let relay = try RelayURL(string: "WSS://Relay.Example.com:443/")  // throws NostrError.invalidRelayURL(input)
+let fromURL = try RelayURL(url: someURL)
+let maybe = RelayURL("wss://relay.example.com")  // failable: nil when invalid
+relay.description   // "wss://relay.example.com" (also its JSON encoding)
+relay.url           // URL the WebSocket opens
+relay == maybe      // true
+```
+
+Invalid: an unparseable string, a scheme other than ws/wss, an empty host, a fragment, or a user
+or password. Decoding an invalid string fails with `DecodingError.dataCorrupted`.
 
 ## RelayPool
 
@@ -1300,22 +1331,25 @@ let config = RelayPoolConfig(
 ### Methods
 
 ```swift
-try await pool.addRelay("wss://relay.example.com", config: relayConfig)  // also accepts a URL
-try await pool.removeRelay("wss://relay.example.com")
+let connection = await pool.addRelay(relay, config: relayConfig)  // existing connection if pooled
+await pool.addRelays([relay, otherRelay])
+await pool.removeRelay(relay)
+let pooled = await pool.relay(for: relay)  // RelayConnection?
 try await pool.connectAll()      // tolerates partial failures
 await pool.disconnectAll()
 try await pool.subscribe(subscriptionId: "sub1", filters: [filter]) { message in }
 try await pool.unsubscribe(subscriptionId: "sub1")
 try await pool.publish(signedEvent)
-try await pool.publish(signedEvent, to: ["wss://relay.example.com"])  // targeted; statuses keyed canonically
-try await pool.count(filters: [filter])   // [URL: EventCount], per relay (NIP-45)
+try await pool.publish(signedEvent, to: [relay])  // targeted; PublishResult keyed by RelayURL
+try await pool.count(filters: [filter])   // [RelayURL: EventCount], per relay (NIP-45)
 await pool.setAuthenticationResponder { url, challenge in /* signed kind-22242 event or nil */ }
 await pool.clearDeduplicationCache()
 ```
 
-Targeting (`to:`) and management take relay URL strings; invalid strings throw
-`NostrError.invalidRelayURL`, nil broadcasts to the whole pool, and an empty array
-throws `noMatchingRelays`.
+Membership and targeting take `RelayURL`s, keyed by their canonical form. Targets (`to:`) are a
+`Set<RelayURL>?`: nil broadcasts to the whole pool, relays not in the pool are skipped, and when
+none is in the pool — an empty set included — the call throws
+`noMatchingRelays([RelayURL])`, carrying the targets sorted by their canonical string.
 
 Event deduplication is per subscription: copies of one event arriving from several relays
 collapse into a single delivery, an event matching two subscriptions is delivered to both,
@@ -1328,7 +1362,7 @@ Manages WebSocket connection to a single relay (actor).
 
 ### Properties
 
-- `url: URL` -- relay WebSocket URL
+- `url: RelayURL` -- the relay's URL; `RelayConnection(url:)` takes a `RelayURL`
 - `state: RelayConnectionState` -- current connection state
 - `config: RelayConnectionConfig`
 - `authenticationChallenge: String?` -- latest NIP-42 AUTH challenge (session-scoped)
@@ -1389,7 +1423,7 @@ request fanned out to all of them, their events merged into one stream, and `Nos
 thrown when an operation reaches no relay.
 
 ```swift
-let transport = RelayConnectionTransport(relayURLs: relays)                 // URLSession sockets
+let transport = RelayConnectionTransport(relayURLs: relays)                 // [RelayURL], URLSession sockets
 let tuned = RelayConnectionTransport(relayURLs: relays, config: relayConfig)
 // Or run the relays on a platform-native socket (OkHttp on Android) or an in-memory test fake.
 let injected = RelayConnectionTransport(relayURLs: relays, webSocketFactory: OkHttpWebSocketFactory())
@@ -1539,7 +1573,7 @@ for await challenge in await signer.authChallenges() {
 
 Error types (enum: Error, LocalizedError, Sendable, Equatable).
 
-Cases: `invalidPrivateKey`, `invalidPublicKey`, `invalidSignature`, `invalidEventID`, `signingFailed`, `signerNotSet`, `verificationFailed`, `serializationFailed`, `invalidData`, `invalidMessageFormat`, `invalidRelayURL(String)`, `connectionFailed(String)`, `notConnected`, `subscriptionNotFound(String)`, `relayError(String)`, `noRelaysInPool`, `noMatchingRelays([String])`, `authenticationFailed(String)`, `cannotPublishAuthenticationEvent`, `timeout`, `invalidHex`, `invalidBech32`, `unknownPrefix(String)`, `invalidTLV`, `invalidNIP19Entity`, `invalidNostrURI`, `encryptionFailed`, `decryptionFailed`, `unsupportedEncryptionVersion(UInt8)`, `invalidPayloadFormat`, `hmacVerificationFailed`, `invalidPadding`, `invalidMnemonic`, `invalidMnemonicWord(String)`, `invalidMnemonicChecksum`, `randomGenerationFailed`, `invalidNcryptsec`, `unsupportedScryptCost(UInt8)`.
+Cases: `invalidPrivateKey`, `invalidPublicKey`, `invalidSignature`, `invalidEventID`, `signingFailed`, `signerNotSet`, `verificationFailed`, `serializationFailed`, `invalidData`, `invalidMessageFormat`, `invalidRelayURL(String)`, `connectionFailed(String)`, `notConnected`, `subscriptionNotFound(String)`, `relayError(String)`, `noRelaysInPool`, `noMatchingRelays([RelayURL])`, `authenticationFailed(String)`, `cannotPublishAuthenticationEvent`, `timeout`, `invalidHex`, `invalidBech32`, `unknownPrefix(String)`, `invalidTLV`, `invalidNIP19Entity`, `invalidNostrURI`, `encryptionFailed`, `decryptionFailed`, `unsupportedEncryptionVersion(UInt8)`, `invalidPayloadFormat`, `hmacVerificationFailed`, `invalidPadding`, `invalidMnemonic`, `invalidMnemonicWord(String)`, `invalidMnemonicChecksum`, `randomGenerationFailed`, `invalidNcryptsec`, `unsupportedScryptCost(UInt8)`.
 
 ## Supported NIPs
 

@@ -14,51 +14,42 @@ struct RelayInformationTests {
 
     @Test("Convert wss to https")
     func convertWssToHttps() {
-        let relayURL = URL(string: "wss://relay.example.com")!
+        let relayURL = RelayURL("wss://relay.example.com")!
         let httpURL = RelayInformation.informationURL(from: relayURL)
 
-        #expect(httpURL?.absoluteString == "https://relay.example.com")
+        #expect(httpURL.absoluteString == "https://relay.example.com")
     }
 
     @Test("Convert ws to http")
     func convertWsToHttp() {
-        let relayURL = URL(string: "ws://localhost:7777")!
+        let relayURL = RelayURL("ws://localhost:7777")!
         let httpURL = RelayInformation.informationURL(from: relayURL)
 
-        #expect(httpURL?.absoluteString == "http://localhost:7777")
+        #expect(httpURL.absoluteString == "http://localhost:7777")
     }
 
     @Test("Preserve path and port")
     func preservePathAndPort() {
-        let relayURL = URL(string: "wss://relay.example.com:8443/nostr")!
+        let relayURL = RelayURL("wss://relay.example.com:8443/nostr")!
         let httpURL = RelayInformation.informationURL(from: relayURL)
 
-        #expect(httpURL?.absoluteString == "https://relay.example.com:8443/nostr")
+        #expect(httpURL.absoluteString == "https://relay.example.com:8443/nostr")
     }
 
     @Test("Preserve query string")
     func preserveQueryString() {
-        let relayURL = URL(string: "wss://relay.example.com/ws?token=abc")!
+        let relayURL = RelayURL("wss://relay.example.com/ws?token=abc")!
         let httpURL = RelayInformation.informationURL(from: relayURL)
 
-        #expect(httpURL?.absoluteString == "https://relay.example.com/ws?token=abc")
+        #expect(httpURL.absoluteString == "https://relay.example.com/ws?token=abc")
     }
 
-    @Test("Uppercase scheme is normalized")
-    func uppercaseSchemeNormalized() {
-        let relayURL = URL(string: "WSS://relay.example.com")!
+    @Test("Uppercase scheme and host are normalized")
+    func uppercaseSchemeNormalized() throws {
+        let relayURL = try RelayURL(string: "WSS://Relay.Example.com/")
         let httpURL = RelayInformation.informationURL(from: relayURL)
 
-        #expect(httpURL?.scheme == "https")
-    }
-
-    @Test("Unsupported scheme returns nil")
-    func unsupportedSchemeReturnsNil() {
-        let httpRelay = URL(string: "https://relay.example.com")!
-        let ftpRelay = URL(string: "ftp://relay.example.com")!
-
-        #expect(RelayInformation.informationURL(from: httpRelay) == nil)
-        #expect(RelayInformation.informationURL(from: ftpRelay) == nil)
+        #expect(httpURL.absoluteString == "https://relay.example.com")
     }
 
     // MARK: - JSON Decoding Tests
@@ -423,42 +414,9 @@ struct RelayInformationTests {
 
     @Test("FetchError descriptions are non-nil")
     func fetchErrorDescriptions() {
-        #expect(RelayInformation.FetchError.invalidRelayURL("x").errorDescription != nil)
         #expect(RelayInformation.FetchError.networkError("x").errorDescription != nil)
         #expect(RelayInformation.FetchError.invalidResponse.errorDescription != nil)
         #expect(RelayInformation.FetchError.decodingFailed("x").errorDescription != nil)
-    }
-
-    @Test("Fetch throws invalidRelayURL for non-ws scheme")
-    func fetchThrowsInvalidURL() async {
-        do {
-            _ = try await RelayInformation.fetch(fromRelayURLString: "https://relay.example.com")
-            Issue.record("Expected error to be thrown")
-        } catch let error as RelayInformation.FetchError {
-            if case .invalidRelayURL = error {
-                // Expected
-            } else {
-                Issue.record("Unexpected FetchError: \(error)")
-            }
-        } catch {
-            Issue.record("Unexpected error type: \(error)")
-        }
-    }
-
-    @Test("Fetch throws invalidRelayURL for malformed string")
-    func fetchThrowsForMalformedString() async {
-        do {
-            _ = try await RelayInformation.fetch(fromRelayURLString: "not a url at all")
-            Issue.record("Expected error to be thrown")
-        } catch let error as RelayInformation.FetchError {
-            if case .invalidRelayURL = error {
-                // Expected
-            } else {
-                Issue.record("Unexpected FetchError: \(error)")
-            }
-        } catch {
-            Issue.record("Unexpected error type: \(error)")
-        }
     }
 
     // MARK: - Sendable/Hashable/Equatable
@@ -491,7 +449,7 @@ struct RelayInformationTests {
 
     @Test("Fetch sends GET to converted https URL with nostr+json Accept header")
     func fetchSendsCorrectRequest() async throws {
-        let relayURL = URL(string: "wss://relay.example.com/ws?token=abc")!
+        let relayURL = RelayURL("wss://relay.example.com/ws?token=abc")!
         let body = Data(#"{"name":"mocked"}"#.utf8)
 
         let captured = try await withMockURLSession(
@@ -517,7 +475,7 @@ struct RelayInformationTests {
             response: .success(status: 200, body: body)
         ) { session in
             try await RelayInformation.fetch(
-                from: URL(string: "wss://relay.example.com")!,
+                from: RelayURL("wss://relay.example.com")!,
                 urlSession: session
             )
         }.returnValue
@@ -535,7 +493,7 @@ struct RelayInformationTests {
                     response: .success(status: status, body: Data("{}".utf8))
                 ) { session in
                     try await RelayInformation.fetch(
-                        from: URL(string: "wss://relay.example.com")!,
+                        from: RelayURL("wss://relay.example.com")!,
                         urlSession: session
                     )
                 }.returnValue
@@ -559,7 +517,7 @@ struct RelayInformationTests {
                 response: .success(status: 200, body: Data("not json at all".utf8))
             ) { session in
                 try await RelayInformation.fetch(
-                    from: URL(string: "wss://relay.example.com")!,
+                    from: RelayURL("wss://relay.example.com")!,
                     urlSession: session
                 )
             }.returnValue
@@ -584,7 +542,7 @@ struct RelayInformationTests {
                 response: .success(status: 200, body: body)
             ) { session in
                 try await RelayInformation.fetch(
-                    from: URL(string: "wss://relay.example.com")!,
+                    from: RelayURL("wss://relay.example.com")!,
                     urlSession: session
                 )
             }.returnValue
@@ -607,7 +565,7 @@ struct RelayInformationTests {
                 response: .failure(URLError(.cannotConnectToHost))
             ) { session in
                 try await RelayInformation.fetch(
-                    from: URL(string: "wss://relay.example.com")!,
+                    from: RelayURL("wss://relay.example.com")!,
                     urlSession: session
                 )
             }.returnValue
@@ -634,7 +592,7 @@ struct RelayInformationTests {
                 response: .failure(URLError(.cancelled))
             ) { session in
                 try await RelayInformation.fetch(
-                    from: URL(string: "wss://relay.example.com")!,
+                    from: RelayURL("wss://relay.example.com")!,
                     urlSession: session
                 )
             }.returnValue

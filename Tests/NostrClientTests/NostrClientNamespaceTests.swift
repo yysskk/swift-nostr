@@ -34,7 +34,7 @@ struct NostrClientNamespaceTests {
         #expect(client.relays.pool === pool)
 
         // The one relay entry point stays in sync with the pool it wraps.
-        try await client.relays.add("wss://relay.example.com")
+        await client.relays.add(RelayURL("wss://relay.example.com")!)
         #expect(await pool.count == 1)
         #expect(await client.relays.count == 1)
     }
@@ -95,12 +95,12 @@ struct NostrClientNamespaceTests {
             relayPool: RelayPool(config: RelayPoolConfig(defaultRelayConfig: ConnectedClientFixture.noReconnectConfig))
         ).relays
 
-        try await relays.add(["wss://relay1.example.com", "wss://relay2.example.com"])
+        await relays.add([RelayURL("wss://relay1.example.com")!, RelayURL("wss://relay2.example.com")!])
         #expect(await relays.count == 2)
         #expect(await relays.connectedCount() == 0)
-        #expect(await relays.relay(for: URL(string: "wss://relay1.example.com")!) != nil)
+        #expect(await relays.relay(for: RelayURL("wss://relay1.example.com")!) != nil)
 
-        try await relays.remove("wss://relay1.example.com")
+        await relays.remove(RelayURL("wss://relay1.example.com")!)
         #expect(await relays.count == 1)
         #expect(await relays.connections.count == 1)
     }

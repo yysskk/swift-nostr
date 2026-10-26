@@ -12,7 +12,7 @@ import Testing
 @Suite("NIP-23 Long Form Content Tests")
 struct NIP23LongFormTests {
 
-    private let relayURL = URL(string: "wss://relay.example.com")!
+    private let relayURL = RelayURL("wss://relay.example.com")!
 
     private func makeSigner() throws -> EventSigner {
         EventSigner(keyPair: try KeyPair())
@@ -248,7 +248,7 @@ struct NIP23LongFormTests {
             webSocketFactory: MockWebSocketSessionFactory(makeSession: { mock })
         )
         let client = NostrClient(relayPool: pool)
-        let connection = try await pool.addRelay(relayURL)
+        let connection = await pool.addRelay(relayURL)
         try await connection.connect()
 
         let task = Task {
@@ -282,11 +282,11 @@ struct NIP23LongFormTests {
             webSocketFactory: MockWebSocketSessionFactory(makeSession: { mock })
         )
         let client = NostrClient(relayPool: pool)
-        let connection = try await pool.addRelay(relayURL)
+        let connection = await pool.addRelay(relayURL)
         try await connection.connect()
 
         // A relay hint matching the pooled relay: the fetch targets it (the new `to:` param).
-        let naddr = try article.naddr(author: signer.publicKey, relays: [relayURL.absoluteString])
+        let naddr = try article.naddr(author: signer.publicKey, relays: [relayURL.description])
 
         let task = Task { try await client.events.fetchLongFormContent(naddr: naddr, timeout: 2) }
 

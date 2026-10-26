@@ -23,7 +23,7 @@ extension UnsignedEvent {
 
     /// A repost of `event` (kind 6). The reposted event is embedded in the content and
     /// referenced by an `e` tag recording `relayURL`.
-    package static func repost(pubkey: PublicKey, of event: Event, relayURL: String?) throws -> UnsignedEvent {
+    package static func repost(pubkey: PublicKey, of event: Event, relayURL: RelayURL?) throws -> UnsignedEvent {
         let encoder = JSONEncoder()
         encoder.keyEncodingStrategy = .convertToSnakeCase
         let eventJson = try encoder.encode(event)
@@ -47,11 +47,12 @@ extension UnsignedEvent {
     }
 
     /// A client-authentication event answering a relay's AUTH challenge (kind 22242, NIP-42).
-    package static func clientAuthentication(pubkey: PublicKey, relayURL: URL, challenge: String) -> UnsignedEvent {
+    package static func clientAuthentication(pubkey: PublicKey, relayURL: RelayURL, challenge: String) -> UnsignedEvent
+    {
         UnsignedEvent(
             pubkey: pubkey,
             kind: .clientAuthentication,
-            tags: [.relay(relayURL.absoluteString), .challenge(challenge)],
+            tags: [.relay(relayURL), .challenge(challenge)],
             content: ""
         )
     }

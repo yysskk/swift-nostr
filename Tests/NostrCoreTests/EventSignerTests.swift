@@ -30,10 +30,10 @@ struct EventSignerTests {
         #expect(try event.verify())
     }
 
-    @Test("signClientAuthentication carries the relay and challenge (NIP-42)")
+    @Test("signClientAuthentication carries the canonical relay URL and challenge (NIP-42)")
     func signClientAuthentication() throws {
         let signer = try makeSigner()
-        let relay = URL(string: "wss://relay.example.com")!
+        let relay = try RelayURL(string: "wss://Relay.Example.com/")
         let event = try signer.signClientAuthentication(relayURL: relay, challenge: "abc123")
 
         #expect(event.kind == .clientAuthentication)
@@ -46,7 +46,7 @@ struct EventSignerTests {
     func signRepostCarriesRelayURL() throws {
         let signer = try makeSigner()
         let reposted = try signer.signTextNote(content: "gm")
-        let event = try signer.signRepost(of: reposted, relayURL: "wss://relay.example.com")
+        let event = try signer.signRepost(of: reposted, relayURL: RelayURL("wss://relay.example.com")!)
 
         #expect(event.kind == .repost)
         #expect(event.tags.contains(["e", reposted.id.hex, "wss://relay.example.com"]))

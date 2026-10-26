@@ -34,8 +34,8 @@ private struct FakeRemoteSigner: NostrSigning {
 @Suite("NIP-29 Group Client Tests")
 struct NIP29GroupClientTests {
 
-    private let groupRelayURL = URL(string: "wss://groups.example.com")!
-    private let otherRelayURL = URL(string: "wss://other.example.com")!
+    private let groupRelayURL = RelayURL("wss://groups.example.com")!
+    private let otherRelayURL = RelayURL("wss://other.example.com")!
     private let groupID = "abcdef"
 
     private var noReconnectConfig: RelayConnectionConfig {
@@ -138,13 +138,13 @@ struct NIP29GroupClientTests {
     @Test("groups.join publishes a kind-9021 event only to the group's relay")
     func joinGroupTargetsOnlyTheGroupRelay() async throws {
         let (client, groupSocket, otherSocket) = makeTwoSocketClient()
-        let groupConnection = try await client.relays.pool.addRelay(groupRelayURL)
+        let groupConnection = await client.relays.pool.addRelay(groupRelayURL)
         try await groupConnection.connect()
-        let otherConnection = try await client.relays.pool.addRelay(otherRelayURL)
+        let otherConnection = await client.relays.pool.addRelay(otherRelayURL)
         try await otherConnection.connect()
         await client.identity.setSigner(EventSigner(keyPair: try KeyPair()))
 
-        let group = GroupReference(relayURL: groupRelayURL.absoluteString, id: groupID, inviteCode: "welcome")
+        let group = GroupReference(relayURL: groupRelayURL.description, id: groupID, inviteCode: "welcome")
         let joinTask = Task { try await client.groups.join(group, reason: "please let me in") }
         let sent = try await acknowledgePublish(on: groupSocket)
         let published = try await joinTask.value
@@ -164,9 +164,9 @@ struct NIP29GroupClientTests {
     func joinGroupInviteCodeOverride() async throws {
         let (client, socket) = makeClient()
         await client.identity.setSigner(EventSigner(keyPair: try KeyPair()))
-        try await client.relays.connect(to: [groupRelayURL.absoluteString])
+        try await client.relays.connect(to: [groupRelayURL])
 
-        let group = GroupReference(relayURL: groupRelayURL.absoluteString, id: groupID, inviteCode: "stale")
+        let group = GroupReference(relayURL: groupRelayURL.description, id: groupID, inviteCode: "stale")
         let joinTask = Task { try await client.groups.join(group, inviteCode: "fresh") }
         let sent = try await acknowledgePublish(on: socket)
         _ = try await joinTask.value
@@ -179,9 +179,9 @@ struct NIP29GroupClientTests {
     func leaveGroupPublishesLeaveRequest() async throws {
         let (client, socket) = makeClient()
         await client.identity.setSigner(EventSigner(keyPair: try KeyPair()))
-        try await client.relays.connect(to: [groupRelayURL.absoluteString])
+        try await client.relays.connect(to: [groupRelayURL])
 
-        let group = GroupReference(relayURL: groupRelayURL.absoluteString, id: groupID)
+        let group = GroupReference(relayURL: groupRelayURL.description, id: groupID)
         let leaveTask = Task { try await client.groups.leave(group, reason: "goodbye") }
         let sent = try await acknowledgePublish(on: socket)
         _ = try await leaveTask.value
@@ -197,9 +197,9 @@ struct NIP29GroupClientTests {
     func publishGroupMessageLayout() async throws {
         let (client, socket) = makeClient()
         await client.identity.setSigner(EventSigner(keyPair: try KeyPair()))
-        try await client.relays.connect(to: [groupRelayURL.absoluteString])
+        try await client.relays.connect(to: [groupRelayURL])
 
-        let group = GroupReference(relayURL: groupRelayURL.absoluteString, id: groupID)
+        let group = GroupReference(relayURL: groupRelayURL.description, id: groupID)
         let publishTask = Task {
             try await client.groups.publishMessage(
                 "hello group",
@@ -221,10 +221,10 @@ struct NIP29GroupClientTests {
     func publishGroupModerationPutUser() async throws {
         let (client, socket) = makeClient()
         await client.identity.setSigner(EventSigner(keyPair: try KeyPair()))
-        try await client.relays.connect(to: [groupRelayURL.absoluteString])
+        try await client.relays.connect(to: [groupRelayURL])
         let member = try KeyPair().publicKey
 
-        let group = GroupReference(relayURL: groupRelayURL.absoluteString, id: groupID)
+        let group = GroupReference(relayURL: groupRelayURL.description, id: groupID)
         let moderationTask = Task {
             try await client.groups.publishModeration(
                 .putUser(pubkey: member, roles: ["moderator"]),
@@ -247,7 +247,7 @@ struct NIP29GroupClientTests {
         await client.identity.setSigner(EventSigner(keyPair: try KeyPair()))
         #expect(await client.relays.pool.relay(for: groupRelayURL) == nil)
 
-        let group = GroupReference(relayURL: groupRelayURL.absoluteString, id: groupID)
+        let group = GroupReference(relayURL: groupRelayURL.description, id: groupID)
         let publishTask = Task { try await client.groups.publishMessage("first post", in: group) }
         let sent = try await acknowledgePublish(on: socket)
         let published = try await publishTask.value
@@ -265,7 +265,7 @@ struct NIP29GroupClientTests {
         let keyPair = try KeyPair()
         try await client.identity.setSigner(FakeRemoteSigner(keyPair: keyPair) as any NostrSigning)
 
-        let group = GroupReference(relayURL: groupRelayURL.absoluteString, id: groupID, inviteCode: "welcome")
+        let group = GroupReference(relayURL: groupRelayURL.description, id: groupID, inviteCode: "welcome")
         let joinTask = Task { try await client.groups.join(group) }
         let sent = try await acknowledgePublish(on: socket)
         _ = try await joinTask.value
@@ -282,7 +282,7 @@ struct NIP29GroupClientTests {
     @Test("groups.fetchMetadata keeps the newest copy across stale ones")
     func fetchGroupMetadataNewestWins() async throws {
         let (client, socket) = makeClient()
-        try await client.relays.connect(to: [groupRelayURL.absoluteString])
+        try await client.relays.connect(to: [groupRelayURL])
         let relaySigner = EventSigner(keyPair: try KeyPair())
         let stale = try stateEvent(
             kind: .groupMetadata, fieldTags: [Event.Tag(name: "name", values: ["Old"])],
@@ -291,7 +291,7 @@ struct NIP29GroupClientTests {
             kind: .groupMetadata, fieldTags: [Event.Tag(name: "name", values: ["New"])],
             createdAt: 1_700_000_100, signer: relaySigner)
 
-        let group = GroupReference(relayURL: groupRelayURL.absoluteString, id: groupID)
+        let group = GroupReference(relayURL: groupRelayURL.description, id: groupID)
         let metadata = try await answering(socket, with: [stale, newer]) {
             try await client.groups.fetchMetadata(for: group)
         }
@@ -318,9 +318,9 @@ struct NIP29GroupClientTests {
 
         // The expected author carried by the reference itself.
         let (client, socket) = makeClient()
-        try await client.relays.connect(to: [groupRelayURL.absoluteString])
+        try await client.relays.connect(to: [groupRelayURL])
         let viaReference = GroupReference(
-            relayURL: groupRelayURL.absoluteString, id: groupID, relayPubkey: relaySigner.publicKey)
+            relayURL: groupRelayURL.description, id: groupID, relayPubkey: relaySigner.publicKey)
         let metadata = try await answering(socket, with: [genuine, impostor]) {
             try await client.groups.fetchMetadata(for: viaReference)
         }
@@ -329,8 +329,8 @@ struct NIP29GroupClientTests {
 
         // The explicit authorPubkey parameter, with a reference that carries no pubkey.
         let (parameterClient, parameterSocket) = makeClient()
-        try await parameterClient.relays.connect(to: [groupRelayURL.absoluteString])
-        let bare = GroupReference(relayURL: groupRelayURL.absoluteString, id: groupID)
+        try await parameterClient.relays.connect(to: [groupRelayURL])
+        let bare = GroupReference(relayURL: groupRelayURL.description, id: groupID)
         let parameterMetadata = try await answering(parameterSocket, with: [genuine, impostor]) {
             try await parameterClient.groups.fetchMetadata(for: bare, authorPubkey: relaySigner.publicKey)
         }
@@ -341,7 +341,7 @@ struct NIP29GroupClientTests {
     @Test("without an expected author, the newest metadata wins regardless of its author")
     func fetchGroupMetadataWithoutValidationTrustsTheRelay() async throws {
         let (client, socket) = makeClient()
-        try await client.relays.connect(to: [groupRelayURL.absoluteString])
+        try await client.relays.connect(to: [groupRelayURL])
         let relaySigner = EventSigner(keyPair: try KeyPair())
         let impostorSigner = EventSigner(keyPair: try KeyPair())
         let genuine = try stateEvent(
@@ -351,7 +351,7 @@ struct NIP29GroupClientTests {
             kind: .groupMetadata, fieldTags: [Event.Tag(name: "name", values: ["Impostor"])],
             createdAt: 1_700_000_100, signer: impostorSigner)
 
-        let group = GroupReference(relayURL: groupRelayURL.absoluteString, id: groupID)
+        let group = GroupReference(relayURL: groupRelayURL.description, id: groupID)
         let metadata = try await answering(socket, with: [genuine, impostor]) {
             try await client.groups.fetchMetadata(for: group)
         }
@@ -363,7 +363,7 @@ struct NIP29GroupClientTests {
     @Test("groups.fetchState fills the fetched kinds and leaves the rest nil")
     func fetchGroupStateSnapshot() async throws {
         let (client, socket) = makeClient()
-        try await client.relays.connect(to: [groupRelayURL.absoluteString])
+        try await client.relays.connect(to: [groupRelayURL])
         let relaySigner = EventSigner(keyPair: try KeyPair())
         let admin = try KeyPair().publicKey
         let metadata = try stateEvent(
@@ -377,7 +377,7 @@ struct NIP29GroupClientTests {
             createdAt: 1_700_000_002, signer: relaySigner)
 
         let group = GroupReference(
-            relayURL: groupRelayURL.absoluteString, id: groupID, relayPubkey: relaySigner.publicKey)
+            relayURL: groupRelayURL.description, id: groupID, relayPubkey: relaySigner.publicKey)
         let state = try await answering(socket, with: [metadata, admins, roles]) {
             try await client.groups.fetchState(for: group)
         }
@@ -400,7 +400,7 @@ struct NIP29GroupClientTests {
     func subscribeToGroupTimelineFilter() async throws {
         let (client, socket) = makeClient()
 
-        let group = GroupReference(relayURL: groupRelayURL.absoluteString, id: groupID)
+        let group = GroupReference(relayURL: groupRelayURL.description, id: groupID)
         let subscription = try await client.groups.timeline(
             group,
             kinds: [.chatMessage],

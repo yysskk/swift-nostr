@@ -91,7 +91,7 @@ public struct NostrRoutingAPI: NostrRelayRouting {
     /// - Returns: The per-relay outcome of the publish.
     @discardableResult
     public func publishGossip(_ event: Event, strategy: PublishStrategy? = nil) async throws -> PublishResult {
-        var targets: Set<URL> = []
+        var targets: Set<RelayURL> = []
 
         targets.formUnion(await writeRelays(for: event.pubkey))
 
@@ -105,7 +105,7 @@ public struct NostrRoutingAPI: NostrRelayRouting {
 
         let available = await client.relayListStore.ensureConnected(targets)
         return try await client.pool.publish(
-            event, toURLs: available.isEmpty ? nil : available, strategy: strategy
+            event, to: available.isEmpty ? nil : available, strategy: strategy
         )
     }
 
@@ -177,7 +177,7 @@ public struct NostrRoutingAPI: NostrRelayRouting {
     /// - Returns: The connected inbox relay URLs (empty if you have advertised no DM relay list).
     /// - Throws: ``NostrError/signerNotSet`` if no signer is configured.
     @discardableResult
-    public func connectDirectMessageInboxRelays() async throws -> Set<URL> {
+    public func connectDirectMessageInboxRelays() async throws -> Set<RelayURL> {
         await connectedInboxRelays(for: try await client.requiredPublicKey())
     }
 
@@ -189,7 +189,7 @@ public struct NostrRoutingAPI: NostrRelayRouting {
     /// Shared by the send path (routing a recipient's gift wrap) and the receive path
     /// (``connectDirectMessageInboxRelays()``).
     /// - Returns: The connected inbox relay URLs (empty if none are known or reachable).
-    func connectedInboxRelays(for pubkey: PublicKey) async -> Set<URL> {
+    func connectedInboxRelays(for pubkey: PublicKey) async -> Set<RelayURL> {
         // Fetch only once per pubkey: skip it when the list is already resolved — cached, or a
         // prior lookup confirmed there is none — so repeated sends don't refetch. Discovery also
         // needs at least one connected relay to query, which avoids a blocking fetch against a
@@ -214,8 +214,8 @@ public struct NostrRoutingAPI: NostrRelayRouting {
     /// Resolves the WRITE relays of the given authors for outbox routing.
     /// - Returns: The connected target set, or `nil` to fall back to the full pool
     ///   when an author is unresolved or nothing could be connected.
-    private func resolveOutboxRelays(authors: [PublicKey]) async -> Set<URL>? {
-        var targets: Set<URL> = []
+    private func resolveOutboxRelays(authors: [PublicKey]) async -> Set<RelayURL>? {
+        var targets: Set<RelayURL> = []
         var hasUnresolved = false
 
         for author in authors {
@@ -232,7 +232,7 @@ public struct NostrRoutingAPI: NostrRelayRouting {
     }
 
     /// A pubkey's WRITE relays, discovering its relay list first when nothing is cached.
-    private func writeRelays(for pubkey: PublicKey) async -> Set<URL> {
+    private func writeRelays(for pubkey: PublicKey) async -> Set<RelayURL> {
         if await cachedRelayList(for: pubkey) == nil {
             _ = try? await fetchRelayList(for: pubkey)
         }

@@ -53,9 +53,9 @@ struct DirectMessageRelayListStoreTests {
         )
 
         let inbox = await store.inboxRelayURLs(for: pubkey)
-        let expected: Set<URL> = [
-            URL(string: "wss://inbox.example.com")!,
-            URL(string: "wss://dm.example.com")!,
+        let expected: Set<RelayURL> = [
+            RelayURL("wss://inbox.example.com")!,
+            RelayURL("wss://dm.example.com")!,
         ]
         #expect(inbox == expected)
     }
@@ -150,7 +150,7 @@ struct DirectMessageRelayListStoreTests {
     @Test("requirePresent policy never opens absent relays")
     func requirePresentIgnoresAbsent() async {
         let store = makeStore(policy: .requirePresent)
-        let urls: Set<URL> = [URL(string: "wss://absent.example.com")!]
+        let urls: Set<RelayURL> = [RelayURL("wss://absent.example.com")!]
         let available = await store.ensureConnected(urls)
         #expect(available.isEmpty)
     }

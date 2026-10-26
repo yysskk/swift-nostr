@@ -10,7 +10,7 @@ import Testing
 /// session that no longer exists.
 @Suite("Relay Connection Socket Generation Tests")
 struct RelayConnectionSocketGenerationTests {
-    private let relayURL = URL(string: "wss://relay.example.com")!
+    private let relayURL = RelayURL("wss://relay.example.com")!
 
     private func makeConnection(
         sockets: @escaping @Sendable () -> MockWebSocketSession

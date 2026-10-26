@@ -4,135 +4,159 @@ import Testing
 @testable import NostrCore
 
 @Suite("Relay URL Normalization Tests")
-struct RelayURLTests {
+struct RelayURLNormalizationTests {
 
-    @Test("Lowercases the scheme and host")
-    func lowercases() {
-        #expect(RelayURL.normalize("wss://Relay.Example.COM") == "wss://relay.example.com")
-        #expect(RelayURL.normalize("WSS://RELAY.EXAMPLE.COM") == "wss://relay.example.com")
-    }
-
-    @Test("Preserves path case")
-    func preservesPathCase() {
-        #expect(RelayURL.normalize("wss://Relay.EXAMPLE.com/NostrRelay") == "wss://relay.example.com/NostrRelay")
-    }
-
-    @Test("Strips the root trailing slash")
-    func stripsTrailingSlash() {
-        #expect(RelayURL.normalize("wss://relay.example.com/") == "wss://relay.example.com")
-    }
-
-    @Test("Preserves a non-root trailing slash")
-    func preservesNonRootTrailingSlash() {
-        #expect(RelayURL.normalize("wss://host/a/") == "wss://host/a/")
-    }
-
-    @Test("Leaves a URL without a trailing slash unchanged")
-    func noTrailingSlash() {
-        #expect(RelayURL.normalize("wss://relay.example.com") == "wss://relay.example.com")
-    }
-
-    @Test("Strips default ports")
-    func stripsDefaultPorts() {
-        #expect(RelayURL.normalize("wss://host:443") == "wss://host")
-        #expect(RelayURL.normalize("ws://host:80") == "ws://host")
-    }
-
-    @Test("Preserves non-default ports")
-    func preservesNonDefaultPorts() {
-        #expect(RelayURL.normalize("wss://host:7777") == "wss://host:7777")
-        // A port that is only a default for the *other* scheme is not a default here.
-        #expect(RelayURL.normalize("ws://host:443") == "ws://host:443")
-    }
-
-    @Test("Unparseable input falls back to the whole-string rule")
-    func unparseableFallsBack() {
-        #expect(RelayURL.normalize("Not A URL/") == "not a url")
-        #expect(RelayURL.normalize("Not A URL") == "not a url")
+    @Test(
+        "Normalizes to the canonical form",
+        arguments: [
+            ("wss://Relay.Example.COM", "wss://relay.example.com"),  // host case
+            ("WSS://RELAY.EXAMPLE.COM", "wss://relay.example.com"),  // scheme case
+            ("wss://relay.example.com/", "wss://relay.example.com"),  // root slash
+            ("wss://relay.example.com", "wss://relay.example.com"),
+            ("wss://relay.example.com:443", "wss://relay.example.com"),  // default wss port
+            ("ws://relay.example.com:80", "ws://relay.example.com"),  // default ws port
+            ("wss://relay.example.com:443/", "wss://relay.example.com"),
+            ("wss://relay.example.com:7777", "wss://relay.example.com:7777"),
+            ("ws://relay.example.com:443", "ws://relay.example.com:443"),  // the other scheme's default
+            ("wss://Relay.EXAMPLE.com/NostrRelay", "wss://relay.example.com/NostrRelay"),  // path case kept
+            ("wss://relay.example.com/a/", "wss://relay.example.com/a/"),  // non-root slash kept
+            ("wss://relay.example.com/path?query=1", "wss://relay.example.com/path?query=1"),
+        ])
+    func normalizes(input: String, canonical: String) throws {
+        let relayURL = try RelayURL(string: input)
+        #expect(relayURL.description == canonical)
+        #expect(relayURL.url == URL(string: canonical)!)
     }
 
     @Test("Normalization is idempotent")
-    func idempotence() {
-        let inputs = [
-            "wss://Relay.Example.com/",
-            "wss://relay.example.com:443/NostrRelay",
-            "ws://HOST:80/a/",
-            "Not A URL/",
-        ]
-        for input in inputs {
-            let once = RelayURL.normalize(input)
-            #expect(RelayURL.normalize(once) == once)
+    func idempotence() throws {
+        for input in ["wss://Relay.Example.com/", "wss://relay.example.com:443/NostrRelay", "ws://HOST:80/a/"] {
+            let once = try RelayURL(string: input)
+            #expect(try RelayURL(string: once.description).description == once.description)
         }
     }
 
-    @Test("normalizedURL round-trips strings and URLs to the canonical key")
-    func normalizedURLRoundTrips() {
-        let canonical = URL(string: "wss://relay.example.com")!
-        #expect(RelayURL.normalizedURL("wss://Relay.Example.com/") == canonical)
-        #expect(RelayURL.normalizedURL(URL(string: "wss://Relay.Example.com/")!) == canonical)
-        #expect(RelayURL.normalizedURL(URL(string: "wss://relay.example.com:443")!) == canonical)
-        #expect(RelayURL.normalizedURL(canonical) == canonical)
+    @Test("A non-root trailing slash keeps two paths distinct")
+    func nonRootSlashIsSignificant() throws {
+        #expect(try RelayURL(string: "wss://host/a/") != RelayURL(string: "wss://host/a"))
+    }
+
+    @Test("Path case is significant")
+    func pathCaseIsSignificant() throws {
+        #expect(try RelayURL(string: "wss://host/Relay") != RelayURL(string: "wss://host/relay"))
     }
 }
 
-@Suite("Relay URL Target Validation Tests")
-struct RelayURLTargetValidationTests {
+@Suite("Relay URL Validation Tests")
+struct RelayURLValidationTests {
 
     @Test(
-        "requireTarget accepts WebSocket relay URLs and returns the canonical key",
-        arguments: [
-            ("wss://relay.example.com", "wss://relay.example.com"),
-            ("WSS://Relay.Example.COM/", "wss://relay.example.com"),
-            ("ws://relay.example.com", "ws://relay.example.com"),
-            ("wss://relay.example.com:7777", "wss://relay.example.com:7777"),
-            ("wss://relay.example.com:443/NostrRelay", "wss://relay.example.com/NostrRelay"),
-            ("wss://relay.example.com/path?query=1", "wss://relay.example.com/path?query=1"),
-        ])
-    func requireTargetAccepts(input: String, canonical: String) throws {
-        #expect(try RelayURL.requireTarget(input) == URL(string: canonical)!)
-    }
-
-    @Test(
-        "requireTarget rejects non-relay URLs",
+        "Rejects strings that are not WebSocket relay URLs",
         arguments: [
             "https://relay.example.com",  // non-WebSocket scheme
             "http://relay.example.com",
+            "relay.example.com",  // no scheme
             "wss:garbage",  // no host
             "wss://",  // empty host
             "wss://relay.example.com/path#frag",  // fragment
-            "wss://user:pw@relay.example.com",  // userinfo
-            "wss://user@relay.example.com",
-            "not a url",
+            "wss://user:pw@relay.example.com",  // user and password
+            "wss://user@relay.example.com",  // user
+            "not a url",  // unparseable
             "",
         ])
-    func requireTargetRejects(input: String) {
+    func rejects(input: String) {
         #expect(throws: NostrError.invalidRelayURL(input)) {
-            _ = try RelayURL.requireTarget(input)
+            _ = try RelayURL(string: input)
         }
+        #expect(RelayURL(input) == nil)
     }
 
-    @Test("requireTargets de-duplicates by canonical key and throws on the first offender")
-    func requireTargetsDeduplicatesAndThrows() throws {
-        let targets = try RelayURL.requireTargets([
+    @Test("init(url:) validates and normalizes, reporting the URL's string on failure")
+    func initFromURL() throws {
+        #expect(try RelayURL(url: URL(string: "wss://Relay.Example.com:443/")!) == RelayURL("wss://relay.example.com"))
+        let https = URL(string: "https://relay.example.com")!
+        #expect(throws: NostrError.invalidRelayURL("https://relay.example.com")) {
+            _ = try RelayURL(url: https)
+        }
+    }
+}
+
+@Suite("Relay URL Value Semantics Tests")
+struct RelayURLValueSemanticsTests {
+
+    @Test("Equivalent spellings are equal and hash alike")
+    func equivalentSpellings() throws {
+        let spellings = [
             "wss://relay.example.com",
             "wss://Relay.Example.com/",
-            "wss://other.example.com",
-        ])
-        #expect(
-            targets == [
-                URL(string: "wss://relay.example.com")!,
-                URL(string: "wss://other.example.com")!,
-            ]
-        )
-
-        #expect(throws: NostrError.invalidRelayURL("https://not-a-relay.example.com")) {
-            _ = try RelayURL.requireTargets(["wss://relay.example.com", "https://not-a-relay.example.com"])
+            "WSS://RELAY.EXAMPLE.COM:443",
+            "wss://relay.example.com:443/",
+        ]
+        let urls = try spellings.map { try RelayURL(string: $0) }
+        #expect(Set(urls).count == 1)
+        for url in urls {
+            #expect(url == urls[0])
+            #expect(url.hashValue == urls[0].hashValue)
         }
+        let dictionary = [urls[0]: "first"]
+        #expect(dictionary[try RelayURL(string: "wss://RELAY.example.com/")] == "first")
     }
 
-    @Test("urlSet keeps valid relay URLs and skips garbage entries")
-    func urlSetSkipsInvalidEntries() {
-        let urls = RelayURL.urlSet([
+    @Test("Distinct relays are not equal")
+    func distinctRelays() throws {
+        #expect(try RelayURL(string: "wss://relay.example.com") != RelayURL(string: "ws://relay.example.com"))
+        #expect(try RelayURL(string: "wss://relay.example.com") != RelayURL(string: "wss://relay.example.com:7777"))
+        #expect(try RelayURL(string: "wss://a.example.com") != RelayURL(string: "wss://b.example.com"))
+    }
+
+    @Test("LosslessStringConvertible round-trips through the canonical description")
+    func losslessStringConvertible() throws {
+        let relayURL = try #require(RelayURL("WSS://Relay.Example.com/nostr"))
+        #expect(relayURL.description == "wss://relay.example.com/nostr")
+        #expect(String(describing: relayURL) == "wss://relay.example.com/nostr")
+        #expect(RelayURL(relayURL.description) == relayURL)
+    }
+
+    @Test("Encodes as its canonical string and decodes any valid spelling")
+    func codable() throws {
+        let relayURL = try RelayURL(string: "wss://Relay.Example.com/")
+        let encoded = try JSONEncoder().encode([relayURL])
+        #expect(String(decoding: encoded, as: UTF8.self) == #"["wss:\/\/relay.example.com"]"#)
+
+        let decoded = try JSONDecoder().decode([RelayURL].self, from: Data(#"["WSS://relay.example.com:443"]"#.utf8))
+        #expect(decoded == [relayURL])
+    }
+
+    @Test("Decoding an invalid relay URL fails with dataCorrupted")
+    func decodingInvalidFails() {
+        for json in [#"["https://relay.example.com"]"#, #"["wss://"]"#, #"[""]"#] {
+            #expect {
+                _ = try JSONDecoder().decode([RelayURL].self, from: Data(json.utf8))
+            } throws: { error in
+                guard case DecodingError.dataCorrupted = error else { return false }
+                return true
+            }
+        }
+    }
+}
+
+@Suite("Relay URL Package Helper Tests")
+struct RelayURLPackageHelperTests {
+
+    @Test("normalize applies the canonical rules to valid and invalid strings alike")
+    func normalize() {
+        #expect(RelayURL.normalize("wss://Relay.Example.COM/") == "wss://relay.example.com")
+        #expect(RelayURL.normalize("wss://host:443") == "wss://host")
+        #expect(RelayURL.normalize("wss://host/a/") == "wss://host/a/")
+        // Strings that are not relay URLs still de-duplicate; unparseable ones fall back to the
+        // whole-string rule.
+        #expect(RelayURL.normalize("HTTPS://Host.Example/") == "https://host.example")
+        #expect(RelayURL.normalize("Not A URL/") == "not a url")
+    }
+
+    @Test("Set(parsingValid:) keeps valid relay URLs and skips malformed entries")
+    func parsingValidSkipsInvalidEntries() {
+        let urls = Set<RelayURL>(parsingValid: [
             "wss://relay.example.com",
             "wss://Relay.Example.com/",  // duplicate after normalization
             "https://not-a-relay.example.com",  // wrong scheme
@@ -140,11 +164,6 @@ struct RelayURLTargetValidationTests {
             "wss://r.example.com/path#frag",  // fragment
             "ws://second.example.com",
         ])
-        #expect(
-            urls == [
-                URL(string: "wss://relay.example.com")!,
-                URL(string: "ws://second.example.com")!,
-            ]
-        )
+        #expect(urls == [RelayURL("wss://relay.example.com")!, RelayURL("ws://second.example.com")!])
     }
 }

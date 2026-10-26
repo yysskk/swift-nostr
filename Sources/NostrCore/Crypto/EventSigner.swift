@@ -86,7 +86,7 @@ public struct EventSigner: Sendable {
     /// - Parameters:
     ///   - event: The event being reposted; it is embedded in the content and referenced by an `e` tag.
     ///   - relayURL: The relay where the reposted event can be found, recorded in the `e` tag.
-    public func signRepost(of event: Event, relayURL: String? = nil) throws -> Event {
+    public func signRepost(of event: Event, relayURL: RelayURL? = nil) throws -> Event {
         try sign(.repost(pubkey: keyPair.publicKey, of: event, relayURL: relayURL))
     }
 
@@ -104,9 +104,9 @@ public struct EventSigner: Sendable {
     /// https://github.com/nostr-protocol/nips/blob/master/42.md
     ///
     /// - Parameters:
-    ///   - relayURL: The URL of the relay being authenticated to, as used to connect.
+    ///   - relayURL: The URL of the relay being authenticated to.
     ///   - challenge: The challenge string received in the relay's AUTH message.
-    public func signClientAuthentication(relayURL: URL, challenge: String) throws -> Event {
+    public func signClientAuthentication(relayURL: RelayURL, challenge: String) throws -> Event {
         try sign(.clientAuthentication(pubkey: keyPair.publicKey, relayURL: relayURL, challenge: challenge))
     }
 

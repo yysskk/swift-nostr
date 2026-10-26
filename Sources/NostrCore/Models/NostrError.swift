@@ -21,8 +21,8 @@ public enum NostrError: Error, LocalizedError, Sendable, Equatable {
     case relayError(String)
     /// A relay-targeted operation ran against an empty pool.
     case noRelaysInPool
-    /// None of the requested relay URLs are in the pool (payload: the normalized requested URLs).
-    case noMatchingRelays([String])
+    /// None of the requested relay URLs are in the pool (payload: the requested URLs, sorted).
+    case noMatchingRelays([RelayURL])
     case authenticationFailed(String)
     case cannotPublishAuthenticationEvent
     case timeout
@@ -83,7 +83,8 @@ public enum NostrError: Error, LocalizedError, Sendable, Equatable {
             if requested.isEmpty {
                 return "The target relay list is empty"
             }
-            return "None of the targeted relays are in the pool: \(requested.joined(separator: ", "))"
+            return
+                "None of the targeted relays are in the pool: \(requested.map(\.description).joined(separator: ", "))"
         case .authenticationFailed(let message):
             return "Authentication failed: \(message)"
         case .cannotPublishAuthenticationEvent:

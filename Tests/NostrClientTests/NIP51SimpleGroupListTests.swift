@@ -231,8 +231,8 @@ struct NIP51SimpleGroupListTests {
 @Suite("NIP-51 Simple Group List Client Tests")
 struct NIP51SimpleGroupListClientTests {
 
-    private let firstRelayURL = URL(string: "wss://first.example.com")!
-    private let secondRelayURL = URL(string: "wss://second.example.com")!
+    private let firstRelayURL = RelayURL("wss://first.example.com")!
+    private let secondRelayURL = RelayURL("wss://second.example.com")!
     private let groupID = "abcdef"
     private let groupRelay = "wss://groups.example.com"
 
@@ -354,9 +354,9 @@ struct NIP51SimpleGroupListClientTests {
     @Test("groups.publishSimpleGroupList broadcasts the kind-10009 event to every relay in the pool")
     func publishBroadcastsToWholePool() async throws {
         let (client, firstSocket, secondSocket) = makeTwoSocketClient()
-        let firstConnection = try await client.relays.pool.addRelay(firstRelayURL)
+        let firstConnection = await client.relays.pool.addRelay(firstRelayURL)
         try await firstConnection.connect()
-        let secondConnection = try await client.relays.pool.addRelay(secondRelayURL)
+        let secondConnection = await client.relays.pool.addRelay(secondRelayURL)
         try await secondConnection.connect()
         await client.identity.setSigner(EventSigner(keyPair: try KeyPair()))
 
@@ -390,7 +390,7 @@ struct NIP51SimpleGroupListClientTests {
     @Test("groups.fetchSimpleGroupList returns the newest typed list across stale copies")
     func fetchPicksNewest() async throws {
         let (client, socket) = makeClient()
-        try await client.relays.connect(to: [firstRelayURL.absoluteString])
+        try await client.relays.connect(to: [firstRelayURL])
         let author = EventSigner(keyPair: try KeyPair())
         let stale = try listEvent(
             entries: [GroupListEntry(groupID: "oldgrp", relayURL: "wss://old.example.com")],
@@ -428,7 +428,7 @@ struct NIP51SimpleGroupListClientTests {
     @Test("Fetching the current user's list decrypts private entries")
     func fetchOwnListDecryptsPrivateEntries() async throws {
         let (client, socket) = makeClient()
-        try await client.relays.connect(to: [firstRelayURL.absoluteString])
+        try await client.relays.connect(to: [firstRelayURL])
         let signer = EventSigner(keyPair: try KeyPair())
         await client.identity.setSigner(signer)
         let typed = SimpleGroupList(

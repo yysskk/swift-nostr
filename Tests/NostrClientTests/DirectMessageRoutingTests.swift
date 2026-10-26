@@ -8,7 +8,7 @@ import Testing
 @Suite("Direct Message Routing Tests (NIP-17, kind 10050)")
 struct DirectMessageRoutingTests {
 
-    private let inboxURL = URL(string: "wss://inbox.example.com")!
+    private let inboxURL = RelayURL("wss://inbox.example.com")!
 
     // MARK: - Receive side
 
@@ -45,7 +45,7 @@ struct DirectMessageRoutingTests {
     @Test("Routes to a recipient's cached DM inbox relays present in the pool")
     func routesRecipientInbox() async throws {
         let pool = RelayPool()
-        try await pool.addRelay(inboxURL)
+        await pool.addRelay(inboxURL)
         let client = NostrClient(relayPool: pool, gossipPolicy: .requirePresent)
 
         let recipient = PublicKey.fixture("recipient")

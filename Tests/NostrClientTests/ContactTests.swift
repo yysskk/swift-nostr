@@ -13,12 +13,12 @@ struct ContactTests {
     func createContactWithAllFields() {
         let contact = Contact(
             pubkey: alice,
-            relayURL: "wss://relay.example.com",
+            relayURL: RelayURL("wss://relay.example.com")!,
             petname: "alice"
         )
 
         #expect(contact.pubkey == alice)
-        #expect(contact.relayURL == "wss://relay.example.com")
+        #expect(contact.relayURL == RelayURL("wss://relay.example.com"))
         #expect(contact.petname == "alice")
     }
 
@@ -35,7 +35,7 @@ struct ContactTests {
     func contactToTagAllFields() {
         let contact = Contact(
             pubkey: alice,
-            relayURL: "wss://relay.example.com",
+            relayURL: RelayURL("wss://relay.example.com")!,
             petname: "alice"
         )
 
@@ -52,7 +52,7 @@ struct ContactTests {
 
     @Test("Contact to tag - with relay only")
     func contactToTagWithRelayOnly() {
-        let contact = Contact(pubkey: alice, relayURL: "wss://relay.example.com")
+        let contact = Contact(pubkey: alice, relayURL: RelayURL("wss://relay.example.com")!)
         let tag = contact.toTag()
         #expect(tag == ["p", alice.hex, "wss://relay.example.com"])
     }
@@ -71,7 +71,7 @@ struct ContactTests {
 
         #expect(contact != nil)
         #expect(contact?.pubkey == alice)
-        #expect(contact?.relayURL == "wss://relay.example.com")
+        #expect(contact?.relayURL == RelayURL("wss://relay.example.com"))
         #expect(contact?.petname == "alice")
     }
 
@@ -95,6 +95,25 @@ struct ContactTests {
         #expect(contact?.pubkey == alice)
         #expect(contact?.relayURL == nil)
         #expect(contact?.petname == "alice")
+    }
+
+    @Test(
+        "Contact from tag - reads a malformed relay hint as absent",
+        arguments: ["not a relay", "https://relay.example.com", "wss://relay.example.com/#frag"])
+    func contactFromTagWithMalformedRelay(relay: String) {
+        let contact = Contact.fromTag(["p", alice.hex, relay, "alice"])
+
+        #expect(contact?.pubkey == alice)
+        #expect(contact?.relayURL == nil)
+        #expect(contact?.petname == "alice")
+    }
+
+    @Test("Contact from tag - writes the relay hint back in canonical form")
+    func contactFromTagCanonicalizesRelay() {
+        let contact = Contact.fromTag(["p", alice.hex, "WSS://Relay.Example.com/"])
+
+        #expect(contact?.relayURL == RelayURL("wss://relay.example.com"))
+        #expect(contact?.toTag() == ["p", alice.hex, "wss://relay.example.com"])
     }
 
     @Test("Contact from tag - invalid tag type")
@@ -122,7 +141,7 @@ struct ContactTests {
     func contactEncodesRelayURLKey() throws {
         let contact = Contact(
             pubkey: alice,
-            relayURL: "wss://relay.example.com",
+            relayURL: RelayURL("wss://relay.example.com")!,
             petname: "alice"
         )
 
@@ -141,7 +160,7 @@ struct ContactTests {
     func contactRoundTripsThroughCodable() throws {
         let contact = Contact(
             pubkey: alice,
-            relayURL: "wss://relay.example.com",
+            relayURL: RelayURL("wss://relay.example.com")!,
             petname: "alice"
         )
 
@@ -172,8 +191,8 @@ struct ContactListEventTests {
         let signer = EventSigner(keyPair: keyPair)
 
         let contacts = [
-            Contact(pubkey: pubkey1, relayURL: "wss://relay1.com", petname: "alice"),
-            Contact(pubkey: pubkey2, relayURL: "wss://relay2.com"),
+            Contact(pubkey: pubkey1, relayURL: RelayURL("wss://relay1.com")!, petname: "alice"),
+            Contact(pubkey: pubkey2, relayURL: RelayURL("wss://relay2.com")!),
             Contact(pubkey: pubkey3),
         ]
 
@@ -209,7 +228,7 @@ struct ContactListEventTests {
         let signer = EventSigner(keyPair: keyPair)
 
         let contacts = [
-            Contact(pubkey: pubkey1, relayURL: "wss://relay1.com", petname: "alice"),
+            Contact(pubkey: pubkey1, relayURL: RelayURL("wss://relay1.com")!, petname: "alice"),
             Contact(pubkey: pubkey2),
         ]
 
@@ -219,7 +238,7 @@ struct ContactListEventTests {
         #expect(extractedContacts != nil)
         #expect(extractedContacts?.count == 2)
         #expect(extractedContacts?[0].pubkey == pubkey1)
-        #expect(extractedContacts?[0].relayURL == "wss://relay1.com")
+        #expect(extractedContacts?[0].relayURL == RelayURL("wss://relay1.com"))
         #expect(extractedContacts?[0].petname == "alice")
         #expect(extractedContacts?[1].pubkey == pubkey2)
         #expect(extractedContacts?[1].relayURL == nil)

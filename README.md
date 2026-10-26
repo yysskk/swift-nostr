@@ -108,7 +108,10 @@ print(mnemonic.phrase, derived.publicKey.npub)
 
 ```swift
 let client = NostrClient()
-try await client.relays.connect(to: ["wss://relay.example.com", "wss://relay2.example.com"])
+try await client.relays.connect(to: [
+    RelayURL(string: "wss://relay.example.com"),
+    RelayURL(string: "wss://relay2.example.com"),
+])
 try await client.identity.setNsec("nsec1...")
 
 // Publish a text note — returns the signed event plus the per-relay outcome.
@@ -117,6 +120,8 @@ print("Accepted by \(note.result.acceptedRelays.count) relay(s)")
 
 try await client.events.publishReaction(to: note.event, content: "🤙")
 ```
+
+A `RelayURL` is a validated `ws`/`wss` URL in canonical form (lowercased scheme and host, no root slash or default port), so every spelling of a relay names the same pool entry; `RelayURL(string:)` throws `NostrError.invalidRelayURL` for anything else.
 
 `PublishStrategy` controls how many acknowledgments a publish waits for (`.firstAck`, `.quorum(n)`, `.allSettled`); the returned `PublishResult` reports the per-relay outcome.
 
@@ -290,7 +295,7 @@ Each of these is covered in depth, with worked examples, in the [documentation](
 - **Client authentication (NIP-42)** — AUTH challenges are answered automatically once a signer is set, with auth-required publish retry; an opt-in manual mode is available.
 - **HTTP authorization (NIP-98)** — sign requests with `URLRequest.setNostrAuthorization(signer:)` or `HTTPAuth`, and validate incoming headers with `HTTPAuth.validate`.
 - **Relay-based groups (NIP-29)** — parse `naddr` share links with `GroupReference`, join and leave, chat with timeline references, moderate with `Groups.ModerationAction`, fetch validated relay-signed state with `groups.fetchState`, and keep the kind-10009 simple group list fresh.
-- **Relay information (NIP-11)** — fetch a relay's capabilities with `RelayInformation.fetch(fromRelayURLString:)`.
+- **Relay information (NIP-11)** — fetch a relay's capabilities with `RelayInformation.fetch(from:)`.
 - **NIP-19 entities** — encode/decode `npub`/`nsec`/`note`/`nprofile`/`nevent`/`naddr` via `NIP19Entity`, `NProfile`, `NEvent`, and `NAddr`.
 - **Low-level APIs** — drive a single `RelayConnection` directly, or sign events by hand with `EventSigner`.
 

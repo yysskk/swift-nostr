@@ -31,7 +31,9 @@ public struct NostrEventsAPI: NostrEventPublishing, NostrEventFetching {
 
     /// Publishes a reply to an event
     /// - Parameters:
-    ///   - event: The event being replied to; its thread root and author are carried over.
+    ///   - event: The event being replied to; its thread root and author are carried over. A
+    ///     relay hint on a root in NIP-10's positional form is carried over only when it is a
+    ///     valid relay URL.
     ///   - content: The reply's text.
     ///   - relayURL: The relay where the replied-to event can be found, recorded in the
     ///     NIP-10 `e` tag.
@@ -42,7 +44,7 @@ public struct NostrEventsAPI: NostrEventPublishing, NostrEventFetching {
     public func publishReply(
         to event: Event,
         content: String,
-        relayURL: String? = nil,
+        relayURL: RelayURL? = nil,
         strategy: PublishStrategy? = nil
     ) async throws -> PublishedEvent {
         try await signAndPublish(strategy: strategy) { publicKey in
@@ -70,7 +72,9 @@ public struct NostrEventsAPI: NostrEventPublishing, NostrEventFetching {
                 // the unmarked tag verbatim would leave a mixed set — one marked "reply", one with
                 // no marker — which marked-scheme readers take to mean a mention, losing the very
                 // thread this recovery exists to preserve.
-                let hint = positionalRoot.values.count >= 2 ? positionalRoot.values[1] : nil
+                // The hint is the parent author's third-party content: kept only when it is a
+                // valid relay URL.
+                let hint = positionalRoot.values.count >= 2 ? RelayURL(positionalRoot.values[1]) : nil
                 tags.append(.event(rootID, relayURL: hint, marker: .root))
                 tags.append(.event(event.id, relayURL: relayURL, marker: .reply))
             } else {
@@ -116,7 +120,7 @@ public struct NostrEventsAPI: NostrEventPublishing, NostrEventFetching {
     @discardableResult
     public func publishRepost(
         of event: Event,
-        relayURL: String? = nil,
+        relayURL: RelayURL? = nil,
         strategy: PublishStrategy? = nil
     ) async throws -> PublishedEvent {
         try await signAndPublish(strategy: strategy) { try .repost(pubkey: $0, of: event, relayURL: relayURL) }
@@ -161,30 +165,28 @@ public struct NostrEventsAPI: NostrEventPublishing, NostrEventFetching {
 
     /// Publishes an already-signed event, to the whole pool or to chosen relays.
     ///
-    /// `relayURLs` is nil (the default) to broadcast to the whole pool, or relay URL strings to
-    /// target a subset — for example, an event signed by a separate key that should reach only a
-    /// few named relays. Targets are normalized the way ``NostrRelaysAPI/add(_:config:)`` keys
-    /// the pool and de-duplicate by that key; an empty array always throws, so an
-    /// accidentally-empty computed list never fans out to the whole pool. Targets not in the pool
-    /// are skipped, not connected on demand: add them with ``NostrRelaysAPI/add(_:config:)`` first.
+    /// `relayURLs` is nil (the default) to broadcast to the whole pool, or the relays to target a
+    /// subset — for example, an event signed by a separate key that should reach only a few named
+    /// relays. An empty set always throws, so an accidentally-empty computed list never fans out
+    /// to the whole pool. Targets not in the pool are skipped, not connected on demand: add them
+    /// with ``NostrRelaysAPI/add(_:config:)`` first.
     /// - Parameters:
     ///   - event: The already-signed event to publish.
     ///   - relayURLs: The relays to publish to, or nil for the whole pool.
     ///   - strategy: How many relay acknowledgments to wait for before returning
     ///     (default: the pool config's ``RelayPoolConfig/defaultPublishStrategy``).
-    /// - Returns: The per-relay outcome of the publish, keyed by canonical relay URL.
-    /// - Throws: ``NostrError/invalidRelayURL(_:)`` for an invalid target string,
-    ///   ``NostrError/noRelaysInPool`` when broadcasting to an empty pool,
+    /// - Returns: The per-relay outcome of the publish, keyed by relay URL.
+    /// - Throws: ``NostrError/noRelaysInPool`` when broadcasting to an empty pool,
     ///   ``NostrError/noMatchingRelays(_:)`` when none of the targeted URLs are in the pool
-    ///   (including an empty array), the last relay error if no targeted relay accepts the event,
+    ///   (including an empty set), the last relay error if no targeted relay accepts the event,
     ///   or ``NostrError/relayError(_:)`` if a `.quorum` strategy cannot be satisfied.
     @discardableResult
     public func publish(
         _ event: Event,
-        to relayURLs: [String]? = nil,
+        to relayURLs: Set<RelayURL>? = nil,
         strategy: PublishStrategy? = nil
     ) async throws -> PublishResult {
-        try await client.pool.publish(event, toURLs: relayURLs.map(RelayURL.requireTargets), strategy: strategy)
+        try await client.pool.publish(event, to: relayURLs, strategy: strategy)
     }
 
     // MARK: - Long-form content (NIP-23)
@@ -235,9 +237,9 @@ public struct NostrEventsAPI: NostrEventPublishing, NostrEventFetching {
         filter.addTagQuery("d", values: [naddr.identifier])
 
         // Use the coordinate's relay hints only where they are already connected in the pool.
-        var hinted: Set<URL> = []
+        var hinted: Set<RelayURL> = []
         for relay in naddr.relays {
-            guard let url = URL(string: relay) else { continue }
+            guard let url = RelayURL(relay) else { continue }
             if await client.pool.relay(for: url) != nil {
                 hinted.insert(url)
             }
@@ -265,20 +267,19 @@ public struct NostrEventsAPI: NostrEventPublishing, NostrEventFetching {
     /// Fetches events matching the given filters (one-time)
     /// Waits for all subscribed relays to send EOSE, or until timeout (whichever comes first).
     ///
-    /// Pass relay URL strings to scope the fetch to a subset of relays (e.g. `naddr` relay
-    /// hints); the default `nil` fetches from all relays in the pool. Targets de-duplicate
-    /// by their normalized routing key; an empty array always throws.
-    /// - Throws: ``NostrError/invalidRelayURL(_:)`` for an invalid target string, and
-    ///   ``NostrError/noRelaysInPool`` or ``NostrError/noMatchingRelays(_:)``
+    /// Pass relay URLs to scope the fetch to a subset of relays (e.g. `naddr` relay hints);
+    /// the default `nil` fetches from all relays in the pool. Targets not in the pool are
+    /// skipped; an empty set always throws.
+    /// - Throws: ``NostrError/noRelaysInPool`` or ``NostrError/noMatchingRelays(_:)``
     ///   (via the underlying subscribe) when nothing can be targeted.
     public func fetch(
         filters: [Filter],
-        to relayURLs: [String]? = nil,
+        to relayURLs: Set<RelayURL>? = nil,
         timeout: TimeInterval = 10
     ) async throws -> [Event] {
         try await client.fetch(
             filters: filters,
-            toURLs: relayURLs.map(RelayURL.requireTargets),
+            toURLs: relayURLs,
             timeout: timeout
         )
     }
@@ -287,20 +288,19 @@ public struct NostrEventsAPI: NostrEventPublishing, NostrEventFetching {
     ///
     /// Queries the targeted relays and returns the maximum reported count — each relay's
     /// count is a lower bound on the events it holds, so the maximum is the best single estimate.
-    /// `relayURLs` is nil (the default) to query the whole pool, or relay URL strings to
-    /// target a subset; an empty array always throws. For per-relay results use
+    /// `relayURLs` is nil (the default) to query the whole pool, or the relays to target a
+    /// subset; an empty set always throws. For per-relay results use
     /// ``RelayPool/count(filters:to:timeout:)`` on ``NostrRelaysAPI/pool``.
-    /// - Throws: ``NostrError/invalidRelayURL(_:)`` for an invalid target string,
-    ///   ``NostrError/noRelaysInPool`` when the pool is empty, or
+    /// - Throws: ``NostrError/noRelaysInPool`` when the pool is empty, or
     ///   ``NostrError/noMatchingRelays(_:)`` when none of the targeted URLs are in the pool.
     public func count(
         filters: [Filter],
-        to relayURLs: [String]? = nil,
+        to relayURLs: Set<RelayURL>? = nil,
         timeout: TimeInterval = 10
     ) async throws -> Int {
         let results = try await client.pool.count(
             filters: filters,
-            toURLs: relayURLs.map(RelayURL.requireTargets),
+            to: relayURLs,
             timeout: timeout
         )
         return results.values.map(\.value).max() ?? 0

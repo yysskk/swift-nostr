@@ -11,6 +11,7 @@ struct TagTests {
     private let id2 = EventID.fixture("id2")
     private let pk1 = PublicKey.fixture("pk1")
     private let pk2 = PublicKey.fixture("pk2")
+    private let relay = RelayURL("wss://r.example")!
 
     // MARK: - Construction
 
@@ -50,10 +51,10 @@ struct TagTests {
     @Test("event tag pads skipped middle elements")
     func eventTagPadsSkippedElements() {
         #expect(Event.Tag.event(id1).rawArray == ["e", id1.hex])
-        #expect(Event.Tag.event(id1, relayURL: "wss://r.example").rawArray == ["e", id1.hex, "wss://r.example"])
+        #expect(Event.Tag.event(id1, relayURL: relay).rawArray == ["e", id1.hex, "wss://r.example"])
         #expect(Event.Tag.event(id1, marker: .reply).rawArray == ["e", id1.hex, "", "reply"])
         #expect(
-            Event.Tag.event(id1, relayURL: "wss://r.example", marker: .root).rawArray == [
+            Event.Tag.event(id1, relayURL: relay, marker: .root).rawArray == [
                 "e", id1.hex, "wss://r.example", "root",
             ])
         #expect(Event.Tag.event(id1, pubkey: pk1).rawArray == ["e", id1.hex, "", "", pk1.hex])
@@ -66,21 +67,34 @@ struct TagTests {
     @Test("pubkey tag pads skipped relay before petname")
     func pubkeyTagPadsRelay() {
         #expect(Event.Tag.pubkey(pk1).rawArray == ["p", pk1.hex])
-        #expect(Event.Tag.pubkey(pk1, relayURL: "wss://r.example").rawArray == ["p", pk1.hex, "wss://r.example"])
+        #expect(Event.Tag.pubkey(pk1, relayURL: relay).rawArray == ["p", pk1.hex, "wss://r.example"])
         #expect(Event.Tag.pubkey(pk1, petname: "alice").rawArray == ["p", pk1.hex, "", "alice"])
         #expect(
-            Event.Tag.pubkey(pk1, relayURL: "wss://r.example", petname: "alice").rawArray == [
+            Event.Tag.pubkey(pk1, relayURL: relay, petname: "alice").rawArray == [
                 "p", pk1.hex, "wss://r.example", "alice",
             ])
+    }
+
+    @Test("relay hints are written in canonical form")
+    func relayHintsAreCanonical() throws {
+        let spelled = try RelayURL(string: "WSS://R.Example:443/")
+        #expect(Event.Tag.event(id1, relayURL: spelled).rawArray == ["e", id1.hex, "wss://r.example"])
+        #expect(Event.Tag.quote(id1, relayURL: spelled).rawArray == ["q", id1.hex, "wss://r.example"])
+        #expect(Event.Tag.pubkey(pk1, relayURL: spelled).rawArray == ["p", pk1.hex, "wss://r.example"])
+        #expect(
+            Event.Tag.address(kind: .longFormContent, pubkey: pk1, identifier: "a", relayURL: spelled).rawArray == [
+                "a", "30023:\(pk1.hex):a", "wss://r.example",
+            ])
+        #expect(Event.Tag.relay(spelled).rawArray == ["relay", "wss://r.example"])
     }
 
     @Test("pubkey tag matches Contact.toTag output")
     func pubkeyTagMatchesContactToTag() throws {
         let contacts = [
             Contact(pubkey: pk1),
-            Contact(pubkey: pk1, relayURL: "wss://r.example"),
+            Contact(pubkey: pk1, relayURL: relay),
             Contact(pubkey: pk1, petname: "alice"),
-            Contact(pubkey: pk1, relayURL: "wss://r.example", petname: "alice"),
+            Contact(pubkey: pk1, relayURL: relay, petname: "alice"),
         ]
         for contact in contacts {
             let tag = Event.Tag.pubkey(contact.pubkey, relayURL: contact.relayURL, petname: contact.petname)

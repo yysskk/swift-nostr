@@ -56,14 +56,14 @@ actor DirectMessageRelayListStore {
     }
 
     /// Resolves the inbox relays for a pubkey — where their gift-wrapped DMs should be delivered.
-    func inboxRelayURLs(for pubkey: PublicKey) -> Set<URL> {
-        RelayURL.urlSet(cache.value(for: pubkey)?.relays ?? [])
+    func inboxRelayURLs(for pubkey: PublicKey) -> Set<RelayURL> {
+        Set(parsingValid: cache.value(for: pubkey)?.relays ?? [])
     }
 
     /// Ensures the given relay URLs are present (and, for `.addAndConnect`, connected) in the pool,
     /// honoring the configured policy and per-resolve cap.
     /// - Returns: The subset of URLs available for routing.
-    func ensureConnected(_ urls: Set<URL>) async -> Set<URL> {
+    func ensureConnected(_ urls: Set<RelayURL>) async -> Set<RelayURL> {
         await connector.ensureConnected(urls)
     }
 }

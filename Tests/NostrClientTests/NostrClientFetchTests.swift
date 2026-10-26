@@ -11,8 +11,8 @@ struct NostrClientFetchTests {
     @Test("EOSE tracker waits for every expected relay")
     func eoseTrackerWaitsForEveryExpectedRelay() {
         var tracker = EOSETracker()
-        let relay1 = URL(string: "wss://relay1.example")!
-        let relay2 = URL(string: "wss://relay2.example")!
+        let relay1 = RelayURL("wss://relay1.example")!
+        let relay2 = RelayURL("wss://relay2.example")!
 
         #expect(tracker.setExpectedRelays([relay1, relay2]) == false)
         #expect(tracker.recordEOSE(from: relay1) == false)
@@ -24,7 +24,7 @@ struct NostrClientFetchTests {
     @Test("EOSE tracker handles early EOSE before relay count is known")
     func eoseTrackerHandlesEarlyEOSE() {
         var tracker = EOSETracker()
-        let relay = URL(string: "wss://relay.example")!
+        let relay = RelayURL("wss://relay.example")!
 
         #expect(tracker.recordEOSE(from: relay) == false)
         #expect(tracker.isComplete == false)
@@ -46,8 +46,8 @@ struct NostrClientFetchTests {
     @Test("EOSE tracker ignores duplicate relay EOSE")
     func eoseTrackerIgnoresDuplicateRelayEOSE() {
         var tracker = EOSETracker()
-        let relay1 = URL(string: "wss://relay1.example")!
-        let relay2 = URL(string: "wss://relay2.example")!
+        let relay1 = RelayURL("wss://relay1.example")!
+        let relay2 = RelayURL("wss://relay2.example")!
 
         #expect(tracker.setExpectedRelays([relay1, relay2]) == false)
         #expect(tracker.recordEOSE(from: relay1) == false)
@@ -55,16 +55,6 @@ struct NostrClientFetchTests {
         #expect(tracker.isComplete == false)
         #expect(tracker.recordEOSE(from: relay2) == true)
         #expect(tracker.isComplete == true)
-    }
-
-    @Test("Fetch validates target strings before touching any relay")
-    func fetchRejectsInvalidTargetString() async throws {
-        let client = NostrClient()
-
-        // Validation precedes targeting, so the invalid string wins over the empty pool.
-        await #expect(throws: NostrError.invalidRelayURL("https://relay.example.com")) {
-            _ = try await client.events.fetch(filters: [Filter()], to: ["https://relay.example.com"])
-        }
     }
 
     @Test("Fetch on an empty pool throws noRelaysInPool immediately")

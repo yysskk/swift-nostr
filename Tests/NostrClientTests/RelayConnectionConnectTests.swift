@@ -11,7 +11,7 @@ struct RelayConnectionConnectTests {
     /// are bounded by the 1-second connection timeout in the worst case.
     private func makeUnreachableConnection() -> RelayConnection {
         RelayConnection(
-            url: URL(string: "ws://127.0.0.1:9")!,
+            url: RelayURL("ws://127.0.0.1:9")!,
             config: RelayConnectionConfig(connectionTimeout: 1)
         )
     }

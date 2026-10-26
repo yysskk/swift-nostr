@@ -65,16 +65,16 @@ extension Tag {
 
     /// An "e" tag referencing an event (NIP-10): `["e", id, relay, marker, pubkey]`.
     /// Skipped middle elements are padded with empty-string placeholders; the id and the
-    /// author's public key are written as hex.
+    /// author's public key are written as hex, and the relay URL in its canonical form.
     public static func event(
         _ id: EventID,
-        relayURL: String? = nil,
+        relayURL: RelayURL? = nil,
         marker: EventMarker? = nil,
         pubkey: PublicKey? = nil
     ) -> Tag {
         var values = [id.hex]
         if let relayURL {
-            values.append(relayURL)
+            values.append(relayURL.description)
         } else if marker != nil || pubkey != nil {
             values.append("")
         }
@@ -91,11 +91,11 @@ extension Tag {
 
     /// A "q" tag quoting another event (NIP-18): `["q", id, relay, pubkey]`.
     /// Skipped middle elements are padded with empty-string placeholders; the id and the
-    /// author's public key are written as hex.
-    public static func quote(_ id: EventID, relayURL: String? = nil, pubkey: PublicKey? = nil) -> Tag {
+    /// author's public key are written as hex, and the relay URL in its canonical form.
+    public static func quote(_ id: EventID, relayURL: RelayURL? = nil, pubkey: PublicKey? = nil) -> Tag {
         var values = [id.hex]
         if let relayURL {
-            values.append(relayURL)
+            values.append(relayURL.description)
         } else if pubkey != nil {
             values.append("")
         }
@@ -107,15 +107,15 @@ extension Tag {
 
     /// A "p" tag referencing a public key: `["p", pubkey, relay, petname]`.
     /// Skipped middle elements are padded with empty-string placeholders; the key is written
-    /// as hex.
+    /// as hex, and the relay URL in its canonical form.
     public static func pubkey(
         _ pubkey: PublicKey,
-        relayURL: String? = nil,
+        relayURL: RelayURL? = nil,
         petname: String? = nil
     ) -> Tag {
         var values = [pubkey.hex]
         if let relayURL {
-            values.append(relayURL)
+            values.append(relayURL.description)
         } else if petname != nil {
             values.append("")
         }
@@ -149,9 +149,9 @@ extension Tag {
     }
 
     /// A "relay" tag carrying the URL of the relay the client is
-    /// authenticating to (NIP-42).
-    public static func relay(_ url: String) -> Tag {
-        Tag(name: "relay", values: [url])
+    /// authenticating to (NIP-42), in its canonical form.
+    public static func relay(_ url: RelayURL) -> Tag {
+        Tag(name: "relay", values: [url.description])
     }
 
     /// A "challenge" tag echoing the challenge string from a relay's
@@ -212,16 +212,16 @@ extension Tag {
     }
 
     /// An "a" tag referencing an addressable event coordinate (NIP-01/NIP-51):
-    /// `["a", "kind:pubkey:identifier", relay?]`.
+    /// `["a", "kind:pubkey:identifier", relay?]`, with the relay URL in its canonical form.
     public static func address(
         kind: Event.Kind,
         pubkey: PublicKey,
         identifier: String,
-        relayURL: String? = nil
+        relayURL: RelayURL? = nil
     ) -> Tag {
         var values = ["\(kind.rawValue):\(pubkey.hex):\(identifier)"]
         if let relayURL {
-            values.append(relayURL)
+            values.append(relayURL.description)
         }
         return Tag(name: "a", values: values)
     }

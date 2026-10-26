@@ -125,9 +125,9 @@ public struct NostrIdentityAPI: NostrIdentityProviding {
     /// - Throws: ``NostrError/noMatchingRelays(_:)`` when the relay is not in the
     ///   pool, ``NostrError/signerNotSet`` without a signer, and everything
     ///   ``RelayConnection/authenticate(with:)`` throws.
-    public func authenticate(relayURL: URL) async throws {
+    public func authenticate(relayURL: RelayURL) async throws {
         guard let connection = await client.pool.relay(for: relayURL) else {
-            throw NostrError.noMatchingRelays([RelayURL.normalize(relayURL.absoluteString)])
+            throw NostrError.noMatchingRelays([relayURL])
         }
         guard let challenge = await connection.authenticationChallenge else {
             throw NostrError.authenticationFailed("The relay has not sent an AUTH challenge")

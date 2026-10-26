@@ -48,11 +48,16 @@ let client = NostrClient()
 
 // Add relays and connect in one step
 try await client.relays.connect(to: [
-    "wss://relay.example.com",
-    "wss://relay2.example.com",
-    "wss://relay3.example.com"
+    RelayURL(string: "wss://relay.example.com"),
+    RelayURL(string: "wss://relay2.example.com"),
+    RelayURL(string: "wss://relay3.example.com"),
 ])
 ```
+
+A ``RelayURL`` is validated and normalized when it is created, so `wss://Relay.Example.com/` and
+`wss://relay.example.com` name the same pool entry, and every relay-targeted API — `add`, `remove`,
+`relay(for:)`, the `to:` targets of publish, fetch, count, and subscribe, and the per-relay keys of
+``PublishResult`` — compares relays by that canonical form.
 
 ## Publish Events
 

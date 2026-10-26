@@ -106,7 +106,7 @@ struct ReconnectBackoffTests {
         let ranges = RecordedRanges()
         let sockets = ReconnectSocketSequence()
         let connection = RelayConnection(
-            url: URL(string: "wss://relay.example.com")!,
+            url: RelayURL("wss://relay.example.com")!,
             webSocketFactory: MockWebSocketSessionFactory(makeSession: { sockets.next() }),
             config: RelayConnectionConfig(autoReconnect: true, initialReconnectDelay: 0),
             jitter: { range in
@@ -131,7 +131,7 @@ struct ReconnectBackoffTests {
     func degenerateConfigStillReconnects() async throws {
         let sockets = ReconnectSocketSequence()
         let connection = RelayConnection(
-            url: URL(string: "wss://relay.example.com")!,
+            url: RelayURL("wss://relay.example.com")!,
             webSocketFactory: MockWebSocketSessionFactory(makeSession: { sockets.next() }),
             config: RelayConnectionConfig(
                 autoReconnect: true, initialReconnectDelay: 0, reconnectBackoffMultiplier: 0),
