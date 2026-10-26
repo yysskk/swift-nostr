@@ -52,7 +52,7 @@ struct NIP42AutomaticAuthenticationTests {
     }
 
     /// Delivers the OK for the next AUTH frame the connection sends, then
-    /// waits for the pubkey to be recorded as authenticated.
+    /// waits for the public key to be recorded as authenticated.
     private func acknowledgeAuth(
         on connection: RelayConnection, mock: MockWebSocketSession
     ) async throws -> Event {
@@ -95,7 +95,7 @@ struct NIP42AutomaticAuthenticationTests {
     }
 
     /// Waits for a new AUTH frame beyond `previousCount`, delivers the relay's OK
-    /// `true` for it, and waits for the pubkey to be recorded. Use when a prior
+    /// `true` for it, and waits for the public key to be recorded. Use when a prior
     /// AUTH frame is already on the wire so the newest one must be acknowledged.
     @discardableResult
     private func acknowledgeLatestAuth(

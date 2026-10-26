@@ -22,10 +22,10 @@ struct NIP04Tests {
     @Test("decrypts a known go-nostr ciphertext")
     func decryptKnownVector() throws {
         let recipientSecret = try bytes(recipientSecretHex)
-        let senderPubkey = try KeyPair(privateKeyHex: senderSecretHex).publicKey.data
+        let senderPublicKey = try KeyPair(privateKeyHex: senderSecretHex).publicKey.data
         let content = "zJxfaJ32rN5Dg1ODjOlEew==?iv=EV5bUjcc4OX2Km/zPp4ndQ=="
 
-        let plaintext = try NIP04.decrypt(content, privateKey: recipientSecret, peerPubkeyXOnly: senderPubkey)
+        let plaintext = try NIP04.decrypt(content, privateKey: recipientSecret, peerPublicKeyXOnly: senderPublicKey)
 
         #expect(plaintext == "nanana")
     }
@@ -33,7 +33,7 @@ struct NIP04Tests {
     @Test("decrypts a known multi-block go-nostr ciphertext")
     func decryptKnownBigVector() throws {
         let recipientSecret = try bytes(recipientSecretHex)
-        let senderPubkey = try KeyPair(privateKeyHex: senderSecretHex).publicKey.data
+        let senderPublicKey = try KeyPair(privateKeyHex: senderSecretHex).publicKey.data
         let content =
             "6f8dMstm+udOu7yipSn33orTmwQpWbtfuY95NH+eTU1kArysWJIDkYgI2D25EAGIDJsNd45jOJ2NbVOhFiL3ZP/NWsTwXokk34iyHyA"
             + "/lkjzugQ1bHXoMD1fP/Ay4hB4al1NHb8HXHKZaxPrErwdRDb8qa/I6dXb/1xxyVvNQBHHvmsM5yIFaPwnCN1DZqXf2KbTA/Ekz7Hy"
@@ -48,7 +48,7 @@ struct NIP04Tests {
             + "63eh+fT6kFI+xYmXNAQkU8Dp0MVhEh4JQI06Ni/AKrvYpC95TXXIphZcF+/Pv/vaGkhG2X9S3uhugwWK?iv=2vWkOQQi0WynNJz/aZ4k2g=="
         let expected = String(repeating: "z", count: 800)
 
-        let plaintext = try NIP04.decrypt(content, privateKey: recipientSecret, peerPubkeyXOnly: senderPubkey)
+        let plaintext = try NIP04.decrypt(content, privateKey: recipientSecret, peerPublicKeyXOnly: senderPublicKey)
 
         #expect(plaintext == expected)
     }
@@ -59,8 +59,8 @@ struct NIP04Tests {
         let bob = try KeyPair()
         let message = "the quick brown fox 🦊"
 
-        let content = try NIP04.encrypt(message, privateKey: alice.privateKey, peerPubkeyXOnly: bob.publicKey.data)
-        let decrypted = try NIP04.decrypt(content, privateKey: bob.privateKey, peerPubkeyXOnly: alice.publicKey.data)
+        let content = try NIP04.encrypt(message, privateKey: alice.privateKey, peerPublicKeyXOnly: bob.publicKey.data)
+        let decrypted = try NIP04.decrypt(content, privateKey: bob.privateKey, peerPublicKeyXOnly: alice.publicKey.data)
 
         #expect(decrypted == message)
     }
@@ -70,8 +70,8 @@ struct NIP04Tests {
         let alice = try KeyPair()
         let bob = try KeyPair()
 
-        let aliceToBob = try NIP04.sharedKey(privateKey: alice.privateKey, peerPubkeyXOnly: bob.publicKey.data)
-        let bobToAlice = try NIP04.sharedKey(privateKey: bob.privateKey, peerPubkeyXOnly: alice.publicKey.data)
+        let aliceToBob = try NIP04.sharedKey(privateKey: alice.privateKey, peerPublicKeyXOnly: bob.publicKey.data)
+        let bobToAlice = try NIP04.sharedKey(privateKey: bob.privateKey, peerPublicKeyXOnly: alice.publicKey.data)
 
         #expect(keyData(aliceToBob) == keyData(bobToAlice))
     }
@@ -81,7 +81,7 @@ struct NIP04Tests {
         let alice = try KeyPair()
         let bob = try KeyPair()
 
-        let content = try NIP04.encrypt("hi", privateKey: alice.privateKey, peerPubkeyXOnly: bob.publicKey.data)
+        let content = try NIP04.encrypt("hi", privateKey: alice.privateKey, peerPublicKeyXOnly: bob.publicKey.data)
         let ivPart = try #require(content.components(separatedBy: "?iv=").last)
 
         #expect(Data(base64Encoded: ivPart)?.count == 16)
@@ -94,7 +94,7 @@ struct NIP04Tests {
 
         #expect(throws: NIP04.DecodingError.malformedContent) {
             try NIP04.decrypt(
-                "zJxfaJ32rN5Dg1ODjOlEew==", privateKey: bob.privateKey, peerPubkeyXOnly: alice.publicKey.data)
+                "zJxfaJ32rN5Dg1ODjOlEew==", privateKey: bob.privateKey, peerPublicKeyXOnly: alice.publicKey.data)
         }
     }
 
@@ -105,7 +105,7 @@ struct NIP04Tests {
 
         #expect(throws: NIP04.DecodingError.invalidBase64) {
             try NIP04.decrypt(
-                "not base64!?iv=also bad!", privateKey: bob.privateKey, peerPubkeyXOnly: alice.publicKey.data)
+                "not base64!?iv=also bad!", privateKey: bob.privateKey, peerPublicKeyXOnly: alice.publicKey.data)
         }
     }
 
@@ -117,7 +117,7 @@ struct NIP04Tests {
         let content = "zJxfaJ32rN5Dg1ODjOlEew==?iv=AAAAAAAAAAA="
 
         #expect(throws: NIP04.DecodingError.malformedContent) {
-            try NIP04.decrypt(content, privateKey: bob.privateKey, peerPubkeyXOnly: alice.publicKey.data)
+            try NIP04.decrypt(content, privateKey: bob.privateKey, peerPublicKeyXOnly: alice.publicKey.data)
         }
     }
 }

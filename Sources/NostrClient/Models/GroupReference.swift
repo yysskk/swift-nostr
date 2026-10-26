@@ -2,7 +2,7 @@ import Foundation
 import NostrCore
 
 /// Where a NIP-29 group lives: the (relay, group id) pair, optionally with the relay's
-/// pubkey (the author of its kind-39000 metadata) and an invite code — everything an
+/// public key (the author of its kind-39000 metadata) and an invite code — everything an
 /// `naddr` share link carries.
 ///
 /// Groups are shared as the `naddr` of their kind-39000 metadata event, sometimes with an
@@ -23,7 +23,7 @@ public struct GroupReference: Sendable, Hashable {
 
     /// The relay's public key — the expected author of the group's kind-39xxx state.
     /// Nil when unknown.
-    public let relayPubkey: PublicKey?
+    public let relayPublicKey: PublicKey?
 
     /// An invite code from a "?invite=<code>" share-link suffix. Nil when absent.
     public let inviteCode: String?
@@ -36,16 +36,16 @@ public struct GroupReference: Sendable, Hashable {
     /// - Parameters:
     ///   - relayURL: The URL of the relay hosting the group.
     ///   - id: The group's id on its relay.
-    ///   - relayPubkey: The relay's public key, if known; group state is validated against it.
+    ///   - relayPublicKey: The relay's public key, if known; group state is validated against it.
     ///   - inviteCode: An invite code to send with a join request, if any.
-    public init(relayURL: RelayURL, id: String, relayPubkey: PublicKey? = nil, inviteCode: String? = nil) {
+    public init(relayURL: RelayURL, id: String, relayPublicKey: PublicKey? = nil, inviteCode: String? = nil) {
         self.relayURL = relayURL
         self.id = id
-        self.relayPubkey = relayPubkey
+        self.relayPublicKey = relayPublicKey
         self.inviteCode = inviteCode
     }
 
-    /// Builds a reference from a kind-39000 `naddr`: the author is the relay's pubkey, the
+    /// Builds a reference from a kind-39000 `naddr`: the author is the relay's public key, the
     /// "d" identifier is the group id, and the first relay hint is the group's relay.
     ///
     /// - Parameters:
@@ -59,7 +59,7 @@ public struct GroupReference: Sendable, Hashable {
         else {
             throw NostrError.invalidNIP19Entity
         }
-        self.init(relayURL: relayURL, id: naddr.identifier, relayPubkey: naddr.author, inviteCode: inviteCode)
+        self.init(relayURL: relayURL, id: naddr.identifier, relayPublicKey: naddr.author, inviteCode: inviteCode)
     }
 
     /// Parses a share-link string: an "naddr1..." coordinate with an optional
@@ -94,17 +94,17 @@ public struct GroupReference: Sendable, Hashable {
     }
 
     /// The coordinate of the group's kind-39000 metadata event: identifier = ``id``,
-    /// author = ``relayPubkey``, with ``relayURL`` as the single relay hint.
+    /// author = ``relayPublicKey``, with ``relayURL`` as the single relay hint.
     ///
-    /// - Throws: ``NostrError/invalidNIP19Entity`` when ``relayPubkey`` is unknown — an
+    /// - Throws: ``NostrError/invalidNIP19Entity`` when ``relayPublicKey`` is unknown — an
     ///   `naddr` cannot be built without its author.
     public func naddr() throws -> NAddr {
-        guard let relayPubkey else {
+        guard let relayPublicKey else {
             throw NostrError.invalidNIP19Entity
         }
         return try NAddr(
             identifier: id,
-            author: relayPubkey,
+            author: relayPublicKey,
             kind: Event.Kind.groupMetadata.rawValue,
             relays: [relayURL]
         )
@@ -113,7 +113,7 @@ public struct GroupReference: Sendable, Hashable {
     /// The shareable string: the ``naddr()`` coordinate, plus "?invite=<code>" when
     /// ``inviteCode`` is set (the code percent-encoded so ``init(naddrString:)`` round-trips it).
     ///
-    /// - Throws: ``NostrError/invalidNIP19Entity`` when ``relayPubkey`` is unknown.
+    /// - Throws: ``NostrError/invalidNIP19Entity`` when ``relayPublicKey`` is unknown.
     public func shareableString() throws -> String {
         let encoded = try naddr().encoded
         guard let inviteCode else { return encoded }

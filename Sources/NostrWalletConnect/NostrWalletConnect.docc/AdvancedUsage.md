@@ -92,14 +92,15 @@ for tx in outgoing {
 
 ## Keysend Payments
 
-A keysend is a spontaneous payment to a node's public key, with no invoice. Attach optional
+A keysend is a spontaneous payment to a node's public key, with no invoice. The
+`nodePublicKey` is the Lightning node's hex key, not a Nostr `PublicKey`. Attach optional
 ``TLVRecord`` values for application data:
 
 ```swift
 let result = try await connection.payKeysend(
     PayKeysendParams(
         amount: 10_000,
-        pubkey: "destinationNodePubkeyHex",
+        nodePublicKey: "<lightning-node-public-key-hex>",
         tlvRecords: [TLVRecord(type: 696969, value: "68656c6c6f")]))
 print(result.preimage)
 ```
@@ -190,7 +191,7 @@ print(zap.invoice, zap.preimage, zap.feesPaid ?? 0)
 An out-of-range amount is rejected before any wallet request is sent. The kind-9735 zap **receipt**
 is published by the LNURL provider to the zap request's relays — not to the wallet's NWC relay — so
 confirm it with `NostrClient` (subscribe to those relays and validate with
-`ZapReceipt(event:)?.validate(lnurlProviderPubkey:expectedAmountMillisats:requiringDescriptionHash:)`).
+`ZapReceipt(event:)?.validate(lnurlProviderPublicKey:expectedAmountMillisats:requiringDescriptionHash:)`).
 
 ## Custom Transport
 

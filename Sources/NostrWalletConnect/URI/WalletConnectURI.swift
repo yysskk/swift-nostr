@@ -1,5 +1,4 @@
 import Foundation
-
 public import NostrCore
 
 /// A parsed NIP-47 `nostr+walletconnect://` connection string.
@@ -8,7 +7,7 @@ public import NostrCore
 /// to talk to the wallet:
 ///
 /// ```text
-/// nostr+walletconnect://<wallet-pubkey-hex>?relay=<wss url>&secret=<32-byte hex>&lud16=<address>
+/// nostr+walletconnect://<wallet-public-key-hex>?relay=<wss url>&secret=<32-byte hex>&lud16=<address>
 /// ```
 ///
 /// - The host is the wallet service's public key in canonical lowercase hex.
@@ -21,7 +20,7 @@ public import NostrCore
 /// https://github.com/nostr-protocol/nips/blob/master/47.md
 public struct WalletConnectURI: Sendable, Hashable {
     /// The wallet service's public key.
-    public let walletPubkey: PublicKey
+    public let walletPublicKey: PublicKey
 
     /// The relays the wallet service listens on. Always at least one.
     public let relays: [RelayURL]
@@ -43,12 +42,12 @@ public struct WalletConnectURI: Sendable, Hashable {
     /// Creates a connection from its components, validating the relay list and secret.
     ///
     /// - Parameters:
-    ///   - walletPubkey: The wallet service's public key.
+    ///   - walletPublicKey: The wallet service's public key.
     ///   - relays: The relays the wallet listens on (must contain at least one).
     ///   - secret: The 32-byte client secret key (must be a valid secp256k1 private key).
     ///   - lud16: An optional lightning address.
     /// - Throws: ``WalletConnectError/invalidURI(reason:)`` if any field fails validation.
-    public init(walletPubkey: PublicKey, relays: [RelayURL], secret: Data, lud16: String? = nil) throws {
+    public init(walletPublicKey: PublicKey, relays: [RelayURL], secret: Data, lud16: String? = nil) throws {
         guard !relays.isEmpty else {
             throw WalletConnectError.invalidURI(reason: "at least one relay is required")
         }
@@ -61,7 +60,7 @@ public struct WalletConnectURI: Sendable, Hashable {
             throw WalletConnectError.invalidURI(reason: "secret is not a valid private key")
         }
 
-        self.walletPubkey = walletPubkey
+        self.walletPublicKey = walletPublicKey
         self.relays = relays
         self.secret = secret
         self.lud16 = lud16
@@ -82,10 +81,10 @@ public struct WalletConnectURI: Sendable, Hashable {
         }
 
         guard let host = components.host, !host.isEmpty else {
-            throw WalletConnectError.invalidURI(reason: "missing wallet pubkey")
+            throw WalletConnectError.invalidURI(reason: "missing wallet public key")
         }
-        guard let walletPubkey = PublicKey(host) else {
-            throw WalletConnectError.invalidURI(reason: "wallet pubkey must be lowercase 32-byte hex")
+        guard let walletPublicKey = PublicKey(host) else {
+            throw WalletConnectError.invalidURI(reason: "wallet public key must be lowercase 32-byte hex")
         }
 
         let queryItems = components.queryItems ?? []
@@ -106,14 +105,14 @@ public struct WalletConnectURI: Sendable, Hashable {
 
         let lud16 = queryItems.first(where: { $0.name == "lud16" })?.value
 
-        try self.init(walletPubkey: walletPubkey, relays: relays, secret: secret, lud16: lud16)
+        try self.init(walletPublicKey: walletPublicKey, relays: relays, secret: secret, lud16: lud16)
     }
 
     /// The connection string, with each relay percent-encoded as a `relay` query parameter.
     public var stringValue: String {
         var components = URLComponents()
         components.scheme = Self.scheme
-        components.host = walletPubkey.hex
+        components.host = walletPublicKey.hex
 
         var items = relays.map { URLQueryItem(name: "relay", value: $0.description) }
         items.append(URLQueryItem(name: "secret", value: secret.hexEncodedString()))
@@ -150,14 +149,14 @@ public struct WalletConnectURI: Sendable, Hashable {
 
 extension WalletConnectURI {
     public static func == (lhs: WalletConnectURI, rhs: WalletConnectURI) -> Bool {
-        lhs.walletPubkey == rhs.walletPubkey
+        lhs.walletPublicKey == rhs.walletPublicKey
             && lhs.relays == rhs.relays
             && lhs.secret == rhs.secret
             && lhs.lud16 == rhs.lud16
     }
 
     public func hash(into hasher: inout Hasher) {
-        hasher.combine(walletPubkey)
+        hasher.combine(walletPublicKey)
         hasher.combine(relays)
         hasher.combine(secret)
         hasher.combine(lud16)

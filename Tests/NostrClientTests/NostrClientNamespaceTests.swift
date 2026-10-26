@@ -175,7 +175,7 @@ struct NostrClientNamespaceTests {
         let parsed = try await messaging.parse(sent.recipientGiftWrap)
 
         #expect(parsed.content == "through the protocol")
-        #expect(parsed.senderPubkey == sender.publicKey)
+        #expect(parsed.senderPublicKey == sender.publicKey)
         await client.relays.disconnect()
     }
 

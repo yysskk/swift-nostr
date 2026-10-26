@@ -121,7 +121,7 @@ struct RelayInformationTests {
     /// The document is written by the relay operator, so a malformed key must not cost the caller
     /// the rest of it — the relay's limits and supported NIPs are what a client actually needs.
     @Test(
-        "Malformed pubkey and self values decode as nil without failing the document",
+        "Malformed public key and self values decode as nil without failing the document",
         arguments: [#""abc123""#, #""\#(String(repeating: "A", count: 64))""#, "42", "null"])
     func decodeMalformedPublicKeysLeniently(value: String) throws {
         let json = Data(

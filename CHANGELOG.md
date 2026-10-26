@@ -315,6 +315,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `RelayConnection.authenticatedPubkeys` is `authenticatedPublicKeys`. The `NostrSigning` and
   `EventSigner` NIP-44 methods and `SealedMessage` name their parameters `recipientPublicKey` and
   `senderPublicKey`; their argument labels are unchanged.
+- **NostrClient spells public keys `publicKey`** (breaking): the rename NostrCore made now covers
+  the client models and APIs, so `publicKey` names one concept everywhere; the JSON keys and tags
+  are unchanged. `EventSigner.signContactList(pubkeys:)` and `signReport(pubkey:type:reason:)` are
+  `signContactList(publicKeys:)` and `signReport(publicKey:type:reason:)`. `Contact.pubkey` and
+  `Contact(pubkey:relayURL:petname:)` are `publicKey` (still `pubkey` in JSON). In NIP-05,
+  `InternetIdentifier.VerificationResult.pubkey` (and its initializer label) is `publicKey`,
+  `verify(_:expectedPubkey:)` is `verify(_:expectedPublicKey:)`, `lookupPubkey(_:)` is
+  `lookupPublicKey(_:)`, `String.verifyAsInternetIdentifier(expectedPubkey:)` is
+  `verifyAsInternetIdentifier(expectedPublicKey:)`, and `VerificationError.pubkeyNotFound` and
+  `pubkeyMismatch` are `publicKeyNotFound` and `publicKeyMismatch`. `DirectMessage` and
+  `DirectMessageFile` `senderPubkey`/`recipientPubkey`, `DirectMessageReaction.senderPubkey` and
+  `messageAuthorPubkey`, and `GiftWrap.UnwrappedMessage.senderPubkey` are `senderPublicKey`,
+  `recipientPublicKey`, and `messageAuthorPublicKey`; `GiftWrap.wrap(event:signer:recipientPubkey:expiration:)`
+  and `DirectMessageBuilder.createReactionWithSelfCopy`'s `recipientPubkey:` take
+  `recipientPublicKey:`. `ZapReceipt.recipientPubkey`/`senderPubkey` are
+  `recipientPublicKey`/`senderPublicKey`, `validate(lnurlProviderPubkey:...)` is
+  `validate(lnurlProviderPublicKey:...)`, and `ValidationError.payeePubkeyMismatch` is
+  `payeePublicKeyMismatch`. `GroupReference.relayPubkey` (and its initializer label) is
+  `relayPublicKey`, and `NostrGroupsAPI.fetchState` and `fetchMetadata` (and their
+  `NostrGroupManaging` requirements) take `authorPublicKey:`. `NostrSubscriptionsAPI.userTimeline(pubkey:limit:)`, `mentions(pubkey:limit:)`,
+  and `metadata(pubkeys:)` and `NostrEventsAPI.fetchMetadata(pubkey:timeout:)` and
+  `publishReport(pubkey:type:reason:strategy:)` take `publicKey:`/`publicKeys:`, as do the matching
+  `NostrEventPublishing`, `NostrEventFetching`, and `NostrSubscribing` requirements.
+- **NostrConnect spells public keys `publicKey`** (breaking): `RemoteSigner.remoteSignerPubkey` is
+  `remoteSignerPublicKey`, `BunkerURI.remoteSignerPubkey` and `BunkerURI(remoteSignerPubkey:relays:secret:)`
+  are `remoteSignerPublicKey`, and `NostrConnectURI.clientPubkey` and its `clientPubkey:` initializer
+  label are `clientPublicKey`. The NIP-04 and NIP-44 commands name their parameter
+  `thirdPartyPublicKey`; their argument labels are unchanged.
+- **NostrWalletConnect spells public keys `publicKey`, and Lightning node keys `nodePublicKey`**
+  (breaking): `WalletConnectURI.walletPubkey` and its `walletPubkey:` initializer label are
+  `walletPublicKey`. `PayKeysendParams.pubkey`, `MultiPayKeysendParams.Keysend.pubkey`, and
+  `GetInfoResult.pubkey` (and their initializer labels) are `nodePublicKey`: each is a Lightning
+  node's hex public key, not a Nostr `PublicKey`, so it stays a `String` and takes a name of its
+  own. The NIP-47 JSON key is still `pubkey`.
 
 ## [0.8.0] - 2026-10-25
 

@@ -16,7 +16,7 @@ extension Event {
     ///
     /// ```swift
     /// Tag.event(note.id, marker: .reply)  // ["e", "<id hex>", "", "reply"]
-    /// Tag.publicKey(alice, petname: "alice") // ["p", "<pubkey hex>", "", "alice"]
+    /// Tag.publicKey(alice, petname: "alice") // ["p", "<public key hex>", "", "alice"]
     /// Tag.hashtag("nostr")                // ["t", "nostr"]
     /// ```
     ///

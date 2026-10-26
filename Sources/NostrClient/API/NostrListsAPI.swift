@@ -17,15 +17,15 @@ public struct NostrListsAPI: NostrListManaging {
     @discardableResult
     public func publish(_ list: NostrList, strategy: PublishStrategy? = nil) async throws -> PublishedEvent {
         let event = try await client.withSigner { signer, publicKey in
-            let content = try await Self.sealPrivateItems(list.privateItems, with: signer, ownPubkey: publicKey)
-            return try await signer.sign(.list(pubkey: publicKey, list, encryptedContent: content))
+            let content = try await Self.sealPrivateItems(list.privateItems, with: signer, ownPublicKey: publicKey)
+            return try await signer.sign(.list(publicKey: publicKey, list, encryptedContent: content))
         }
         let result = try await client.pool.publish(event, strategy: strategy)
         return PublishedEvent(event: event, result: result)
     }
 
-    /// Fetches the newest list of `kind`. With no `pubkey` it fetches the current user's list
-    /// and decrypts private items; for another pubkey only public items are returned.
+    /// Fetches the newest list of `kind`. With no `publicKey` it fetches the current user's list
+    /// and decrypts private items; for another public key only public items are returned.
     /// - Parameter timeout: How long to wait for relays to finish; `nil` uses
     ///   ``RelayPoolConfig/queryTimeout``.
     /// - Throws: when fetching the current user's own list and its private content cannot be
@@ -33,10 +33,10 @@ public struct NostrListsAPI: NostrListManaging {
     /// - Returns: The list, or nil if none was found.
     public func fetch(
         kind: Event.Kind,
-        for pubkey: PublicKey? = nil,
+        for publicKey: PublicKey? = nil,
         timeout: Duration? = nil
     ) async throws -> NostrList? {
-        let target = try await author(pubkey)
+        let target = try await author(publicKey)
         let events = try await client.fetch(
             filters: [Filter(authors: [target], kinds: [kind], limit: 1)],
             fromURLs: nil,
@@ -50,7 +50,7 @@ public struct NostrListsAPI: NostrListManaging {
         // Only the author can decrypt private items — do so when fetching the current user's
         // own list, and surface a decrypt failure so a subsequent republish cannot silently
         // drop the private items.
-        if pubkey == nil, await client.hasSigner {
+        if publicKey == nil, await client.hasSigner {
             return try await openList(newest)
         }
         return NostrList(event: newest)
@@ -67,15 +67,15 @@ public struct NostrListsAPI: NostrListManaging {
         strategy: PublishStrategy? = nil
     ) async throws -> PublishedEvent {
         let event = try await client.withSigner { signer, publicKey in
-            let content = try await Self.sealPrivateItems(set.privateItems, with: signer, ownPubkey: publicKey)
-            return try await signer.sign(.set(pubkey: publicKey, set, encryptedContent: content))
+            let content = try await Self.sealPrivateItems(set.privateItems, with: signer, ownPublicKey: publicKey)
+            return try await signer.sign(.set(publicKey: publicKey, set, encryptedContent: content))
         }
         let result = try await client.pool.publish(event, strategy: strategy)
         return PublishedEvent(event: event, result: result)
     }
 
-    /// Fetches one set by kind and `d` identifier. With no `pubkey` it fetches the current
-    /// user's set and decrypts its private items; for another pubkey only public items are
+    /// Fetches one set by kind and `d` identifier. With no `publicKey` it fetches the current
+    /// user's set and decrypts its private items; for another public key only public items are
     /// returned.
     /// - Parameter timeout: How long to wait for relays to finish; `nil` uses
     ///   ``RelayPoolConfig/queryTimeout``.
@@ -85,10 +85,10 @@ public struct NostrListsAPI: NostrListManaging {
     public func fetchSet(
         kind: Event.Kind,
         identifier: String,
-        for pubkey: PublicKey? = nil,
+        for publicKey: PublicKey? = nil,
         timeout: Duration? = nil
     ) async throws -> NostrListSet? {
-        let target = try await author(pubkey)
+        let target = try await author(publicKey)
         var filter = Filter(authors: [target], kinds: [kind])
         filter.addTagQuery("d", values: [identifier])
         let events = try await client.fetch(filters: [filter], fromURLs: nil, timeout: timeout)
@@ -100,25 +100,25 @@ public struct NostrListsAPI: NostrListManaging {
         else {
             return nil
         }
-        if pubkey == nil, await client.hasSigner {
+        if publicKey == nil, await client.hasSigner {
             return try await openSet(newest)
         }
         return try NostrListSet(event: newest)
     }
 
     /// Fetches all sets of a kind for an author, keeping the newest per `d` identifier. With no
-    /// `pubkey` it fetches the current user's sets and decrypts their private items; for another
-    /// pubkey only public items are returned.
+    /// `publicKey` it fetches the current user's sets and decrypts their private items; for another
+    /// public key only public items are returned.
     /// - Parameter timeout: How long to wait for relays to finish; `nil` uses
     ///   ``RelayPoolConfig/queryTimeout``.
     /// - Throws: when fetching the current user's own sets and a set's private content cannot be
     ///   decrypted.
     public func fetchSets(
         kind: Event.Kind,
-        for pubkey: PublicKey? = nil,
+        for publicKey: PublicKey? = nil,
         timeout: Duration? = nil
     ) async throws -> [NostrListSet] {
-        let target = try await author(pubkey)
+        let target = try await author(publicKey)
         let events = try await client.fetch(
             filters: [Filter(authors: [target], kinds: [kind])],
             fromURLs: nil,
@@ -133,7 +133,7 @@ public struct NostrListsAPI: NostrListManaging {
             newestByIdentifier[identifier] = VerifiedEventSelection.newest(
                 in: events, kind: kind, author: target, identifier: identifier)
         }
-        let decrypt = pubkey == nil ? await client.hasSigner : false
+        let decrypt = publicKey == nil ? await client.hasSigner : false
         var sets: [NostrListSet] = []
         for event in newestByIdentifier.values {
             sets.append(decrypt ? try await openSet(event) : try NostrListSet(event: event))
@@ -144,7 +144,7 @@ public struct NostrListsAPI: NostrListManaging {
     /// Fetches the set addressed by a NIP-19 `naddr`.
     ///
     /// Only public items are returned; the current user's private items are available via
-    /// ``fetchSet(kind:identifier:for:timeout:)`` with no `pubkey`.
+    /// ``fetchSet(kind:identifier:for:timeout:)`` with no `publicKey`.
     /// - Parameter timeout: How long to wait for relays to finish; `nil` uses
     ///   ``RelayPoolConfig/queryTimeout``.
     /// - Returns: The set, or nil if none was found.
@@ -166,10 +166,10 @@ public struct NostrListsAPI: NostrListManaging {
 
     // MARK: - Private items (NIP-44 to the author's own key)
 
-    /// The author to query: the given pubkey, or the signer's own when none is given.
+    /// The author to query: the given public key, or the signer's own when none is given.
     /// - Throws: ``NostrError/signerNotSet`` when neither is available.
-    private func author(_ pubkey: PublicKey?) async throws -> PublicKey {
-        if let pubkey { return pubkey }
+    private func author(_ publicKey: PublicKey?) async throws -> PublicKey {
+        if let publicKey { return publicKey }
         return try await client.requiredPublicKey()
     }
 
@@ -190,10 +190,10 @@ public struct NostrListsAPI: NostrListManaging {
     /// Seals a list's or set's private items to the author's own key, or returns empty content
     /// when there are none. Goes through the signer, so a remote NIP-46 signer seals them too.
     private static func sealPrivateItems(
-        _ items: [Tag], with signer: any NostrSigning, ownPubkey: PublicKey
+        _ items: [Tag], with signer: any NostrSigning, ownPublicKey: PublicKey
     ) async throws -> String {
         guard let json = try ListItemCipher.plaintext(items) else { return "" }
-        return try await signer.nip44Encrypt(json, to: ownPubkey)
+        return try await signer.nip44Encrypt(json, to: ownPublicKey)
     }
 
     /// Opens the self-encrypted private items of a list or set event (empty content → []).

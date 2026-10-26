@@ -5,7 +5,7 @@ import NostrCore
 ///
 /// Clients embed NIP-21 entities (`nostr:npub1…`, `nostr:note1…`, …) inline in the content of an
 /// event; this type both locates those references and derives the tags the referencing event should
-/// carry for them (`p` for profile/pubkey mentions, `q` for note/nevent quotes, `a` for `naddr`).
+/// carry for them (`p` for profile/public key mentions, `q` for note/nevent quotes, `a` for `naddr`).
 /// https://github.com/nostr-protocol/nips/blob/master/27.md
 public struct NostrContentReference: Sendable, Hashable {
     /// The full matched text, e.g. `"nostr:npub1..."`.

@@ -116,7 +116,7 @@ struct RemoteSignerSessionTests {
         let remote = try makeSigner(transport: transport)
         try await connectHandshake(remote, transport: transport)
 
-        let pubkey = Task { try await remote.userPublicKey() }
+        let publicKey = Task { try await remote.userPublicKey() }
         let pong = Task { try await remote.ping() }
 
         let sent = try await RemoteSignerFixtures.waitForSentEvents(transport, count: 3)
@@ -134,7 +134,7 @@ struct RemoteSignerSessionTests {
                     requestID: request.id, result: result, client: client, signer: signer))
         }
 
-        let resolved = try await pubkey.value
+        let resolved = try await publicKey.value
         #expect(resolved == PublicKey.fixture("user"))
         try await pong.value
     }
@@ -157,7 +157,7 @@ struct RemoteSignerSessionTests {
         _ = request
     }
 
-    @Test("a response from a non-signer pubkey is ignored")
+    @Test("a response from a non-signer public key is ignored")
     func nonSignerResponseIgnored() async throws {
         let transport = FakeRemoteSignerTransport()
         let remote = try makeSigner(transport: transport, requestTimeout: .milliseconds(300))
@@ -225,7 +225,7 @@ struct RemoteSignerSessionTests {
 
         let challenges = await remote.authChallenges()
 
-        let pubkey = Task { try await remote.userPublicKey() }
+        let publicKey = Task { try await remote.userPublicKey() }
         let sent = try await RemoteSignerFixtures.waitForSentEvents(transport, count: 2)
         let request = try RemoteSignerFixtures.decryptRequest(sent[1], client: client, signer: signer)
 
@@ -247,7 +247,7 @@ struct RemoteSignerSessionTests {
         try await transport.deliver(
             RemoteSignerFixtures.response(
                 requestID: request.id, result: PublicKey.fixture("user").hex, client: client, signer: signer))
-        let resolved = try await pubkey.value
+        let resolved = try await publicKey.value
         #expect(resolved == PublicKey.fixture("user"))
     }
 

@@ -51,8 +51,8 @@ struct NostrSigningClientTests {
         return (NostrClient(relayPool: pool), mock)
     }
 
-    private func unsignedNote(pubkey: PublicKey, content: String) -> UnsignedEvent {
-        UnsignedEvent(publicKey: pubkey, kind: .textNote, content: content)
+    private func unsignedNote(publicKey: PublicKey, content: String) -> UnsignedEvent {
+        UnsignedEvent(publicKey: publicKey, kind: .textNote, content: content)
     }
 
     // MARK: - Setting a remote signer
@@ -77,7 +77,7 @@ struct NostrSigningClientTests {
         let keyPair = try KeyPair()
         try await client.identity.setSigner(MockRemoteSigner(keyPair: keyPair) as any NostrSigning)
 
-        let signed = try await client.identity.sign(unsignedNote(pubkey: keyPair.publicKey, content: "hello"))
+        let signed = try await client.identity.sign(unsignedNote(publicKey: keyPair.publicKey, content: "hello"))
 
         #expect(signed.publicKey == keyPair.publicKey)
         #expect(signed.kind == .textNote)
@@ -91,7 +91,7 @@ struct NostrSigningClientTests {
         let keyPair = try KeyPair()
         await client.identity.setSigner(EventSigner(keyPair: keyPair))
 
-        let signed = try await client.identity.sign(unsignedNote(pubkey: keyPair.publicKey, content: "hi"))
+        let signed = try await client.identity.sign(unsignedNote(publicKey: keyPair.publicKey, content: "hi"))
 
         #expect(signed.publicKey == keyPair.publicKey)
         #expect(signed.content == "hi")
@@ -101,10 +101,10 @@ struct NostrSigningClientTests {
     @Test("sign(_:) without a signer throws signerNotSet")
     func signWithoutSignerThrows() async throws {
         let (client, _) = makeClient()
-        let pubkey = try KeyPair().publicKey
+        let publicKey = try KeyPair().publicKey
 
         await #expect(throws: NostrError.signerNotSet) {
-            try await client.identity.sign(self.unsignedNote(pubkey: pubkey, content: "x"))
+            try await client.identity.sign(self.unsignedNote(publicKey: publicKey, content: "x"))
         }
     }
 
@@ -193,7 +193,7 @@ struct NostrSigningClientTests {
         let message = try await DirectMessageParser(signer: EventSigner(keyPair: recipient))
             .parse(result.recipientGiftWrap)
         #expect(message.content == "wrapped by my bunker")
-        #expect(message.senderPubkey == sender.publicKey)
+        #expect(message.senderPublicKey == sender.publicKey)
         await client.relays.disconnect()
     }
 

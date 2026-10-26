@@ -10,7 +10,7 @@ public enum GossipRelayPolicy: Sendable, Equatable {
     case requirePresent
 }
 
-/// Caches per-pubkey NIP-65 relay lists and resolves outbox/inbox relay sets for the gossip model.
+/// Caches per-public-key NIP-65 relay lists and resolves outbox/inbox relay sets for the gossip model.
 /// Owned by `NostrClient`; routes through the shared `RelayPool` via a ``RelayConnector``.
 actor RelayListStore {
     private var cache = ReplaceableCache<RelayListMetadata>()
@@ -24,8 +24,8 @@ actor RelayListStore {
     /// An equal `createdAt` keeps the existing entry.
     /// - Returns: The effective (possibly pre-existing) list.
     @discardableResult
-    func store(_ list: RelayListMetadata, createdAt: Timestamp, for pubkey: PublicKey) -> RelayListMetadata {
-        cache.store(list, createdAt: createdAt, for: pubkey)
+    func store(_ list: RelayListMetadata, createdAt: Timestamp, for publicKey: PublicKey) -> RelayListMetadata {
+        cache.store(list, createdAt: createdAt, for: publicKey)
     }
 
     /// Ingests a kind 10002 event into the cache.
@@ -38,19 +38,19 @@ actor RelayListStore {
         return store(list, createdAt: event.createdAt, for: event.publicKey)
     }
 
-    /// Returns the cached relay list for a pubkey, if any.
-    func cachedList(for pubkey: PublicKey) -> RelayListMetadata? {
-        cache.value(for: pubkey)
+    /// Returns the cached relay list for a public key, if any.
+    func cachedList(for publicKey: PublicKey) -> RelayListMetadata? {
+        cache.value(for: publicKey)
     }
 
-    /// Resolves the WRITE relays for a pubkey (where the user publishes) — use these to READ their events.
-    func writeRelayURLs(for pubkey: PublicKey) -> Set<RelayURL> {
-        Set(cache.value(for: pubkey)?.writeRelays ?? [])
+    /// Resolves the WRITE relays for a public key (where the user publishes) — use these to READ their events.
+    func writeRelayURLs(for publicKey: PublicKey) -> Set<RelayURL> {
+        Set(cache.value(for: publicKey)?.writeRelays ?? [])
     }
 
-    /// Resolves the READ relays for a pubkey (their inbox) — use these to SEND them events they should see.
-    func readRelayURLs(for pubkey: PublicKey) -> Set<RelayURL> {
-        Set(cache.value(for: pubkey)?.readRelays ?? [])
+    /// Resolves the READ relays for a public key (their inbox) — use these to SEND them events they should see.
+    func readRelayURLs(for publicKey: PublicKey) -> Set<RelayURL> {
+        Set(cache.value(for: publicKey)?.readRelays ?? [])
     }
 
     /// Ensures the given relay URLs are present (and, for `.addAndConnect`, connected) in the pool,

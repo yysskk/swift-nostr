@@ -46,8 +46,8 @@ public actor WalletConnection {
     private let config: Config
     private let keyPair: KeyPair
     private let signer: EventSigner
-    private let walletPubkey: PublicKey
-    private let clientPubkey: PublicKey
+    private let walletPublicKey: PublicKey
+    private let clientPublicKey: PublicKey
 
     /// Open notification streams, keyed so each can deregister on termination.
     private var notificationStreams: [UUID: AsyncStream<WalletConnectNotification>.Continuation] = [:]
@@ -68,8 +68,8 @@ public actor WalletConnection {
         self.config = config
         self.keyPair = keyPair
         self.signer = EventSigner(keyPair: keyPair)
-        self.walletPubkey = uri.walletPubkey
-        self.clientPubkey = keyPair.publicKey
+        self.walletPublicKey = uri.walletPublicKey
+        self.clientPublicKey = keyPair.publicKey
         self.session = Session(
             transport: transport
                 ?? RelayConnectionTransport(relayURLs: uri.relays),
@@ -251,7 +251,8 @@ public actor WalletConnection {
         let content: String
         do {
             let json = String(decoding: try JSONEncoder().encode(request), as: UTF8.self)
-            content = try WalletConnectCipher(scheme).encrypt(json, recipientPubkey: walletPubkey, sender: keyPair)
+            content = try WalletConnectCipher(scheme).encrypt(
+                json, recipientPublicKey: walletPublicKey, sender: keyPair)
         } catch {
             throw WalletConnectError.requestEncodingFailed
         }
@@ -260,12 +261,12 @@ public actor WalletConnection {
         // wallet that sees it late does not pay an invoice nobody is listening for anymore.
         let expiration = Timestamp.now.advanced(by: config.requestTimeout + .seconds(10))
         let tags: [Tag] = [
-            .publicKey(walletPubkey),
+            .publicKey(walletPublicKey),
             Tag(name: "encryption", values: [scheme.rawValue]),
             .expiration(expiration),
         ]
         let unsigned = UnsignedEvent(
-            publicKey: clientPubkey, kind: .walletConnectRequest, tags: tags, content: content)
+            publicKey: clientPublicKey, kind: .walletConnectRequest, tags: tags, content: content)
         do {
             return try signer.sign(unsigned)
         } catch {
@@ -279,7 +280,7 @@ public actor WalletConnection {
         // The relay filter already restricts authors, but enforce it here too as defense in depth —
         // and require the event to say what it was signed to say, so nothing downstream reads a
         // payload whose author has not actually vouched for it.
-        guard event.publicKey == walletPubkey, (try? event.verify()) == true else { return }
+        guard event.publicKey == walletPublicKey, (try? event.verify()) == true else { return }
         switch event.kind {
         case .walletConnectResponse:
             await handleResponse(event)
@@ -298,7 +299,7 @@ public actor WalletConnection {
         // The `e` tag names the request this answers. A value that is not a canonical event id
         // cannot name any request this connection sent, so the response is dropped.
         guard let requestID = event.firstTagValue(named: "e").flatMap(EventID.init) else { return }
-        let walletPubkey = walletPubkey
+        let walletPublicKey = walletPublicKey
         let keyPair = keyPair
 
         // The response names the scheme it was encrypted with; the request's own scheme is only a
@@ -331,7 +332,7 @@ public actor WalletConnection {
 
             guard
                 let content = try? WalletConnectCipher(scheme).decrypt(
-                    event.content, senderPubkey: walletPubkey, recipient: keyPair)
+                    event.content, senderPublicKey: walletPublicKey, recipient: keyPair)
             else {
                 // Nothing to preserve for a single-response request, so fail fast.
                 if request.expected == 1 {
@@ -379,7 +380,7 @@ public actor WalletConnection {
     private func handleNotification(_ event: Event, scheme: WalletConnectEncryption) {
         guard !notificationStreams.isEmpty,
             let content = try? WalletConnectCipher(scheme).decrypt(
-                event.content, senderPubkey: walletPubkey, recipient: keyPair),
+                event.content, senderPublicKey: walletPublicKey, recipient: keyPair),
             let notification = WalletConnectNotification(content: content)
         else {
             return
@@ -401,13 +402,13 @@ public actor WalletConnection {
 
     private var responseFilter: Filter {
         Filter(
-            authors: [walletPubkey],
+            authors: [walletPublicKey],
             kinds: [.walletConnectResponse, .walletConnectNotification, .walletConnectNotificationLegacy],
-            publicKeyReferences: [clientPubkey])
+            publicKeyReferences: [clientPublicKey])
     }
 
     private var infoFilter: Filter {
-        Filter(authors: [walletPubkey], kinds: [.walletConnectInfo], limit: 1)
+        Filter(authors: [walletPublicKey], kinds: [.walletConnectInfo], limit: 1)
     }
 }
 

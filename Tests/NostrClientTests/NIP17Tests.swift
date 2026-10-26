@@ -37,7 +37,7 @@ struct NIP17Tests {
 
         let sealed = try SealedMessage.seal(originalMessage, for: bob.publicKey, using: alice)
 
-        // Alice can open using Bob's pubkey (same shared secret)
+        // Alice can open using Bob's public key (same shared secret)
         let opened = try sealed.open(from: bob.publicKey, using: alice)
 
         #expect(opened == originalMessage)
@@ -96,7 +96,7 @@ struct NIP17Tests {
         let wrapped = try await GiftWrap.wrap(
             event: originalEvent,
             signer: signer,
-            recipientPubkey: bob.publicKey
+            recipientPublicKey: bob.publicKey
         )
 
         // Verify it's a gift wrap event
@@ -109,7 +109,7 @@ struct NIP17Tests {
         // Bob unwraps the event
         let unwrapped = try await GiftWrap.unwrap(giftWrap: wrapped, recipient: EventSigner(keyPair: bob))
 
-        #expect(unwrapped.senderPubkey == alice.publicKey)
+        #expect(unwrapped.senderPublicKey == alice.publicKey)
         #expect(unwrapped.event.content == "Secret message")
     }
 
@@ -124,10 +124,10 @@ struct NIP17Tests {
         let wrapped = try await GiftWrap.wrap(
             event: event,
             signer: signer,
-            recipientPubkey: bob.publicKey
+            recipientPublicKey: bob.publicKey
         )
 
-        // The gift wrap pubkey should NOT be Alice's pubkey (it's ephemeral)
+        // The gift wrap public key should NOT be Alice's public key (it's ephemeral)
         #expect(wrapped.publicKey != alice.publicKey)
     }
 
@@ -153,7 +153,7 @@ struct NIP17Tests {
         let message = try await parser.parse(giftWrap)
 
         #expect(message.content == "Hello Bob!")
-        #expect(message.senderPubkey == alice.publicKey)
+        #expect(message.senderPublicKey == alice.publicKey)
         #expect(message.subject == "Test Subject")
     }
 
@@ -252,8 +252,8 @@ struct NIP17Tests {
         #expect(aliceUnwrapped.event.id == result.rumor.id)
         #expect(bobUnwrapped.event.content == "Hello Bob!")
         #expect(aliceUnwrapped.event.content == "Hello Bob!")
-        #expect(bobUnwrapped.senderPubkey == alice.publicKey)
-        #expect(aliceUnwrapped.senderPubkey == alice.publicKey)
+        #expect(bobUnwrapped.senderPublicKey == alice.publicKey)
+        #expect(aliceUnwrapped.senderPublicKey == alice.publicKey)
     }
 
     @Test("A message whose p tag is not a canonical hex key is rejected")
@@ -265,7 +265,7 @@ struct NIP17Tests {
             rawTags: [["p", bob.publicKey.hex.uppercased()]], content: "hi"
         ).asRumor()
         let giftWrap = try await GiftWrap.wrap(
-            event: rumor, signer: EventSigner(keyPair: alice), recipientPubkey: bob.publicKey)
+            event: rumor, signer: EventSigner(keyPair: alice), recipientPublicKey: bob.publicKey)
 
         await #expect(throws: NostrError.invalidData) {
             try await DirectMessageParser(signer: EventSigner(keyPair: bob)).parse(giftWrap)
@@ -281,12 +281,12 @@ struct NIP17Tests {
             rawTags: [["p", bob.publicKey.hex], ["e", "not-an-id", "", "reply"]], content: "hi"
         ).asRumor()
         let giftWrap = try await GiftWrap.wrap(
-            event: rumor, signer: EventSigner(keyPair: alice), recipientPubkey: bob.publicKey)
+            event: rumor, signer: EventSigner(keyPair: alice), recipientPublicKey: bob.publicKey)
 
         let message = try await DirectMessageParser(signer: EventSigner(keyPair: bob)).parse(giftWrap)
 
         #expect(message.replyTo == nil)
-        #expect(message.recipientPubkey == bob.publicKey)
+        #expect(message.recipientPublicKey == bob.publicKey)
         #expect(message.content == "hi")
     }
 
@@ -313,8 +313,8 @@ struct NIP17Tests {
         #expect(aliceMessage.content == bobMessage.content)
         #expect(aliceMessage.subject == bobMessage.subject)
         #expect(aliceMessage.replyTo == bobMessage.replyTo)
-        #expect(aliceMessage.senderPubkey == alice.publicKey)
-        #expect(aliceMessage.recipientPubkey == bob.publicKey)
+        #expect(aliceMessage.senderPublicKey == alice.publicKey)
+        #expect(aliceMessage.recipientPublicKey == bob.publicKey)
     }
 
     @Test("Rumor id matches the id the signing path would produce")
@@ -369,7 +369,7 @@ struct NIP17Tests {
         let message = try await parser.parse(giftWrap)
 
         #expect(message.id == message.rumorID)
-        #expect(message.senderPubkey == alice.publicKey)
+        #expect(message.senderPublicKey == alice.publicKey)
     }
 
     @Test("Invalid gift wrap kind throws error")

@@ -5,7 +5,7 @@ public import NostrCore
 /// (as a QR code or deep link):
 ///
 /// ```text
-/// nostrconnect://<client-pubkey>?relay=...&secret=...&perms=...&name=...&url=...&image=...
+/// nostrconnect://<client-public-key>?relay=...&secret=...&perms=...&name=...&url=...&image=...
 /// ```
 ///
 /// - The host is the client's public key in canonical lowercase hex, which originates the
@@ -18,7 +18,7 @@ public import NostrCore
 /// https://github.com/nostr-protocol/nips/blob/master/46.md
 public struct NostrConnectURI: Sendable, Hashable {
     /// The client's public key — the URI origin.
-    public let clientPubkey: PublicKey
+    public let clientPublicKey: PublicKey
 
     /// The relays the client listens on. Always at least one.
     public let relays: [RelayURL]
@@ -44,7 +44,7 @@ public struct NostrConnectURI: Sendable, Hashable {
     /// Creates an invitation from its components.
     ///
     /// - Parameters:
-    ///   - clientPubkey: The client's public key.
+    ///   - clientPublicKey: The client's public key.
     ///   - relays: The relays the client listens on (must contain at least one).
     ///   - secret: The connection secret the signer must echo back.
     ///   - permissions: The permissions requested from the signer.
@@ -53,7 +53,7 @@ public struct NostrConnectURI: Sendable, Hashable {
     ///   - image: An optional client icon.
     /// - Throws: ``RemoteSignerError/invalidURI(reason:)`` if the relay list is empty.
     public init(
-        clientPubkey: PublicKey,
+        clientPublicKey: PublicKey,
         relays: [RelayURL],
         secret: String,
         permissions: [RemoteSignerPermission] = [],
@@ -65,7 +65,7 @@ public struct NostrConnectURI: Sendable, Hashable {
             throw RemoteSignerError.invalidURI(reason: "at least one relay is required")
         }
 
-        self.clientPubkey = clientPubkey
+        self.clientPublicKey = clientPublicKey
         self.relays = relays
         self.secret = secret
         self.permissions = permissions
@@ -94,7 +94,7 @@ public struct NostrConnectURI: Sendable, Hashable {
         image: URL? = nil
     ) throws -> NostrConnectURI {
         try NostrConnectURI(
-            clientPubkey: clientKeyPair.publicKey,
+            clientPublicKey: clientKeyPair.publicKey,
             relays: relays,
             secret: URIQuery.randomHex(byteCount: 16),
             permissions: permissions,
@@ -118,10 +118,10 @@ public struct NostrConnectURI: Sendable, Hashable {
         }
 
         guard let host = components.host, !host.isEmpty else {
-            throw RemoteSignerError.invalidURI(reason: "missing client pubkey")
+            throw RemoteSignerError.invalidURI(reason: "missing client public key")
         }
-        guard let clientPubkey = PublicKey(host) else {
-            throw RemoteSignerError.invalidURI(reason: "client pubkey must be lowercase 32-byte hex")
+        guard let clientPublicKey = PublicKey(host) else {
+            throw RemoteSignerError.invalidURI(reason: "client public key must be lowercase 32-byte hex")
         }
 
         let queryItems = components.queryItems ?? []
@@ -150,7 +150,7 @@ public struct NostrConnectURI: Sendable, Hashable {
         let image = (queryItems.first(where: { $0.name == "image" })?.value).flatMap { URL(string: $0) }
 
         try self.init(
-            clientPubkey: clientPubkey,
+            clientPublicKey: clientPublicKey,
             relays: relays,
             secret: secret,
             permissions: permissions,
@@ -176,6 +176,6 @@ public struct NostrConnectURI: Sendable, Hashable {
         if let image {
             items.append(URLQueryItem(name: "image", value: image.absoluteString))
         }
-        return "\(Self.scheme)://\(clientPubkey)?\(URIQuery.encode(items))"
+        return "\(Self.scheme)://\(clientPublicKey)?\(URIQuery.encode(items))"
     }
 }

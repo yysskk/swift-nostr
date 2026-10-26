@@ -76,14 +76,14 @@ struct OpenTimestampsTests {
         let unsigned = UnsignedEvent(
             publicKey: keyPair.publicKey,
             kind: .textNote,
-            tags: [["p", "somepubkey"]],
+            tags: [["p", "somepublickey"]],
             content: "Test content"
         )
 
         let withOTS = unsigned.withOpenTimestamps(ots)
 
         #expect(withOTS.tags.contains { $0 == ["ots", otsData] })
-        #expect(withOTS.tags.contains { $0 == ["p", "somepubkey"] })
+        #expect(withOTS.tags.contains { $0 == ["p", "somepublickey"] })
         #expect(withOTS.content == unsigned.content)
         #expect(withOTS.kind == unsigned.kind)
     }

@@ -10,31 +10,32 @@ import NostrCore
 // remote one.
 extension UnsignedEvent {
     /// A metadata event (kind 0).
-    package static func metadata(pubkey: PublicKey, _ metadata: UserMetadata) throws -> UnsignedEvent {
+    package static func metadata(publicKey: PublicKey, _ metadata: UserMetadata) throws -> UnsignedEvent {
         let content = try JSONEncoder().encode(metadata)
-        return UnsignedEvent(publicKey: pubkey, kind: .setMetadata, content: String(decoding: content, as: UTF8.self))
+        return UnsignedEvent(
+            publicKey: publicKey, kind: .setMetadata, content: String(decoding: content, as: UTF8.self))
     }
 
     /// A relay list metadata event (kind 10002, NIP-65).
-    package static func relayListMetadata(pubkey: PublicKey, _ relayList: RelayListMetadata) -> UnsignedEvent {
-        UnsignedEvent(publicKey: pubkey, kind: .relayListMetadata, tags: relayList.tags, content: "")
+    package static func relayListMetadata(publicKey: PublicKey, _ relayList: RelayListMetadata) -> UnsignedEvent {
+        UnsignedEvent(publicKey: publicKey, kind: .relayListMetadata, tags: relayList.tags, content: "")
     }
 
     /// A DM relay list event (kind 10050, NIP-17), advertising where the author receives
     /// private direct messages. Its content is empty; the relays are carried as `relay` tags.
     package static func directMessageRelayList(
-        pubkey: PublicKey, _ relayList: DirectMessageRelayList
+        publicKey: PublicKey, _ relayList: DirectMessageRelayList
     ) -> UnsignedEvent {
-        UnsignedEvent(publicKey: pubkey, kind: .directMessageRelayList, tags: relayList.tags, content: "")
+        UnsignedEvent(publicKey: publicKey, kind: .directMessageRelayList, tags: relayList.tags, content: "")
     }
 
     /// A report of `target` (kind 1984, NIP-56). The report type rides on the "p" tag;
     /// `reason` becomes the content.
     package static func report(
-        pubkey: PublicKey, target: PublicKey, type: ReportType, reason: String
+        publicKey: PublicKey, target: PublicKey, type: ReportType, reason: String
     ) -> UnsignedEvent {
         UnsignedEvent(
-            publicKey: pubkey,
+            publicKey: publicKey,
             kind: .report,
             tags: [Tag(name: "p", values: [target.hex, type.rawValue])],
             content: reason
@@ -44,10 +45,10 @@ extension UnsignedEvent {
     /// A report of an event and its author (kind 1984, NIP-56). The report type rides on the
     /// "e" tag; a bare "p" tag names the author.
     package static func report(
-        pubkey: PublicKey, event: Event, type: ReportType, reason: String
+        publicKey: PublicKey, event: Event, type: ReportType, reason: String
     ) -> UnsignedEvent {
         UnsignedEvent(
-            publicKey: pubkey,
+            publicKey: publicKey,
             kind: .report,
             tags: [
                 Tag(name: "e", values: [event.id.hex, type.rawValue]),
@@ -62,14 +63,14 @@ extension UnsignedEvent {
     /// When `publishedAt` is nil it is set to the current time (first-publication time per the
     /// spec); it is preserved verbatim on later edits.
     package static func longFormContent(
-        pubkey: PublicKey, _ article: LongFormContent, draft: Bool
+        publicKey: PublicKey, _ article: LongFormContent, draft: Bool
     ) -> UnsignedEvent {
         var article = article
         if article.publishedAt == nil {
             article.publishedAt = .now
         }
         return UnsignedEvent(
-            publicKey: pubkey,
+            publicKey: publicKey,
             kind: draft ? .longFormDraft : .longFormContent,
             tags: article.tags,
             content: article.content
@@ -77,9 +78,9 @@ extension UnsignedEvent {
     }
 
     /// A NIP-51 list event whose private items are already sealed into `encryptedContent`.
-    package static func list(pubkey: PublicKey, _ list: NostrList, encryptedContent: String) -> UnsignedEvent {
+    package static func list(publicKey: PublicKey, _ list: NostrList, encryptedContent: String) -> UnsignedEvent {
         UnsignedEvent(
-            publicKey: pubkey,
+            publicKey: publicKey,
             kind: list.kind,
             tags: list.publicItems,
             content: encryptedContent
@@ -88,7 +89,7 @@ extension UnsignedEvent {
 
     /// A NIP-51 set event whose private items are already sealed into `encryptedContent`: the `d`
     /// identifier, presentation metadata, and public items as tags.
-    package static func set(pubkey: PublicKey, _ set: NostrListSet, encryptedContent: String) -> UnsignedEvent {
+    package static func set(publicKey: PublicKey, _ set: NostrListSet, encryptedContent: String) -> UnsignedEvent {
         var tags: [Tag] = [.identifier(set.identifier)]
         if let title = set.title {
             tags.append(Tag(name: "title", values: [title]))
@@ -104,7 +105,7 @@ extension UnsignedEvent {
         tags.append(contentsOf: set.publicItems.filter { !NostrListSet.reservedTagNames.contains($0.name) })
 
         return UnsignedEvent(
-            publicKey: pubkey,
+            publicKey: publicKey,
             kind: set.kind,
             tags: tags,
             content: encryptedContent

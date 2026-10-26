@@ -60,12 +60,12 @@ struct NIP57ZapReceiptTests {
 
         let zapReceipt = try #require(ZapReceipt(event: receipt))
         try zapReceipt.validate(
-            lnurlProviderPubkey: payee.publicKey,
+            lnurlProviderPublicKey: payee.publicKey,
             expectedAmountMillisats: coffeeAmountMillisats,
             requiringDescriptionHash: false)
 
         #expect(zapReceipt.bolt11 == coffeeInvoice)
-        #expect(zapReceipt.recipientPubkey?.hex == recipient)
+        #expect(zapReceipt.recipientPublicKey?.hex == recipient)
         #expect(zapReceipt.amountMillisats == coffeeAmountMillisats)
         #expect(zapReceipt.zapRequest?.kind == .zapRequest)
     }
@@ -84,7 +84,7 @@ struct NIP57ZapReceiptTests {
             ])
 
         try ZapReceipt(event: receipt)!.validate(
-            lnurlProviderPubkey: payee.publicKey, requiringDescriptionHash: false)
+            lnurlProviderPublicKey: payee.publicKey, requiringDescriptionHash: false)
     }
 
     /// Asking for an amount that the invoice never names is a check that cannot be made. Passing
@@ -104,7 +104,7 @@ struct NIP57ZapReceiptTests {
 
         #expect(throws: ZapReceipt.ValidationError.missingAmount) {
             try ZapReceipt(event: receipt)!.validate(
-                lnurlProviderPubkey: payee.publicKey,
+                lnurlProviderPublicKey: payee.publicKey,
                 expectedAmountMillisats: 999_999,
                 requiringDescriptionHash: false)
         }
@@ -127,7 +127,7 @@ struct NIP57ZapReceiptTests {
             ])
 
         #expect(throws: ZapReceipt.ValidationError.missingDescriptionHash) {
-            try ZapReceipt(event: receipt)!.validate(lnurlProviderPubkey: payee.publicKey)
+            try ZapReceipt(event: receipt)!.validate(lnurlProviderPublicKey: payee.publicKey)
         }
     }
 
@@ -147,7 +147,7 @@ struct NIP57ZapReceiptTests {
 
         #expect(throws: ZapReceipt.ValidationError.missingRecipient) {
             try ZapReceipt(event: receipt)!.validate(
-                lnurlProviderPubkey: payee.publicKey, requiringDescriptionHash: false)
+                lnurlProviderPublicKey: payee.publicKey, requiringDescriptionHash: false)
         }
     }
 
@@ -165,9 +165,9 @@ struct NIP57ZapReceiptTests {
             ])
 
         let zapReceipt = try #require(ZapReceipt(event: receipt))
-        #expect(zapReceipt.recipientPubkey == nil)
+        #expect(zapReceipt.recipientPublicKey == nil)
         #expect(throws: ZapReceipt.ValidationError.missingRecipient) {
-            try zapReceipt.validate(lnurlProviderPubkey: payee.publicKey, requiringDescriptionHash: false)
+            try zapReceipt.validate(lnurlProviderPublicKey: payee.publicKey, requiringDescriptionHash: false)
         }
     }
 
@@ -181,9 +181,9 @@ struct NIP57ZapReceiptTests {
         let malformed = try #require(
             ZapReceipt(event: try makeReceipt(signedBy: payee, tags: [["P", "sender"], ["e", "zapped"]])))
 
-        #expect(wellFormed.senderPubkey == sender)
+        #expect(wellFormed.senderPublicKey == sender)
         #expect(wellFormed.zappedEventID == zapped)
-        #expect(malformed.senderPubkey == nil)
+        #expect(malformed.senderPublicKey == nil)
         #expect(malformed.zappedEventID == nil)
     }
 
@@ -212,7 +212,7 @@ struct NIP57ZapReceiptTests {
 
         #expect(throws: ZapReceipt.ValidationError.invalidAmount) {
             try ZapReceipt(event: receipt)!.validate(
-                lnurlProviderPubkey: payee.publicKey, requiringDescriptionHash: false)
+                lnurlProviderPublicKey: payee.publicKey, requiringDescriptionHash: false)
         }
     }
 
@@ -224,7 +224,7 @@ struct NIP57ZapReceiptTests {
         #expect(ZapReceipt(event: note) == nil)
     }
 
-    @Test("a receipt signed by another key fails payeePubkeyMismatch")
+    @Test("a receipt signed by another key fails payeePublicKeyMismatch")
     func payeeMismatch() throws {
         let payee = try KeyPair()
         let recipient = try KeyPair().publicKey.hex
@@ -237,9 +237,9 @@ struct NIP57ZapReceiptTests {
                 ["p", recipient],
             ])
 
-        let otherPubkey = try KeyPair().publicKey
-        #expect(throws: ZapReceipt.ValidationError.payeePubkeyMismatch) {
-            try ZapReceipt(event: receipt)!.validate(lnurlProviderPubkey: otherPubkey)
+        let otherPublicKey = try KeyPair().publicKey
+        #expect(throws: ZapReceipt.ValidationError.payeePublicKeyMismatch) {
+            try ZapReceipt(event: receipt)!.validate(lnurlProviderPublicKey: otherPublicKey)
         }
     }
 
@@ -265,7 +265,7 @@ struct NIP57ZapReceiptTests {
             tags: receipt.tags, content: receipt.content, signature: badSig)
 
         #expect(throws: ZapReceipt.ValidationError.invalidSignature) {
-            try ZapReceipt(event: tampered)!.validate(lnurlProviderPubkey: payee.publicKey)
+            try ZapReceipt(event: tampered)!.validate(lnurlProviderPublicKey: payee.publicKey)
         }
     }
 
@@ -279,7 +279,7 @@ struct NIP57ZapReceiptTests {
             tags: [["description", description], ["p", recipient]])
 
         #expect(throws: ZapReceipt.ValidationError.missingBolt11) {
-            try ZapReceipt(event: receipt)!.validate(lnurlProviderPubkey: payee.publicKey)
+            try ZapReceipt(event: receipt)!.validate(lnurlProviderPublicKey: payee.publicKey)
         }
     }
 
@@ -291,7 +291,7 @@ struct NIP57ZapReceiptTests {
             tags: [["bolt11", coffeeInvoice], ["p", try KeyPair().publicKey.hex]])
 
         #expect(throws: ZapReceipt.ValidationError.missingDescription) {
-            try ZapReceipt(event: receipt)!.validate(lnurlProviderPubkey: payee.publicKey)
+            try ZapReceipt(event: receipt)!.validate(lnurlProviderPublicKey: payee.publicKey)
         }
     }
 
@@ -309,7 +309,7 @@ struct NIP57ZapReceiptTests {
             ])
 
         #expect(throws: ZapReceipt.ValidationError.invalidBolt11) {
-            try ZapReceipt(event: receipt)!.validate(lnurlProviderPubkey: payee.publicKey)
+            try ZapReceipt(event: receipt)!.validate(lnurlProviderPublicKey: payee.publicKey)
         }
     }
 
@@ -327,7 +327,7 @@ struct NIP57ZapReceiptTests {
             ])
 
         #expect(throws: ZapReceipt.ValidationError.descriptionHashMismatch) {
-            try ZapReceipt(event: receipt)!.validate(lnurlProviderPubkey: payee.publicKey)
+            try ZapReceipt(event: receipt)!.validate(lnurlProviderPublicKey: payee.publicKey)
         }
     }
 
@@ -347,7 +347,7 @@ struct NIP57ZapReceiptTests {
 
         #expect(throws: ZapReceipt.ValidationError.amountMismatch) {
             try ZapReceipt(event: receipt)!.validate(
-                lnurlProviderPubkey: payee.publicKey, requiringDescriptionHash: false)
+                lnurlProviderPublicKey: payee.publicKey, requiringDescriptionHash: false)
         }
     }
 
@@ -366,7 +366,7 @@ struct NIP57ZapReceiptTests {
 
         #expect(throws: ZapReceipt.ValidationError.amountMismatch) {
             try ZapReceipt(event: receipt)!.validate(
-                lnurlProviderPubkey: payee.publicKey,
+                lnurlProviderPublicKey: payee.publicKey,
                 expectedAmountMillisats: 1,
                 requiringDescriptionHash: false)
         }
@@ -388,7 +388,7 @@ struct NIP57ZapReceiptTests {
 
         #expect(throws: ZapReceipt.ValidationError.recipientMismatch) {
             try ZapReceipt(event: receipt)!.validate(
-                lnurlProviderPubkey: payee.publicKey, requiringDescriptionHash: false)
+                lnurlProviderPublicKey: payee.publicKey, requiringDescriptionHash: false)
         }
     }
 
@@ -409,7 +409,7 @@ struct NIP57ZapReceiptTests {
 
         #expect(throws: ZapReceipt.ValidationError.zappedEventMismatch) {
             try ZapReceipt(event: receipt)!.validate(
-                lnurlProviderPubkey: payee.publicKey, requiringDescriptionHash: false)
+                lnurlProviderPublicKey: payee.publicKey, requiringDescriptionHash: false)
         }
     }
 
@@ -433,7 +433,7 @@ struct NIP57ZapReceiptTests {
             tags: receipt.tags, content: receipt.content, signature: badSig)
 
         #expect(throws: ZapReceipt.ValidationError.invalidSignature) {
-            try ZapReceipt(event: tampered)!.validate(lnurlProviderPubkey: payee.publicKey)
+            try ZapReceipt(event: tampered)!.validate(lnurlProviderPublicKey: payee.publicKey)
         }
     }
 
@@ -453,7 +453,7 @@ struct NIP57ZapReceiptTests {
 
         #expect(throws: ZapReceipt.ValidationError.preimageMismatch) {
             try ZapReceipt(event: receipt)!.validate(
-                lnurlProviderPubkey: payee.publicKey, requiringDescriptionHash: false)
+                lnurlProviderPublicKey: payee.publicKey, requiringDescriptionHash: false)
         }
     }
 }

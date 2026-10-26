@@ -15,56 +15,56 @@ struct RelayListStoreTests {
     @Test("Newer relay list wins (replaceable event)")
     func newerWins() async {
         let store = makeStore()
-        let pubkey = PublicKey.fixture("pubkey1")
+        let publicKey = PublicKey.fixture("publicKey1")
 
         let listA = RelayListMetadata(entries: [RelayListEntry(url: RelayURL("wss://a.example.com")!)])
         let listB = RelayListMetadata(entries: [RelayListEntry(url: RelayURL("wss://b.example.com")!)])
         let listC = RelayListMetadata(entries: [RelayListEntry(url: RelayURL("wss://c.example.com")!)])
 
-        await store.store(listA, createdAt: Timestamp(rawValue: 100), for: pubkey)
-        await store.store(listB, createdAt: Timestamp(rawValue: 50), for: pubkey)  // older → ignored
-        var cached = await store.cachedList(for: pubkey)
+        await store.store(listA, createdAt: Timestamp(rawValue: 100), for: publicKey)
+        await store.store(listB, createdAt: Timestamp(rawValue: 50), for: publicKey)  // older → ignored
+        var cached = await store.cachedList(for: publicKey)
         #expect(cached?.entries.first?.url == RelayURL("wss://a.example.com"))
 
-        await store.store(listC, createdAt: Timestamp(rawValue: 200), for: pubkey)  // newer → wins
-        cached = await store.cachedList(for: pubkey)
+        await store.store(listC, createdAt: Timestamp(rawValue: 200), for: publicKey)  // newer → wins
+        cached = await store.cachedList(for: publicKey)
         #expect(cached?.entries.first?.url == RelayURL("wss://c.example.com"))
     }
 
     @Test("Equal createdAt keeps existing entry")
     func equalCreatedAtKeepsExisting() async {
         let store = makeStore()
-        let pubkey = PublicKey.fixture("pubkey1")
+        let publicKey = PublicKey.fixture("publicKey1")
 
         await store.store(
             RelayListMetadata(entries: [RelayListEntry(url: RelayURL("wss://a.example.com")!)]),
             createdAt: Timestamp(rawValue: 100),
-            for: pubkey
+            for: publicKey
         )
         await store.store(
             RelayListMetadata(entries: [RelayListEntry(url: RelayURL("wss://b.example.com")!)]),
             createdAt: Timestamp(rawValue: 100),
-            for: pubkey
+            for: publicKey
         )
 
-        let cached = await store.cachedList(for: pubkey)
+        let cached = await store.cachedList(for: publicKey)
         #expect(cached?.entries.first?.url == RelayURL("wss://a.example.com"))
     }
 
     @Test("Resolves write and read relay URLs")
     func writeReadURLResolution() async {
         let store = makeStore()
-        let pubkey = PublicKey.fixture("pubkey1")
+        let publicKey = PublicKey.fixture("publicKey1")
 
         let list = RelayListMetadata(entries: [
             RelayListEntry(url: RelayURL("wss://both.example.com")!, usage: .readWrite),
             RelayListEntry(url: RelayURL("wss://read.example.com")!, usage: .read),
             RelayListEntry(url: RelayURL("wss://write.example.com")!, usage: .write),
         ])
-        await store.store(list, createdAt: Timestamp(rawValue: 1), for: pubkey)
+        await store.store(list, createdAt: Timestamp(rawValue: 1), for: publicKey)
 
-        let writeURLs = await store.writeRelayURLs(for: pubkey)
-        let readURLs = await store.readRelayURLs(for: pubkey)
+        let writeURLs = await store.writeRelayURLs(for: publicKey)
+        let readURLs = await store.readRelayURLs(for: publicKey)
 
         let expectedWrite: Set<RelayURL> = [
             RelayURL("wss://both.example.com")!,
@@ -78,8 +78,8 @@ struct RelayListStoreTests {
         #expect(readURLs == expectedRead)
     }
 
-    @Test("Unknown pubkey resolves to empty relay sets")
-    func unknownPubkeyResolvesEmpty() async {
+    @Test("Unknown public key resolves to empty relay sets")
+    func unknownPublicKeyResolvesEmpty() async {
         let store = makeStore()
         let writeURLs = await store.writeRelayURLs(for: PublicKey.fixture("nobody"))
         let readURLs = await store.readRelayURLs(for: PublicKey.fixture("nobody"))

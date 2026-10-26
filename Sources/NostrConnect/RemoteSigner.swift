@@ -14,7 +14,7 @@ public import NostrCore
 /// For a `bunker://` session the client sends the first `connect` request, presenting the bunker
 /// secret when the token carries one; call ``connect()`` to run it. For a `nostrconnect://` session
 /// the signer initiates instead: ``awaitConnection()`` waits for the signer's first response, whose
-/// echoed secret both authenticates it and reveals its pubkey.
+/// echoed secret both authenticates it and reveals its public key.
 ///
 /// ### Authentication challenges
 /// A signer may answer a request with an `auth_url` challenge instead of a result, asking the user
@@ -62,10 +62,10 @@ public actor RemoteSigner {
     /// The remote signer's public key. Known up front for a `bunker://` session; `nil` for a
     /// client-initiated `nostrconnect://` session until ``awaitConnection()`` discovers it from the
     /// signer's first valid response.
-    private var signerPubkey: PublicKey?
+    private var signerPublicKey: PublicKey?
 
     /// The connection secret a `nostrconnect://` invitation expects the signer to echo back, used to
-    /// authenticate the signer before its pubkey is pinned. `nil` for a `bunker://` session.
+    /// authenticate the signer before its public key is pinned. `nil` for a `bunker://` session.
     private let expectedInvitationSecret: String?
 
     /// The permissions this client asks the signer to grant in its `connect` call.
@@ -95,7 +95,7 @@ public actor RemoteSigner {
     /// The waiter suspended in ``awaitConnection()``, resolved once a valid connect response
     /// (echoing the invitation secret) arrives, or the wait times out. `nil` when not awaiting.
     private var connectionWaiter: CheckedContinuation<PublicKey, any Error>?
-    /// A discovered signer pubkey from a valid connect response that arrived before
+    /// A discovered signer public key from a valid connect response that arrived before
     /// ``discoverSigner()`` registered its waiter (the response can be delivered as soon as the
     /// subscription exists, which is before the waiter is set). Consumed when the waiter registers so
     /// the acknowledgement is never lost to that window.
@@ -127,7 +127,7 @@ public actor RemoteSigner {
         self.clientKeyPair = keyPair
         self.signer = EventSigner(keyPair: keyPair)
         self.clientPublicKey = keyPair.publicKey
-        self.signerPubkey = bunker.remoteSignerPubkey
+        self.signerPublicKey = bunker.remoteSignerPublicKey
         self.secret = bunker.secret
         self.expectedInvitationSecret = nil
         self.requestedPermissions = permissions
@@ -152,7 +152,7 @@ public actor RemoteSigner {
         self.clientKeyPair = clientKeyPair
         self.signer = EventSigner(keyPair: clientKeyPair)
         self.clientPublicKey = clientKeyPair.publicKey
-        self.signerPubkey = nil
+        self.signerPublicKey = nil
         self.secret = nil
         self.expectedInvitationSecret = expectedInvitationSecret
         // The invitation URI already carries this flow's permissions, and the client never sends
@@ -168,8 +168,8 @@ public actor RemoteSigner {
     /// The remote signer's public key, or `nil` for a client-initiated `nostrconnect://` session
     /// before ``awaitConnection()`` has discovered it. Known immediately for a `bunker://` session.
     /// Not necessarily the user's key (see ``userPublicKey()``).
-    public var remoteSignerPubkey: PublicKey? {
-        signerPubkey
+    public var remoteSignerPublicKey: PublicKey? {
+        signerPublicKey
     }
 
     // MARK: - Lifecycle
@@ -184,13 +184,13 @@ public actor RemoteSigner {
         try await ensureStarted()
         guard !didConnect else { return }
 
-        let signerPubkey = try requireSignerPubkey()
-        // NIP-46's connect takes `[signerPubkey, secret, perms]`. The secret is included only when
+        let signerPublicKey = try requireSignerPublicKey()
+        // NIP-46's connect takes `[signerPublicKey, secret, perms]`. The secret is included only when
         // the token carries one; an older signer may echo it back instead of "ack", so accept
         // either. The permissions go in the third slot, which is positional — so an empty secret
         // still has to be sent when there are permissions to name after it. Without them every
         // operation had to be authorized interactively, one `auth_url` round-trip at a time.
-        var params = [signerPubkey.hex]
+        var params = [signerPublicKey.hex]
         if secret != nil || !requestedPermissions.isEmpty {
             params.append(secret ?? "")
         }
@@ -316,16 +316,16 @@ public actor RemoteSigner {
     }
 
     private func buildRequestEvent(_ request: RemoteSignerRequest) throws -> Event {
-        // The signer's pubkey must be known before any request can be addressed to it — always true
+        // The signer's public key must be known before any request can be addressed to it — always true
         // for a bunker session, and true for a nostrconnect session once awaitConnection() resolves.
-        let signerPubkey = try requireSignerPubkey()
+        let signerPublicKey = try requireSignerPublicKey()
         do {
             let json = String(decoding: try JSONEncoder().encode(request), as: UTF8.self)
-            let sealed = try SealedMessage.seal(json, for: signerPubkey, using: clientKeyPair)
+            let sealed = try SealedMessage.seal(json, for: signerPublicKey, using: clientKeyPair)
             let unsigned = UnsignedEvent(
                 publicKey: clientKeyPair.publicKey,
                 kind: .nostrConnect,
-                rawTags: [["p", signerPubkey.hex]],
+                rawTags: [["p", signerPublicKey.hex]],
                 content: sealed.payload)
             return try signer.sign(unsigned)
         } catch {
@@ -336,17 +336,17 @@ public actor RemoteSigner {
     // MARK: - Incoming events
 
     private func handle(event: Event) async {
-        // A client-initiated (nostrconnect://) session does not yet know the signer's pubkey: the
+        // A client-initiated (nostrconnect://) session does not yet know the signer's public key: the
         // first valid response echoing the invitation secret both authenticates the signer and
         // reveals it. Route such events to the connection waiter instead of the request path.
-        guard let signerPubkey else {
+        guard let signerPublicKey else {
             handleConnectionCandidate(event)
             return
         }
 
         // The relay filter already restricts authors, but enforce it here too as defense in depth:
         // ignore anything that is not from the signer.
-        guard event.publicKey == signerPubkey else { return }
+        guard event.publicKey == signerPublicKey else { return }
 
         guard
             let content = try? SealedMessage(payload: event.content).open(from: event.publicKey, using: clientKeyPair),
@@ -400,26 +400,26 @@ public actor RemoteSigner {
     // MARK: - Client-initiated connection
 
     /// Waits for the signer to accept a `nostrconnect://` invitation and returns its discovered
-    /// pubkey. Backs ``awaitConnection()``; see that method for the full contract.
+    /// public key. Backs ``awaitConnection()``; see that method for the full contract.
     func discoverSigner() async throws -> PublicKey {
         try await ensureStarted()
 
         // Already discovered (e.g. a second call, or a bunker session): nothing to wait for.
-        if let signerPubkey { return signerPubkey }
+        if let signerPublicKey { return signerPublicKey }
 
         // Only one waiter at a time; a concurrent caller would clobber the continuation.
         guard connectionWaiter == nil else {
             throw RemoteSignerError.connectionInProgress
         }
 
-        let signerPubkey: PublicKey
+        let signerPublicKey: PublicKey
         if let buffered = bufferedDiscovery {
             // A valid connect response already arrived while we were starting up.
             bufferedDiscovery = nil
-            signerPubkey = buffered
+            signerPublicKey = buffered
         } else {
             let timeout = config.requestTimeout
-            signerPubkey = try await withCheckedThrowingContinuation { continuation in
+            signerPublicKey = try await withCheckedThrowingContinuation { continuation in
                 connectionWaiter = continuation
                 connectionTimeoutTask = Task { [weak self] in
                     try? await Task.sleep(for: timeout)
@@ -430,15 +430,15 @@ public actor RemoteSigner {
         }
 
         // Pin subsequent traffic to the now-known signer (defense in depth) and mark connected.
-        self.signerPubkey = signerPubkey
+        self.signerPublicKey = signerPublicKey
         didConnect = true
         try? await session.subscribe(id: Self.responseSubscriptionID, filters: [responseFilter])
-        return signerPubkey
+        return signerPublicKey
     }
 
     /// Inspects an event received before the signer is known: if it decrypts to a response whose
     /// result echoes the expected invitation secret, it is the authentic connect acknowledgement, so
-    /// resolve the waiter with the sender's pubkey. Anything else (including a mismatched secret from
+    /// resolve the waiter with the sender's public key. Anything else (including a mismatched secret from
     /// a spoofer) is ignored so the client keeps waiting for the correct response.
     private func handleConnectionCandidate(_ event: Event) {
         guard let expectedInvitationSecret else { return }
@@ -455,18 +455,18 @@ public actor RemoteSigner {
             resolveConnection(with: event.publicKey)
         } else {
             // The waiter isn't registered yet (the response arrived between the subscription being
-            // created and ``discoverSigner()`` suspending); hold the pubkey for it to pick up.
+            // created and ``discoverSigner()`` suspending); hold the public key for it to pick up.
             bufferedDiscovery = event.publicKey
         }
     }
 
-    /// Resolves the pending ``discoverSigner()`` waiter with the discovered signer pubkey.
-    private func resolveConnection(with signerPubkey: PublicKey) {
+    /// Resolves the pending ``discoverSigner()`` waiter with the discovered signer public key.
+    private func resolveConnection(with signerPublicKey: PublicKey) {
         connectionTimeoutTask?.cancel()
         connectionTimeoutTask = nil
         let waiter = connectionWaiter
         connectionWaiter = nil
-        waiter?.resume(returning: signerPubkey)
+        waiter?.resume(returning: signerPublicKey)
     }
 
     /// Fails the pending ``discoverSigner()`` waiter (e.g. on timeout).
@@ -478,11 +478,11 @@ public actor RemoteSigner {
         waiter?.resume(throwing: error)
     }
 
-    /// The signer's pubkey, or throws ``RemoteSignerError/notConnected`` if it is not yet known (a
+    /// The signer's public key, or throws ``RemoteSignerError/notConnected`` if it is not yet known (a
     /// nostrconnect session before ``awaitConnection()`` resolves).
-    private func requireSignerPubkey() throws -> PublicKey {
-        guard let signerPubkey else { throw RemoteSignerError.notConnected }
-        return signerPubkey
+    private func requireSignerPublicKey() throws -> PublicKey {
+        guard let signerPublicKey else { throw RemoteSignerError.notConnected }
+        return signerPublicKey
     }
 
     // MARK: - Commands support
@@ -502,18 +502,19 @@ public actor RemoteSigner {
     }
 
     /// Records the user's public key so later calls return it without another round-trip.
-    func cacheUserPublicKey(_ pubkey: PublicKey) {
-        cachedUserPublicKey = pubkey
+    func cacheUserPublicKey(_ publicKey: PublicKey) {
+        cachedUserPublicKey = publicKey
     }
 
     // MARK: - Filters
 
     /// The subscription filter for incoming responses. It pins `authors` to the signer once known
     /// (a bunker session, or a nostrconnect session after discovery); before a nostrconnect signer
-    /// is known it omits `authors` so the client can receive the connect response from any pubkey.
+    /// is known it omits `authors` so the client can receive the connect response from any public key.
     private var responseFilter: Filter {
         Filter(
-            authors: signerPubkey.map { [$0] }, kinds: [.nostrConnect], publicKeyReferences: [clientKeyPair.publicKey])
+            authors: signerPublicKey.map { [$0] }, kinds: [.nostrConnect],
+            publicKeyReferences: [clientKeyPair.publicKey])
     }
 
     // MARK: - Testing

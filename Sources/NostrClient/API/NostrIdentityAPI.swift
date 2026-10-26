@@ -50,10 +50,10 @@ public struct NostrIdentityAPI: NostrIdentityProviding {
 
     /// Signs an event with the configured signer, local or remote.
     ///
-    /// Build an ``UnsignedEvent`` with ``publicKey`` as its pubkey; combine with
+    /// Build an ``UnsignedEvent`` with ``publicKey`` as its public key; combine with
     /// ``NostrEventsAPI/publish(_:to:strategy:)`` to author and publish an event this library has
     /// no helper for.
-    /// - Parameter unsignedEvent: The event to sign; its `pubkey` should be ``publicKey``.
+    /// - Parameter unsignedEvent: The event to sign; its `publicKey` should be ``publicKey``.
     /// - Returns: The signed ``Event``.
     /// - Throws: ``NostrError/signerNotSet`` if no signer is set, plus anything the signer throws.
     public func sign(_ unsignedEvent: UnsignedEvent) async throws -> Event {
@@ -62,33 +62,33 @@ public struct NostrIdentityAPI: NostrIdentityProviding {
 
     // MARK: - Encryption (NIP-44)
 
-    /// Encrypts `plaintext` to `recipientPubkey` with NIP-44 v2 as the configured signer, local or
+    /// Encrypts `plaintext` to `recipientPublicKey` with NIP-44 v2 as the configured signer, local or
     /// remote.
     ///
     /// Use it for app payloads addressed to a peer outside the direct-message path. With a remote
     /// NIP-46 signer each call is a relay round-trip.
     /// - Parameters:
     ///   - plaintext: The message to encrypt.
-    ///   - recipientPubkey: The recipient's public key.
+    ///   - recipientPublicKey: The recipient's public key.
     /// - Returns: The NIP-44 payload.
     /// - Throws: ``NostrError/signerNotSet`` if no signer is set, plus anything the signer throws.
-    public func nip44Encrypt(_ plaintext: String, to recipientPubkey: PublicKey) async throws -> String {
+    public func nip44Encrypt(_ plaintext: String, to recipientPublicKey: PublicKey) async throws -> String {
         try await client.withSigner { signer, _ in
-            try await signer.nip44Encrypt(plaintext, to: recipientPubkey)
+            try await signer.nip44Encrypt(plaintext, to: recipientPublicKey)
         }
     }
 
-    /// Decrypts a NIP-44 v2 payload from `senderPubkey` with the configured signer, local or remote.
+    /// Decrypts a NIP-44 v2 payload from `senderPublicKey` with the configured signer, local or remote.
     ///
     /// With a remote NIP-46 signer each call is a relay round-trip.
     /// - Parameters:
     ///   - ciphertext: The NIP-44 payload.
-    ///   - senderPubkey: The sender's public key.
+    ///   - senderPublicKey: The sender's public key.
     /// - Returns: The decrypted plaintext.
     /// - Throws: ``NostrError/signerNotSet`` if no signer is set, plus anything the signer throws.
-    public func nip44Decrypt(_ ciphertext: String, from senderPubkey: PublicKey) async throws -> String {
+    public func nip44Decrypt(_ ciphertext: String, from senderPublicKey: PublicKey) async throws -> String {
         try await client.withSigner { signer, _ in
-            try await signer.nip44Decrypt(ciphertext, from: senderPubkey)
+            try await signer.nip44Decrypt(ciphertext, from: senderPublicKey)
         }
     }
 

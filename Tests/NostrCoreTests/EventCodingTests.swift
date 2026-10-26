@@ -33,7 +33,7 @@ struct EventCodingTests {
     }
 
     @Test("a NIP-01 event decodes its pubkey field into publicKey")
-    func nip01PubkeyFieldDecodesIntoPublicKey() throws {
+    func nip01WireKeyDecodesIntoPublicKey() throws {
         let publicKeyHex = String(repeating: "cd", count: 32)
         let json = #"""
             {"id":"\#(String(repeating: "ab", count: 32))","pubkey":"\#(publicKeyHex)","created_at":1234567890,\#

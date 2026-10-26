@@ -17,7 +17,7 @@ enum VerifiedEventSelection {
     /// - Parameters:
     ///   - events: The events a fetch returned.
     ///   - kind: The kind requested, or nil to accept any.
-    ///   - author: The pubkey requested, or nil to accept any author.
+    ///   - author: The public key requested, or nil to accept any author.
     ///   - identifier: The `d` tag requested for an addressable event, or nil when the coordinates
     ///     do not include one.
     /// - Returns: The winning event, or nil when nothing survives the checks.

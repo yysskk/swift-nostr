@@ -124,12 +124,12 @@ struct InternetIdentifierTests {
     func verificationResultProperties() {
         let result = InternetIdentifier.VerificationResult(
             identifier: "alice@example.com",
-            pubkey: .fixture("alice"),
+            publicKey: .fixture("alice"),
             relays: [RelayURL("wss://relay1.com")!, RelayURL("wss://relay2.com")!]
         )
 
         #expect(result.identifier == "alice@example.com")
-        #expect(result.pubkey == .fixture("alice"))
+        #expect(result.publicKey == .fixture("alice"))
         #expect(result.relays.count == 2)
     }
 
@@ -137,19 +137,19 @@ struct InternetIdentifierTests {
     func verificationResultEquality() {
         let result1 = InternetIdentifier.VerificationResult(
             identifier: "alice@example.com",
-            pubkey: .fixture("alice"),
+            publicKey: .fixture("alice"),
             relays: [RelayURL("wss://relay.com")!]
         )
 
         let result2 = InternetIdentifier.VerificationResult(
             identifier: "alice@example.com",
-            pubkey: .fixture("alice"),
+            publicKey: .fixture("alice"),
             relays: [RelayURL("wss://relay.com")!]
         )
 
         let result3 = InternetIdentifier.VerificationResult(
             identifier: "bob@example.com",
-            pubkey: .fixture("alice"),
+            publicKey: .fixture("alice"),
             relays: [RelayURL("wss://relay.com")!]
         )
 
@@ -161,12 +161,12 @@ struct InternetIdentifierTests {
     func verificationResultHashable() {
         let result1 = InternetIdentifier.VerificationResult(
             identifier: "alice@example.com",
-            pubkey: .fixture("alice")
+            publicKey: .fixture("alice")
         )
 
         let result2 = InternetIdentifier.VerificationResult(
             identifier: "alice@example.com",
-            pubkey: .fixture("alice")
+            publicKey: .fixture("alice")
         )
 
         var set: Set<InternetIdentifier.VerificationResult> = []
@@ -182,8 +182,8 @@ struct InternetIdentifierTests {
     func verificationErrorDescriptions() {
         #expect(InternetIdentifier.VerificationError.invalidIdentifier.errorDescription != nil)
         #expect(InternetIdentifier.VerificationError.invalidResponse.errorDescription != nil)
-        #expect(InternetIdentifier.VerificationError.pubkeyNotFound.errorDescription != nil)
-        #expect(InternetIdentifier.VerificationError.pubkeyMismatch.errorDescription != nil)
+        #expect(InternetIdentifier.VerificationError.publicKeyNotFound.errorDescription != nil)
+        #expect(InternetIdentifier.VerificationError.publicKeyMismatch.errorDescription != nil)
     }
 
     // MARK: - Integration Tests (require network)
@@ -221,7 +221,7 @@ struct InternetIdentifierTests {
         let result = try InternetIdentifier.result(for: "Alice@example.com", name: "Alice", in: data)
 
         #expect(result.identifier == "Alice@example.com")
-        #expect(result.pubkey == alice)
+        #expect(result.publicKey == alice)
         #expect(result.relays == [RelayURL("wss://relay.example.com")!])
     }
 
@@ -244,7 +244,7 @@ struct InternetIdentifierTests {
     func malformedKeyIsNotFound(value: String) throws {
         let data = try nostrJSON(names: ["alice": value])
 
-        #expect(throws: InternetIdentifier.VerificationError.pubkeyNotFound) {
+        #expect(throws: InternetIdentifier.VerificationError.publicKeyNotFound) {
             try InternetIdentifier.result(for: "alice@example.com", name: "alice", in: data)
         }
     }
@@ -253,7 +253,7 @@ struct InternetIdentifierTests {
     func uppercaseKeyIsNotFound() throws {
         let data = try nostrJSON(names: ["alice": alice.hex.uppercased()])
 
-        #expect(throws: InternetIdentifier.VerificationError.pubkeyNotFound) {
+        #expect(throws: InternetIdentifier.VerificationError.publicKeyNotFound) {
             try InternetIdentifier.result(for: "alice@example.com", name: "alice", in: data)
         }
     }
@@ -262,7 +262,7 @@ struct InternetIdentifierTests {
     func missingNameIsNotFound() throws {
         let data = try nostrJSON(names: ["bob": alice.hex])
 
-        #expect(throws: InternetIdentifier.VerificationError.pubkeyNotFound) {
+        #expect(throws: InternetIdentifier.VerificationError.publicKeyNotFound) {
             try InternetIdentifier.result(for: "alice@example.com", name: "alice", in: data)
         }
     }

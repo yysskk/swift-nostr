@@ -16,12 +16,12 @@ struct NIP56ReportTests {
             ])
     }
 
-    @Test("signReport(pubkey:) produces a kind-1984 event with the type on the p tag")
-    func signPubkeyReport() throws {
+    @Test("signReport(publicKey:) produces a kind-1984 event with the type on the p tag")
+    func signPublicKeyReport() throws {
         let signer = EventSigner(keyPair: try KeyPair())
         let target = try KeyPair()
 
-        let event = try signer.signReport(pubkey: target.publicKey, type: .nudity, reason: "explicit content")
+        let event = try signer.signReport(publicKey: target.publicKey, type: .nudity, reason: "explicit content")
 
         #expect(event.kind == .report)
         #expect(event.content == "explicit content")
@@ -29,12 +29,12 @@ struct NIP56ReportTests {
         #expect(try event.verify())
     }
 
-    @Test("signReport(pubkey:) supports impersonation, the spec's canonical example")
+    @Test("signReport(publicKey:) supports impersonation, the spec's canonical example")
     func signImpersonationReport() throws {
         let signer = EventSigner(keyPair: try KeyPair())
         let target = try KeyPair()
 
-        let event = try signer.signReport(pubkey: target.publicKey, type: .impersonation)
+        let event = try signer.signReport(publicKey: target.publicKey, type: .impersonation)
 
         #expect(event.kind == .report)
         #expect(event.content.isEmpty)
@@ -74,12 +74,12 @@ struct NIP56ReportTests {
         #expect(try event.verify())
     }
 
-    @Test("publishReport(pubkey:) without a signer throws signerNotSet")
+    @Test("publishReport(publicKey:) without a signer throws signerNotSet")
     func publishReportWithoutSignerThrowsSignerNotSet() async throws {
         let client = NostrClient()
 
         await #expect(throws: NostrError.signerNotSet) {
-            _ = try await client.events.publishReport(pubkey: .fixture("target"), type: .spam)
+            _ = try await client.events.publishReport(publicKey: .fixture("target"), type: .spam)
         }
     }
 }

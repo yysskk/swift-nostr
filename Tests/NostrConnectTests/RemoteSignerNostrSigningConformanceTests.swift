@@ -46,7 +46,7 @@ struct RemoteSignerNostrSigningConformanceTests {
         let _: any NostrSigning = remote
     }
 
-    @Test("publicKey through any NostrSigning returns the user pubkey from get_public_key")
+    @Test("publicKey through any NostrSigning returns the user public key from get_public_key")
     func publicKeyThroughProtocol() async throws {
         let (remote, transport) = try await connected()
         let signing: any NostrSigning = remote

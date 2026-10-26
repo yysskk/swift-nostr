@@ -87,20 +87,20 @@ struct NIP51SimpleGroupListTests {
     @Test("An entry built from a reference keeps only the list fields")
     func entryFromReference() {
         let reference = GroupReference(
-            relayURL: groupRelay, id: groupID, relayPubkey: .fixture("relay"), inviteCode: "welcome")
+            relayURL: groupRelay, id: groupID, relayPublicKey: .fixture("relay"), inviteCode: "welcome")
         let entry = GroupListEntry(reference, name: "Cooking")
         #expect(entry.groupID == groupID)
         #expect(entry.relayURL == groupRelay)
         #expect(entry.name == "Cooking")
     }
 
-    @Test("An entry's reference carries no relay pubkey or invite code")
+    @Test("An entry's reference carries no relay public key or invite code")
     func entryToReference() {
         let entry = GroupListEntry(groupID: groupID, relayURL: groupRelay, name: "Cooking")
         let reference = entry.reference
         #expect(reference.id == groupID)
         #expect(reference.relayURL == groupRelay)
-        #expect(reference.relayPubkey == nil)
+        #expect(reference.relayPublicKey == nil)
         #expect(reference.inviteCode == nil)
     }
 

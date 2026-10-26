@@ -41,7 +41,7 @@ struct DirectMessageRelayListTests {
         let list = DirectMessageRelayList(tags: [
             ["relay", "wss://a.example.com"],
             ["r", "wss://b.example.com"],
-            ["p", "somepubkey"],
+            ["p", "somepublickey"],
             ["relay", "wss://c.example.com"],
         ])
         #expect(list.relays == [RelayURL("wss://a.example.com")!, RelayURL("wss://c.example.com")!])
@@ -186,16 +186,16 @@ struct DirectMessageRelayListTests {
 @Suite("Direct Message Relay List Filter Tests (NIP-17)")
 struct DirectMessageRelayListFilterTests {
 
-    @Test("DM relay list filter for single pubkey")
-    func filterSinglePubkey() {
+    @Test("DM relay list filter for single public key")
+    func filterSinglePublicKey() {
         let filter = Filter.directMessageRelayList(publicKey: .fixture("abc123"))
         #expect(filter.authors == [.fixture("abc123")])
         #expect(filter.kinds == [10050])
         #expect(filter.limit == 1)
     }
 
-    @Test("DM relay list filter for multiple pubkeys")
-    func filterMultiplePubkeys() {
+    @Test("DM relay list filter for multiple public keys")
+    func filterMultiplePublicKeys() {
         let filter = Filter.directMessageRelayList(publicKeys: [.fixture("abc123"), .fixture("def456")])
         #expect(filter.authors == [.fixture("abc123"), .fixture("def456")])
         #expect(filter.kinds == [10050])

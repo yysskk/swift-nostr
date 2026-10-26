@@ -21,9 +21,21 @@ struct WalletConnectResponseTests {
         #expect(response.error == nil)
         let result = try #require(response.result)
         #expect(result.alias == "Alby")
+        #expect(result.nodePublicKey == "02abc")
         #expect(result.blockHeight == 830_000)
         #expect(result.methods == ["pay_invoice", "get_balance"])
         #expect(result.notifications == ["payment_received"])
+    }
+
+    @Test("get_info encodes nodePublicKey under the wire key public key")
+    func encodeGetInfoNodePublicKey() throws {
+        let data = try JSONEncoder().encode(GetInfoResult(nodePublicKey: "02abc"))
+        guard case .object(let object) = try JSONDecoder().decode(JSONValue.self, from: data) else {
+            Issue.record("expected a JSON object")
+            return
+        }
+        #expect(object["pubkey"] == .string("02abc"))
+        #expect(object["nodePublicKey"] == nil)
     }
 
     @Test("decodes a transaction with all snake_case fields")

@@ -28,7 +28,7 @@ public struct NostrMessagesAPI: NostrMessaging {
     /// self-copy stays best-effort.
     /// - Parameters:
     ///   - content: The message content
-    ///   - recipientPubkey: The recipient's public key
+    ///   - recipientPublicKey: The recipient's public key
     ///   - subject: Optional conversation subject
     ///   - replyTo: Optional id of the event to reply to
     ///   - expiration: Optional NIP-40 expiration for a disappearing message. Set on both gift
@@ -43,7 +43,7 @@ public struct NostrMessagesAPI: NostrMessaging {
     @discardableResult
     public func send(
         _ content: String,
-        to recipientPubkey: PublicKey,
+        to recipientPublicKey: PublicKey,
         subject: String? = nil,
         replyTo: EventID? = nil,
         expiration: Timestamp? = nil,
@@ -52,14 +52,14 @@ public struct NostrMessagesAPI: NostrMessaging {
         let result = try await client.withSigner { signer, _ in
             try await DirectMessageBuilder(signer: signer).createMessageWithSelfCopy(
                 content: content,
-                to: recipientPubkey,
+                to: recipientPublicKey,
                 subject: subject,
                 replyTo: replyTo,
                 expiration: expiration
             )
         }
 
-        return try await deliver(result, to: recipientPubkey, strategy: strategy)
+        return try await deliver(result, to: recipientPublicKey, strategy: strategy)
     }
 
     /// Sends a NIP-25 reaction to a received direct message, gift-wrapped like the message itself.
@@ -85,13 +85,13 @@ public struct NostrMessagesAPI: NostrMessaging {
             try await DirectMessageBuilder(signer: signer).createReactionWithSelfCopy(
                 reaction: reaction,
                 to: message.rumorID,
-                author: message.senderPubkey,
-                recipientPubkey: message.senderPubkey,
+                author: message.senderPublicKey,
+                recipientPublicKey: message.senderPublicKey,
                 expiration: expiration
             )
         }
 
-        return try await deliver(result, to: message.senderPubkey, strategy: strategy)
+        return try await deliver(result, to: message.senderPublicKey, strategy: strategy)
     }
 
     /// Sends a NIP-17 kind-15 file message, gift-wrapped and routed like a text message.
@@ -107,7 +107,7 @@ public struct NostrMessagesAPI: NostrMessaging {
     ///   - size: Optional size of the encrypted file in bytes.
     ///   - dimensions: Optional pixel dimensions as "<width>x<height>".
     ///   - blurhash: Optional blurhash placeholder for progressive display.
-    ///   - recipientPubkey: The recipient's public key.
+    ///   - recipientPublicKey: The recipient's public key.
     ///   - expiration: Optional NIP-40 expiration applied to both gift wraps.
     ///   - strategy: How many relay acknowledgments to wait for on the recipient gift wrap before
     ///     returning (default: the pool config's ``RelayPoolConfig/defaultPublishStrategy``).
@@ -120,7 +120,7 @@ public struct NostrMessagesAPI: NostrMessaging {
         size: Int? = nil,
         dimensions: String? = nil,
         blurhash: String? = nil,
-        to recipientPubkey: PublicKey,
+        to recipientPublicKey: PublicKey,
         expiration: Timestamp? = nil,
         strategy: PublishStrategy? = nil
     ) async throws -> SendDirectMessageResult {
@@ -132,12 +132,12 @@ public struct NostrMessagesAPI: NostrMessaging {
                 size: size,
                 dimensions: dimensions,
                 blurhash: blurhash,
-                to: recipientPubkey,
+                to: recipientPublicKey,
                 expiration: expiration
             )
         }
 
-        return try await deliver(result, to: recipientPubkey, strategy: strategy)
+        return try await deliver(result, to: recipientPublicKey, strategy: strategy)
     }
 
     /// Sends a rumor of any kind gift-wrapped (NIP-59), delivered like a NIP-17 direct message.
@@ -147,11 +147,11 @@ public struct NostrMessagesAPI: NostrMessaging {
     /// ``send(_:to:subject:replyTo:expiration:strategy:)``: to each addressee's kind-10050 DM
     /// relays, falling back to the full pool. Use it for private payloads other than kinds 14, 15,
     /// and 7. To build the gift wraps without publishing, use
-    /// ``GiftWrap/wrap(event:signer:recipientPubkey:expiration:)``.
+    /// ``GiftWrap/wrap(event:signer:recipientPublicKey:expiration:)``.
     /// - Parameters:
-    ///   - rumor: The event to deliver. Its `pubkey` must be the signer's public key; it is never
+    ///   - rumor: The event to deliver. Its `publicKey` must be the signer's public key; it is never
     ///     signed.
-    ///   - recipientPubkey: The recipient's public key.
+    ///   - recipientPublicKey: The recipient's public key.
     ///   - expiration: Optional NIP-40 expiration applied to both gift wraps.
     ///   - strategy: How many relay acknowledgments to wait for on the recipient gift wrap before
     ///     returning (default: the pool config's ``RelayPoolConfig/defaultPublishStrategy``).
@@ -162,7 +162,7 @@ public struct NostrMessagesAPI: NostrMessaging {
     @discardableResult
     public func sendGiftWrapped(
         _ rumor: UnsignedEvent,
-        to recipientPubkey: PublicKey,
+        to recipientPublicKey: PublicKey,
         expiration: Timestamp? = nil,
         strategy: PublishStrategy? = nil
     ) async throws -> SendDirectMessageResult {
@@ -172,13 +172,13 @@ public struct NostrMessagesAPI: NostrMessaging {
             }
             return try await DirectMessageBuilder(signer: signer).wrapWithSelfCopy(
                 rumor: try rumor.asRumor(),
-                senderPubkey: publicKey,
-                to: recipientPubkey,
+                senderPublicKey: publicKey,
+                to: recipientPublicKey,
                 expiration: expiration
             )
         }
 
-        return try await deliver(result, to: recipientPubkey, strategy: strategy)
+        return try await deliver(result, to: recipientPublicKey, strategy: strategy)
     }
 
     // MARK: - Parsing
@@ -268,10 +268,10 @@ public struct NostrMessagesAPI: NostrMessaging {
     /// the best-effort self-copy never blocks or fails the primary send.
     private func deliver(
         _ result: SendDirectMessageResult,
-        to recipientPubkey: PublicKey,
+        to recipientPublicKey: PublicKey,
         strategy: PublishStrategy?
     ) async throws -> SendDirectMessageResult {
-        async let recipientTargetsTask = inboxTargets(for: recipientPubkey)
+        async let recipientTargetsTask = inboxTargets(for: recipientPublicKey)
         // The rumor is authored under the sender's key, so it names the self-copy's addressee.
         async let senderTargetsTask = inboxTargets(for: result.rumor.publicKey)
         let recipientTargets = await recipientTargetsTask
@@ -301,12 +301,12 @@ public struct NostrMessagesAPI: NostrMessaging {
         try? await client.pool.publish(event, to: relayURLs, strategy: nil)
     }
 
-    /// Resolves the kind-10050 DM inbox relays to route a gift wrap to for `pubkey`, connecting
+    /// Resolves the kind-10050 DM inbox relays to route a gift wrap to for `publicKey`, connecting
     /// them per the gossip policy.
     /// - Returns: The connected inbox relays, or nil when the addressee advertised no DM relay
     ///   list (or none could be connected) — signalling a fall back to the full relay pool.
-    private func inboxTargets(for pubkey: PublicKey) async -> Set<RelayURL>? {
-        let connected = await client.routing.connectedInboxRelays(for: pubkey)
+    private func inboxTargets(for publicKey: PublicKey) async -> Set<RelayURL>? {
+        let connected = await client.routing.connectedInboxRelays(for: publicKey)
         return connected.isEmpty ? nil : connected
     }
 

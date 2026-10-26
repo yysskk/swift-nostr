@@ -15,13 +15,13 @@ public struct DirectMessageReaction: Sendable, Identifiable, Hashable {
     public let rumorID: EventID
 
     /// The reactor's public key.
-    public let senderPubkey: PublicKey
+    public let senderPublicKey: PublicKey
 
     /// The rumor id of the message being reacted to (the reaction's "e" tag).
     public let messageID: EventID
 
     /// The public key of the reacted-to message's author (the reaction's "p" tag).
-    public let messageAuthorPubkey: PublicKey
+    public let messageAuthorPublicKey: PublicKey
 
     /// The reaction content — typically "+" (like), "-" (dislike), or an emoji.
     public let content: String
@@ -36,17 +36,17 @@ public struct DirectMessageReaction: Sendable, Identifiable, Hashable {
     /// Creates a reaction from its parsed parts.
     public init(
         rumorID: EventID,
-        senderPubkey: PublicKey,
+        senderPublicKey: PublicKey,
         messageID: EventID,
-        messageAuthorPubkey: PublicKey,
+        messageAuthorPublicKey: PublicKey,
         content: String,
         createdAt: Timestamp,
         expiresAt: Timestamp? = nil
     ) {
         self.rumorID = rumorID
-        self.senderPubkey = senderPubkey
+        self.senderPublicKey = senderPublicKey
         self.messageID = messageID
-        self.messageAuthorPubkey = messageAuthorPubkey
+        self.messageAuthorPublicKey = messageAuthorPublicKey
         self.content = content
         self.createdAt = createdAt
         self.expiresAt = expiresAt

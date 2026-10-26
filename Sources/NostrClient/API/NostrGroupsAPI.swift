@@ -39,12 +39,12 @@ public struct NostrGroupsAPI: NostrGroupManaging {
         reason: String? = nil,
         strategy: PublishStrategy? = nil
     ) async throws -> PublishedEvent {
-        try await publish(to: group, strategy: strategy) { pubkey in
+        try await publish(to: group, strategy: strategy) { publicKey in
             Groups.joinRequest(
                 groupID: group.id,
                 inviteCode: inviteCode ?? group.inviteCode,
                 reason: reason,
-                publicKey: pubkey
+                publicKey: publicKey
             )
         }
     }
@@ -68,8 +68,8 @@ public struct NostrGroupsAPI: NostrGroupManaging {
         reason: String? = nil,
         strategy: PublishStrategy? = nil
     ) async throws -> PublishedEvent {
-        try await publish(to: group, strategy: strategy) { pubkey in
-            Groups.leaveRequest(groupID: group.id, reason: reason, publicKey: pubkey)
+        try await publish(to: group, strategy: strategy) { publicKey in
+            Groups.leaveRequest(groupID: group.id, reason: reason, publicKey: publicKey)
         }
     }
 
@@ -106,14 +106,14 @@ public struct NostrGroupsAPI: NostrGroupManaging {
         previous: [String] = [],
         strategy: PublishStrategy? = nil
     ) async throws -> PublishedEvent {
-        try await publish(to: group, strategy: strategy) { pubkey in
+        try await publish(to: group, strategy: strategy) { publicKey in
             Groups.contentEvent(
                 groupID: group.id,
                 kind: kind,
                 content: content,
                 tags: tags,
                 previous: previous,
-                publicKey: pubkey
+                publicKey: publicKey
             )
         }
     }
@@ -145,8 +145,8 @@ public struct NostrGroupsAPI: NostrGroupManaging {
         reason: String? = nil,
         strategy: PublishStrategy? = nil
     ) async throws -> PublishedEvent {
-        try await publish(to: group, strategy: strategy) { pubkey in
-            Groups.moderationEvent(action, groupID: group.id, previous: previous, reason: reason, publicKey: pubkey)
+        try await publish(to: group, strategy: strategy) { publicKey in
+            Groups.moderationEvent(action, groupID: group.id, previous: previous, reason: reason, publicKey: publicKey)
         }
     }
 
@@ -154,7 +154,7 @@ public struct NostrGroupsAPI: NostrGroupManaging {
 
     /// Fetches the group's kind-39000 metadata from its relay, newest-wins across stale copies.
     ///
-    /// When `authorPubkey ?? group.relayPubkey` is non-nil, candidate events are verified
+    /// When `authorPublicKey ?? group.relayPublicKey` is non-nil, candidate events are verified
     /// (``Event/verify()``) and events by any other author are dropped before the
     /// newest-wins pick, and the parser applies the same author check; when nil, the newest
     /// event is parsed as-is — the relay you are already trusting as transport is the
@@ -162,18 +162,18 @@ public struct NostrGroupsAPI: NostrGroupManaging {
     ///
     /// - Parameters:
     ///   - group: The group to query; its relay is added to the pool and connected on demand.
-    ///   - authorPubkey: The relay pubkey to validate against, overriding `group.relayPubkey`.
+    ///   - authorPublicKey: The relay public key to validate against, overriding `group.relayPublicKey`.
     ///   - timeout: How long to wait for relays to finish; `nil` uses ``RelayPoolConfig/queryTimeout``.
     /// - Returns: The parsed metadata, or nil when the relay returned no usable event.
     /// - Throws: ``Groups/ValidationError`` when the winning event does not parse,
     ///   plus anything the connection or fetch throws.
     public func fetchMetadata(
         for group: GroupReference,
-        authorPubkey: PublicKey? = nil,
+        authorPublicKey: PublicKey? = nil,
         timeout: Duration? = nil
     ) async throws -> Groups.Metadata? {
         let relayURL = try await ensureRelay(group)
-        let author = authorPubkey ?? group.relayPubkey
+        let author = authorPublicKey ?? group.relayPublicKey
         let events = try await client.fetch(
             filters: [.groupState(groupID: group.id, kinds: [.groupMetadata])],
             fromURLs: [relayURL],
@@ -189,23 +189,23 @@ public struct NostrGroupsAPI: NostrGroupManaging {
     /// roles, and pins — from its relay in one round trip (``Filter/groupState(groupID:kinds:)``).
     ///
     /// The newest event per kind wins, with the same author-validation semantics as
-    /// ``fetchMetadata(for:authorPubkey:timeout:)``. Fields stay nil when the relay
+    /// ``fetchMetadata(for:authorPublicKey:timeout:)``. Fields stay nil when the relay
     /// published nothing for that kind — for example the member list of a private group.
     ///
     /// - Parameters:
     ///   - group: The group to query; its relay is added to the pool and connected on demand.
-    ///   - authorPubkey: The relay pubkey to validate against, overriding `group.relayPubkey`.
+    ///   - authorPublicKey: The relay public key to validate against, overriding `group.relayPublicKey`.
     ///   - timeout: How long to wait for relays to finish; `nil` uses ``RelayPoolConfig/queryTimeout``.
     /// - Returns: The snapshot, with a nil field per kind the relay did not answer for.
     /// - Throws: ``Groups/ValidationError`` when a winning event does not parse,
     ///   plus anything the connection or fetch throws.
     public func fetchState(
         for group: GroupReference,
-        authorPubkey: PublicKey? = nil,
+        authorPublicKey: PublicKey? = nil,
         timeout: Duration? = nil
     ) async throws -> GroupState {
         let relayURL = try await ensureRelay(group)
-        let author = authorPubkey ?? group.relayPubkey
+        let author = authorPublicKey ?? group.relayPublicKey
         let events = try await client.fetch(
             filters: [.groupState(groupID: group.id)],
             fromURLs: [relayURL],
@@ -264,8 +264,8 @@ public struct NostrGroupsAPI: NostrGroupManaging {
 
     /// Fetches the newest kind-10009 simple group list — the NIP-29 groups a user is in.
     ///
-    /// With no `pubkey` it fetches the current user's list and decrypts private entries;
-    /// for another pubkey only public entries are returned. A thin typed wrapper over
+    /// With no `publicKey` it fetches the current user's list and decrypts private entries;
+    /// for another public key only public entries are returned. A thin typed wrapper over
     /// ``NostrListsAPI/fetch(kind:for:timeout:)`` with the same throwing behavior: fetching the
     /// current user's own list throws when the list's private content cannot be decrypted
     /// (republishing such a list would silently drop the private entries).
@@ -273,14 +273,14 @@ public struct NostrGroupsAPI: NostrGroupManaging {
     /// https://github.com/nostr-protocol/nips/blob/master/51.md
     ///
     /// - Parameters:
-    ///   - pubkey: The list's author; nil (the default) fetches the current user's list.
+    ///   - publicKey: The list's author; nil (the default) fetches the current user's list.
     ///   - timeout: How long to wait for relays to finish; `nil` uses ``RelayPoolConfig/queryTimeout``.
     /// - Returns: The typed list, or nil if none was found.
     public func fetchSimpleGroupList(
-        for pubkey: PublicKey? = nil,
+        for publicKey: PublicKey? = nil,
         timeout: Duration? = nil
     ) async throws -> SimpleGroupList? {
-        guard let list = try await client.lists.fetch(kind: .simpleGroupList, for: pubkey, timeout: timeout) else {
+        guard let list = try await client.lists.fetch(kind: .simpleGroupList, for: publicKey, timeout: timeout) else {
             return nil
         }
         return try SimpleGroupList(list: list)
@@ -319,9 +319,9 @@ public struct NostrGroupsAPI: NostrGroupManaging {
         strategy: PublishStrategy?,
         _ build: (_ publicKey: PublicKey) -> UnsignedEvent
     ) async throws -> PublishedEvent {
-        let pubkey = try await client.requiredPublicKey()
+        let publicKey = try await client.requiredPublicKey()
         let relayURL = try await ensureRelay(group)
-        let event = try await client.activeSign(build(pubkey))
+        let event = try await client.activeSign(build(publicKey))
         let result = try await client.pool.publish(event, to: [relayURL], strategy: strategy)
         return PublishedEvent(event: event, result: result)
     }

@@ -305,7 +305,7 @@ struct NIP29GroupClientTests {
         await client.relays.disconnect()
     }
 
-    @Test("with the relay pubkey known, an impostor's newer metadata is dropped")
+    @Test("with the relay public key known, an impostor's newer metadata is dropped")
     func fetchGroupMetadataDropsImpostor() async throws {
         let relaySigner = EventSigner(keyPair: try KeyPair())
         let impostorSigner = EventSigner(keyPair: try KeyPair())
@@ -320,19 +320,19 @@ struct NIP29GroupClientTests {
         let (client, socket) = makeClient()
         try await client.relays.connect(to: [groupRelayURL])
         let viaReference = GroupReference(
-            relayURL: groupRelayURL, id: groupID, relayPubkey: relaySigner.publicKey)
+            relayURL: groupRelayURL, id: groupID, relayPublicKey: relaySigner.publicKey)
         let metadata = try await answering(socket, with: [genuine, impostor]) {
             try await client.groups.fetchMetadata(for: viaReference)
         }
         #expect(metadata?.name == "Genuine")
         await client.relays.disconnect()
 
-        // The explicit authorPubkey parameter, with a reference that carries no pubkey.
+        // The explicit authorPublicKey parameter, with a reference that carries no public key.
         let (parameterClient, parameterSocket) = makeClient()
         try await parameterClient.relays.connect(to: [groupRelayURL])
         let bare = GroupReference(relayURL: groupRelayURL, id: groupID)
         let parameterMetadata = try await answering(parameterSocket, with: [genuine, impostor]) {
-            try await parameterClient.groups.fetchMetadata(for: bare, authorPubkey: relaySigner.publicKey)
+            try await parameterClient.groups.fetchMetadata(for: bare, authorPublicKey: relaySigner.publicKey)
         }
         #expect(parameterMetadata?.name == "Genuine")
         await parameterClient.relays.disconnect()
@@ -377,7 +377,7 @@ struct NIP29GroupClientTests {
             createdAt: Timestamp(rawValue: 1_700_000_002), signer: relaySigner)
 
         let group = GroupReference(
-            relayURL: groupRelayURL, id: groupID, relayPubkey: relaySigner.publicKey)
+            relayURL: groupRelayURL, id: groupID, relayPublicKey: relaySigner.publicKey)
         let state = try await answering(socket, with: [metadata, admins, roles]) {
             try await client.groups.fetchState(for: group)
         }

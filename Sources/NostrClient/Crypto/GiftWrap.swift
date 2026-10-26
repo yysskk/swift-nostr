@@ -13,7 +13,7 @@ public struct GiftWrap: Sendable {
     /// Unwrapped gift wrap result containing the sender and the original event
     public struct UnwrappedMessage: Sendable {
         /// The actual sender's public key (from the seal)
-        public let senderPubkey: PublicKey
+        public let senderPublicKey: PublicKey
         /// The original unwrapped event (rumor)
         public let event: Event
     }
@@ -26,7 +26,7 @@ public struct GiftWrap: Sendable {
     /// - Parameters:
     ///   - event: The event to wrap (will be converted to rumor if signed)
     ///   - signer: The sender's signer, local or remote
-    ///   - recipientPubkey: The recipient's public key
+    ///   - recipientPublicKey: The recipient's public key
     ///   - expiration: Optional NIP-40 expiration. Applied to the outer gift wrap (the stored
     ///     kind-1059 event relays act on) so the message disappears after the given time. The
     ///     inner rumor is unaffected, keeping the plaintext content private until then.
@@ -34,7 +34,7 @@ public struct GiftWrap: Sendable {
     public static func wrap(
         event: Event,
         signer: any NostrSigning,
-        recipientPubkey: PublicKey,
+        recipientPublicKey: PublicKey,
         expiration: Timestamp? = nil
     ) async throws -> Event {
         // 1. Create rumor (unsigned event JSON)
@@ -47,7 +47,7 @@ public struct GiftWrap: Sendable {
             createdAt: randomizedTimestamp(),
             kind: .seal,
             tags: [],
-            content: try await signer.nip44Encrypt(rumorJson, to: recipientPubkey)
+            content: try await signer.nip44Encrypt(rumorJson, to: recipientPublicKey)
         )
 
         let seal = try await signer.sign(sealUnsigned)
@@ -56,7 +56,7 @@ public struct GiftWrap: Sendable {
         // 3. Create gift wrap (encrypt seal with an ephemeral key, which hides the sender)
         let ephemeralSigner = EventSigner(keyPair: try KeyPair())
 
-        var wrapTags: [Tag] = [.publicKey(recipientPubkey)]
+        var wrapTags: [Tag] = [.publicKey(recipientPublicKey)]
         if let expiration {
             wrapTags.append(.expiration(expiration))
         }
@@ -66,7 +66,7 @@ public struct GiftWrap: Sendable {
             createdAt: randomizedTimestamp(),
             kind: .giftWrap,
             tags: wrapTags,
-            content: try ephemeralSigner.nip44Encrypt(sealJson, to: recipientPubkey)
+            content: try ephemeralSigner.nip44Encrypt(sealJson, to: recipientPublicKey)
         )
 
         return try ephemeralSigner.sign(wrapUnsigned)
@@ -76,7 +76,7 @@ public struct GiftWrap: Sendable {
     ///
     /// The seal's signature is verified, and the rumor it carries must name that same sealer as its
     /// author and carry the true hash of its own contents. So both
-    /// ``UnwrappedMessage/senderPubkey`` and the returned event's `pubkey` are attested by the
+    /// ``UnwrappedMessage/senderPublicKey`` and the returned event's `publicKey` are attested by the
     /// seal's signature, and the event's `id` can be trusted as an identity for the message.
     /// - Parameters:
     ///   - giftWrap: The gift-wrapped event
@@ -121,7 +121,7 @@ public struct GiftWrap: Sendable {
 
         // 3. Return the unwrapped message
         return UnwrappedMessage(
-            senderPubkey: seal.publicKey,
+            senderPublicKey: seal.publicKey,
             event: rumor
         )
     }
@@ -132,7 +132,7 @@ public struct GiftWrap: Sendable {
     private static func createRumor(from event: Event) -> Rumor {
         Rumor(
             id: event.id,
-            pubkey: event.publicKey,
+            publicKey: event.publicKey,
             createdAt: event.createdAt,
             kind: event.kind,
             tags: event.tags,
@@ -163,7 +163,7 @@ public struct GiftWrap: Sendable {
         // Rebuilt through `UnsignedEvent` so the id comes from the same canonical NIP-01
         // serialization that signing and rumor construction use, rather than a second copy of it.
         let unsigned = UnsignedEvent(
-            publicKey: rumor.pubkey,
+            publicKey: rumor.publicKey,
             createdAt: rumor.createdAt,
             kind: rumor.kind,
             rawTags: rumor.tags,
@@ -177,7 +177,7 @@ public struct GiftWrap: Sendable {
         // Convert rumor back to Event (without a signature since it's a rumor)
         return Event(
             id: rumor.id,
-            publicKey: rumor.pubkey,
+            publicKey: rumor.publicKey,
             createdAt: rumor.createdAt,
             kind: rumor.kind,
             tags: rumor.tags,
@@ -214,7 +214,7 @@ public struct GiftWrap: Sendable {
 /// Internal representation of a rumor (unsigned event)
 private struct Rumor: Codable {
     let id: EventID
-    let pubkey: PublicKey
+    let publicKey: PublicKey
     let createdAt: Timestamp
     let kind: Event.Kind
     let tags: [[String]]
@@ -222,7 +222,7 @@ private struct Rumor: Codable {
 
     enum CodingKeys: String, CodingKey {
         case id
-        case pubkey
+        case publicKey = "pubkey"
         case createdAt = "created_at"
         case kind
         case tags

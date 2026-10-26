@@ -90,7 +90,7 @@ struct NIP17FileMessageTests {
             result.recipientGiftWrap)
         #expect(file.url == url)
         #expect(file.mimeType == "text/plain")
-        #expect(file.senderPubkey == sender.publicKey)
+        #expect(file.senderPublicKey == sender.publicKey)
         #expect(file.encryptedSHA256 == encrypted.encryptedSHA256)
         #expect(file.originalSHA256 == encrypted.originalSHA256)
         #expect(file.size == encrypted.ciphertext.count)
@@ -160,7 +160,7 @@ struct NIP17FileMessageTests {
             content: "https://files.example.com/1"
         ).asRumor()
         let giftWrap = try await GiftWrap.wrap(
-            event: rumor, signer: EventSigner(keyPair: sender), recipientPubkey: recipient.publicKey)
+            event: rumor, signer: EventSigner(keyPair: sender), recipientPublicKey: recipient.publicKey)
 
         await #expect(throws: NostrError.self) {
             try await DirectMessageParser(signer: EventSigner(keyPair: recipient)).parseFileMessage(giftWrap)
@@ -211,7 +211,7 @@ struct NIP17FileMessageTests {
             content: url
         ).asRumor()
         return try await GiftWrap.wrap(
-            event: rumor, signer: EventSigner(keyPair: sender), recipientPubkey: recipient.publicKey)
+            event: rumor, signer: EventSigner(keyPair: sender), recipientPublicKey: recipient.publicKey)
     }
 
     @Test("a disappearing file message carries the expiration on the gift wrap")

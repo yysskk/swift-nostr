@@ -52,7 +52,7 @@ public struct NostrEventsAPI: NostrEventPublishing, NostrEventFetching {
 
             // Carry over the thread root (NIP-10). The marker lives at a fixed position —
             // ["e", id, relay, marker] — so it is read there rather than searched for anywhere in
-            // the tag: a relay hint or pubkey that happens to read "root" is not a marker.
+            // the tag: a relay hint or public key that happens to read "root" is not a marker.
             let parentEventTags = event.tags(named: "e")
             let markedRoot = parentEventTags.first {
                 $0.values.count >= 3 && $0.values[2] == Tag.EventMarker.root.rawValue
@@ -96,7 +96,7 @@ public struct NostrEventsAPI: NostrEventPublishing, NostrEventFetching {
         _ metadata: UserMetadata,
         strategy: PublishStrategy? = nil
     ) async throws -> PublishedEvent {
-        try await signAndPublish(strategy: strategy) { try .metadata(pubkey: $0, metadata) }
+        try await signAndPublish(strategy: strategy) { try .metadata(publicKey: $0, metadata) }
     }
 
     /// Publishes a reaction to an event
@@ -139,16 +139,18 @@ public struct NostrEventsAPI: NostrEventPublishing, NostrEventFetching {
         }
     }
 
-    /// Publishes a report of a pubkey (kind 1984, NIP-56).
+    /// Publishes a report of a public key (kind 1984, NIP-56).
     /// - Returns: The signed event together with the per-relay publish outcome.
     @discardableResult
     public func publishReport(
-        pubkey: PublicKey,
+        publicKey target: PublicKey,
         type: ReportType,
         reason: String = "",
         strategy: PublishStrategy? = nil
     ) async throws -> PublishedEvent {
-        try await signAndPublish(strategy: strategy) { .report(pubkey: $0, target: pubkey, type: type, reason: reason) }
+        try await signAndPublish(strategy: strategy) {
+            .report(publicKey: $0, target: target, type: type, reason: reason)
+        }
     }
 
     /// Publishes a report of an event and its author (kind 1984, NIP-56).
@@ -160,7 +162,9 @@ public struct NostrEventsAPI: NostrEventPublishing, NostrEventFetching {
         reason: String = "",
         strategy: PublishStrategy? = nil
     ) async throws -> PublishedEvent {
-        try await signAndPublish(strategy: strategy) { .report(pubkey: $0, event: event, type: type, reason: reason) }
+        try await signAndPublish(strategy: strategy) {
+            .report(publicKey: $0, event: event, type: type, reason: reason)
+        }
     }
 
     /// Publishes an already-signed event, to the whole pool or to chosen relays.
@@ -204,7 +208,7 @@ public struct NostrEventsAPI: NostrEventPublishing, NostrEventFetching {
         draft: Bool = false,
         strategy: PublishStrategy? = nil
     ) async throws -> PublishedEvent {
-        try await signAndPublish(strategy: strategy) { .longFormContent(pubkey: $0, article, draft: draft) }
+        try await signAndPublish(strategy: strategy) { .longFormContent(publicKey: $0, article, draft: draft) }
     }
 
     /// Fetches an article by author and identifier, keeping the newest copy across relays.
@@ -324,16 +328,16 @@ public struct NostrEventsAPI: NostrEventPublishing, NostrEventFetching {
 
     /// Fetches user metadata.
     ///
-    /// Kind 0 is replaceable, so the newest profile the named pubkey signed wins; taking whichever
+    /// Kind 0 is replaceable, so the newest profile the named public key signed wins; taking whichever
     /// copy arrived first made the result depend on which relay answered soonest.
     /// - Parameter timeout: How long to wait for relays to finish; `nil` uses
     ///   ``RelayPoolConfig/queryTimeout``.
-    public func fetchMetadata(pubkey: PublicKey, timeout: Duration? = nil) async throws -> UserMetadata? {
+    public func fetchMetadata(publicKey: PublicKey, timeout: Duration? = nil) async throws -> UserMetadata? {
         let events = try await client.fetch(
-            filters: [.metadata(publicKeys: [pubkey])], fromURLs: nil, timeout: timeout
+            filters: [.metadata(publicKeys: [publicKey])], fromURLs: nil, timeout: timeout
         )
 
-        guard let event = VerifiedEventSelection.newest(in: events, kind: .setMetadata, author: pubkey)
+        guard let event = VerifiedEventSelection.newest(in: events, kind: .setMetadata, author: publicKey)
         else { return nil }
 
         return try? JSONDecoder().decode(UserMetadata.self, from: Data(event.content.utf8))
@@ -341,7 +345,7 @@ public struct NostrEventsAPI: NostrEventPublishing, NostrEventFetching {
 
     // MARK: - Private
 
-    /// Builds an event under the signer's pubkey, signs it, and broadcasts it to the whole pool —
+    /// Builds an event under the signer's public key, signs it, and broadcasts it to the whole pool —
     /// the shape every convenience `publish*` helper above shares.
     private func signAndPublish(
         strategy: PublishStrategy?,

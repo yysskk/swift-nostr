@@ -8,8 +8,8 @@ import Testing
 struct NostrConnectURITests {
     let relays = [RelayURL("wss://relay.example")!]
 
-    @Test("invitation adopts the key pair's pubkey and mints a hex secret")
-    func invitationSetsPubkeyAndSecret() throws {
+    @Test("invitation adopts the key pair's public key and mints a hex secret")
+    func invitationSetsPublicKeyAndSecret() throws {
         let keyPair = try KeyPair()
         let invitation = try NostrConnectURI.invitation(
             clientKeyPair: keyPair,
@@ -17,7 +17,7 @@ struct NostrConnectURITests {
             permissions: [.signEvent(kind: .textNote)]
         )
 
-        #expect(invitation.clientPubkey == keyPair.publicKey)
+        #expect(invitation.clientPublicKey == keyPair.publicKey)
         #expect(!invitation.secret.isEmpty)
         #expect(Data(hexString: invitation.secret)?.count == 16)
     }
@@ -35,7 +35,7 @@ struct NostrConnectURITests {
     func roundTripsWithMetadata() throws {
         let keyPair = try KeyPair()
         let invitation = try NostrConnectURI(
-            clientPubkey: keyPair.publicKey,
+            clientPublicKey: keyPair.publicKey,
             relays: relays,
             secret: "deadbeef",
             permissions: [.signEvent(kind: .textNote), .nip44Encrypt],
@@ -64,7 +64,7 @@ struct NostrConnectURITests {
     func encodedMetadataSurvivesRoundTrip() throws {
         let keyPair = try KeyPair()
         let invitation = try NostrConnectURI(
-            clientPubkey: keyPair.publicKey,
+            clientPublicKey: keyPair.publicKey,
             relays: relays,
             secret: "s3cr3t",
             name: "My App & Co",
@@ -86,30 +86,30 @@ struct NostrConnectURITests {
         }
     }
 
-    @Test("rejects a malformed pubkey")
-    func rejectsMalformedPubkey() {
-        #expect(throws: RemoteSignerError.invalidURI(reason: "client pubkey must be lowercase 32-byte hex")) {
+    @Test("rejects a malformed public key")
+    func rejectsMalformedPublicKey() {
+        #expect(throws: RemoteSignerError.invalidURI(reason: "client public key must be lowercase 32-byte hex")) {
             try NostrConnectURI(string: "nostrconnect://zzzz?relay=wss%3A%2F%2Frelay.example&secret=s")
         }
     }
 
     /// A key has one spelling, so an uppercase host is rejected rather than folded to lowercase.
-    @Test("rejects an uppercase pubkey")
-    func rejectsUppercasePubkey() throws {
-        let pubkey = try KeyPair().publicKey.hex.uppercased()
-        #expect(throws: RemoteSignerError.invalidURI(reason: "client pubkey must be lowercase 32-byte hex")) {
-            try NostrConnectURI(string: "nostrconnect://\(pubkey)?relay=wss%3A%2F%2Frelay.example&secret=s")
+    @Test("rejects an uppercase public key")
+    func rejectsUppercasePublicKey() throws {
+        let publicKey = try KeyPair().publicKey.hex.uppercased()
+        #expect(throws: RemoteSignerError.invalidURI(reason: "client public key must be lowercase 32-byte hex")) {
+            try NostrConnectURI(string: "nostrconnect://\(publicKey)?relay=wss%3A%2F%2Frelay.example&secret=s")
         }
     }
 
     @Test("serializes the typed client key as the lowercase hex host and parses it back")
     func serializesTypedKeyAsHost() throws {
         let keyPair = try KeyPair()
-        let invitation = try NostrConnectURI(clientPubkey: keyPair.publicKey, relays: relays, secret: "s")
+        let invitation = try NostrConnectURI(clientPublicKey: keyPair.publicKey, relays: relays, secret: "s")
 
         let expected = "nostrconnect://\(keyPair.publicKey.hex)?relay=wss%3A%2F%2Frelay.example&secret=s"
         #expect(invitation.stringValue == expected)
-        #expect(try NostrConnectURI(string: invitation.stringValue).clientPubkey == keyPair.publicKey)
+        #expect(try NostrConnectURI(string: invitation.stringValue).clientPublicKey == keyPair.publicKey)
     }
 
     @Test(
@@ -121,24 +121,24 @@ struct NostrConnectURITests {
             "wss%3A%2F%2F",  // empty host
         ])
     func rejectsMalformedRelay(relay: String) throws {
-        let pubkey = try KeyPair().publicKey.hex
+        let publicKey = try KeyPair().publicKey.hex
         let error = RemoteSignerError.invalidURI(reason: "missing or malformed relay")
         #expect(throws: error) {
-            try NostrConnectURI(string: "nostrconnect://\(pubkey)?relay=\(relay)&secret=s")
+            try NostrConnectURI(string: "nostrconnect://\(publicKey)?relay=\(relay)&secret=s")
         }
         #expect(throws: error) {
             try NostrConnectURI(
-                string: "nostrconnect://\(pubkey)?relay=wss%3A%2F%2Fgood.example&relay=\(relay)&secret=s")
+                string: "nostrconnect://\(publicKey)?relay=wss%3A%2F%2Fgood.example&relay=\(relay)&secret=s")
         }
     }
 
     @Test("normalizes relays and writes them back in canonical form")
     func canonicalizesRelays() throws {
-        let pubkey = try KeyPair().publicKey.hex
-        let uri = try NostrConnectURI(string: "nostrconnect://\(pubkey)?relay=WSS%3A%2F%2FRelay.Example%2F&secret=s")
+        let publicKey = try KeyPair().publicKey.hex
+        let uri = try NostrConnectURI(string: "nostrconnect://\(publicKey)?relay=WSS%3A%2F%2FRelay.Example%2F&secret=s")
 
         #expect(uri.relays == [RelayURL("wss://relay.example")!])
-        #expect(uri.stringValue == "nostrconnect://\(pubkey)?relay=wss%3A%2F%2Frelay.example&secret=s")
+        #expect(uri.stringValue == "nostrconnect://\(publicKey)?relay=wss%3A%2F%2Frelay.example&secret=s")
     }
 
     @Test("parses a comma-separated permission list")

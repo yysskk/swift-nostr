@@ -5,14 +5,14 @@ public import NostrCore
 ///
 /// In this flow the client — not the signer — starts the handshake. The client generates a
 /// ``NostrConnectURI`` invitation (shown to the user as a QR code or deep link), the signer scans it
-/// and replies, and the client discovers the signer's pubkey from that reply *after* validating the
+/// and replies, and the client discovers the signer's public key from that reply *after* validating the
 /// invitation secret the signer echoes back. Once ``awaitConnection()`` resolves, the typed commands
 /// (``sign(_:)``, ``userPublicKey()``, …) work exactly as they do for a `bunker://` session.
 ///
 /// https://github.com/nostr-protocol/nips/blob/master/46.md
 extension RemoteSigner {
     /// Creates a client-initiated session from a `nostrconnect://` invitation you generated and
-    /// showed to the signer (QR/link). The signer's pubkey is discovered from its first valid
+    /// showed to the signer (QR/link). The signer's public key is discovered from its first valid
     /// response — call ``awaitConnection()`` to wait for it.
     ///
     /// - Parameters:
@@ -20,20 +20,20 @@ extension RemoteSigner {
     ///     and displayed to the signer. Its `secret` is retained and matched against the signer's
     ///     reply.
     ///   - clientKeyPair: The client identity whose public key originates the invitation. Must match
-    ///     ``NostrConnectURI/clientPubkey``.
+    ///     ``NostrConnectURI/clientPublicKey``.
     ///   - transport: The relay transport. Defaults to a `RelayConnectionTransport` over the
     ///     invitation's relays; inject a custom one (e.g. for tests).
     ///   - config: Session behavior.
     /// - Throws: ``RemoteSignerError/invalidURI(reason:)`` if `clientKeyPair` does not match the
-    ///   invitation's `clientPubkey`.
+    ///   invitation's `clientPublicKey`.
     public init(
         invitation: NostrConnectURI,
         clientKeyPair: KeyPair,
         transport: (any RelayTransport)? = nil,
         config: Config = Config()
     ) throws {
-        guard clientKeyPair.publicKey == invitation.clientPubkey else {
-            throw RemoteSignerError.invalidURI(reason: "client keypair does not match the invitation pubkey")
+        guard clientKeyPair.publicKey == invitation.clientPublicKey else {
+            throw RemoteSignerError.invalidURI(reason: "client keypair does not match the invitation public key")
         }
         self.init(
             clientKeyPair: clientKeyPair,
@@ -44,15 +44,15 @@ extension RemoteSigner {
 
     /// Waits for the signer to accept the invitation: the first kind-24133 response whose result
     /// echoes the invitation secret (per NIP-46, the client MUST validate the returned secret).
-    /// Returns the discovered remote-signer pubkey and pins subsequent traffic to it.
+    /// Returns the discovered remote-signer public key and pins subsequent traffic to it.
     ///
     /// A response whose result is present but does *not* equal the secret is treated as a spoofing
     /// attempt and ignored: the method keeps waiting for the correct secret rather than failing, and
-    /// gives up only when the wait times out. Once resolved, ``remoteSignerPubkey`` returns the
-    /// discovered pubkey and the session is connected, so the typed commands work immediately.
+    /// gives up only when the wait times out. Once resolved, ``remoteSignerPublicKey`` returns the
+    /// discovered public key and the session is connected, so the typed commands work immediately.
     ///
     /// Calling this on a session whose signer is already known (a `bunker://` session, or a repeat
-    /// call) returns the known pubkey without waiting.
+    /// call) returns the known public key without waiting.
     ///
     /// - Returns: The remote signer's public key.
     /// - Throws: ``RemoteSignerError/timedOut`` if no valid response arrives within

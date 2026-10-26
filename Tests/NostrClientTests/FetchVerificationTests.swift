@@ -60,20 +60,20 @@ struct FetchVerificationTests {
                 content: content))
     }
 
-    /// An event claiming `pubkey` as its author, with a correct id but a signature that is not
+    /// An event claiming `publicKey` as its author, with a correct id but a signature that is not
     /// theirs — what a relay can fabricate for anyone.
     private func forged(
-        claiming pubkey: PublicKey,
+        claiming publicKey: PublicKey,
         kind: Event.Kind,
         createdAt: Timestamp,
         tags: [[String]] = [],
         content: String = ""
     ) throws -> Event {
         let unsigned = UnsignedEvent(
-            publicKey: pubkey, createdAt: createdAt, kind: kind, rawTags: tags, content: content)
+            publicKey: publicKey, createdAt: createdAt, kind: kind, rawTags: tags, content: content)
         return Event(
             id: try unsigned.computedID,
-            publicKey: pubkey,
+            publicKey: publicKey,
             createdAt: createdAt,
             kind: kind,
             tags: unsigned.tags,
@@ -166,7 +166,7 @@ struct FetchVerificationTests {
 
         // The forgery arrives first and is the newest by timestamp: both old selections favoured it.
         let metadata = try await answering(socket, with: [forgery, stale, current]) {
-            try await client.events.fetchMetadata(pubkey: victim.publicKey)
+            try await client.events.fetchMetadata(publicKey: victim.publicKey)
         }
 
         #expect(metadata?.name == "current")

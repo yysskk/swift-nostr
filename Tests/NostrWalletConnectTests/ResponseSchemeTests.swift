@@ -121,8 +121,8 @@ struct ResponseSchemeTests {
 
     /// Guards the author check that was already in place, alongside the signature check added
     /// beside it — the two together are what make a response this wallet's answer.
-    @Test("a response from another pubkey is ignored")
-    func responseFromAnotherPubkeyIsIgnored() async throws {
+    @Test("a response from another public key is ignored")
+    func responseFromAnotherPublicKeyIsIgnored() async throws {
         let (connection, transport, client, _) = try makeConnection(timeout: .milliseconds(300))
         let impostor = try KeyPair()
 
@@ -139,7 +139,7 @@ struct ResponseSchemeTests {
         }
     }
 
-    /// The signature was never checked, so a response carrying the wallet's pubkey but signed by
+    /// The signature was never checked, so a response carrying the wallet's public key but signed by
     /// nobody satisfied the request outright.
     @Test("a response whose signature does not verify is ignored")
     func unsignedResponseIsIgnored() async throws {
