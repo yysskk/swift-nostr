@@ -38,7 +38,7 @@ struct ScryptRoundTripTests {
         #expect(throws: NostrError.unsupportedScryptCost(19)) {
             _ = try encrypted.decrypt(password: password)
         }
-        #expect(try encrypted.decrypt(password: password, maxLogN: 19) == privateKey)
+        #expect(try encrypted.decrypt(password: password, maximumLogN: 19) == privateKey)
     }
 
     /// The writing side needs the same whole-range check as the reading side: an upper-bound-only
@@ -66,7 +66,7 @@ struct ScryptRoundTripTests {
         let encrypted = try EncryptedPrivateKey.encrypt(
             privateKey: privateKey, password: password, logN: 14)
         #expect(throws: NostrError.unsupportedScryptCost(23)) {
-            _ = try encrypted.decrypt(password: password, maxLogN: 23)
+            _ = try encrypted.decrypt(password: password, maximumLogN: 23)
         }
     }
 

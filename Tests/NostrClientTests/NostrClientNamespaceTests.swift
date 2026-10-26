@@ -15,8 +15,8 @@ struct NostrClientNamespaceTests {
         let (client, _) = try await ConnectedClientFixture.make()
 
         // Reading a namespace twice yields two values that reach the same actor.
-        #expect(await client.relays.count == 1)
-        #expect(await client.relays.pool.count == 1)
+        #expect(await client.relays.relayCount == 1)
+        #expect(await client.relays.pool.relayCount == 1)
 
         try await client.identity.setPrivateKey(try KeyPair().privateKeyHex)
         // A signer installed through one namespace is visible from the others.
@@ -35,8 +35,8 @@ struct NostrClientNamespaceTests {
 
         // The one relay entry point stays in sync with the pool it wraps.
         await client.relays.add(RelayURL("wss://relay.example.com")!)
-        #expect(await pool.count == 1)
-        #expect(await client.relays.count == 1)
+        #expect(await pool.relayCount == 1)
+        #expect(await client.relays.relayCount == 1)
     }
 
     // MARK: - Capability protocols
@@ -96,12 +96,12 @@ struct NostrClientNamespaceTests {
         ).relays
 
         await relays.add([RelayURL("wss://relay1.example.com")!, RelayURL("wss://relay2.example.com")!])
-        #expect(await relays.count == 2)
-        #expect(await relays.connectedCount() == 0)
+        #expect(await relays.relayCount == 2)
+        #expect(await relays.connectedRelayCount() == 0)
         #expect(await relays.relay(for: RelayURL("wss://relay1.example.com")!) != nil)
 
         await relays.remove(RelayURL("wss://relay1.example.com")!)
-        #expect(await relays.count == 1)
+        #expect(await relays.relayCount == 1)
         #expect(await relays.connections.count == 1)
     }
 
@@ -135,7 +135,7 @@ struct NostrClientNamespaceTests {
         let note = try EventSigner(keyPair: author).signTextNote(content: "stored")
 
         let events = try await answering(socket, with: [note]) {
-            try await fetching.fetch(filters: [Filter(kinds: [.textNote])], to: nil, timeout: 5)
+            try await fetching.fetch(filters: [Filter(kinds: [.textNote])], from: nil, timeout: 5)
         }
 
         #expect(events.map(\.content) == ["stored"])

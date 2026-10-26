@@ -16,7 +16,7 @@ public struct NostrRoutingAPI: NostrRelayRouting {
     /// - Returns: The relay list, or nil if none was found.
     public func fetchRelayList(for pubkey: PublicKey, timeout: TimeInterval = 10) async throws -> RelayListMetadata? {
         let events = try await client.fetch(
-            filters: [.relayListMetadata(pubkey: pubkey)], toURLs: nil, timeout: timeout
+            filters: [.relayListMetadata(pubkey: pubkey)], fromURLs: nil, timeout: timeout
         )
         // Replaceable event: the newest list this pubkey actually signed. Taking the newest of
         // whatever arrived let any relay install a list for someone else by dating it far ahead.
@@ -120,7 +120,7 @@ public struct NostrRoutingAPI: NostrRelayRouting {
         timeout: TimeInterval = 10
     ) async throws -> DirectMessageRelayList? {
         let events = try await client.fetch(
-            filters: [.directMessageRelayList(pubkey: pubkey)], toURLs: nil, timeout: timeout
+            filters: [.directMessageRelayList(pubkey: pubkey)], fromURLs: nil, timeout: timeout
         )
         // Replaceable event: the newest list this pubkey actually signed. This one decides where
         // their private messages are delivered, so an unverified copy would let a relay redirect
@@ -195,7 +195,7 @@ public struct NostrRoutingAPI: NostrRelayRouting {
         // needs at least one connected relay to query, which avoids a blocking fetch against a
         // pool that cannot answer.
         if await client.dmRelayListStore.isResolved(for: pubkey) == false,
-            await client.pool.connectedCount() > 0
+            await client.pool.connectedRelayCount() > 0
         {
             do {
                 if try await fetchDirectMessageRelayList(for: pubkey) == nil {

@@ -86,7 +86,7 @@ struct NostrClientTargetedPublishTests {
 
         // The unknown relay is neither connected on demand nor reported.
         #expect(Set(result.statuses.keys) == [urlA])
-        #expect(await client.relays.count == 2)
+        #expect(await client.relays.relayCount == 2)
         #expect(PublishAckSupport.eventFrames(in: sockets[1]).isEmpty)
         await client.relays.disconnect()
     }
@@ -129,7 +129,7 @@ struct NostrClientTargetedPublishTests {
             try await client.events.publish(event, to: [RelayURL("wss://Unknown.Example.com/")!])
         }
         #expect(PublishAckSupport.eventFrames(in: sockets[0]).isEmpty)
-        #expect(await client.relays.count == 1)
+        #expect(await client.relays.relayCount == 1)
         await client.relays.disconnect()
     }
 }

@@ -67,7 +67,7 @@ struct NIP45CountTests {
         let (connection, mock) = makeConnection()
         try await connection.connect()
 
-        let task = Task { try await connection.count(filters: [Filter(kinds: [.textNote])]) }
+        let task = Task { try await connection.countEvents(matching: [Filter(kinds: [.textNote])]) }
 
         let receivedID = try await awaitCountSubscriptionID(in: mock)
         mock.deliver(.string("[\"COUNT\",\"\(receivedID)\",{\"count\":238}]"))
@@ -82,7 +82,7 @@ struct NIP45CountTests {
         let (connection, mock) = makeConnection()
         try await connection.connect()
 
-        let task = Task { try await connection.count(filters: [Filter(kinds: [.textNote])]) }
+        let task = Task { try await connection.countEvents(matching: [Filter(kinds: [.textNote])]) }
 
         let receivedID = try await awaitCountSubscriptionID(in: mock)
         mock.deliver(.string("[\"COUNT\",\"\(receivedID)\",{\"count\":93,\"approximate\":true}]"))
@@ -98,7 +98,7 @@ struct NIP45CountTests {
         try await connection.connect()
 
         await #expect(throws: NostrError.timeout) {
-            try await connection.count(filters: [Filter(kinds: [.textNote])], timeout: 0.2)
+            try await connection.countEvents(matching: [Filter(kinds: [.textNote])], timeout: 0.2)
         }
         await connection.disconnect()
     }
@@ -108,7 +108,7 @@ struct NIP45CountTests {
         let (connection, mock) = makeConnection()
         try await connection.connect()
 
-        let task = Task { try await connection.count(filters: [Filter(kinds: [.textNote])]) }
+        let task = Task { try await connection.countEvents(matching: [Filter(kinds: [.textNote])]) }
 
         let receivedID = try await awaitCountSubscriptionID(in: mock)
         mock.deliver(.string("[\"CLOSED\",\"\(receivedID)\",\"error: count not supported\"]"))
@@ -124,7 +124,7 @@ struct NIP45CountTests {
         let (connection, mock) = makeConnection()
         try await connection.connect()
 
-        let task = Task { try await connection.count(filters: [Filter(kinds: [.textNote])]) }
+        let task = Task { try await connection.countEvents(matching: [Filter(kinds: [.textNote])]) }
 
         _ = try await awaitCountSubscriptionID(in: mock)
         await connection.disconnect()
@@ -139,8 +139,8 @@ struct NIP45CountTests {
         let (connection, mock) = makeConnection()
         try await connection.connect()
 
-        let taskA = Task { try await connection.count(filters: [Filter(kinds: [.textNote])]) }
-        let taskB = Task { try await connection.count(filters: [Filter(kinds: [.setMetadata])]) }
+        let taskA = Task { try await connection.countEvents(matching: [Filter(kinds: [.textNote])]) }
+        let taskB = Task { try await connection.countEvents(matching: [Filter(kinds: [.setMetadata])]) }
 
         try await pollUntil { countFrames(in: mock).count == 2 }
         let frames = countFrames(in: mock)
@@ -188,7 +188,7 @@ struct NIP45CountTests {
         let (connection, mock) = makeConnection()
         try await connection.connect()
 
-        let task = Task { try await connection.count(filters: [Filter(kinds: [.textNote])]) }
+        let task = Task { try await connection.countEvents(matching: [Filter(kinds: [.textNote])]) }
         let receivedID = try await awaitCountSubscriptionID(in: mock)
         mock.deliver(.string("[\"COUNT\",\"\(receivedID)\",{\"count\":1}]"))
         _ = try await task.value
@@ -206,7 +206,7 @@ struct NIP45CountTests {
     func poolCountOnEmptyPoolThrows() async {
         let pool = RelayPool()
         await #expect(throws: NostrError.noRelaysInPool) {
-            _ = try await pool.count(filters: [Filter(kinds: [.textNote])])
+            _ = try await pool.countEvents(matching: [Filter(kinds: [.textNote])])
         }
     }
 
@@ -229,7 +229,7 @@ struct NIP45CountTests {
         try await connectionA.connect()
         try await connectionB.connect()
 
-        let task = Task { try await pool.count(filters: [Filter(kinds: [.textNote])]) }
+        let task = Task { try await pool.countEvents(matching: [Filter(kinds: [.textNote])]) }
 
         try await pollUntil {
             mockA.sentTextFrames.contains { $0.hasPrefix("[\"COUNT\"") }
@@ -266,7 +266,7 @@ struct NIP45CountTests {
 
         // Relay A answers; relay B never replies and times out. The pool tolerates the
         // partial failure and returns only the relay that answered.
-        let task = Task { try await pool.count(filters: [Filter(kinds: [.textNote])], timeout: 0.3) }
+        let task = Task { try await pool.countEvents(matching: [Filter(kinds: [.textNote])], timeout: 0.3) }
 
         try await pollUntil { mockA.sentTextFrames.contains { $0.hasPrefix("[\"COUNT\"") } }
         let subA = try subscriptionID(fromCountFrame: countFrames(in: mockA)[0])
@@ -297,7 +297,7 @@ struct NIP45CountTests {
 
         // Neither relay replies; every per-relay count times out, so the pool surfaces the error.
         await #expect(throws: NostrError.timeout) {
-            try await pool.count(filters: [Filter(kinds: [.textNote])], timeout: 0.2)
+            try await pool.countEvents(matching: [Filter(kinds: [.textNote])], timeout: 0.2)
         }
         await pool.disconnectAll()
     }
@@ -324,8 +324,8 @@ struct NIP45CountTests {
 
         // Target relay A only, spelled differently from its pool key.
         let task = Task {
-            try await client.events.count(
-                filters: [Filter(kinds: [.textNote])], to: [RelayURL("WSS://Relay-A.example.com/")!])
+            try await client.events.countEvents(
+                matching: [Filter(kinds: [.textNote])], from: [RelayURL("WSS://Relay-A.example.com/")!])
         }
 
         try await pollUntil { mockA.sentTextFrames.contains { $0.hasPrefix("[\"COUNT\"") } }
@@ -358,7 +358,7 @@ struct NIP45CountTests {
         try await connectionA.connect()
         try await connectionB.connect()
 
-        let task = Task { try await client.events.count(filters: [Filter(kinds: [.textNote])]) }
+        let task = Task { try await client.events.countEvents(matching: [Filter(kinds: [.textNote])]) }
 
         try await pollUntil {
             mockA.sentTextFrames.contains { $0.hasPrefix("[\"COUNT\"") }

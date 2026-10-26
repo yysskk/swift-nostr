@@ -250,9 +250,9 @@ results. With zero resolved relays they throw (`NostrError.noRelaysInPool` /
 let events = try await client.events.fetch(filters: [filter])
 let event = try await client.events.fetchEvent(id: eventID)      // EventID
 let metadata = try await client.events.fetchMetadata(pubkey: alice)
-// Scope a fetch to a subset of relays (e.g. naddr relay hints): `to:` is a Set<RelayURL>?;
+// Scope a fetch to a subset of relays (e.g. naddr relay hints): `from:` is a Set<RelayURL>?;
 // nil (default) uses the whole pool, [] throws, and relays not in the pool are skipped.
-let scoped = try await client.events.fetch(filters: [filter], to: [relay])
+let scoped = try await client.events.fetch(filters: [filter], from: [relay])
 ```
 
 ### Event Counts (NIP-45)
@@ -263,11 +263,11 @@ count fails fast.
 
 ```swift
 // Max count across relays (each relay's count is a lower bound):
-let total = try await client.events.count(filters: [filter])
-// Scope to a subset of relays (same to: semantics as fetch):
-let scoped = try await client.events.count(filters: [filter], to: [relay])
+let total = try await client.events.countEvents(matching: [filter])
+// Scope to a subset of relays (same `from:` semantics as fetch):
+let scoped = try await client.events.countEvents(matching: [filter], from: [relay])
 // Per-relay counts:
-let byRelay = try await client.relays.pool.count(filters: [filter])  // [RelayURL: EventCount]
+let byRelay = try await client.relays.pool.countEvents(matching: [filter])  // [RelayURL: EventCount]
 ```
 
 ### Direct Messages (NIP-17)
@@ -695,7 +695,7 @@ NIP-49 password-encrypted private key (`ncryptsec1...`), protected with scrypt a
 
 ### Encrypt and Decrypt
 
-Passwords are NFKC-normalized before key derivation. scrypt allocates 2^logN KiB, and the cost byte is chosen by whoever wrote the payload, so both sides are bounded: `encrypt` writes at most `maximumLogN` and `decrypt` spends at most `maxLogN`, both defaulting to `EncryptedPrivateKey.defaultMaximumLogN` (18, 256 MiB; NIP-49 permits up to 22). A cost outside the bound throws `NostrError.unsupportedScryptCost` before any derivation. Raise the bound only to write or open a deliberately costlier key; a parsed payload's `logN` is readable first. A wrong password throws `NostrError.decryptionFailed`.
+Passwords are NFKC-normalized before key derivation. scrypt allocates 2^logN KiB, and the cost byte is chosen by whoever wrote the payload, so both sides are bounded: `encrypt` writes and `decrypt` spends at most `maximumLogN`, defaulting to `EncryptedPrivateKey.defaultMaximumLogN` (18, 256 MiB; NIP-49 permits up to 22). A cost outside the bound throws `NostrError.unsupportedScryptCost` before any derivation. Raise the bound only to write or open a deliberately costlier key; a parsed payload's `logN` is readable first. A wrong password throws `NostrError.decryptionFailed`.
 
 ```swift
 // Encrypt raw private-key bytes.
@@ -710,15 +710,15 @@ let ncryptsec = encrypted.ncryptsec
 
 // Parse and decrypt (decrypt returns the raw 32 bytes without validating the scalar).
 let parsed = try EncryptedPrivateKey(ncryptsec: ncryptsec)
-let privateKey = try parsed.decrypt(password: "hunter2")       // maxLogN defaults to 18
-let costly = try parsed.decrypt(password: "hunter2", maxLogN: 22)  // opt in to a costlier key
+let privateKey = try parsed.decrypt(password: "hunter2")       // maximumLogN defaults to 18
+let costly = try parsed.decrypt(password: "hunter2", maximumLogN: 22)  // opt in to a costlier key
 ```
 
 ### KeyPair Convenience
 
 ```swift
 let encrypted = try keyPair.encryptedPrivateKey(password: "hunter2")
-let keyPair = try KeyPair(ncryptsec: "ncryptsec1...", password: "hunter2")  // validates the key; optional maxLogN:
+let keyPair = try KeyPair(ncryptsec: "ncryptsec1...", password: "hunter2")  // validates the key; optional maximumLogN:
 ```
 
 ## EventSigner
@@ -1370,7 +1370,7 @@ try await pool.subscribe(subscriptionID: "sub1", filters: [filter]) { message in
 try await pool.unsubscribe(subscriptionID: "sub1")
 try await pool.publish(signedEvent)
 try await pool.publish(signedEvent, to: [relay])  // targeted; PublishResult keyed by RelayURL
-try await pool.count(filters: [filter])   // [RelayURL: EventCount], per relay (NIP-45)
+try await pool.countEvents(matching: [filter])   // [RelayURL: EventCount], per relay (NIP-45)
 await pool.setAuthenticationResponder { url, challenge in /* signed kind-22242 event or nil */ }
 await pool.clearDeduplicationCache()
 ```
@@ -1421,7 +1421,7 @@ await connection.disconnect()
 try await connection.subscribe(subscriptionID: "sub1", filters: [filter]) { message in }
 try await connection.unsubscribe(subscriptionID: "sub1")
 try await connection.publish(signedEvent)
-try await connection.count(filters: [filter])         // EventCount from this relay (NIP-45)
+try await connection.countEvents(matching: [filter])         // EventCount from this relay (NIP-45)
 try await connection.authenticate(using: signer)      // answer the stored challenge (NIP-42)
 try await connection.authenticate(with: signedAuthEvent)  // pre-signed kind-22242 event
 await connection.setAuthenticationResponder { url, challenge in /* event or nil */ }

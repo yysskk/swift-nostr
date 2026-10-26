@@ -248,6 +248,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `NostrGroupManaging` requirement, and `Bolt11Invoice.timestamp` were `Date`; NIP-47
   `WalletConnectTransaction.createdAt`, `expiresAt`, and `settledAt` and `ListTransactionsParams.from`
   and `until` were `Int64`. The NIP-47 JSON is unchanged.
+- **`maxLogN` is spelled `maximumLogN`** (breaking): `EncryptedPrivateKey.decrypt(password:maxLogN:)`
+  is `decrypt(password:maximumLogN:)` and `KeyPair(ncryptsec:password:maxLogN:)` is
+  `KeyPair(ncryptsec:password:maximumLogN:)`, so reading and writing a NIP-49 key bound the scrypt
+  cost with the same unabbreviated name `encrypt` already used.
+- **Relay counts and NIP-45 counts are named apart** (breaking): `count` meant both the number of
+  relays and a COUNT query. `NostrRelaysAPI.count` and `RelayPool.count` are `relayCount`, and
+  `connectedCount()` on `NostrRelaysAPI`, `RelayPool`, and `NostrRelayManaging` is
+  `connectedRelayCount()`. The NIP-45 queries `NostrEventsAPI.count(filters:to:timeout:)`,
+  `RelayPool.count(filters:to:timeout:)`, and the `NostrEventFetching` requirement are
+  `countEvents(matching:from:timeout:)`, and `RelayConnection.count(filters:timeout:)` is
+  `countEvents(matching:timeout:)`.
+- **Fetches read from relays** (breaking): `NostrEventsAPI.fetch(filters:to:timeout:)` and the
+  `NostrEventFetching` requirement are `fetch(filters:from:timeout:)`, so a scoped fetch reads as
+  fetching from those relays. `publish(_:to:)` and `subscribe(filters:to:)` keep `to`.
 
 ## [0.8.0] - 2026-10-25
 

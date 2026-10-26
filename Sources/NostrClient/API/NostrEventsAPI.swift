@@ -216,7 +216,7 @@ public struct NostrEventsAPI: NostrEventPublishing, NostrEventFetching {
     ) async throws -> LongFormContent? {
         var filter = Filter(authors: [author], kinds: [.longFormContent])
         filter.addTagQuery("d", values: [identifier])
-        let events = try await client.fetch(filters: [filter], toURLs: nil, timeout: timeout)
+        let events = try await client.fetch(filters: [filter], fromURLs: nil, timeout: timeout)
         // Addressable event: the newest copy the named author signed under this identifier.
         guard
             let newest = VerifiedEventSelection.newest(
@@ -243,7 +243,7 @@ public struct NostrEventsAPI: NostrEventPublishing, NostrEventFetching {
         }
 
         let events = try await client.fetch(
-            filters: [filter], toURLs: hinted.isEmpty ? nil : hinted, timeout: timeout
+            filters: [filter], fromURLs: hinted.isEmpty ? nil : hinted, timeout: timeout
         )
         // Addressable event: the coordinate names the author, kind, and identifier, so all three
         // are checked — a relay hint the coordinate carries is not a reason to trust what it sends.
@@ -271,12 +271,12 @@ public struct NostrEventsAPI: NostrEventPublishing, NostrEventFetching {
     ///   (via the underlying subscribe) when nothing can be targeted.
     public func fetch(
         filters: [Filter],
-        to relayURLs: Set<RelayURL>? = nil,
+        from relayURLs: Set<RelayURL>? = nil,
         timeout: TimeInterval = 10
     ) async throws -> [Event] {
         try await client.fetch(
             filters: filters,
-            toURLs: relayURLs,
+            fromURLs: relayURLs,
             timeout: timeout
         )
     }
@@ -287,17 +287,17 @@ public struct NostrEventsAPI: NostrEventPublishing, NostrEventFetching {
     /// count is a lower bound on the events it holds, so the maximum is the best single estimate.
     /// `relayURLs` is nil (the default) to query the whole pool, or the relays to target a
     /// subset; an empty set always throws. For per-relay results use
-    /// ``RelayPool/count(filters:to:timeout:)`` on ``NostrRelaysAPI/pool``.
+    /// ``RelayPool/countEvents(matching:from:timeout:)`` on ``NostrRelaysAPI/pool``.
     /// - Throws: ``NostrError/noRelaysInPool`` when the pool is empty, or
     ///   ``NostrError/noMatchingRelays(_:)`` when none of the targeted URLs are in the pool.
-    public func count(
-        filters: [Filter],
-        to relayURLs: Set<RelayURL>? = nil,
+    public func countEvents(
+        matching filters: [Filter],
+        from relayURLs: Set<RelayURL>? = nil,
         timeout: TimeInterval = 10
     ) async throws -> Int {
-        let results = try await client.pool.count(
-            filters: filters,
-            to: relayURLs,
+        let results = try await client.pool.countEvents(
+            matching: filters,
+            from: relayURLs,
             timeout: timeout
         )
         return results.values.map(\.value).max() ?? 0
@@ -308,7 +308,7 @@ public struct NostrEventsAPI: NostrEventPublishing, NostrEventFetching {
     /// The returned event is the one that was asked for: a relay that ignores the id filter can
     /// answer with anything, and its signature is checked before it is handed back.
     public func fetchEvent(id: EventID, timeout: TimeInterval = 10) async throws -> Event? {
-        let events = try await client.fetch(filters: [Filter(ids: [id])], toURLs: nil, timeout: timeout)
+        let events = try await client.fetch(filters: [Filter(ids: [id])], fromURLs: nil, timeout: timeout)
         return VerifiedEventSelection.event(withID: id, in: events)
     }
 
@@ -318,7 +318,7 @@ public struct NostrEventsAPI: NostrEventPublishing, NostrEventFetching {
     /// copy arrived first made the result depend on which relay answered soonest.
     public func fetchMetadata(pubkey: PublicKey, timeout: TimeInterval = 10) async throws -> UserMetadata? {
         let events = try await client.fetch(
-            filters: [.metadata(pubkeys: [pubkey])], toURLs: nil, timeout: timeout
+            filters: [.metadata(pubkeys: [pubkey])], fromURLs: nil, timeout: timeout
         )
 
         guard let event = VerifiedEventSelection.newest(in: events, kind: .setMetadata, author: pubkey)

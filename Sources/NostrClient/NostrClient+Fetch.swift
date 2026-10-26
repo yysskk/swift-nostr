@@ -10,10 +10,10 @@ extension NostrClient {
     /// `timeout`, whichever comes first. Takes pre-validated canonical URLs; nil fetches from
     /// the whole pool.
     ///
-    /// Backs ``NostrEventsAPI/fetch(filters:to:timeout:)``.
+    /// Backs ``NostrEventsAPI/fetch(filters:from:timeout:)``.
     func fetch(
         filters: [Filter],
-        toURLs relayURLs: Set<RelayURL>?,
+        fromURLs relayURLs: Set<RelayURL>?,
         timeout: TimeInterval
     ) async throws -> [Event] {
         let subscription = try await subscribe(filters: filters, toURLs: relayURLs)

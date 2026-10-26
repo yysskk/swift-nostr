@@ -58,7 +58,7 @@ struct EncryptedPrivateKeyCostTests {
         let encrypted = try makeEncrypted(logN: 14)
 
         #expect(throws: NostrError.unsupportedScryptCost(14)) {
-            _ = try encrypted.decrypt(password: password, maxLogN: 13)
+            _ = try encrypted.decrypt(password: password, maximumLogN: 13)
         }
     }
 
@@ -66,8 +66,8 @@ struct EncryptedPrivateKeyCostTests {
     func callerCanRaiseTheCap() throws {
         let encrypted = try makeEncrypted(logN: 14)
 
-        #expect(try encrypted.decrypt(password: password, maxLogN: 14) == privateKey)
-        #expect(try encrypted.decrypt(password: password, maxLogN: 22) == privateKey)
+        #expect(try encrypted.decrypt(password: password, maximumLogN: 14) == privateKey)
+        #expect(try encrypted.decrypt(password: password, maximumLogN: 22) == privateKey)
     }
 
     /// An upper-bound-only guard let a zero cap through, and `1...0` is not a valid range — so the
@@ -77,7 +77,7 @@ struct EncryptedPrivateKeyCostTests {
         let encrypted = try makeEncrypted()
 
         #expect(throws: NostrError.unsupportedScryptCost(0)) {
-            _ = try encrypted.decrypt(password: password, maxLogN: 0)
+            _ = try encrypted.decrypt(password: password, maximumLogN: 0)
         }
     }
 
@@ -86,7 +86,7 @@ struct EncryptedPrivateKeyCostTests {
         let encrypted = try makeEncrypted()
 
         #expect(throws: NostrError.unsupportedScryptCost(23)) {
-            _ = try encrypted.decrypt(password: password, maxLogN: 23)
+            _ = try encrypted.decrypt(password: password, maximumLogN: 23)
         }
     }
 
