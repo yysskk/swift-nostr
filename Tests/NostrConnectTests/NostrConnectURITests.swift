@@ -6,7 +6,7 @@ import Testing
 
 @Suite("NostrConnectURI Tests")
 struct NostrConnectURITests {
-    let relays = [URL(string: "wss://relay.example")!]
+    let relays = [RelayURL("wss://relay.example")!]
 
     @Test("invitation adopts the key pair's pubkey and mints a hex secret")
     func invitationSetsPubkeyAndSecret() throws {
@@ -112,12 +112,33 @@ struct NostrConnectURITests {
         #expect(try NostrConnectURI(string: invitation.stringValue).clientPubkey == keyPair.publicKey)
     }
 
-    @Test("rejects a non-WebSocket relay")
-    func rejectsNonWebSocketRelay() throws {
+    @Test(
+        "rejects a relay that is not a valid relay URL, even beside a valid one",
+        arguments: [
+            "https%3A%2F%2Frelay.example",  // not a WebSocket URL
+            "wss%3A%2F%2Frelay.example%2F%23frag",  // fragment
+            "wss%3A%2F%2Fuser%3Apw%40relay.example",  // user and password
+            "wss%3A%2F%2F",  // empty host
+        ])
+    func rejectsMalformedRelay(relay: String) throws {
         let pubkey = try KeyPair().publicKey.hex
-        #expect(throws: RemoteSignerError.self) {
-            try NostrConnectURI(string: "nostrconnect://\(pubkey)?relay=https%3A%2F%2Frelay.example&secret=s")
+        let error = RemoteSignerError.invalidURI(reason: "missing or malformed relay")
+        #expect(throws: error) {
+            try NostrConnectURI(string: "nostrconnect://\(pubkey)?relay=\(relay)&secret=s")
         }
+        #expect(throws: error) {
+            try NostrConnectURI(
+                string: "nostrconnect://\(pubkey)?relay=wss%3A%2F%2Fgood.example&relay=\(relay)&secret=s")
+        }
+    }
+
+    @Test("normalizes relays and writes them back in canonical form")
+    func canonicalizesRelays() throws {
+        let pubkey = try KeyPair().publicKey.hex
+        let uri = try NostrConnectURI(string: "nostrconnect://\(pubkey)?relay=WSS%3A%2F%2FRelay.Example%2F&secret=s")
+
+        #expect(uri.relays == [RelayURL("wss://relay.example")!])
+        #expect(uri.stringValue == "nostrconnect://\(pubkey)?relay=wss%3A%2F%2Frelay.example&secret=s")
     }
 
     @Test("parses a comma-separated permission list")

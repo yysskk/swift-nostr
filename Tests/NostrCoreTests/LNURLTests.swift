@@ -118,7 +118,7 @@ struct LNURLTests {
         let signer = EventSigner(keyPair: try KeyPair())
         let zapRequest = try signer.signZapRequest(
             recipientPubkey: recipient.publicKey,
-            relays: ["wss://relay.example.com"],
+            relays: [RelayURL("wss://relay.example.com")!],
             amountMillisats: 21000
         )
 

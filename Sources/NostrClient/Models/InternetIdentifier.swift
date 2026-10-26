@@ -20,15 +20,17 @@ public struct InternetIdentifier: Sendable {
         /// The verified public key
         public let pubkey: PublicKey
 
-        /// Optional relay URLs recommended for this user
-        public let relays: [String]
+        /// Relay URLs the server recommends for this user, in the order listed. The server's
+        /// `relays` entries are third-party content, so one that is not a valid relay URL is
+        /// skipped.
+        public let relays: [RelayURL]
 
         /// Creates a verification result.
         /// - Parameters:
         ///   - identifier: The full identifier (e.g., "alice@example.com").
         ///   - pubkey: The public key the identifier resolved to.
         ///   - relays: Relay URLs the server recommends for this user.
-        public init(identifier: String, pubkey: PublicKey, relays: [String] = []) {
+        public init(identifier: String, pubkey: PublicKey, relays: [RelayURL] = []) {
             self.identifier = identifier
             self.pubkey = pubkey
             self.relays = relays
@@ -181,7 +183,7 @@ public struct InternetIdentifier: Sendable {
         return VerificationResult(
             identifier: identifier,
             pubkey: pubkey,
-            relays: response.relays?[pubkey.hex] ?? []
+            relays: (response.relays?[pubkey.hex] ?? []).compactMap(RelayURL.init)
         )
     }
 
@@ -210,8 +212,8 @@ public struct InternetIdentifier: Sendable {
 
     /// Looks up recommended relays for an internet identifier
     /// - Parameter identifier: The identifier
-    /// - Returns: Array of relay URLs
-    public static func lookupRelays(_ identifier: String) async throws -> [String] {
+    /// - Returns: The valid relay URLs the server recommends, in the order listed
+    public static func lookupRelays(_ identifier: String) async throws -> [RelayURL] {
         let result = try await verify(identifier)
         return result.relays
     }

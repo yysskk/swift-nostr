@@ -14,13 +14,14 @@ public struct NAddr: Sendable, Hashable {
     /// The event kind.
     public let kind: Int
 
-    /// Relay hints where the event may be found.
-    public let relays: [String]
+    /// Relay hints where the event may be found. Decoding skips a hint that is not a valid
+    /// relay URL; encoding writes each hint in canonical form.
+    public let relays: [RelayURL]
 
     /// Creates an addressable-event coordinate.
     /// - Throws: ``NostrError/invalidNIP19Entity`` if `kind` does not fit in a 32-bit unsigned
-    ///   integer, or ``NostrError/invalidTLV`` if a relay hint is longer than 255 bytes.
-    public init(identifier: String, author: PublicKey, kind: Int, relays: [String] = []) throws {
+    ///   integer, or ``NostrError/invalidTLV`` if a relay hint's canonical form is longer than 255 bytes.
+    public init(identifier: String, author: PublicKey, kind: Int, relays: [RelayURL] = []) throws {
         self.identifier = identifier
         self.author = author
         self.kind = try TLV.validatedKind(kind)
@@ -35,7 +36,7 @@ public struct NAddr: Sendable, Hashable {
     }
 
     /// Builds an `naddr` coordinate from an addressable event, extracting its `d` tag.
-    public init(event: Event, relays: [String] = []) throws {
+    public init(event: Event, relays: [RelayURL] = []) throws {
         let identifier = event.tags.first { $0.first == "d" }.flatMap { $0.count > 1 ? $0[1] : "" } ?? ""
         try self.init(identifier: identifier, author: event.pubkey, kind: event.kind.rawValue, relays: relays)
     }
@@ -44,13 +45,15 @@ public struct NAddr: Sendable, Hashable {
         var identifier: String?
         var author: PublicKey?
         var kind: Int?
-        var relays: [String] = []
+        var relays: [RelayURL] = []
         for record in try TLV.decode(tlvData) {
             switch record.type {
             case TLV.Kind.special.rawValue:
                 identifier = String(decoding: record.value, as: UTF8.self)
             case TLV.Kind.relay.rawValue:
-                relays.append(String(decoding: record.value, as: UTF8.self))
+                if let relay = TLV.relay(record) {
+                    relays.append(relay)
+                }
             case TLV.Kind.author.rawValue:
                 author = try TLV.publicKey(record)
             case TLV.Kind.kind.rawValue:

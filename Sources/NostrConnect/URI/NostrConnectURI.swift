@@ -21,7 +21,7 @@ public struct NostrConnectURI: Sendable, Hashable {
     public let clientPubkey: PublicKey
 
     /// The relays the client listens on. Always at least one.
-    public let relays: [URL]
+    public let relays: [RelayURL]
 
     /// The connection secret the signer must echo back (required by NIP-46).
     public let secret: String
@@ -41,7 +41,7 @@ public struct NostrConnectURI: Sendable, Hashable {
     /// The URI scheme, without the `://` separator.
     public static let scheme = "nostrconnect"
 
-    /// Creates an invitation from its components, validating the relay list.
+    /// Creates an invitation from its components.
     ///
     /// - Parameters:
     ///   - clientPubkey: The client's public key.
@@ -51,10 +51,10 @@ public struct NostrConnectURI: Sendable, Hashable {
     ///   - name: An optional client display name.
     ///   - url: An optional client website.
     ///   - image: An optional client icon.
-    /// - Throws: ``RemoteSignerError/invalidURI(reason:)`` if the relay list fails validation.
+    /// - Throws: ``RemoteSignerError/invalidURI(reason:)`` if the relay list is empty.
     public init(
         clientPubkey: PublicKey,
-        relays: [URL],
+        relays: [RelayURL],
         secret: String,
         permissions: [RemoteSignerPermission] = [],
         name: String? = nil,
@@ -63,9 +63,6 @@ public struct NostrConnectURI: Sendable, Hashable {
     ) throws {
         guard !relays.isEmpty else {
             throw RemoteSignerError.invalidURI(reason: "at least one relay is required")
-        }
-        guard relays.allSatisfy(URIQuery.isWebSocketURL) else {
-            throw RemoteSignerError.invalidURI(reason: "relays must be ws:// or wss:// URLs")
         }
 
         self.clientPubkey = clientPubkey
@@ -90,7 +87,7 @@ public struct NostrConnectURI: Sendable, Hashable {
     /// - Throws: ``RemoteSignerError/invalidURI(reason:)`` if the relay list is empty.
     public static func invitation(
         clientKeyPair: KeyPair,
-        relays: [URL],
+        relays: [RelayURL],
         permissions: [RemoteSignerPermission] = [],
         name: String? = nil,
         url: URL? = nil,
@@ -111,7 +108,8 @@ public struct NostrConnectURI: Sendable, Hashable {
     ///
     /// - Parameter string: The invitation string produced by a client.
     /// - Throws: ``RemoteSignerError/invalidURI(reason:)`` if the string is malformed or missing
-    ///   required fields, including a host that is not a canonical lowercase hex public key.
+    ///   required fields, including a host that is not a canonical lowercase hex public key or a
+    ///   `relay` value that is not a valid relay URL.
     public init(string: String) throws {
         guard let components = URLComponents(string: string),
             components.scheme?.lowercased() == Self.scheme
@@ -128,8 +126,10 @@ public struct NostrConnectURI: Sendable, Hashable {
 
         let queryItems = components.queryItems ?? []
 
+        // Every relay must parse: dropping a malformed one would make the token look like it
+        // lists fewer relays than it does.
         let relayValues = queryItems.filter { $0.name == "relay" }.compactMap { $0.value }
-        let relays = relayValues.compactMap { URL(string: $0) }
+        let relays = relayValues.compactMap(RelayURL.init)
         guard !relayValues.isEmpty, relays.count == relayValues.count else {
             throw RemoteSignerError.invalidURI(reason: "missing or malformed relay")
         }
@@ -162,7 +162,7 @@ public struct NostrConnectURI: Sendable, Hashable {
 
     /// The invitation string to display as a QR code or deep link, with all values percent-encoded.
     public var stringValue: String {
-        var items = relays.map { URLQueryItem(name: "relay", value: $0.absoluteString) }
+        var items = relays.map { URLQueryItem(name: "relay", value: $0.description) }
         items.append(URLQueryItem(name: "secret", value: secret))
         if !permissions.isEmpty {
             items.append(URLQueryItem(name: "perms", value: permissions.map(\.rawValue).joined(separator: ",")))

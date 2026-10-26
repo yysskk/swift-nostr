@@ -30,7 +30,7 @@ struct ZapPaymentTests {
         MockURLProtocol.statusCode = 200
         MockURLProtocol.responseBody = Data(#"{"pr":"lnbc210n1pzapinvoice"}"#.utf8)
         let zapRequest = try zapSigner.signZapRequest(
-            recipientPubkey: PublicKey.fixture("1"), relays: ["wss://relay.example"],
+            recipientPubkey: PublicKey.fixture("1"), relays: [RelayURL("wss://relay.example")!],
             amountMillisats: 21000)
 
         async let result = connection.payZap(
@@ -69,7 +69,7 @@ struct ZapPaymentTests {
         MockURLProtocol.statusCode = 200
         MockURLProtocol.responseBody = Data(#"{"pr":"lnbc210n1pzapinvoice"}"#.utf8)
         let zapRequest = try zapSigner.signZapRequest(
-            recipientPubkey: PublicKey.fixture("1"), relays: ["wss://relay.example"],
+            recipientPubkey: PublicKey.fixture("1"), relays: [RelayURL("wss://relay.example")!],
             amountMillisats: 21000)
 
         async let result = connection.payZap(
@@ -104,7 +104,7 @@ struct ZapPaymentTests {
             uri: try NWCFixtures.uri(wallet: wallet, client: client), transport: transport)
 
         let zapRequest = try zapSigner.signZapRequest(
-            recipientPubkey: PublicKey.fixture("1"), relays: ["wss://relay.example"])
+            recipientPubkey: PublicKey.fixture("1"), relays: [RelayURL("wss://relay.example")!])
 
         await #expect(throws: LNURLPayResponse.InvoiceError.self) {
             _ = try await connection.payZap(

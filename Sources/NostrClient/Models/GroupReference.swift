@@ -16,7 +16,7 @@ import NostrCore
 /// https://github.com/nostr-protocol/nips/blob/master/29.md
 public struct GroupReference: Sendable, Hashable {
     /// The URL of the relay hosting the group.
-    public let relayURL: String
+    public let relayURL: RelayURL
 
     /// The group's id on its relay.
     public let id: String
@@ -38,7 +38,7 @@ public struct GroupReference: Sendable, Hashable {
     ///   - id: The group's id on its relay.
     ///   - relayPubkey: The relay's public key, if known; group state is validated against it.
     ///   - inviteCode: An invite code to send with a join request, if any.
-    public init(relayURL: String, id: String, relayPubkey: PublicKey? = nil, inviteCode: String? = nil) {
+    public init(relayURL: RelayURL, id: String, relayPubkey: PublicKey? = nil, inviteCode: String? = nil) {
         self.relayURL = relayURL
         self.id = id
         self.relayPubkey = relayPubkey
@@ -46,16 +46,16 @@ public struct GroupReference: Sendable, Hashable {
     }
 
     /// Builds a reference from a kind-39000 `naddr`: the author is the relay's pubkey, the
-    /// "d" identifier is the group id, and the first non-empty relay hint is the group's relay.
+    /// "d" identifier is the group id, and the first relay hint is the group's relay.
     ///
     /// - Parameters:
     ///   - naddr: The coordinate of the group's kind-39000 metadata event.
     ///   - inviteCode: An invite code shared alongside the coordinate, if any.
     /// - Throws: ``NostrError/invalidNIP19Entity`` unless the coordinate's kind is 39000 and
-    ///   it carries at least one non-empty relay hint — a group without a relay is unusable.
+    ///   it carries at least one valid relay hint — a group without a relay is unusable.
     public init(naddr: NAddr, inviteCode: String? = nil) throws {
         guard naddr.kind == Event.Kind.groupMetadata.rawValue,
-            let relayURL = naddr.relays.first(where: { !$0.isEmpty })
+            let relayURL = naddr.relays.first
         else {
             throw NostrError.invalidNIP19Entity
         }

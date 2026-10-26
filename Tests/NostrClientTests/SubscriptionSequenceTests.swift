@@ -235,7 +235,7 @@ struct SubscriptionSequenceTests {
         try await client.identity.setPrivateKey(String(repeating: "1", count: 64))
         // Publishing our own relay list caches it, so no relay-list fetch is needed.
         try await PublishAckSupport.acknowledgingPublishes(on: socket) {
-            try await client.routing.publishRelayList(write: [self.relayURL.description])
+            try await client.routing.publishRelayList(write: [self.relayURL])
         }
         let author = await client.identity.publicKey!
 

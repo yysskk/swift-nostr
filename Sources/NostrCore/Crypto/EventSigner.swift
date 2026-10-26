@@ -119,7 +119,7 @@ public struct EventSigner: Sendable {
     /// - Parameters:
     ///   - recipientPubkey: The public key being zapped (the `p` tag, required).
     ///   - relays: Relays the recipient's wallet should publish the zap receipt to (the `relays`
-    ///     tag, required — must contain at least one relay).
+    ///     tag, in canonical form; required — must contain at least one relay).
     ///   - amountMillisats: The amount in millisatoshis (the `amount` tag). Recommended.
     ///   - lnurl: The recipient's lnurl-pay URL, bech32-encoded with the `lnurl` prefix. Recommended.
     ///   - eventID: The id of the event being zapped, when zapping an event rather than a person
@@ -128,7 +128,7 @@ public struct EventSigner: Sendable {
     ///   - comment: An optional message sent with the payment (the event content).
     public func signZapRequest(
         recipientPubkey: PublicKey,
-        relays: [String],
+        relays: [RelayURL],
         amountMillisats: Int64? = nil,
         lnurl: String? = nil,
         eventID: EventID? = nil,
@@ -142,7 +142,7 @@ public struct EventSigner: Sendable {
         }
 
         var tags: [Tag] = [
-            Tag(name: "relays", values: relays),
+            Tag(name: "relays", values: relays.map(\.description)),
             .pubkey(recipientPubkey),
         ]
         if let amountMillisats {

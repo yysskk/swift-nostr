@@ -203,7 +203,7 @@ public protocol NostrRelayRouting: Sendable {
     /// Publishes the current user's NIP-65 relay list from read/write URLs.
     @discardableResult
     func publishRelayList(
-        read: [String], write: [String], strategy: PublishStrategy?
+        read: [RelayURL], write: [RelayURL], strategy: PublishStrategy?
     ) async throws -> PublishedEvent
     /// Subscribes to authors on their own WRITE relays (the outbox model).
     func subscribeOutbox(
@@ -227,7 +227,7 @@ public protocol NostrRelayRouting: Sendable {
     /// Publishes the current user's NIP-17 DM relay list from relay URLs.
     @discardableResult
     func publishDirectMessageRelayList(
-        relays: [String], strategy: PublishStrategy?
+        relays: [RelayURL], strategy: PublishStrategy?
     ) async throws -> PublishedEvent
     /// Connects the current user's own DM inbox relays so messages sent there arrive.
     @discardableResult

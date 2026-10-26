@@ -106,8 +106,8 @@ extension RemoteSigner {
     /// Asks the signer for its preferred relays (`switch_relays`).
     /// - Returns: The signer's preferred relays, or `nil` when it keeps the current set.
     /// - Throws: ``RemoteSignerError/responseDecodingFailed`` if the reply is neither a JSON array
-    ///   of URLs nor `null`.
-    public func switchRelays() async throws -> [URL]? {
+    ///   of relay URLs nor `null`.
+    public func switchRelays() async throws -> [RelayURL]? {
         let result = try await performSingle(method: .switchRelays, params: [])
         let trimmed = result.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed != "null" else { return nil }
@@ -115,11 +115,11 @@ extension RemoteSigner {
             throw RemoteSignerError.responseDecodingFailed
         }
         // The signer chose these, and it is the same untrusted party whose relays are
-        // scheme-checked on both URI paths. A compromised one could otherwise point the session at
-        // `http://` or `file://`. An unparseable or non-WebSocket entry is reported rather than
+        // validated on both URI paths. A compromised one could otherwise point the session at
+        // `http://` or `file://`. An entry that is not a relay URL is reported rather than
         // quietly dropped, so a malformed response does not look like a shorter relay list.
-        let urls = strings.compactMap { URL(string: $0) }
-        guard urls.count == strings.count, urls.allSatisfy(URIQuery.isWebSocketURL) else {
+        let urls = strings.compactMap(RelayURL.init)
+        guard urls.count == strings.count else {
             throw RemoteSignerError.responseDecodingFailed
         }
         return urls

@@ -8,6 +8,7 @@ public struct RelayListMetadata: Codable, Hashable, Sendable {
     /// The relay entries, in document order.
     public let entries: [RelayListEntry]
 
+    /// Creates a list from relay entries, kept as given.
     public init(entries: [RelayListEntry]) {
         self.entries = entries
     }
@@ -15,21 +16,19 @@ public struct RelayListMetadata: Codable, Hashable, Sendable {
     /// Builds a list from explicit read and write relay URLs; URLs present in both are marked
     /// as read+write.
     ///
-    /// Membership and de-duplication are both decided on the normalized URL, so any spelling of
-    /// the same relay — trailing slash, host case, default port — collapses into a single entry
-    /// carrying every usage the caller asked for. Entries keep the order and spelling of their
-    /// first appearance, matching how a parsed list de-duplicates.
-    package init(read: [String], write: [String]) {
-        let readKeys = Set(read.map(RelayURL.normalize))
-        let writeKeys = Set(write.map(RelayURL.normalize))
+    /// A relay listed more than once collapses into a single entry carrying every usage the
+    /// caller asked for. Entries keep the order of their first appearance, matching how a parsed
+    /// list de-duplicates.
+    package init(read: [RelayURL], write: [RelayURL]) {
+        let readSet = Set(read)
+        let writeSet = Set(write)
 
         var entries: [RelayListEntry] = []
-        var seen = Set<String>()
+        var seen = Set<RelayURL>()
         for url in read + write {
-            let key = RelayURL.normalize(url)
-            guard seen.insert(key).inserted else { continue }
+            guard seen.insert(url).inserted else { continue }
             let usage: RelayUsage =
-                switch (readKeys.contains(key), writeKeys.contains(key)) {
+                switch (readSet.contains(url), writeSet.contains(url)) {
                 case (true, true): .readWrite
                 case (true, false): .read
                 case (false, _): .write
@@ -40,12 +39,12 @@ public struct RelayListMetadata: Codable, Hashable, Sendable {
     }
 
     /// URLs the author reads from (their inbox). Send a user events here so they will see them.
-    public var readRelays: [String] {
+    public var readRelays: [RelayURL] {
         entries.filter { $0.usage.canRead }.map { $0.url }
     }
 
     /// URLs the author writes to (their outbox). Read a user's events from here.
-    public var writeRelays: [String] {
+    public var writeRelays: [RelayURL] {
         entries.filter { $0.usage.canWrite }.map { $0.url }
     }
 
@@ -62,16 +61,16 @@ public struct RelayListMetadata: Codable, Hashable, Sendable {
         self.init(tags: event.tags)
     }
 
-    /// Parses a relay list from raw tags (kind-agnostic). Duplicate relay URLs are removed (first wins).
+    /// Parses a relay list from raw tags (kind-agnostic). A tag whose URL is not a valid relay
+    /// URL is skipped, and duplicate relays are removed (first wins).
     public init(tags: [[String]]) {
-        var seen = Set<String>()
+        var seen = Set<RelayURL>()
         var result: [RelayListEntry] = []
         for tag in tags {
             guard let entry = RelayListEntry.fromTag(tag) else {
                 continue
             }
-            let key = RelayURL.normalize(entry.url)
-            if seen.insert(key).inserted {
+            if seen.insert(entry.url).inserted {
                 result.append(entry)
             }
         }

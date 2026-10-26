@@ -13,20 +13,20 @@ import Testing
 struct NIP51SimpleGroupListTests {
 
     private let groupID = "abcdef"
-    private let groupRelay = "wss://groups.example.com"
+    private let groupRelay = RelayURL("wss://groups.example.com")!
 
     // MARK: - Entry ⇔ tag round-trips
 
     @Test("An entry without a name produces a two-value group tag")
     func entryTagWithoutName() {
         let entry = GroupListEntry(groupID: groupID, relayURL: groupRelay)
-        #expect(entry.tag.rawArray == ["group", groupID, groupRelay])
+        #expect(entry.tag.rawArray == ["group", groupID, groupRelay.description])
     }
 
     @Test("An entry with a name produces a three-value group tag")
     func entryTagWithName() {
         let entry = GroupListEntry(groupID: groupID, relayURL: groupRelay, name: "Cooking")
-        #expect(entry.tag.rawArray == ["group", groupID, groupRelay, "Cooking"])
+        #expect(entry.tag.rawArray == ["group", groupID, groupRelay.description, "Cooking"])
     }
 
     @Test("A named group tag parses and round-trips")
@@ -49,10 +49,10 @@ struct NIP51SimpleGroupListTests {
 
     @Test("A present-but-empty name is treated as nil")
     func emptyNameBecomesNil() throws {
-        let tag = try #require(Event.Tag.raw(["group", groupID, groupRelay, ""]))
+        let tag = try #require(Event.Tag.raw(["group", groupID, groupRelay.description, ""]))
         let entry = try #require(GroupListEntry(tag: tag))
         #expect(entry.name == nil)
-        #expect(entry.tag.rawArray == ["group", groupID, groupRelay])
+        #expect(entry.tag.rawArray == ["group", groupID, groupRelay.description])
     }
 
     @Test("An empty name is normalized to nil on construction and mutation")
@@ -62,7 +62,7 @@ struct NIP51SimpleGroupListTests {
         var entry = GroupListEntry(groupID: groupID, relayURL: groupRelay, name: "Cooking")
         entry.name = ""
         #expect(entry.name == nil)
-        #expect(entry.tag.rawArray == ["group", groupID, groupRelay])
+        #expect(entry.tag.rawArray == ["group", groupID, groupRelay.description])
         #expect(GroupListEntry(tag: entry.tag) == entry)
     }
 
@@ -73,6 +73,7 @@ struct NIP51SimpleGroupListTests {
             ["group", "abcdef"],  // missing relay value
             ["group", "", "wss://groups.example.com"],  // empty id
             ["group", "abcdef", ""],  // empty relay
+            ["group", "abcdef", "https://groups.example.com"],  // not a relay URL
             ["group", "abcdef", "wss://groups.example.com", "Cooking", "extra"],  // values beyond the name
         ]
     )
@@ -110,16 +111,18 @@ struct NIP51SimpleGroupListTests {
         let unknown = Event.Tag(name: "client", values: ["nostrapp"])
         let malformedGroup = try #require(Event.Tag.raw(["group", ""]))
         let markedRelay = Event.Tag(name: "r", values: ["wss://marked.example.com", "read"])
+        let malformedRelay = Event.Tag.reference("https://not-a-relay.example.com")
         let list = NostrList(
             kind: .simpleGroupList,
             publicItems: [
                 .simpleGroup(id: groupID, relayURL: groupRelay, name: "Cooking"),
                 unknown,
-                .reference(groupRelay),
-                .simpleGroup(id: "012345", relayURL: "wss://other.example.com"),
+                .reference(groupRelay.description),
+                .simpleGroup(id: "012345", relayURL: RelayURL("wss://other.example.com")!),
                 malformedGroup,
                 .reference("wss://other.example.com"),
                 markedRelay,
+                malformedRelay,
             ]
         )
 
@@ -127,11 +130,11 @@ struct NIP51SimpleGroupListTests {
         #expect(
             typed.publicEntries == [
                 GroupListEntry(groupID: groupID, relayURL: groupRelay, name: "Cooking"),
-                GroupListEntry(groupID: "012345", relayURL: "wss://other.example.com"),
+                GroupListEntry(groupID: "012345", relayURL: RelayURL("wss://other.example.com")!),
             ]
         )
-        #expect(typed.relayURLs == [groupRelay, "wss://other.example.com"])
-        #expect(typed.additionalPublicTags == [unknown, malformedGroup, markedRelay])
+        #expect(typed.relayURLs == [groupRelay, RelayURL("wss://other.example.com")!])
+        #expect(typed.additionalPublicTags == [unknown, malformedGroup, markedRelay, malformedRelay])
         #expect(typed.privateEntries.isEmpty)
         #expect(typed.additionalPrivateTags.isEmpty)
     }
@@ -142,15 +145,15 @@ struct NIP51SimpleGroupListTests {
         let original = NostrList(
             kind: .simpleGroupList,
             publicItems: [
-                .reference(groupRelay),
+                .reference(groupRelay.description),
                 Event.Tag(name: "client", values: ["nostrapp"]),
                 .simpleGroup(id: groupID, relayURL: groupRelay, name: "Cooking"),
                 malformedGroup,
-                .simpleGroup(id: "012345", relayURL: "wss://other.example.com"),
+                .simpleGroup(id: "012345", relayURL: RelayURL("wss://other.example.com")!),
             ],
             privateItems: [
                 Event.Tag(name: "note", values: ["remember"]),
-                .simpleGroup(id: "5ec4e7", relayURL: "wss://hidden.example.com"),
+                .simpleGroup(id: "5ec4e7", relayURL: RelayURL("wss://hidden.example.com")!),
             ]
         )
 
@@ -161,15 +164,15 @@ struct NIP51SimpleGroupListTests {
         #expect(
             rebuilt.publicItems == [
                 Event.Tag.simpleGroup(id: groupID, relayURL: groupRelay, name: "Cooking"),
-                .simpleGroup(id: "012345", relayURL: "wss://other.example.com"),
-                .reference(groupRelay),
+                .simpleGroup(id: "012345", relayURL: RelayURL("wss://other.example.com")!),
+                .reference(groupRelay.description),
                 Event.Tag(name: "client", values: ["nostrapp"]),
                 malformedGroup,
             ]
         )
         #expect(
             rebuilt.privateItems == [
-                Event.Tag.simpleGroup(id: "5ec4e7", relayURL: "wss://hidden.example.com"),
+                Event.Tag.simpleGroup(id: "5ec4e7", relayURL: RelayURL("wss://hidden.example.com")!),
                 Event.Tag(name: "note", values: ["remember"]),
             ]
         )
@@ -200,7 +203,8 @@ struct NIP51SimpleGroupListTests {
         let typed = SimpleGroupList(
             publicEntries: [GroupListEntry(groupID: groupID, relayURL: groupRelay)],
             privateEntries: [
-                GroupListEntry(groupID: "secret-group-id", relayURL: "wss://hidden.example.com", name: "Secret Kitchen")
+                GroupListEntry(
+                    groupID: "secret-group-id", relayURL: RelayURL("wss://hidden.example.com")!, name: "Secret Kitchen")
             ],
             relayURLs: [groupRelay],
             additionalPrivateTags: [Event.Tag(name: "note", values: ["private-marker"])]
@@ -234,7 +238,7 @@ struct NIP51SimpleGroupListClientTests {
     private let firstRelayURL = RelayURL("wss://first.example.com")!
     private let secondRelayURL = RelayURL("wss://second.example.com")!
     private let groupID = "abcdef"
-    private let groupRelay = "wss://groups.example.com"
+    private let groupRelay = RelayURL("wss://groups.example.com")!
 
     private var noReconnectConfig: RelayConnectionConfig {
         RelayConnectionConfig(connectionTimeout: 1, pingInterval: 60, autoReconnect: false)
@@ -333,7 +337,7 @@ struct NIP51SimpleGroupListClientTests {
     /// Builds and signs a public-only kind-10009 list event at a pinned timestamp.
     private func listEvent(
         entries: [GroupListEntry],
-        relayURLs: [String],
+        relayURLs: [RelayURL],
         createdAt: Int64,
         signer: EventSigner
     ) throws -> Event {
@@ -375,7 +379,7 @@ struct NIP51SimpleGroupListClientTests {
         #expect(
             sentFirst.structuredTags == [
                 .simpleGroup(id: groupID, relayURL: groupRelay, name: "Cooking"),
-                .reference(groupRelay),
+                .reference(groupRelay.description),
             ]
         )
         #expect(sentFirst.content == "")
@@ -393,14 +397,14 @@ struct NIP51SimpleGroupListClientTests {
         try await client.relays.connect(to: [firstRelayURL])
         let author = EventSigner(keyPair: try KeyPair())
         let stale = try listEvent(
-            entries: [GroupListEntry(groupID: "oldgrp", relayURL: "wss://old.example.com")],
-            relayURLs: ["wss://old.example.com"],
+            entries: [GroupListEntry(groupID: "oldgrp", relayURL: RelayURL("wss://old.example.com")!)],
+            relayURLs: [RelayURL("wss://old.example.com")!],
             createdAt: 1_700_000_000,
             signer: author
         )
         let newer = try listEvent(
-            entries: [GroupListEntry(groupID: "newgrp", relayURL: "wss://new.example.com", name: "Fresh")],
-            relayURLs: ["wss://new.example.com"],
+            entries: [GroupListEntry(groupID: "newgrp", relayURL: RelayURL("wss://new.example.com")!, name: "Fresh")],
+            relayURLs: [RelayURL("wss://new.example.com")!],
             createdAt: 1_700_000_100,
             signer: author
         )
@@ -412,10 +416,10 @@ struct NIP51SimpleGroupListClientTests {
         let list = try #require(fetched)
         #expect(
             list.publicEntries == [
-                GroupListEntry(groupID: "newgrp", relayURL: "wss://new.example.com", name: "Fresh")
+                GroupListEntry(groupID: "newgrp", relayURL: RelayURL("wss://new.example.com")!, name: "Fresh")
             ]
         )
-        #expect(list.relayURLs == ["wss://new.example.com"])
+        #expect(list.relayURLs == [RelayURL("wss://new.example.com")!])
         #expect(list.privateEntries.isEmpty)
         #expect(list.additionalPublicTags.isEmpty)
 
@@ -433,7 +437,7 @@ struct NIP51SimpleGroupListClientTests {
         await client.identity.setSigner(signer)
         let typed = SimpleGroupList(
             publicEntries: [GroupListEntry(groupID: groupID, relayURL: groupRelay)],
-            privateEntries: [GroupListEntry(groupID: "5ec4e7", relayURL: "wss://hidden.example.com")],
+            privateEntries: [GroupListEntry(groupID: "5ec4e7", relayURL: RelayURL("wss://hidden.example.com")!)],
             relayURLs: [groupRelay]
         )
         let event = try signer.signList(typed.list)

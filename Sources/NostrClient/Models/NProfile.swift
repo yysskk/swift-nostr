@@ -8,12 +8,13 @@ public struct NProfile: Sendable, Hashable {
     /// The referenced public key.
     public let publicKey: PublicKey
 
-    /// Relay hints where the profile may be found.
-    public let relays: [String]
+    /// Relay hints where the profile may be found. Decoding skips a hint that is not a valid
+    /// relay URL; encoding writes each hint in canonical form.
+    public let relays: [RelayURL]
 
     /// Creates a profile reference.
-    /// - Throws: ``NostrError/invalidTLV`` if a relay hint is longer than 255 bytes.
-    public init(publicKey: PublicKey, relays: [String] = []) throws {
+    /// - Throws: ``NostrError/invalidTLV`` if a relay hint's canonical form is longer than 255 bytes.
+    public init(publicKey: PublicKey, relays: [RelayURL] = []) throws {
         self.publicKey = publicKey
         self.relays = try TLV.validatedRelays(relays)
     }
@@ -27,13 +28,15 @@ public struct NProfile: Sendable, Hashable {
 
     init(tlvData: Data) throws {
         var publicKey: PublicKey?
-        var relays: [String] = []
+        var relays: [RelayURL] = []
         for record in try TLV.decode(tlvData) {
             switch record.type {
             case TLV.Kind.special.rawValue:
                 publicKey = try TLV.publicKey(record)
             case TLV.Kind.relay.rawValue:
-                relays.append(String(decoding: record.value, as: UTF8.self))
+                if let relay = TLV.relay(record) {
+                    relays.append(relay)
+                }
             default:
                 continue
             }

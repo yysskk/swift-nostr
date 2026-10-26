@@ -157,7 +157,7 @@ relays), connect your own inbox relays before receiving with
 ``NostrRoutingAPI/fetchDirectMessageRelayList(for:timeout:)``:
 
 ```swift
-try await client.routing.publishDirectMessageRelayList(relays: ["wss://inbox.example.com"])
+try await client.routing.publishDirectMessageRelayList(relays: [try RelayURL(string: "wss://inbox.example.com")])
 try await client.routing.connectDirectMessageInboxRelays()
 
 let dmRelays = try await client.routing.fetchDirectMessageRelayList(for: recipient)
@@ -261,18 +261,18 @@ relay hints.
 let author = try PublicKey(hex: "3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d")
 
 // Profile reference with relay hints (nprofile)
-let profile = try NProfile(publicKey: author, relays: ["wss://relay.example.com"])
+let profile = try NProfile(publicKey: author, relays: [try RelayURL(string: "wss://relay.example.com")])
 let nprofile = try profile.encoded
 
 // Event reference (nevent) built from a fetched event
-let nevent = try NEvent(event: event, relays: ["wss://relay.example.com"]).encoded
+let nevent = try NEvent(event: event, relays: [try RelayURL(string: "wss://relay.example.com")]).encoded
 
 // Addressable event coordinate (naddr) for replaceable events (e.g. long-form)
 let naddr = try NAddr(
     identifier: "my-article",
     author: author,
     kind: 30023,
-    relays: ["wss://relay3.example.com"]
+    relays: [try RelayURL(string: "wss://relay3.example.com")]
 ).encoded
 ```
 
@@ -591,8 +591,8 @@ right relays automatically.
 ```swift
 // Publish your own relay list: where you read (inbox) and write (outbox)
 try await client.routing.publishRelayList(
-    read: ["wss://inbox.example.com"],
-    write: ["wss://relay.example.com", "wss://relay2.example.com"]
+    read: [try RelayURL(string: "wss://inbox.example.com")],
+    write: [try RelayURL(string: "wss://relay.example.com"), try RelayURL(string: "wss://relay2.example.com")]
 )
 
 // Fetch another user's relay list (cached for routing)
@@ -642,7 +642,7 @@ guard pay.supportsZaps, let providerPubkey = pay.nostrPubkey else { return }
 let signer = EventSigner(keyPair: keyPair)
 let zapRequest = try signer.signZapRequest(
     recipientPubkey: try PublicKey(npub: "npub1..."),
-    relays: ["wss://relay.example.com"],     // where the recipient's wallet should publish the receipt
+    relays: [try RelayURL(string: "wss://relay.example.com")],     // where the recipient's wallet should publish the receipt
     amountMillisats: 21_000,
     lnurl: LNURL.encode(serviceURL),
     comment: "great post!"

@@ -104,10 +104,11 @@ struct NIP29GroupKindAndTagTests {
             Event.Tag.role("admin", description: "Can edit metadata").rawArray
                 == ["role", "admin", "Can edit metadata"])
         #expect(
-            Event.Tag.simpleGroup(id: "abcdef", relayURL: "wss://groups.example.com").rawArray
+            Event.Tag.simpleGroup(id: "abcdef", relayURL: RelayURL("wss://groups.example.com")!).rawArray
                 == ["group", "abcdef", "wss://groups.example.com"])
         #expect(
-            Event.Tag.simpleGroup(id: "abcdef", relayURL: "wss://groups.example.com", name: "Cooking").rawArray
+            Event.Tag.simpleGroup(id: "abcdef", relayURL: RelayURL("wss://groups.example.com")!, name: "Cooking")
+                .rawArray
                 == ["group", "abcdef", "wss://groups.example.com", "Cooking"])
     }
 

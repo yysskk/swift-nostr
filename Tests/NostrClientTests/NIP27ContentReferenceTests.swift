@@ -103,7 +103,7 @@ struct NIP27ContentReferenceTests {
     func nprofileMapsToPubkeyTagWithRelay() throws {
         let profile = try NProfile(
             publicKey: PublicKey(pubkeyHex)!,
-            relays: ["wss://relay.example.com", "wss://relay2.example.com"]
+            relays: [RelayURL("wss://relay.example.com")!, RelayURL("wss://relay2.example.com")!]
         )
         let uri = try NIP19Entity.nprofile(profile).nostrURI
         let reference = try #require(NostrContentReference.references(in: uri).first)
@@ -112,12 +112,12 @@ struct NIP27ContentReferenceTests {
 
     @Test("an nprofile skips relay hints that are not relay URLs")
     func nprofileSkipsMalformedRelayHints() throws {
-        let profile = try NProfile(
-            publicKey: PublicKey(pubkeyHex)!,
+        let nprofile = try RawTLV.bech32(
+            prefix: "nprofile",
+            special: PublicKey(pubkeyHex)!.data,
             relays: ["https://not-a-relay.example.com", "WSS://Relay2.Example.com/"]
         )
-        let uri = try NIP19Entity.nprofile(profile).nostrURI
-        let reference = try #require(NostrContentReference.references(in: uri).first)
+        let reference = try #require(NostrContentReference.references(in: "nostr:\(nprofile)").first)
         #expect(reference.tag.rawArray == ["p", pubkeyHex, "wss://relay2.example.com"])
     }
 
@@ -132,7 +132,7 @@ struct NIP27ContentReferenceTests {
     func neventMapsToQuoteTagWithRelayAndPubkey() throws {
         let event = try NEvent(
             eventID: EventID(eventIdHex)!,
-            relays: ["wss://relay.example.com"],
+            relays: [RelayURL("wss://relay.example.com")!],
             author: PublicKey(pubkeyHex)!,
             kind: 1
         )
@@ -147,7 +147,7 @@ struct NIP27ContentReferenceTests {
             identifier: "1700847963",
             author: PublicKey(pubkeyHex)!,
             kind: 30023,
-            relays: ["wss://relay3.example.com"]
+            relays: [RelayURL("wss://relay3.example.com")!]
         )
         let uri = try NIP19Entity.naddr(addr).nostrURI
         let reference = try #require(NostrContentReference.references(in: uri).first)

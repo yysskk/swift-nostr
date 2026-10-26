@@ -143,8 +143,8 @@ struct PublishedEventTests {
         let (client, socket) = try await makeClient()
         let published = try await PublishAckSupport.acknowledgingPublishes(on: socket) {
             try await client.routing.publishRelayList(
-                read: ["wss://read.example.com"],
-                write: ["wss://write.example.com"]
+                read: [RelayURL("wss://read.example.com")!],
+                write: [RelayURL("wss://write.example.com")!]
             )
         }
 
@@ -215,7 +215,7 @@ struct PublishedEventTests {
             _ = try await client.messages.subscribe()
         }
         await #expect(throws: NostrError.signerNotSet) {
-            _ = try await client.routing.publishRelayList(write: ["wss://w.example.com"])
+            _ = try await client.routing.publishRelayList(write: [RelayURL("wss://w.example.com")!])
         }
     }
 

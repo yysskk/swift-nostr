@@ -154,7 +154,7 @@ Need per-relay EOSE, notices, and auth challenges? Iterate `client.subscriptions
 
 ```swift
 // Advertise where you receive DMs (kind 10050; NIP-17 suggests 1–3 relays), then connect your inbox.
-try await client.routing.publishDirectMessageRelayList(relays: ["wss://inbox.example.com"])
+try await client.routing.publishDirectMessageRelayList(relays: [try RelayURL(string: "wss://inbox.example.com")])
 try await client.routing.connectDirectMessageInboxRelays()
 
 // Receive — already decrypted and parsed. Wraps meant for someone else are skipped;

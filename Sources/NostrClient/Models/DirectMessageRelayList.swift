@@ -15,18 +15,18 @@ import NostrCore
 /// https://github.com/nostr-protocol/nips/blob/master/17.md
 public struct DirectMessageRelayList: Codable, Hashable, Sendable {
     /// The relay URLs where the author receives direct messages, in document order.
-    public let relays: [String]
+    public let relays: [RelayURL]
 
     /// Creates a list from relay URLs. Duplicate URLs are removed (first wins),
     /// matching how a list parsed from an event is normalized — so a list always
     /// round-trips identically through ``toTags()`` and back.
-    public init(relays: [String]) {
+    public init(relays: [RelayURL]) {
         self.relays = Self.deduplicated(relays)
     }
 
-    /// Converts to the full tag array for a kind 10050 event.
+    /// Converts to the full tag array for a kind 10050 event, with each URL in canonical form.
     public func toTags() -> [[String]] {
-        relays.map { ["relay", $0] }
+        relays.map { ["relay", $0.description] }
     }
 
     /// Parses a DM relay list from a kind 10050 event. Returns nil if the event is not kind 10050.
@@ -37,23 +37,23 @@ public struct DirectMessageRelayList: Codable, Hashable, Sendable {
         self.init(tags: event.tags)
     }
 
-    /// Parses a DM relay list from raw tags (kind-agnostic). Duplicate relay URLs are removed (first wins).
+    /// Parses a DM relay list from raw tags (kind-agnostic). A `relay` tag whose URL is not a
+    /// valid relay URL is skipped, and duplicate relays are removed (first wins).
     public init(tags: [[String]]) {
-        let urls = tags.compactMap { tag -> String? in
-            guard tag.count >= 2, tag[0] == "relay", !tag[1].isEmpty else {
+        let urls = tags.compactMap { tag -> RelayURL? in
+            guard tag.count >= 2, tag[0] == "relay" else {
                 return nil
             }
-            return tag[1]
+            return RelayURL(tag[1])
         }
         self.relays = Self.deduplicated(urls)
     }
 
-    /// De-duplicates relay URLs on a normalized key (first wins), preserving the
-    /// original URL strings so tags round-trip exactly.
-    private static func deduplicated(_ urls: [String]) -> [String] {
-        var seen = Set<String>()
-        var result: [String] = []
-        for url in urls where seen.insert(RelayURL.normalize(url)).inserted {
+    /// De-duplicates relay URLs (first wins), preserving their order.
+    private static func deduplicated(_ urls: [RelayURL]) -> [RelayURL] {
+        var seen = Set<RelayURL>()
+        var result: [RelayURL] = []
+        for url in urls where seen.insert(url).inserted {
             result.append(url)
         }
         return result

@@ -22,7 +22,7 @@ struct DirectMessageRoutingTests {
         // inbox.example.com is present in the pool.
         try await PublishAckSupport.acknowledgingPublishes(on: socket) {
             try await client.routing.publishDirectMessageRelayList(
-                relays: ["wss://inbox.example.com", "wss://absent.example.com"]
+                relays: [RelayURL("wss://inbox.example.com")!, RelayURL("wss://absent.example.com")!]
             )
         }
 
@@ -50,7 +50,9 @@ struct DirectMessageRoutingTests {
 
         let recipient = PublicKey.fixture("recipient")
         await client.dmRelayListStore.store(
-            DirectMessageRelayList(relays: ["wss://inbox.example.com", "wss://absent.example.com"]),
+            DirectMessageRelayList(relays: [
+                RelayURL("wss://inbox.example.com")!, RelayURL("wss://absent.example.com")!,
+            ]),
             createdAt: 1,
             for: recipient
         )

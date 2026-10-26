@@ -104,7 +104,7 @@ struct FetchVerificationTests {
             try await client.routing.fetchDirectMessageRelayList(for: victim.publicKey)
         }
 
-        #expect(list?.relays == ["wss://real.example.com"])
+        #expect(list?.relays == [RelayURL("wss://real.example.com")!])
         await client.relays.disconnect()
     }
 
@@ -145,7 +145,7 @@ struct FetchVerificationTests {
             try await client.routing.fetchRelayList(for: victim.publicKey)
         }
 
-        #expect(list?.entries.map(\.url) == ["wss://real.example.com"])
+        #expect(list?.entries.map(\.url) == [RelayURL("wss://real.example.com")!])
         await client.relays.disconnect()
     }
 

@@ -18,7 +18,7 @@ struct WalletConnectURITests {
     func parseCanonical() throws {
         let uri = try WalletConnectURI(string: canonical)
         #expect(uri.walletPubkey == (try PublicKey(hex: walletPubkeyHex)))
-        #expect(uri.relays == [URL(string: "wss://relay.damus.io")!])
+        #expect(uri.relays == [RelayURL("wss://relay.damus.io")!])
         #expect(uri.secret.hexEncodedString() == secretHex)
         #expect(uri.lud16 == nil)
     }
@@ -32,8 +32,8 @@ struct WalletConnectURITests {
         let uri = try WalletConnectURI(string: string)
         #expect(
             uri.relays == [
-                URL(string: "wss://relay.one.example")!,
-                URL(string: "wss://relay.two.example")!,
+                RelayURL("wss://relay.one.example")!,
+                RelayURL("wss://relay.two.example")!,
             ])
     }
 
@@ -89,7 +89,7 @@ struct WalletConnectURITests {
         let walletPubkey = try PublicKey(hex: walletPubkeyHex)
         let uri = try WalletConnectURI(
             walletPubkey: walletPubkey,
-            relays: [URL(string: "wss://relay.damus.io")!],
+            relays: [RelayURL("wss://relay.damus.io")!],
             secret: try #require(Data(hexString: secretHex)))
         #expect(uri.stringValue.hasPrefix("nostr+walletconnect://\(walletPubkeyHex)?"))
         #expect(try WalletConnectURI(string: uri.stringValue).walletPubkey == walletPubkey)
@@ -100,6 +100,37 @@ struct WalletConnectURITests {
         #expect(throws: WalletConnectError.self) {
             try WalletConnectURI(string: "nostr+walletconnect://\(walletPubkeyHex)?secret=\(secretHex)")
         }
+    }
+
+    @Test(
+        "rejects a relay that is not a valid relay URL, even beside a valid one",
+        arguments: [
+            "https%3A%2F%2Frelay.example",  // not a WebSocket URL
+            "wss%3A%2F%2Frelay.example%2F%23frag",  // fragment
+            "wss%3A%2F%2Fuser%3Apw%40relay.example",  // user and password
+            "wss%3A%2F%2F",  // empty host
+        ])
+    func rejectsMalformedRelay(relay: String) {
+        let error = WalletConnectError.invalidURI(reason: "missing or malformed relay")
+        #expect(throws: error) {
+            try WalletConnectURI(string: "nostr+walletconnect://\(walletPubkeyHex)?relay=\(relay)&secret=\(secretHex)")
+        }
+        #expect(throws: error) {
+            try WalletConnectURI(
+                string: "nostr+walletconnect://\(walletPubkeyHex)?relay=wss%3A%2F%2Fgood.example&relay=\(relay)"
+                    + "&secret=\(secretHex)")
+        }
+    }
+
+    @Test("normalizes relays and writes them back in canonical form")
+    func canonicalizesRelays() throws {
+        let uri = try WalletConnectURI(
+            string: "nostr+walletconnect://\(walletPubkeyHex)?relay=WSS%3A%2F%2FRelay.Damus.io%2F&secret=\(secretHex)")
+
+        #expect(uri.relays == [RelayURL("wss://relay.damus.io")!])
+        #expect(
+            uri.stringValue == "nostr+walletconnect://\(walletPubkeyHex)?relay=wss://relay.damus.io&secret=\(secretHex)"
+        )
     }
 
     @Test("rejects a malformed secret")
@@ -115,7 +146,7 @@ struct WalletConnectURITests {
         #expect(throws: WalletConnectError.self) {
             try WalletConnectURI(
                 walletPubkey: try PublicKey(hex: walletPubkeyHex),
-                relays: [URL(string: "wss://r.example")!],
+                relays: [RelayURL("wss://r.example")!],
                 secret: Data(repeating: 1, count: 16))
         }
     }

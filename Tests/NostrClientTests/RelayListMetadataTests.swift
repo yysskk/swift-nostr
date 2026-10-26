@@ -24,25 +24,25 @@ struct RelayListMetadataTests {
 
     @Test("Entry to tag - read+write (no marker)")
     func entryToTagReadWrite() {
-        let entry = RelayListEntry(url: "wss://relay.example.com", usage: .readWrite)
+        let entry = RelayListEntry(url: RelayURL("wss://relay.example.com")!, usage: .readWrite)
         #expect(entry.toTag() == ["r", "wss://relay.example.com"])
     }
 
     @Test("Entry to tag - read only")
     func entryToTagRead() {
-        let entry = RelayListEntry(url: "wss://relay.example.com", usage: .read)
+        let entry = RelayListEntry(url: RelayURL("wss://relay.example.com")!, usage: .read)
         #expect(entry.toTag() == ["r", "wss://relay.example.com", "read"])
     }
 
     @Test("Entry to tag - write only")
     func entryToTagWrite() {
-        let entry = RelayListEntry(url: "wss://relay.example.com", usage: .write)
+        let entry = RelayListEntry(url: RelayURL("wss://relay.example.com")!, usage: .write)
         #expect(entry.toTag() == ["r", "wss://relay.example.com", "write"])
     }
 
     @Test("Entry default usage is read+write")
     func entryDefaultUsage() {
-        let entry = RelayListEntry(url: "wss://relay.example.com")
+        let entry = RelayListEntry(url: RelayURL("wss://relay.example.com")!)
         #expect(entry.usage == .readWrite)
     }
 
@@ -51,7 +51,7 @@ struct RelayListMetadataTests {
     @Test("Entry from tag - no marker means read+write")
     func entryFromTagNoMarker() {
         let entry = RelayListEntry.fromTag(["r", "wss://relay.example.com"])
-        #expect(entry?.url == "wss://relay.example.com")
+        #expect(entry?.url == RelayURL("wss://relay.example.com"))
         #expect(entry?.usage == .readWrite)
     }
 
@@ -95,13 +95,13 @@ struct RelayListMetadataTests {
     @Test("readRelays and writeRelays filtering")
     func readWriteFiltering() {
         let list = RelayListMetadata(entries: [
-            RelayListEntry(url: "wss://both.example.com", usage: .readWrite),
-            RelayListEntry(url: "wss://read.example.com", usage: .read),
-            RelayListEntry(url: "wss://write.example.com", usage: .write),
+            RelayListEntry(url: RelayURL("wss://both.example.com")!, usage: .readWrite),
+            RelayListEntry(url: RelayURL("wss://read.example.com")!, usage: .read),
+            RelayListEntry(url: RelayURL("wss://write.example.com")!, usage: .write),
         ])
 
-        #expect(list.readRelays == ["wss://both.example.com", "wss://read.example.com"])
-        #expect(list.writeRelays == ["wss://both.example.com", "wss://write.example.com"])
+        #expect(list.readRelays == [RelayURL("wss://both.example.com")!, RelayURL("wss://read.example.com")!])
+        #expect(list.writeRelays == [RelayURL("wss://both.example.com")!, RelayURL("wss://write.example.com")!])
     }
 
     // MARK: - toTags / parse round-trip
@@ -109,9 +109,9 @@ struct RelayListMetadataTests {
     @Test("toTags produces NIP-65 r tags")
     func toTagsFormat() {
         let list = RelayListMetadata(entries: [
-            RelayListEntry(url: "wss://a.example.com", usage: .readWrite),
-            RelayListEntry(url: "wss://b.example.com", usage: .read),
-            RelayListEntry(url: "wss://c.example.com", usage: .write),
+            RelayListEntry(url: RelayURL("wss://a.example.com")!, usage: .readWrite),
+            RelayListEntry(url: RelayURL("wss://b.example.com")!, usage: .read),
+            RelayListEntry(url: RelayURL("wss://c.example.com")!, usage: .write),
         ])
 
         #expect(
@@ -126,9 +126,9 @@ struct RelayListMetadataTests {
     @Test("Round-trip toTags then init(tags:)")
     func roundTrip() {
         let original = RelayListMetadata(entries: [
-            RelayListEntry(url: "wss://a.example.com", usage: .readWrite),
-            RelayListEntry(url: "wss://b.example.com", usage: .read),
-            RelayListEntry(url: "wss://c.example.com", usage: .write),
+            RelayListEntry(url: RelayURL("wss://a.example.com")!, usage: .readWrite),
+            RelayListEntry(url: RelayURL("wss://b.example.com")!, usage: .read),
+            RelayListEntry(url: RelayURL("wss://c.example.com")!, usage: .write),
         ])
 
         let parsed = RelayListMetadata(tags: original.toTags())
@@ -143,8 +143,8 @@ struct RelayListMetadataTests {
             ["r", "wss://b.example.com", "read"],
         ])
         #expect(list.entries.count == 2)
-        #expect(list.entries[0].url == "wss://a.example.com")
-        #expect(list.entries[1].url == "wss://b.example.com")
+        #expect(list.entries[0].url == RelayURL("wss://a.example.com"))
+        #expect(list.entries[1].url == RelayURL("wss://b.example.com"))
     }
 
     @Test("Duplicate relay URLs are de-duplicated (first wins)")
@@ -166,13 +166,21 @@ struct RelayListMetadataTests {
         #expect(list.entries.count == 1)
     }
 
-    @Test("Stored url is not mutated by normalization")
-    func storedURLNotMutated() {
-        // A mixed-case host with a trailing slash must round-trip exactly through toTags().
+    @Test("A parsed relay is written back in canonical form")
+    func parsedURLIsCanonical() {
         let list = RelayListMetadata(tags: [["r", "wss://Relay.Example.com/"]])
         #expect(list.entries.count == 1)
-        #expect(list.entries[0].url == "wss://Relay.Example.com/")
-        #expect(list.toTags() == [["r", "wss://Relay.Example.com/"]])
+        #expect(list.entries[0].url == RelayURL("wss://relay.example.com"))
+        #expect(list.toTags() == [["r", "wss://relay.example.com"]])
+    }
+
+    @Test(
+        "An r tag whose URL is not a relay URL is skipped",
+        arguments: ["https://relay.example.com", "not a relay", "wss://relay.example.com/#frag"])
+    func malformedURLIsSkipped(url: String) {
+        #expect(RelayListEntry.fromTag(["r", url]) == nil)
+        let list = RelayListMetadata(tags: [["r", url], ["r", "wss://good.example.com", "write"]])
+        #expect(list.entries == [RelayListEntry(url: RelayURL("wss://good.example.com")!, usage: .write)])
     }
 }
 
@@ -185,9 +193,9 @@ struct RelayListMetadataEventTests {
         let signer = EventSigner(keyPair: keyPair)
 
         let list = RelayListMetadata(entries: [
-            RelayListEntry(url: "wss://a.example.com", usage: .readWrite),
-            RelayListEntry(url: "wss://b.example.com", usage: .read),
-            RelayListEntry(url: "wss://c.example.com", usage: .write),
+            RelayListEntry(url: RelayURL("wss://a.example.com")!, usage: .readWrite),
+            RelayListEntry(url: RelayURL("wss://b.example.com")!, usage: .read),
+            RelayListEntry(url: RelayURL("wss://c.example.com")!, usage: .write),
         ])
 
         let event = try signer.signRelayListMetadata(list)
@@ -204,16 +212,18 @@ struct RelayListMetadataEventTests {
         let signer = EventSigner(keyPair: keyPair)
 
         let event = try signer.signRelayListMetadata(
-            read: ["wss://read.example.com", "wss://both.example.com"],
-            write: ["wss://write.example.com", "wss://both.example.com"]
+            read: [RelayURL("wss://read.example.com")!, RelayURL("wss://both.example.com")!],
+            write: [RelayURL("wss://write.example.com")!, RelayURL("wss://both.example.com")!]
         )
 
         #expect(event.kind == 10002)
         let list = event.relayListMetadata
         #expect(list != nil)
         // Order is not guaranteed for the read/write overload; compare as sets.
-        #expect(Set(list?.readRelays ?? []) == ["wss://read.example.com", "wss://both.example.com"])
-        #expect(Set(list?.writeRelays ?? []) == ["wss://write.example.com", "wss://both.example.com"])
+        #expect(
+            Set(list?.readRelays ?? []) == [RelayURL("wss://read.example.com")!, RelayURL("wss://both.example.com")!])
+        #expect(
+            Set(list?.writeRelays ?? []) == [RelayURL("wss://write.example.com")!, RelayURL("wss://both.example.com")!])
     }
 
     @Test("Sign relay list from read/write URLs collapses repeated URLs into one entry")
@@ -221,16 +231,16 @@ struct RelayListMetadataEventTests {
         let signer = EventSigner(keyPair: try KeyPair())
 
         let event = try signer.signRelayListMetadata(
-            read: ["wss://a.example.com", "wss://a.example.com/"],
-            write: ["wss://b.example.com", "wss://B.example.com"]
+            read: [RelayURL("wss://a.example.com")!, RelayURL("wss://a.example.com/")!],
+            write: [RelayURL("wss://b.example.com")!, RelayURL("wss://B.example.com")!]
         )
 
         // Repeats — including alternate spellings of the same relay — must not become
         // duplicate `r` tags, matching how a parsed list de-duplicates.
         #expect(event.tags.count == 2)
         let list = event.relayListMetadata
-        #expect(list?.readRelays == ["wss://a.example.com"])
-        #expect(list?.writeRelays == ["wss://b.example.com"])
+        #expect(list?.readRelays == [RelayURL("wss://a.example.com")!])
+        #expect(list?.writeRelays == [RelayURL("wss://b.example.com")!])
     }
 
     @Test("A relay spelled differently in read and write is still marked read+write")
@@ -240,16 +250,16 @@ struct RelayListMetadataEventTests {
         // The same relay, spelled with a trailing slash on one side and mixed case on the other.
         // Both usages must survive: dropping one would silently demote the relay.
         let event = try signer.signRelayListMetadata(
-            read: ["wss://Relay.example.com/"],
-            write: ["wss://relay.example.com"]
+            read: [RelayURL("wss://Relay.example.com/")!],
+            write: [RelayURL("wss://relay.example.com")!]
         )
 
-        #expect(event.tags == [["r", "wss://Relay.example.com/"]])
+        #expect(event.tags == [["r", "wss://relay.example.com"]])
         let list = try #require(event.relayListMetadata)
         #expect(list.entries.count == 1)
         #expect(list.entries[0].usage == .readWrite)
-        #expect(list.readRelays == ["wss://Relay.example.com/"])
-        #expect(list.writeRelays == ["wss://Relay.example.com/"])
+        #expect(list.readRelays == [RelayURL("wss://relay.example.com")!])
+        #expect(list.writeRelays == [RelayURL("wss://relay.example.com")!])
     }
 
     @Test("Extract relay list from event")
@@ -258,16 +268,16 @@ struct RelayListMetadataEventTests {
         let signer = EventSigner(keyPair: keyPair)
 
         let list = RelayListMetadata(entries: [
-            RelayListEntry(url: "wss://a.example.com", usage: .read),
-            RelayListEntry(url: "wss://b.example.com", usage: .write),
+            RelayListEntry(url: RelayURL("wss://a.example.com")!, usage: .read),
+            RelayListEntry(url: RelayURL("wss://b.example.com")!, usage: .write),
         ])
         let event = try signer.signRelayListMetadata(list)
 
         let extracted = event.relayListMetadata
         #expect(extracted != nil)
         #expect(extracted?.entries.count == 2)
-        #expect(extracted?.readRelays == ["wss://a.example.com"])
-        #expect(extracted?.writeRelays == ["wss://b.example.com"])
+        #expect(extracted?.readRelays == [RelayURL("wss://a.example.com")!])
+        #expect(extracted?.writeRelays == [RelayURL("wss://b.example.com")!])
     }
 
     @Test("relayListMetadata returns nil for non-10002 event")
@@ -286,7 +296,7 @@ struct RelayListMetadataEventTests {
         let signer = EventSigner(keyPair: keyPair)
 
         let relayListEvent = try signer.signRelayListMetadata(
-            RelayListMetadata(entries: [RelayListEntry(url: "wss://a.example.com")])
+            RelayListMetadata(entries: [RelayListEntry(url: RelayURL("wss://a.example.com")!)])
         )
         let textNote = try signer.signTextNote(content: "Hello")
 

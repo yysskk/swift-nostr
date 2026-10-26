@@ -54,7 +54,7 @@ struct NIP21Tests {
     func neventRoundTrip() throws {
         let event = try NEvent(
             eventID: eventID,
-            relays: ["wss://relay.example.com"],
+            relays: [RelayURL("wss://relay.example.com")!],
             author: PublicKey(pubkeyHex)!,
             kind: 1
         )
@@ -69,7 +69,7 @@ struct NIP21Tests {
             identifier: "1700847963",
             author: PublicKey(pubkeyHex)!,
             kind: 30023,
-            relays: ["wss://relay3.example.com"]
+            relays: [RelayURL("wss://relay3.example.com")!]
         )
         let uri = try NIP19Entity.naddr(addr).nostrURI
         #expect(uri.hasPrefix("nostr:naddr1"))

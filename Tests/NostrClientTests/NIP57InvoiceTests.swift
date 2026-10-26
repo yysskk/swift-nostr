@@ -17,7 +17,8 @@ struct NIP57InvoiceTests {
     private func makeZapRequest() throws -> Event {
         let signer = EventSigner(keyPair: try KeyPair())
         return try signer.signZapRequest(
-            recipientPubkey: PublicKey.fixture("rp"), relays: ["wss://r.example.com"], amountMillisats: 21000)
+            recipientPubkey: PublicKey.fixture("rp"), relays: [RelayURL("wss://r.example.com")!], amountMillisats: 21000
+        )
     }
 
     // MARK: - Success

@@ -150,13 +150,14 @@ struct NostrClientNamespaceTests {
 
         let published = try await PublishAckSupport.acknowledgingPublishes(on: socket) {
             try await routing.publishRelayList(
-                read: ["wss://read.example.com"], write: ["wss://write.example.com"], strategy: nil)
+                read: [RelayURL("wss://read.example.com")!], write: [RelayURL("wss://write.example.com")!],
+                strategy: nil)
         }
 
         #expect(published.event.kind == .relayListMetadata)
         // Publishing seeds the cache, so the author's list resolves without a network round trip.
         let cached = await routing.cachedRelayList(for: published.event.pubkey)
-        #expect(cached?.writeRelays == ["wss://write.example.com"])
+        #expect(cached?.writeRelays == [RelayURL("wss://write.example.com")!])
         await client.relays.disconnect()
     }
 
@@ -184,7 +185,7 @@ struct NostrClientNamespaceTests {
         try await client.identity.setPrivateKey(try KeyPair().privateKeyHex)
         let groups: any NostrGroupManaging = client.groups
         let list = SimpleGroupList(
-            publicEntries: [GroupListEntry(groupID: "abc", relayURL: "wss://groups.example.com")])
+            publicEntries: [GroupListEntry(groupID: "abc", relayURL: RelayURL("wss://groups.example.com")!)])
 
         let published = try await PublishAckSupport.acknowledgingPublishes(on: socket) {
             try await groups.publishSimpleGroupList(list, strategy: nil)

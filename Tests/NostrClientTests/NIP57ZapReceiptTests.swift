@@ -35,7 +35,7 @@ struct NIP57ZapReceiptTests {
     {
         let sender = EventSigner(keyPair: try KeyPair())
         let request = try sender.signZapRequest(
-            recipientPubkey: try PublicKey(hex: recipient), relays: ["wss://relay.example.com"],
+            recipientPubkey: try PublicKey(hex: recipient), relays: [RelayURL("wss://relay.example.com")!],
             amountMillisats: amountMillisats, eventID: try eventId.map(EventID.init(hex:)))
         return String(decoding: try JSONEncoder().encode(request), as: UTF8.self)
     }

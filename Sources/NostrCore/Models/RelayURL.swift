@@ -23,7 +23,7 @@ public struct RelayURL: Sendable {
     ///   its scheme is not `ws` or `wss`, its host is empty, or it has a fragment or a user or
     ///   password.
     public init(string: String) throws {
-        guard let components = URLComponents(string: string),
+        guard var components = URLComponents(string: string),
             let scheme = components.scheme?.lowercased(), scheme == "wss" || scheme == "ws",
             let host = components.host, !host.isEmpty,
             components.fragment == nil,
@@ -31,8 +31,13 @@ public struct RelayURL: Sendable {
         else {
             throw NostrError.invalidRelayURL(string)
         }
-        let canonical = Self.normalize(string)
-        guard let url = URL(string: canonical) else {
+        components.scheme = scheme
+        components.host = host.lowercased()
+        if components.path == "/" { components.path = "" }  // root slash only; /a/ ≠ /a
+        if (scheme, components.port) == ("wss", 443) || (scheme, components.port) == ("ws", 80) {
+            components.port = nil
+        }
+        guard let canonical = components.string, let url = URL(string: canonical) else {
             throw NostrError.invalidRelayURL(string)
         }
         self.canonical = canonical
@@ -86,38 +91,5 @@ extension RelayURL: Codable {
     public func encode(to encoder: any Encoder) throws {
         var container = encoder.singleValueContainer()
         try container.encode(canonical)
-    }
-}
-
-extension RelayURL {
-    /// Normalizes a relay URL string into its canonical form without validating it: lowercased
-    /// scheme and host, a root trailing slash stripped, and default ports removed. A string that
-    /// does not parse as a URL with a host is lowercased and loses one trailing slash instead.
-    ///
-    /// Used to build ``RelayURL`` values and to de-duplicate relay-list entries that are stored
-    /// as strings — never to rewrite those entries, so relay tags round-trip exactly.
-    package static func normalize(_ string: String) -> String {
-        guard var components = URLComponents(string: string), let host = components.host, !host.isEmpty else {
-            var normalized = string.lowercased()  // unparseable: legacy whole-string rule
-            if normalized.hasSuffix("/") { normalized.removeLast() }
-            return normalized
-        }
-        components.scheme = components.scheme?.lowercased()
-        components.host = host.lowercased()
-        if components.path == "/" { components.path = "" }  // root slash only; /a/ ≠ /a
-        switch (components.scheme, components.port) {
-        case ("wss", 443), ("ws", 80): components.port = nil
-        default: break
-        }
-        return components.string ?? string
-    }
-}
-
-extension Set<RelayURL> {
-    /// Parses relay URL strings into a set, skipping every entry that is not a valid WebSocket
-    /// relay URL. Lenient by design: it ingests third-party relay lists (NIP-65 / NIP-17 tag
-    /// content), where one malformed entry must not discard the rest.
-    package init(parsingValid strings: some Sequence<String>) {
-        self.init(strings.compactMap(RelayURL.init))
     }
 }

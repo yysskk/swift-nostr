@@ -30,7 +30,7 @@ extension EventSigner {
 
     /// Creates and signs a relay list metadata event from explicit read/write relay URLs (NIP-65).
     /// URLs present in both lists are marked as read+write.
-    public func signRelayListMetadata(read: [String] = [], write: [String] = []) throws -> Event {
+    public func signRelayListMetadata(read: [RelayURL] = [], write: [RelayURL] = []) throws -> Event {
         try signRelayListMetadata(RelayListMetadata(read: read, write: write))
     }
 
@@ -44,7 +44,7 @@ extension EventSigner {
     }
 
     /// Creates and signs a DM relay list event from relay URLs (kind 10050, NIP-17).
-    public func signDirectMessageRelayList(relays: [String]) throws -> Event {
+    public func signDirectMessageRelayList(relays: [RelayURL]) throws -> Event {
         try signDirectMessageRelayList(DirectMessageRelayList(relays: relays))
     }
 

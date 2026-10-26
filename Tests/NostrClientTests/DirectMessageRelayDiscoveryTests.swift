@@ -19,7 +19,7 @@ struct DirectMessageRelayDiscoveryTests {
     func publishReturnsEventAndCaches() async throws {
         let (client, socket) = try await makeClient()
         let published = try await PublishAckSupport.acknowledgingPublishes(on: socket) {
-            try await client.routing.publishDirectMessageRelayList(relays: ["wss://inbox.example.com"])
+            try await client.routing.publishDirectMessageRelayList(relays: [RelayURL("wss://inbox.example.com")!])
         }
 
         #expect(published.event.kind == .directMessageRelayList)
@@ -29,14 +29,14 @@ struct DirectMessageRelayDiscoveryTests {
 
         let pubkey = await client.identity.publicKey
         let cached = await client.routing.cachedDirectMessageRelayList(for: pubkey!)
-        #expect(cached?.relays == ["wss://inbox.example.com"])
+        #expect(cached?.relays == [RelayURL("wss://inbox.example.com")!])
         await client.relays.disconnect()
     }
 
     @Test("routing.publishDirectMessageRelayList accepts a DirectMessageRelayList value")
     func publishAcceptsListValue() async throws {
         let (client, socket) = try await makeClient()
-        let list = DirectMessageRelayList(relays: ["wss://a.example.com", "wss://b.example.com"])
+        let list = DirectMessageRelayList(relays: [RelayURL("wss://a.example.com")!, RelayURL("wss://b.example.com")!])
 
         let published = try await PublishAckSupport.acknowledgingPublishes(on: socket) {
             try await client.routing.publishDirectMessageRelayList(list)
@@ -55,7 +55,7 @@ struct DirectMessageRelayDiscoveryTests {
     func publishWithoutSignerThrows() async {
         let client = NostrClient()
         await #expect(throws: NostrError.signerNotSet) {
-            _ = try await client.routing.publishDirectMessageRelayList(relays: ["wss://inbox.example.com"])
+            _ = try await client.routing.publishDirectMessageRelayList(relays: [RelayURL("wss://inbox.example.com")!])
         }
     }
 }

@@ -167,6 +167,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   keeping the string. Hints read from other authors' events are parsed the same way: a reply to an
   event in NIP-10's positional form carries over its root's relay hint only when it is valid, and a
   `nostr:` `nprofile` / `nevent` / `naddr` reference's tag carries its first valid relay hint.
+- **Relay lists hold `RelayURL`s** (breaking): `RelayListEntry.url`, `RelayListMetadata.readRelays` and
+  `writeRelays`, and `DirectMessageRelayList.relays` are typed, as are
+  `DirectMessageRelayList(relays:)`, `EventSigner.signRelayListMetadata(read:write:)` and
+  `signDirectMessageRelayList(relays:)`, and `routing.publishRelayList(read:write:strategy:)` and
+  `publishDirectMessageRelayList(relays:strategy:)` (with their `NostrRelayRouting` requirements). A
+  NIP-65 `r` tag or NIP-17 `relay` tag whose URL is not a valid relay URL is skipped when parsing, so
+  routing only ever sees usable relays; lists de-duplicate by relay and are written in canonical form
+  instead of keeping the first spelling verbatim.
+- **NIP-19 relay hints are `[RelayURL]`** (breaking): `NProfile.relays`, `NEvent.relays`, and
+  `NAddr.relays`, their initializers, and `LongFormContent.naddr(author:relays:)` and
+  `NostrListSet.naddr(author:relays:)`. Decoding skips a TLV relay record that is not a valid relay URL
+  rather than keeping the raw string, and encoding writes each hint in canonical form; the 255-byte
+  limit applies to that form.
+- **NIP-29 groups name their relay with a `RelayURL`** (breaking): `GroupReference.relayURL`,
+  `GroupReference(relayURL:id:relayPubkey:inviteCode:)`, `GroupListEntry.relayURL` and its initializer,
+  `SimpleGroupList.relayURLs`, and `Tag.simpleGroup(id:relayURL:name:)`. `GroupReference(naddr:)` takes
+  the coordinate's first valid relay hint, so the group flows no longer throw `invalidRelayURL`. In a
+  kind-10009 list, a `group` tag or single-value `r` tag whose relay is not a valid relay URL is kept in
+  the additional tags rather than parsed.
+- **NIP-05 relays are `[RelayURL]`** (breaking): `InternetIdentifier.VerificationResult.relays` and
+  `InternetIdentifier.lookupRelays(_:)`. A `nostr.json` relay entry that is not a valid relay URL is
+  skipped.
+- **`EventSigner.signZapRequest` takes `relays: [RelayURL]`** (breaking), written to the `relays` tag
+  in canonical form.
+- **Connection URIs hold `RelayURL`s** (breaking): `BunkerURI.relays`, `NostrConnectURI.relays`, and
+  `WalletConnectURI.relays` are `[RelayURL]`, their initializers and `NostrConnectURI.invitation` take
+  one, and `RemoteSigner.switchRelays()` returns `[RelayURL]?`. Parsing a `bunker://`,
+  `nostrconnect://`, or `nostr+walletconnect://` string whose `relay` parameter is not a valid relay URL
+  — a fragment, a user or password, or an empty host, besides a non-WebSocket scheme — throws
+  `RemoteSignerError.invalidURI(reason:)` or `WalletConnectError.invalidURI(reason:)`, and a
+  `switch_relays` reply with such an entry throws `responseDecodingFailed`. `stringValue` writes each
+  relay in canonical form.
 
 ## [0.8.0] - 2026-10-25
 

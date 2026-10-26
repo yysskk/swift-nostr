@@ -16,7 +16,7 @@ struct BunkerURITests {
         let uri = try BunkerURI(string: "bunker://\(pubkey)?relay=wss%3A%2F%2Frelay.example&secret=abc123")
 
         #expect(uri.remoteSignerPubkey == (try PublicKey(hex: pubkey)))
-        #expect(uri.relays == [URL(string: "wss://relay.example")!])
+        #expect(uri.relays == [RelayURL("wss://relay.example")!])
         #expect(uri.secret == "abc123")
     }
 
@@ -28,8 +28,8 @@ struct BunkerURITests {
 
         #expect(
             uri.relays == [
-                URL(string: "wss://relay.one")!,
-                URL(string: "wss://relay.two")!,
+                RelayURL("wss://relay.one")!,
+                RelayURL("wss://relay.two")!,
             ]
         )
     }
@@ -70,19 +70,39 @@ struct BunkerURITests {
         }
     }
 
-    @Test("rejects a non-WebSocket relay")
-    func rejectsNonWebSocketRelay() {
-        // Relay values come from an untrusted signer/QR code; only ws:// and wss:// are accepted.
-        #expect(throws: RemoteSignerError.self) {
-            try BunkerURI(string: "bunker://\(pubkey)?relay=https%3A%2F%2Frelay.example")
+    @Test(
+        "rejects a relay that is not a valid relay URL, even beside a valid one",
+        arguments: [
+            "https%3A%2F%2Frelay.example",  // not a WebSocket URL
+            "wss%3A%2F%2Frelay.example%2F%23frag",  // fragment
+            "wss%3A%2F%2Fuser%3Apw%40relay.example",  // user and password
+            "wss%3A%2F%2F",  // empty host
+        ])
+    func rejectsMalformedRelay(relay: String) {
+        // Relay values come from an untrusted signer/QR code; a malformed one is an error rather
+        // than silently dropped.
+        let error = RemoteSignerError.invalidURI(reason: "missing or malformed relay")
+        #expect(throws: error) {
+            try BunkerURI(string: "bunker://\(pubkey)?relay=\(relay)")
         }
+        #expect(throws: error) {
+            try BunkerURI(string: "bunker://\(pubkey)?relay=wss%3A%2F%2Fgood.example&relay=\(relay)")
+        }
+    }
+
+    @Test("normalizes relays and writes them back in canonical form")
+    func canonicalizesRelays() throws {
+        let uri = try BunkerURI(string: "bunker://\(pubkey)?relay=WSS%3A%2F%2FRelay.Example%3A443%2F")
+
+        #expect(uri.relays == [RelayURL("wss://relay.example")!])
+        #expect(uri.stringValue == "bunker://\(pubkey)?relay=wss%3A%2F%2Frelay.example")
     }
 
     @Test("round-trips through stringValue with a secret")
     func roundTripsWithSecret() throws {
         let uri = try BunkerURI(
             remoteSignerPubkey: try PublicKey(hex: pubkey),
-            relays: [URL(string: "wss://relay.one")!, URL(string: "wss://relay.two")!],
+            relays: [RelayURL("wss://relay.one")!, RelayURL("wss://relay.two")!],
             secret: "abc123"
         )
 
@@ -93,7 +113,7 @@ struct BunkerURITests {
     func roundTripsWithoutSecret() throws {
         let uri = try BunkerURI(
             remoteSignerPubkey: try PublicKey(hex: pubkey),
-            relays: [URL(string: "wss://relay.example")!]
+            relays: [RelayURL("wss://relay.example")!]
         )
 
         #expect(try BunkerURI(string: uri.stringValue) == uri)
@@ -103,7 +123,7 @@ struct BunkerURITests {
     func serializesTypedKeyAsHost() throws {
         let uri = try BunkerURI(
             remoteSignerPubkey: try PublicKey(hex: pubkey),
-            relays: [URL(string: "wss://relay.example")!],
+            relays: [RelayURL("wss://relay.example")!],
             secret: "abc123"
         )
 
