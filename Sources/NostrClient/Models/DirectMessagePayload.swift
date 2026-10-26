@@ -4,7 +4,7 @@ import Foundation
 ///
 /// A single gift-wrap stream (kind 1059 addressed to the user) carries messages (kind 14),
 /// reactions (kind 7), and file messages (kind 15). Returned by
-/// ``NostrMessagesAPI/payloads(limit:)`` and ``NostrMessagesAPI/parsePayload(_:)``
+/// ``NostrMessaging/payloads(limit:)`` and ``NostrMessaging/parsePayload(_:)``
 /// so callers can handle them in one place.
 public enum DirectMessagePayload: Sendable, Hashable {
     /// A private direct message (kind 14).

@@ -3,7 +3,7 @@ import NostrCore
 
 /// Result of sending a gift-wrapped NIP-17 payload — a private direct message, a NIP-25
 /// reaction to one, a file message, or a rumor of any kind sent with
-/// ``NostrMessagesAPI/sendGiftWrapped(_:to:expiration:strategy:)``.
+/// ``NostrMessaging/sendGiftWrapped(_:to:expiration:strategy:)-(_,_,Timestamp?,_)``.
 ///
 /// NIP-17 sends the same payload twice: one gift wrap addressed to the recipient
 /// and one addressed to the sender (the self-copy that provides sent history and
@@ -11,7 +11,7 @@ import NostrCore
 /// https://github.com/nostr-protocol/nips/blob/master/17.md
 public struct SendDirectMessageResult: Sendable {
     /// The unsigned rumor shared by both gift wraps — kind 14 for a message, kind 15 for a file,
-    /// kind 7 for a reaction, or the caller's kind for ``NostrMessagesAPI/sendGiftWrapped(_:to:expiration:strategy:)``
+    /// kind 7 for a reaction, or the caller's kind for ``NostrMessaging/sendGiftWrapped(_:to:expiration:strategy:)-(_,_,Timestamp?,_)``
     /// (``Event/signature`` is `nil`; NIP-17 rumors must never be signed). Its `id` is the stable
     /// key for matching the payload when it echoes back from a relay.
     public let rumor: Event
@@ -24,7 +24,7 @@ public struct SendDirectMessageResult: Sendable {
 
     /// Per-relay outcome of publishing the recipient gift wrap.
     /// Always present when returned from a send such as
-    /// ``NostrMessagesAPI/send(_:to:subject:replyTo:expiration:strategy:)``;
+    /// ``NostrMessaging/send(_:to:subject:replyTo:expiration:strategy:)``;
     /// `nil` when the result was built without publishing (e.g. by ``DirectMessageBuilder``).
     public let recipientPublishResult: PublishResult?
 

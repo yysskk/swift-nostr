@@ -18,8 +18,9 @@ public struct DirectMessageBuilder: Sendable {
     ///
     /// NIP-17 sends every message twice — once wrapped for the recipient and once
     /// wrapped for the sender — so the sender's other devices can reconstruct the
-    /// conversation. Both wraps carry the identical unsigned rumor; its `id` is the
-    /// key for matching the message when it echoes back from a relay.
+    /// conversation. Both wraps carry the identical unsigned rumor, built by
+    /// ``EventTemplate/directMessage(_:to:subject:replyTo:)``; its `id` is the key for matching the
+    /// message when it echoes back from a relay.
     /// - Parameters:
     ///   - content: The message content
     ///   - recipientPublicKey: The recipient's public key
@@ -35,20 +36,17 @@ public struct DirectMessageBuilder: Sendable {
         replyTo: EventID? = nil,
         expiration: Timestamp? = nil
     ) async throws -> SendDirectMessageResult {
-        let senderPublicKey = try await signer.publicKey
-        let rumor = try makeRumor(
-            senderPublicKey: senderPublicKey,
-            content: content,
-            tags: directMessageTags(recipientPublicKey: recipientPublicKey, subject: subject, replyTo: replyTo)
+        try await wrapWithSelfCopy(
+            .directMessage(content, to: recipientPublicKey, subject: subject, replyTo: replyTo),
+            to: recipientPublicKey,
+            expiration: expiration
         )
-        return try await wrapWithSelfCopy(
-            rumor: rumor, senderPublicKey: senderPublicKey, to: recipientPublicKey, expiration: expiration)
     }
 
     /// Creates a gift-wrapped NIP-25 reaction to a direct message, plus the sender's self-copy.
     ///
     /// The reaction is an unsigned kind-7 rumor referencing the target message's rumor id and
-    /// author. Like a message it is wrapped twice — for the recipient and for the sender — so it
+    /// author, built by ``EventTemplate/directMessageReaction(to:author:content:)``. Like a message it is wrapped twice — for the recipient and for the sender — so it
     /// stays private and sender-anonymous, and both wraps carry the identical rumor.
     /// - Parameters:
     ///   - reaction: The reaction content. NIP-25 uses "+" for a like, "-" for a dislike, or an
@@ -65,18 +63,20 @@ public struct DirectMessageBuilder: Sendable {
         recipientPublicKey: PublicKey,
         expiration: Timestamp? = nil
     ) async throws -> SendDirectMessageResult {
-        let senderPublicKey = try await signer.publicKey
-        let rumor = try makeReactionRumor(
-            senderPublicKey: senderPublicKey, reaction: reaction, messageID: messageID, author: author)
-        return try await wrapWithSelfCopy(
-            rumor: rumor, senderPublicKey: senderPublicKey, to: recipientPublicKey, expiration: expiration)
+        try await wrapWithSelfCopy(
+            .directMessageReaction(to: messageID, author: author, content: reaction),
+            to: recipientPublicKey,
+            expiration: expiration
+        )
     }
 
     /// Creates a gift-wrapped NIP-17 kind-15 file message, plus the sender's self-copy.
     ///
     /// The file must already be encrypted (see ``EncryptedFile/encrypt(_:)``) and uploaded; pass
     /// the resulting URL and ``EncryptedFile``. The message carries the URL as its content and the
-    /// key, nonce, and hashes as tags, wrapped exactly like a text message so it stays private.
+    /// key, nonce, and hashes as tags — built by
+    /// ``EventTemplate/fileMessage(url:mimeType:encryption:size:dimensions:blurhash:to:)`` — wrapped
+    /// exactly like a text message so it stays private.
     /// - Parameters:
     ///   - url: The URL of the uploaded encrypted file.
     ///   - mimeType: The file's MIME type before encryption (the `file-type` tag).
@@ -97,12 +97,13 @@ public struct DirectMessageBuilder: Sendable {
         to recipientPublicKey: PublicKey,
         expiration: Timestamp? = nil
     ) async throws -> SendDirectMessageResult {
-        let senderPublicKey = try await signer.publicKey
-        let rumor = try makeFileRumor(
-            senderPublicKey: senderPublicKey, url: url, mimeType: mimeType, encryption: encryption,
-            recipientPublicKey: recipientPublicKey, size: size, dimensions: dimensions, blurhash: blurhash)
-        return try await wrapWithSelfCopy(
-            rumor: rumor, senderPublicKey: senderPublicKey, to: recipientPublicKey, expiration: expiration)
+        try await wrapWithSelfCopy(
+            .fileMessage(
+                url: url, mimeType: mimeType, encryption: encryption, size: size, dimensions: dimensions,
+                blurhash: blurhash, to: recipientPublicKey),
+            to: recipientPublicKey,
+            expiration: expiration
+        )
     }
 
     /// Creates gift-wrapped events for a group message (sends to multiple recipients)
@@ -125,7 +126,10 @@ public struct DirectMessageBuilder: Sendable {
         }
 
         let senderPublicKey = try await signer.publicKey
-        let rumor = try makeRumor(senderPublicKey: senderPublicKey, content: content, tags: tags)
+        // Never signed, like every NIP-17 rumor.
+        let rumor = try UnsignedEvent(
+            EventTemplate(kind: .privateDirectMessage, tags: tags, content: content), publicKey: senderPublicKey
+        ).asRumor()
 
         // One wrap per recipient, plus a copy for the sender. Each is an independent seal — a
         // relay round-trip apiece for a remote signer — so they run concurrently and are put back
@@ -148,22 +152,36 @@ public struct DirectMessageBuilder: Sendable {
 
     // MARK: - Private Helpers
 
-    /// Wraps a shared rumor twice — once for the recipient and once for the sender's self-copy —
-    /// and packages both with the rumor.
+    /// Authors `template` as a rumor under the signer's public key and wraps it twice — see
+    /// ``wrapWithSelfCopy(_:senderPublicKey:to:expiration:)``.
+    func wrapWithSelfCopy(
+        _ template: EventTemplate,
+        to recipientPublicKey: PublicKey,
+        expiration: Timestamp?
+    ) async throws -> SendDirectMessageResult {
+        try await wrapWithSelfCopy(
+            template, senderPublicKey: try await signer.publicKey, to: recipientPublicKey, expiration: expiration)
+    }
+
+    /// Authors `template` as a rumor under `senderPublicKey` and wraps it twice — once for the
+    /// recipient and once for the sender's self-copy — packaging both with the rumor.
     ///
-    /// NIP-17 delivers every message to both parties so the sender's other devices can reconstruct
-    /// the conversation; both wraps carry the identical rumor, whose `id` keys the two copies
-    /// together. Any NIP-40 `expiration` is applied to both wraps so the copies expire in lockstep.
+    /// The rumor is deliberately never signed (NIP-17: a leaked signed rumor would be cryptographic
+    /// proof of authorship and destroy deniability). NIP-17 delivers every message to both parties
+    /// so the sender's other devices can reconstruct the conversation; both wraps carry the
+    /// identical rumor, whose `id` keys the two copies together. Any NIP-40 `expiration` is applied
+    /// to both wraps so the copies expire in lockstep.
     ///
     /// The two wraps are independent seals, so they are built concurrently — with a remote signer
-    /// that halves the round-trips a send costs. Internal so
-    /// ``NostrMessagesAPI/sendGiftWrapped(_:to:expiration:strategy:)`` can wrap a caller-built rumor.
+    /// that halves the round-trips a send costs. Internal so ``NostrMessagesAPI`` can wrap a
+    /// caller's template under the public key it already resolved.
     func wrapWithSelfCopy(
-        rumor: Event,
+        _ template: EventTemplate,
         senderPublicKey: PublicKey,
         to recipientPublicKey: PublicKey,
         expiration: Timestamp?
     ) async throws -> SendDirectMessageResult {
+        let rumor = try UnsignedEvent(template, publicKey: senderPublicKey).asRumor()
         async let recipientGiftWrap = GiftWrap.wrap(
             event: rumor,
             signer: signer,
@@ -182,97 +200,5 @@ public struct DirectMessageBuilder: Sendable {
             recipientGiftWrap: try await recipientGiftWrap,
             selfGiftWrap: try await selfGiftWrap
         )
-    }
-
-    /// Builds the NIP-17 tag list for a 1-to-1 direct message
-    private func directMessageTags(
-        recipientPublicKey: PublicKey,
-        subject: String?,
-        replyTo: EventID?
-    ) -> [Tag] {
-        var tags: [Tag] = [
-            .publicKey(recipientPublicKey)
-        ]
-
-        if let subject = subject {
-            tags.append(.subject(subject))
-        }
-
-        if let replyTo = replyTo {
-            tags.append(.event(replyTo, marker: .reply))
-        }
-
-        return tags
-    }
-
-    /// Creates the unsigned kind-14 rumor with its id computed.
-    /// The rumor is deliberately never signed (NIP-17: a leaked signed rumor would
-    /// be cryptographic proof of authorship and destroy deniability).
-    private func makeRumor(senderPublicKey: PublicKey, content: String, tags: [Tag]) throws -> Event {
-        let unsigned = UnsignedEvent(
-            publicKey: senderPublicKey,
-            kind: .privateDirectMessage,
-            tags: tags,
-            content: content
-        )
-        return try unsigned.asRumor()
-    }
-
-    /// Creates the unsigned kind-7 reaction rumor. Like the message rumor it is never signed.
-    private func makeReactionRumor(
-        senderPublicKey: PublicKey, reaction: String, messageID: EventID, author: PublicKey
-    ) throws -> Event {
-        let tags: [Tag] = [
-            .event(messageID),
-            .publicKey(author),
-            .kind(.privateDirectMessage),
-        ]
-        let unsigned = UnsignedEvent(
-            publicKey: senderPublicKey,
-            kind: .reaction,
-            tags: tags,
-            content: reaction
-        )
-        return try unsigned.asRumor()
-    }
-
-    /// Creates the unsigned kind-15 file-message rumor. Like the message rumor it is never signed.
-    /// The content is the file URL; the key, nonce, and hashes are carried as tags.
-    private func makeFileRumor(
-        senderPublicKey: PublicKey,
-        url: String,
-        mimeType: String,
-        encryption: EncryptedFile,
-        recipientPublicKey: PublicKey,
-        size: Int?,
-        dimensions: String?,
-        blurhash: String?
-    ) throws -> Event {
-        var tags: [Tag] = [
-            .publicKey(recipientPublicKey),
-            Tag(name: "file-type", values: [mimeType]),
-            Tag(name: "encryption-algorithm", values: ["aes-gcm"]),
-            Tag(name: "decryption-key", values: [encryption.key.base64EncodedString()]),
-            Tag(name: "decryption-nonce", values: [encryption.nonce.base64EncodedString()]),
-            Tag(name: "x", values: [encryption.encryptedSHA256]),
-            Tag(name: "ox", values: [encryption.originalSHA256]),
-        ]
-        if let size {
-            tags.append(Tag(name: "size", values: [String(size)]))
-        }
-        if let dimensions {
-            tags.append(Tag(name: "dim", values: [dimensions]))
-        }
-        if let blurhash {
-            tags.append(Tag(name: "blurhash", values: [blurhash]))
-        }
-
-        let unsigned = UnsignedEvent(
-            publicKey: senderPublicKey,
-            kind: .fileMessage,
-            tags: tags,
-            content: url
-        )
-        return try unsigned.asRumor()
     }
 }

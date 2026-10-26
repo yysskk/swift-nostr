@@ -170,7 +170,7 @@ for try await message in try await client.messages.subscribe() {
 try await client.messages.send("Hello privately!", to: alice)
 
 // Any other rumor kind, wrapped and routed the same way.
-try await client.messages.sendGiftWrapped(rumor, to: alice)
+try await client.messages.sendGiftWrapped(EventTemplate(kind: Event.Kind(rawValue: 30_999), content: payload), to: alice)
 ```
 
 Reactions (NIP-25), encrypted file messages (kind 15), and disappearing messages (NIP-40) build on the same flow — see [Advanced Usage](https://yysskk.github.io/swift-nostr/documentation/nostrclient/advancedusage).

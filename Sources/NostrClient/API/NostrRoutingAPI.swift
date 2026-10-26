@@ -176,8 +176,8 @@ public struct NostrRoutingAPI: NostrRelayRouting {
     /// in the pool, so gift-wrapped messages addressed there are received. Fetches the user's DM
     /// relay list first if it is not already cached.
     ///
-    /// Call this before subscribing with ``NostrMessagesAPI/subscribe(limit:)`` or
-    /// ``NostrMessagesAPI/giftWraps(limit:)`` so the subscription covers the relays you advertised.
+    /// Call this before subscribing with ``NostrMessaging/subscribe(limit:)`` or
+    /// ``NostrMessaging/giftWraps(limit:)`` so the subscription covers the relays you advertised.
     /// - Returns: The connected inbox relay URLs (empty if you have advertised no DM relay list).
     /// - Throws: ``NostrError/signerNotSet`` if no signer is configured.
     @discardableResult

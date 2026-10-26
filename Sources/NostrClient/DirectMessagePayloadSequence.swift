@@ -5,7 +5,7 @@ import NostrCore
 /// wrap already unwrapped and classified as a ``DirectMessagePayload`` — a message or a
 /// reaction to one.
 ///
-/// Returned by ``NostrMessagesAPI/payloads(limit:)``:
+/// Returned by ``NostrMessaging/payloads(limit:)``:
 ///
 /// ```swift
 /// for try await payload in try await client.messages.payloads() {
@@ -20,8 +20,8 @@ import NostrCore
 /// or carrying an inner kind that is none of the three — are skipped. A signer that fails to
 /// *attempt* the read is different: with a remote NIP-46 signer every unwrap is a relay round-trip,
 /// so a timeout, a disconnect, or a refused request throws out of the iteration instead of silently
-/// dropping payloads. Resubscribe to resume. Use ``NostrMessagesAPI/subscribe(limit:)`` for
-/// messages only, or ``NostrMessagesAPI/giftWraps(limit:)`` for the raw gift-wrap events.
+/// dropping payloads. Resubscribe to resume. Use ``NostrMessaging/subscribe(limit:)`` for
+/// messages only, or ``NostrMessaging/giftWraps(limit:)`` for the raw gift-wrap events.
 ///
 /// Like ``SubscriptionSequence``, ending iteration, cancelling the consuming task, or calling
 /// ``close()`` sends CLOSE to the relays. Single-consumer.
@@ -30,6 +30,16 @@ public struct DirectMessagePayloadSequence: AsyncSequence, Sendable {
 
     let base: SubscriptionSequence
     let parser: DirectMessageParser
+
+    /// Creates a sequence that unwraps the gift wraps `subscription` yields with `parser` — for a
+    /// stub ``NostrMessaging`` conformer; the client builds its own.
+    /// - Parameters:
+    ///   - subscription: The gift-wrap subscription; its non-event items are skipped.
+    ///   - parser: Opens each gift wrap, as the recipient it is bound to.
+    public init(subscription: SubscriptionSequence, parser: DirectMessageParser) {
+        self.base = subscription
+        self.parser = parser
+    }
 
     /// The subscription ID, usable with ``NostrSubscriptionsAPI/unsubscribe(subscriptionID:)``.
     public var id: String { base.id }

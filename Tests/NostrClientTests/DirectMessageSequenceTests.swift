@@ -53,7 +53,8 @@ struct DirectMessageSequenceTests {
             stream: stream,
             onClose: {}
         )
-        return DirectMessageSequence(base: base, parser: DirectMessageParser(signer: signer))
+        return DirectMessageSequence(
+            messagesOf: DirectMessagePayloadSequence(subscription: base, parser: DirectMessageParser(signer: signer)))
     }
 
     @Test("yields parsed messages and skips unparseable items")
@@ -129,7 +130,7 @@ struct DirectMessageSequenceTests {
         continuation.yield(.event(relayURL: relayURL, event: toBob.recipientGiftWrap))
         continuation.finish()
         let sequence = DirectMessagePayloadSequence(
-            base: SubscriptionSequence(
+            subscription: SubscriptionSequence(
                 id: "sub_test", expectedRelays: [relayURL], stream: stream, onClose: {}),
             parser: DirectMessageParser(signer: UnreachableSigner(keyPair: bob))
         )

@@ -152,4 +152,112 @@ struct EventTemplateClientTests {
         )
         #expect(publishedAt >= before.rawValue && publishedAt <= after.rawValue)
     }
+
+    // MARK: - Direct messages
+
+    @Test("directMessage is kind 14 naming the recipient, with the text as content")
+    func directMessage() {
+        let template = EventTemplate.directMessage("hello", to: .fixture("bob"))
+
+        #expect(template.kind == .privateDirectMessage)
+        #expect(template.tags.map(\.rawArray) == [["p", PublicKey.fixture("bob").hex]])
+        #expect(template.content == "hello")
+    }
+
+    @Test("directMessage appends the subject, then the reply-marked e tag")
+    func directMessageSubjectAndReply() {
+        let template = EventTemplate.directMessage(
+            "re: plans", to: .fixture("bob"), subject: "plans", replyTo: .fixture("parent"))
+
+        #expect(
+            template.tags.map(\.rawArray) == [
+                ["p", PublicKey.fixture("bob").hex],
+                ["subject", "plans"],
+                ["e", EventID.fixture("parent").hex, "", "reply"],
+            ])
+    }
+
+    @Test("directMessageReaction is kind 7 referencing the message, its author, and kind 14")
+    func directMessageReaction() {
+        let template = EventTemplate.directMessageReaction(to: .fixture("message"), author: .fixture("alice"))
+
+        #expect(template.kind == .reaction)
+        #expect(
+            template.tags.map(\.rawArray) == [
+                ["e", EventID.fixture("message").hex],
+                ["p", PublicKey.fixture("alice").hex],
+                ["k", "14"],
+            ])
+        #expect(template.content == "+")
+        #expect(
+            EventTemplate.directMessageReaction(to: .fixture("message"), author: .fixture("alice"), content: "🤙")
+                .content == "🤙")
+    }
+
+    @Test("fileMessage is kind 15 with the URL as content and the file's keys and hashes as tags")
+    func fileMessage() throws {
+        let file = try EncryptedFile.encrypt(Data("file bytes".utf8))
+
+        let template = EventTemplate.fileMessage(
+            url: "https://files.example.com/blob", mimeType: "image/jpeg", encryption: file, to: .fixture("bob"))
+
+        #expect(template.kind == .fileMessage)
+        #expect(template.content == "https://files.example.com/blob")
+        #expect(
+            template.tags.map(\.rawArray) == [
+                ["p", PublicKey.fixture("bob").hex],
+                ["file-type", "image/jpeg"],
+                ["encryption-algorithm", "aes-gcm"],
+                ["decryption-key", file.key.base64EncodedString()],
+                ["decryption-nonce", file.nonce.base64EncodedString()],
+                ["x", file.encryptedSHA256],
+                ["ox", file.originalSHA256],
+            ])
+    }
+
+    @Test("fileMessage appends size, dimensions, and blurhash in that order")
+    func fileMessageOptionalTags() throws {
+        let template = EventTemplate.fileMessage(
+            url: "https://files.example.com/blob", mimeType: "image/png",
+            encryption: try EncryptedFile.encrypt(Data("file bytes".utf8)), size: 1024, dimensions: "640x480",
+            blurhash: "LEHV6nWB2yk8", to: .fixture("bob"))
+
+        #expect(template.tags.count == 10)
+        #expect(
+            template.tags.suffix(3).map(\.rawArray) == [
+                ["size", "1024"],
+                ["dim", "640x480"],
+                ["blurhash", "LEHV6nWB2yk8"],
+            ])
+    }
+
+    @Test("DirectMessageBuilder's rumors are the factories' templates under the sender's key")
+    func builderRumorsMatchFactories() async throws {
+        let alice = try KeyPair()
+        let builder = DirectMessageBuilder(signer: EventSigner(keyPair: alice))
+        let file = try EncryptedFile.encrypt(Data("file bytes".utf8))
+        let expected: [EventTemplate] = [
+            .directMessage("hi", to: .fixture("bob"), subject: "s", replyTo: .fixture("parent")),
+            .directMessageReaction(to: .fixture("message"), author: .fixture("bob"), content: "-"),
+            .fileMessage(
+                url: "https://files.example.com/blob", mimeType: "image/jpeg", encryption: file, to: .fixture("bob")),
+        ]
+
+        let rumors = [
+            try await builder.createMessageWithSelfCopy(
+                content: "hi", to: .fixture("bob"), subject: "s", replyTo: .fixture("parent")
+            ).rumor,
+            try await builder.createReactionWithSelfCopy(
+                reaction: "-", to: .fixture("message"), author: .fixture("bob"), recipientPublicKey: .fixture("bob")
+            ).rumor,
+            try await builder.createFileMessageWithSelfCopy(
+                url: "https://files.example.com/blob", mimeType: "image/jpeg", encryption: file, to: .fixture("bob")
+            ).rumor,
+        ]
+
+        #expect(rumors.map(\.kind) == expected.map(\.kind))
+        #expect(rumors.map(\.tags) == expected.map { $0.tags.map(\.rawArray) })
+        #expect(rumors.map(\.content) == expected.map(\.content))
+        #expect(rumors.allSatisfy { $0.publicKey == alice.publicKey && $0.signature == nil })
+    }
 }

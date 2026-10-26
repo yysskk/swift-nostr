@@ -172,19 +172,30 @@ struct NostrClientNamespaceTests {
 
     @Test("messages conforms to NostrMessaging end to end")
     func messagingCapability() async throws {
-        let (client, _) = try await ConnectedClientFixture.make()
-        let recipient = try KeyPair()
-        try await client.identity.setPrivateKey(recipient.privateKeyHex)
+        let (client, socket) = try await ConnectedClientFixture.make()
+        let user = try KeyPair()
+        try await client.identity.setPrivateKey(user.privateKeyHex)
         let messaging: any NostrMessaging = client.messages
+        let peer = try KeyPair()
+        await client.dmRelayListStore.markNoList(for: peer.publicKey)
+        await client.dmRelayListStore.markNoList(for: user.publicKey)
 
-        let sender = try KeyPair()
-        let sent = try await DirectMessageBuilder(signer: EventSigner(keyPair: sender))
-            .createMessageWithSelfCopy(content: "through the protocol", to: recipient.publicKey)
+        // The conveniences live in a protocol extension that carries the defaults, so a call
+        // through the existential is as short as one through the namespace.
+        let sent = try await PublishAckSupport.acknowledgingPublishes(2, on: socket) {
+            try await messaging.send("through the protocol", to: peer.publicKey)
+        }
+        let echoed = try await messaging.parse(sent.selfGiftWrap)
 
-        let parsed = try await messaging.parse(sent.recipientGiftWrap)
+        let incoming = try await DirectMessageBuilder(signer: EventSigner(keyPair: peer))
+            .createMessageWithSelfCopy(content: "back at you", to: user.publicKey)
+        let parsed = try await messaging.parse(incoming.recipientGiftWrap)
 
-        #expect(parsed.content == "through the protocol")
-        #expect(parsed.senderPublicKey == sender.publicKey)
+        #expect(sent.recipientPublishResult?.acceptedRelays == [ConnectedClientFixture.defaultRelayURL])
+        #expect(echoed.content == "through the protocol")
+        #expect(echoed.recipientPublicKey == peer.publicKey)
+        #expect(parsed.content == "back at you")
+        #expect(parsed.senderPublicKey == peer.publicKey)
         await client.relays.disconnect()
     }
 
