@@ -248,7 +248,7 @@ let signer = try RemoteSigner(invitation: invitation, clientKeyPair: clientKeyPa
 let remotePublicKey = try await signer.awaitConnection()   // the signer's PublicKey, once it accepts
 ```
 
-`ping`, NIP-44/NIP-04 encrypt and decrypt, `switch_relays`, and `logout` are available too, along with an `authChallenges()` stream for `auth_url` approvals.
+`ping`, NIP-44/NIP-04 encrypt and decrypt, `switch_relays`, and `logout` are available too, along with an `authChallenges()` stream for `auth_url` approvals. `RemoteSignerMethod` is an open set, so `send(_:params:)` calls a method without a typed wrapper and returns its raw `result`.
 
 A `RemoteSigner` can also drive a `NostrClient`: `client.identity.setSigner(_:)` accepts any `NostrSigning`, and every feature runs through that abstraction — `identity.sign(_:)`, `events.publish(_:)`, the convenience `publish*` helpers, NIP-17 direct messages, NIP-51 private list items, and NIP-42 authentication all work with a remote signer exactly as they do with a local key.
 

@@ -8,7 +8,8 @@ public import NostrCore
 /// signer's relays, and awaits the matching response — correlated by the `id` field inside the
 /// decrypted JSON body (not by any event tag). Build one from a signer-issued ``BunkerURI`` (the
 /// `bunker://` flow) or from a client-generated ``NostrConnectURI`` invitation (the `nostrconnect://`
-/// flow, see `RemoteSigner+NostrConnect`), then call the typed commands (see `RemoteSigner+Commands`).
+/// flow, see `RemoteSigner+NostrConnect`), then call the typed commands (see `RemoteSigner+Commands`),
+/// or ``send(_:params:)`` for a method without one.
 ///
 /// ### The connect handshake
 /// For a `bunker://` session the client sends the first `connect` request, presenting the bunker
@@ -485,16 +486,37 @@ public actor RemoteSigner {
         return signerPublicKey
     }
 
-    // MARK: - Commands support
+    // MARK: - Raw requests
 
-    /// Sends a request, returning the required `result` string or throwing when it is absent.
-    func performSingle(method: RemoteSignerMethod, params: [String]) async throws -> String {
+    /// Sends a request for `method` and returns the `result` string of the signer's response.
+    ///
+    /// The typed commands are built on this; call it directly for a method that has no typed
+    /// wrapper, such as one specific to a particular signer. An `auth_url` challenge keeps the
+    /// request pending exactly as it does for a typed command (see ``authChallenges()``).
+    ///
+    /// ```swift
+    /// let info = try await signer.send(RemoteSignerMethod(rawValue: "get_session_info"))
+    /// ```
+    /// - Parameters:
+    ///   - method: The method to invoke.
+    ///   - params: The method's positional string arguments.
+    /// - Returns: The response's `result`, uninterpreted.
+    /// - Throws: ``RemoteSignerError/signerError(message:)`` if the signer answers with an error,
+    ///   ``RemoteSignerError/responseDecodingFailed`` if the response carries no result,
+    ///   ``RemoteSignerError/timedOut`` if it does not answer in time,
+    ///   ``RemoteSignerError/notConnected`` if the signer is not yet known (a `nostrconnect://`
+    ///   session before ``awaitConnection()``) or the session disconnects while the request is
+    ///   pending, ``RemoteSignerError/requestEncodingFailed`` if the request cannot be encrypted or
+    ///   signed, or a transport error.
+    public func send(_ method: RemoteSignerMethod, params: [String] = []) async throws -> String {
         let response = try await sendRequest(method: method, params: params)
         guard let result = response.result else {
             throw RemoteSignerError.responseDecodingFailed
         }
         return result
     }
+
+    // MARK: - Commands support
 
     /// The user's public key if it has already been fetched by ``userPublicKey()``.
     var userPublicKeyIfCached: PublicKey? {

@@ -13,7 +13,7 @@ extension RemoteSigner {
     ///   but a canonical hex public key.
     public func userPublicKey() async throws -> PublicKey {
         if let cached = userPublicKeyIfCached { return cached }
-        guard let publicKey = PublicKey(try await performSingle(method: .getPublicKey, params: [])) else {
+        guard let publicKey = PublicKey(try await send(.getPublicKey)) else {
             throw RemoteSignerError.responseValidationFailed
         }
         cacheUserPublicKey(publicKey)
@@ -33,7 +33,7 @@ extension RemoteSigner {
     ///   verify or does not match the request.
     public func sign(_ event: UnsignedEvent) async throws -> Event {
         let requestJSON = try encodeUnsignedEvent(event)
-        let result = try await performSingle(method: .signEvent, params: [requestJSON])
+        let result = try await send(.signEvent, params: [requestJSON])
 
         guard let signed = try? JSONDecoder().decode(Event.self, from: Data(result.utf8)) else {
             throw RemoteSignerError.responseDecodingFailed
@@ -57,7 +57,7 @@ extension RemoteSigner {
     /// Liveness check (`ping`); the signer replies with `pong`.
     /// - Throws: ``RemoteSignerError/responseValidationFailed`` if the reply is not `pong`.
     public func ping() async throws {
-        let result = try await performSingle(method: .ping, params: [])
+        let result = try await send(.ping)
         guard result == "pong" else {
             throw RemoteSignerError.responseValidationFailed
         }
@@ -70,7 +70,7 @@ extension RemoteSigner {
     ///   - recipientPublicKey: The recipient's public key.
     /// - Returns: The NIP-44 ciphertext.
     public func nip44Encrypt(_ plaintext: String, to recipientPublicKey: PublicKey) async throws -> String {
-        try await performSingle(method: .nip44Encrypt, params: [recipientPublicKey.hex, plaintext])
+        try await send(.nip44Encrypt, params: [recipientPublicKey.hex, plaintext])
     }
 
     /// Decrypts a NIP-44 message from a third party (`nip44_decrypt`); the signer performs it with
@@ -80,7 +80,7 @@ extension RemoteSigner {
     ///   - senderPublicKey: The sender's public key.
     /// - Returns: The decrypted plaintext.
     public func nip44Decrypt(_ ciphertext: String, from senderPublicKey: PublicKey) async throws -> String {
-        try await performSingle(method: .nip44Decrypt, params: [senderPublicKey.hex, ciphertext])
+        try await send(.nip44Decrypt, params: [senderPublicKey.hex, ciphertext])
     }
 
     /// Encrypts `plaintext` for a third party using legacy NIP-04 (`nip04_encrypt`); the signer
@@ -90,7 +90,7 @@ extension RemoteSigner {
     ///   - thirdPartyPublicKey: The recipient's public key.
     /// - Returns: The NIP-04 ciphertext.
     public func nip04Encrypt(_ plaintext: String, to thirdPartyPublicKey: PublicKey) async throws -> String {
-        try await performSingle(method: .nip04Encrypt, params: [thirdPartyPublicKey.hex, plaintext])
+        try await send(.nip04Encrypt, params: [thirdPartyPublicKey.hex, plaintext])
     }
 
     /// Decrypts a legacy NIP-04 message from a third party (`nip04_decrypt`); the signer performs it
@@ -100,7 +100,7 @@ extension RemoteSigner {
     ///   - thirdPartyPublicKey: The sender's public key.
     /// - Returns: The decrypted plaintext.
     public func nip04Decrypt(_ ciphertext: String, from thirdPartyPublicKey: PublicKey) async throws -> String {
-        try await performSingle(method: .nip04Decrypt, params: [thirdPartyPublicKey.hex, ciphertext])
+        try await send(.nip04Decrypt, params: [thirdPartyPublicKey.hex, ciphertext])
     }
 
     /// Asks the signer for its preferred relays (`switch_relays`).
@@ -108,7 +108,7 @@ extension RemoteSigner {
     /// - Throws: ``RemoteSignerError/responseDecodingFailed`` if the reply is neither a JSON array
     ///   of relay URLs nor `null`.
     public func switchRelays() async throws -> [RelayURL]? {
-        let result = try await performSingle(method: .switchRelays, params: [])
+        let result = try await send(.switchRelays)
         let trimmed = result.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed != "null" else { return nil }
         guard let strings = try? JSONDecoder().decode([String].self, from: Data(result.utf8)) else {
