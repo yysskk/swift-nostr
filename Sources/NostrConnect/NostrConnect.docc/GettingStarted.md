@@ -157,6 +157,17 @@ await signer.logout()
 ``RemoteSigner/disconnect()`` tears down the relay connection without notifying the signer, failing
 any in-flight requests with ``RemoteSignerError/notConnected``.
 
+## Call Other Methods
+
+``RemoteSignerMethod`` is an open set: a signer may implement methods this package has no typed
+command for. ``RemoteSigner/send(_:params:)`` sends any method with its positional string
+parameters and returns the response's `result` string as is:
+
+```swift
+let method = RemoteSignerMethod(rawValue: "get_session_info")
+let info = try await signer.send(method)
+```
+
 ## Handle Errors
 
 Commands throw ``RemoteSignerError``. A signer that rejects a request reports it as

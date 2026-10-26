@@ -82,6 +82,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   accessor in an `extension NostrClient` and tested against stubs that implement only the
   primitives. Both need only the existing public API, which a test importing `NostrClient` without
   `@testable` now exercises.
+- **`RemoteSigner.send(_:params:)` calls any NIP-46 method**: it sends the method with its
+  positional string parameters over the same path as the typed commands — `auth_url` challenges
+  and timeouts included — and returns the response's `result` string. It throws
+  `RemoteSignerError.signerError(message:)` for an error response and `responseDecodingFailed` when
+  the response has no result, so a method this package does not model can be called without a
+  typed wrapper.
 
 ### Changed
 
@@ -606,6 +612,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `fetchSimpleGroupList(for:timeout:)` for a non-optional `PublicKey`, and
   `publishSimpleGroupList(_:)`. An optional `authorPublicKey`, `kinds`, `since`, or `publicKey`
   therefore needs every argument spelled out.
+
+- **`RemoteSignerMethod` is an open struct** (breaking): it was a closed `enum` and is now a
+  `RawRepresentable` struct over the wire token, with a non-failable `init(rawValue:)` and the same
+  ten methods as static constants, so a method a signer implements beyond them can be named and
+  sent with `RemoteSigner.send(_:params:)`. It encodes as a bare JSON string and its `description`
+  is the token. `CaseIterable` is gone, and a `switch` over it needs a `default` case.
 
 ### Fixed
 

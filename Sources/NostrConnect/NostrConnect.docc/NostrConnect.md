@@ -21,6 +21,8 @@ answers with the result. The user's private key never leaves the signer.
   its first response after validating the invitation secret.
 - Typed commands: sign an event, fetch the user public key, ping, NIP-44/NIP-04 encrypt and
   decrypt, and switch relays.
+- ``RemoteSigner/send(_:params:)`` for any other method, including one this package does not
+  model.
 - Request/response correlation by the request `id`, with per-request timeouts.
 - An `auth_url` challenge stream that keeps the request pending while the user authorizes.
 - Relay I/O behind `NostrCore`'s `RelayTransport` seam: the default `RelayConnectionTransport`

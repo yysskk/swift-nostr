@@ -1813,6 +1813,10 @@ let pt = try await signer.nip44Decrypt(ct, from: thirdParty)
 let ct04 = try await signer.nip04Encrypt("hi", to: thirdParty)  // legacy NIP-04, PublicKey
 let pt04 = try await signer.nip04Decrypt(ct04, from: thirdParty)
 let relays = try await signer.switchRelays()                  // [RelayURL]? — nil when the signer keeps its set
+// Any method, including one the package does not model: returns the response's raw result string.
+// Throws RemoteSignerError.signerError(message:) on an error response, .responseDecodingFailed
+// when the response has no result, and .timedOut / .notConnected like the typed commands.
+let info = try await signer.send(RemoteSignerMethod(rawValue: "get_session_info"), params: [])
 await signer.logout()                                          // best-effort logout, then disconnect
 await signer.disconnect()                                      // tear down; fails in-flight with notConnected
 ```
@@ -1829,7 +1833,7 @@ for await challenge in await signer.authChallenges() {
 ```
 
 - `BunkerURI(string:)` / `NostrConnectURI(string:)` — parse `bunker://` tokens and `nostrconnect://` invitations; the host is the signer's `remoteSignerPublicKey` / the client's `clientPublicKey` as a `PublicKey`, and a host that is not canonical lowercase hex (uppercase included) throws `invalidURI(reason:)`. `BunkerURI(remoteSignerPublicKey:relays:secret:)` and `NostrConnectURI(clientPublicKey:relays:secret:…)` take a `PublicKey` and `relays: [RelayURL]`; a `relay` parameter that is not a valid relay URL throws `invalidURI(reason:)` rather than being dropped
-- `RemoteSignerMethod` — the method set (`connect`, `sign_event`, `ping`, `get_public_key`, `nip04_*`, `nip44_*`, `switch_relays`, `logout`)
+- `RemoteSignerMethod` — an open struct over the wire token (`rawValue`, bare JSON string); constants for `connect`, `sign_event`, `ping`, `get_public_key`, `nip04_*`, `nip44_*`, `switch_relays`, `logout`; `RemoteSignerMethod(rawValue:)` for any other
 - `RemoteSignerPermission` — `perms` tokens (e.g. `.signEvent(kind:)`, `.nip44Encrypt`)
 - `RemoteSignerAuthChallenge` — `url`, `method`, `requestID`
 - `RelayTransport` / `RelayConnectionTransport` (`NostrCore`) — the relay seam; inject a fake for

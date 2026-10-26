@@ -320,4 +320,51 @@ struct RemoteSignerCommandsTests {
         let resolved = try await relays.value
         #expect(resolved == nil)
     }
+
+    // MARK: - send
+
+    @Test("send carries a custom method and its params and returns the result")
+    func sendCustomMethod() async throws {
+        let (remote, transport) = try await connected()
+        let method = RemoteSignerMethod(rawValue: "get_session_info")
+
+        let result = Task { try await remote.send(method, params: ["first", "second"]) }
+        let request = try await nextRequest(transport)
+        #expect(request.method == "get_session_info")
+        #expect(request.params == ["first", "second"])
+        try await transport.deliver(
+            RemoteSignerFixtures.response(
+                requestID: request.id, result: #"{"active":true}"#, client: client, signer: signer))
+
+        #expect(try await result.value == #"{"active":true}"#)
+    }
+
+    @Test("send defaults to no params")
+    func sendDefaultsToNoParams() async throws {
+        let (remote, transport) = try await connected()
+
+        let result = Task { try await remote.send(RemoteSignerMethod(rawValue: "custom")) }
+        let request = try await nextRequest(transport)
+        #expect(request.method == "custom")
+        #expect(request.params.isEmpty)
+        try await transport.deliver(
+            RemoteSignerFixtures.response(requestID: request.id, result: "ok", client: client, signer: signer))
+
+        #expect(try await result.value == "ok")
+    }
+
+    @Test("send surfaces an error response as signerError")
+    func sendSignerError() async throws {
+        let (remote, transport) = try await connected()
+
+        let result = Task { try await remote.send(RemoteSignerMethod(rawValue: "custom"), params: ["x"]) }
+        let request = try await nextRequest(transport)
+        try await transport.deliver(
+            RemoteSignerFixtures.response(
+                requestID: request.id, error: "unsupported method", client: client, signer: signer))
+
+        await #expect(throws: RemoteSignerError.signerError(message: "unsupported method")) {
+            _ = try await result.value
+        }
+    }
 }
