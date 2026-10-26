@@ -156,7 +156,7 @@ struct NIP44VectorTests {
     )
     func longMessage(_ vector: NIP44Vectors.LongMessageVector) throws {
         let plaintext = String(repeating: vector.pattern, count: vector.repeatCount)
-        #expect(Self.sha256Hex(of: plaintext) == vector.plaintextSha256)
+        #expect(Self.sha256Hex(of: plaintext) == vector.plaintextSHA256)
 
         let conversationKey = try #require(Data(hexString: vector.conversationKey))
         let nonce = try #require(Data(hexString: vector.nonce))
@@ -166,7 +166,7 @@ struct NIP44VectorTests {
             conversationKey: conversationKey,
             nonce: nonce
         )
-        #expect(Self.sha256Hex(of: payload) == vector.payloadSha256)
+        #expect(Self.sha256Hex(of: payload) == vector.payloadSHA256)
 
         let decrypted = try SealedMessage.decrypt(payload: payload, conversationKey: conversationKey)
         #expect(Data(decrypted.utf8) == Data(plaintext.utf8))
@@ -332,8 +332,8 @@ enum NIP44Vectors: Sendable {
         let nonce: String
         let pattern: String
         let repeatCount: Int
-        let plaintextSha256: String
-        let payloadSha256: String
+        let plaintextSHA256: String
+        let payloadSHA256: String
 
         private enum CodingKeys: String, CodingKey {
             case conversationKey
@@ -341,8 +341,8 @@ enum NIP44Vectors: Sendable {
             case pattern
             // `repeat` is a Swift keyword.
             case repeatCount = "repeat"
-            case plaintextSha256
-            case payloadSha256
+            case plaintextSHA256 = "plaintextSha256"
+            case payloadSHA256 = "payloadSha256"
         }
     }
 

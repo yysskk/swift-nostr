@@ -38,7 +38,7 @@ struct WalletConnectURITests {
     }
 
     @Test("parses an optional lud16 lightning address")
-    func parseLud16() throws {
+    func parseLUD16() throws {
         let uri = try WalletConnectURI(string: canonical + "&lud16=alice%40example.com")
         #expect(uri.lud16 == "alice@example.com")
     }

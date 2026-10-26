@@ -39,7 +39,7 @@ public struct GiftWrap: Sendable {
     ) async throws -> Event {
         // 1. Create rumor (unsigned event JSON)
         let rumor = createRumor(from: event)
-        let rumorJson = try encodeRumor(rumor)
+        let rumorJSON = try encodeRumor(rumor)
 
         // 2. Create seal (encrypt rumor to recipient, signed by the sender)
         let sealUnsigned = UnsignedEvent(
@@ -47,11 +47,11 @@ public struct GiftWrap: Sendable {
             createdAt: randomizedTimestamp(),
             kind: .seal,
             tags: [],
-            content: try await signer.nip44Encrypt(rumorJson, to: recipientPublicKey)
+            content: try await signer.nip44Encrypt(rumorJSON, to: recipientPublicKey)
         )
 
         let seal = try await signer.sign(sealUnsigned)
-        let sealJson = try encodeSeal(seal)
+        let sealJSON = try encodeSeal(seal)
 
         // 3. Create gift wrap (encrypt seal with an ephemeral key, which hides the sender)
         let ephemeralSigner = EventSigner(keyPair: try KeyPair())
@@ -66,7 +66,7 @@ public struct GiftWrap: Sendable {
             createdAt: randomizedTimestamp(),
             kind: .giftWrap,
             tags: wrapTags,
-            content: try ephemeralSigner.nip44Encrypt(sealJson, to: recipientPublicKey)
+            content: try ephemeralSigner.nip44Encrypt(sealJSON, to: recipientPublicKey)
         )
 
         return try ephemeralSigner.sign(wrapUnsigned)
@@ -98,8 +98,8 @@ public struct GiftWrap: Sendable {
         }
 
         // 1. Open gift wrap to get seal
-        let sealJson = try await recipient.nip44Decrypt(giftWrap.content, from: giftWrap.publicKey)
-        let seal = try decodeSeal(sealJson)
+        let sealJSON = try await recipient.nip44Decrypt(giftWrap.content, from: giftWrap.publicKey)
+        let seal = try decodeSeal(sealJSON)
 
         guard seal.kind == .seal else {
             throw Error.unexpectedKind(seal.kind)
@@ -111,8 +111,8 @@ public struct GiftWrap: Sendable {
         }
 
         // 2. Open seal to get rumor
-        let rumorJson = try await recipient.nip44Decrypt(seal.content, from: seal.publicKey)
-        let rumor = try decodeRumor(rumorJson)
+        let rumorJSON = try await recipient.nip44Decrypt(seal.content, from: seal.publicKey)
+        let rumor = try decodeRumor(rumorJSON)
 
         // NIP-17: "Clients MUST verify if pubkey of the kind:13 is the same pubkey on the kind:14,
         // otherwise any sender can impersonate others by simply changing the pubkey on kind:14."

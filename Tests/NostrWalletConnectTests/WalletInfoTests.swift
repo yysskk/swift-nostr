@@ -30,7 +30,7 @@ struct WalletInfoTests {
     }
 
     @Test("prefers NIP-44 when both schemes are advertised")
-    func prefersNip44() throws {
+    func prefersNIP44() throws {
         let event = infoEvent(content: "pay_invoice", tags: [["encryption", "nip44_v2 nip04"]])
         let info = try #require(WalletInfo(infoEvent: event))
         #expect(info.encryptions == [.nip44, .nip04])
@@ -38,14 +38,14 @@ struct WalletInfoTests {
     }
 
     @Test("defaults to NIP-04 when no encryption tag is present")
-    func defaultsToNip04() throws {
+    func defaultsToNIP04() throws {
         let info = try #require(WalletInfo(infoEvent: infoEvent(content: "pay_invoice")))
         #expect(info.encryptions == [.nip04])
         #expect(info.negotiatedEncryption == .nip04)
     }
 
     @Test("uses NIP-04 when only NIP-04 is advertised")
-    func onlyNip04() throws {
+    func onlyNIP04() throws {
         let event = infoEvent(content: "pay_invoice", tags: [["encryption", "nip04"]])
         let info = try #require(WalletInfo(infoEvent: event))
         #expect(info.negotiatedEncryption == .nip04)

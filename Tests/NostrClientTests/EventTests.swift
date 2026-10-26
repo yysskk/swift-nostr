@@ -128,7 +128,7 @@ struct EventTests {
     }
 
     @Test("Event JSON encoding/decoding")
-    func eventJsonCoding() throws {
+    func eventJSONCoding() throws {
         let keyPair = try KeyPair()
         let signer = EventSigner(keyPair: keyPair)
         let event = try signer.sign(.textNote("JSON test"))

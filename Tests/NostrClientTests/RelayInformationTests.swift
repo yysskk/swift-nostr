@@ -13,7 +13,7 @@ struct RelayInformationTests {
     // MARK: - URL Conversion Tests
 
     @Test("Convert wss to https")
-    func convertWssToHttps() {
+    func convertWSSToHTTPS() {
         let relayURL = RelayURL("wss://relay.example.com")!
         let httpURL = RelayInformation.informationURL(from: relayURL)
 
@@ -21,7 +21,7 @@ struct RelayInformationTests {
     }
 
     @Test("Convert ws to http")
-    func convertWsToHttp() {
+    func convertWSToHTTP() {
         let relayURL = RelayURL("ws://localhost:7777")!
         let httpURL = RelayInformation.informationURL(from: relayURL)
 
