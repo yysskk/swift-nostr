@@ -126,9 +126,8 @@ struct FilterSerializationTests {
     /// An event on the wire keeps `created_at`; the same encoder serializes it.
     @Test("events serialize created_at in snake case")
     func eventKeepsCreatedAt() throws {
-        let signer = try EventSigner(
-            privateKeyHex: "5566778899aabbccddeeff00112233445566778899aabbccddeeff0011223344"
-        )
+        let privateKey = try PrivateKey(hex: "5566778899aabbccddeeff00112233445566778899aabbccddeeff0011223344")
+        let signer = EventSigner(privateKey: privateKey)
         let event = signer.sign(.textNote("gm"))
 
         let json = ClientMessage.event(event).serialize()

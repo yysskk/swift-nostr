@@ -75,6 +75,6 @@ struct ScryptRoundTripTests {
         let keyPair = KeyPair()
         let encrypted = try keyPair.encryptedPrivateKey(password: password, logN: 14)
 
-        #expect(try KeyPair(ncryptsec: encrypted.ncryptsec, password: password).privateKeyHex == keyPair.privateKeyHex)
+        #expect(try KeyPair(ncryptsec: encrypted.ncryptsec, password: password).privateKey == keyPair.privateKey)
     }
 }

@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`PrivateKey` is a typed secret key**: 32 bytes validated as a secp256k1 scalar — non-zero and
+  below the curve order — by `init(hex:)`, `init(data:)`, and `init(nsec:)`, which throw
+  `KeyPair.Error`. `hex`, `data`, and `nsec` export it. It is not `Codable`, and its `description`,
+  `debugDescription`, and mirror are redacted, so `print`, string interpolation, and `dump` never
+  show the key. Equality compares every byte in constant time.
 - **`PublicKey`, `EventID`, and `Signature` are typed hex values**: each holds exactly one
   spelling, canonical lowercase hex (64, 64, and 128 digits), which is also its `description` and
   its JSON encoding. `init(hex:)`, `init(data:)`, `PublicKey(npub:)`, and `EventID(note:)` reject
@@ -97,6 +102,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`KeyPair` holds a `PrivateKey`** (breaking): `privateKey` is a `PrivateKey` instead of `Data`,
+  and `KeyPair(privateKey:)` takes one and no longer throws. `KeyPair(privateKey: Data)`,
+  `KeyPair(privateKeyHex:)`, `privateKeyHex`, and `nsec` are removed in favor of `PrivateKey(data:)`,
+  `PrivateKey(hex:)`, `privateKey.hex`, and `privateKey.nsec`; `KeyPair(nsec:)` stays.
+  `EventSigner(privateKeyHex:)` is `EventSigner(privateKey:)`,
+  `KeyDerivation.deriveNostrKey(seed:account:)` returns a `PrivateKey`, and
+  `WalletConnectURI.secret` is a `PrivateKey`, so
+  `WalletConnectURI(walletPublicKey:relays:secret:lud16:)` throws only for an empty relay list.
 - **`Event.verify()` throws for every failure** (breaking): it returns `Void` and throws the new
   `Event.VerificationError.invalidSignature` for a signature that does not verify, instead of
   returning `false`. `Event.isValid` is the same check as a `Bool`, for when the reason does not

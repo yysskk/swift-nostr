@@ -110,7 +110,7 @@ struct NostrClientTargetedPublishTests {
     func templatePublishReachesOnlyTargetedRelays() async throws {
         let (client, sockets) = try await makeClient(relayURLs: [urlA, urlB, urlC])
         let keyPair = KeyPair()
-        try await client.identity.setPrivateKey(keyPair.privateKeyHex)
+        try await client.identity.setPrivateKey(keyPair.privateKey.hex)
 
         let task = Task {
             try await client.events.publish(.textNote("templated"), to: [urlA, urlC], strategy: .allSettled)
@@ -134,7 +134,7 @@ struct NostrClientTargetedPublishTests {
     @Test("a template published to an empty target list throws instead of broadcasting")
     func templatePublishToEmptyTargetsThrows() async throws {
         let (client, sockets) = try await makeClient(relayURLs: [urlA, urlB])
-        try await client.identity.setPrivateKey(KeyPair().privateKeyHex)
+        try await client.identity.setPrivateKey(KeyPair().privateKey.hex)
 
         await #expect(throws: RelayPool.Error.noMatchingRelays([])) {
             try await client.events.publish(.textNote("nowhere"), to: [])

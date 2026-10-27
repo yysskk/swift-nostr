@@ -33,7 +33,7 @@ struct NIP44VectorTests {
     )
     func conversationKey(_ vector: NIP44Vectors.ConversationKeyVector) throws {
         let derived = try SealedMessage.conversationKeyHex(
-            keyPair: KeyPair(privateKeyHex: vector.sec1),
+            keyPair: KeyPair(privateKey: PrivateKey(hex: vector.sec1)),
             publicKey: PublicKey(hex: vector.pub2)
         )
 
@@ -78,8 +78,8 @@ struct NIP44VectorTests {
         arguments: NIP44Vectors.valid.encryptDecrypt
     )
     func encryptDecryptConversationKey(_ vector: NIP44Vectors.EncryptDecryptVector) throws {
-        let keyPair1 = try KeyPair(privateKeyHex: vector.sec1)
-        let keyPair2 = try KeyPair(privateKeyHex: vector.sec2)
+        let keyPair1 = try KeyPair(privateKey: PrivateKey(hex: vector.sec1))
+        let keyPair2 = try KeyPair(privateKey: PrivateKey(hex: vector.sec2))
 
         let fromSender = try SealedMessage.conversationKeyHex(keyPair: keyPair1, publicKey: keyPair2.publicKey)
         let fromRecipient = try SealedMessage.conversationKeyHex(keyPair: keyPair2, publicKey: keyPair1.publicKey)
@@ -128,8 +128,8 @@ struct NIP44VectorTests {
         arguments: NIP44Vectors.valid.encryptDecrypt
     )
     func sealAndOpenMatchVector(_ vector: NIP44Vectors.EncryptDecryptVector) throws {
-        let sender = try KeyPair(privateKeyHex: vector.sec1)
-        let recipient = try KeyPair(privateKeyHex: vector.sec2)
+        let sender = try KeyPair(privateKey: PrivateKey(hex: vector.sec1))
+        let recipient = try KeyPair(privateKey: PrivateKey(hex: vector.sec2))
         let nonce = try #require(Data(hexString: vector.nonce))
 
         let sealed = try SealedMessage.seal(
@@ -183,7 +183,7 @@ struct NIP44VectorTests {
     func invalidConversationKey(_ vector: NIP44Vectors.InvalidConversationKeyVector) throws {
         let publicKey = try PublicKey(hex: vector.pub2)
         do throws(KeyPair.Error) {
-            let keyPair = try KeyPair(privateKeyHex: vector.sec1)
+            let keyPair = try KeyPair(privateKey: PrivateKey(hex: vector.sec1))
             #expect(throws: SealedMessage.Error.invalidPublicKey) {
                 _ = try SealedMessage.conversationKeyHex(keyPair: keyPair, publicKey: publicKey)
             }

@@ -81,9 +81,7 @@ struct ProofOfWorkTests {
     // MARK: - Mining
 
     private func testSigner() throws -> EventSigner {
-        try EventSigner(
-            privateKeyHex: "e8f32e723decf4051aefac8e2c93c9c5b214313817cdb01a1494b917c8436b35"
-        )
+        try EventSigner(privateKey: PrivateKey(hex: "e8f32e723decf4051aefac8e2c93c9c5b214313817cdb01a1494b917c8436b35"))
     }
 
     private func unsignedNote(for signer: EventSigner, tags: [Event.Tag] = []) throws -> UnsignedEvent {

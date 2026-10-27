@@ -24,7 +24,7 @@ struct GiftWrappedRumorDeliveryTests {
     func deliversCustomKindRumor() async throws {
         let (client, socket) = try await ConnectedClientFixture.make()
         try await client.identity.setPrivateKey(senderKey)
-        let sender = try KeyPair(privateKeyHex: senderKey)
+        let sender = try KeyPair(privateKey: PrivateKey(hex: senderKey))
         let recipient = KeyPair()
         await client.dmRelayListStore.markNoList(for: recipient.publicKey)
         await client.dmRelayListStore.markNoList(for: sender.publicKey)
@@ -71,7 +71,7 @@ struct GiftWrappedRumorDeliveryTests {
         try await pool.addRelay(inboxURL).connect()
         let client = NostrClient(relayPool: pool, gossipPolicy: .requirePresent)
         try await client.identity.setPrivateKey(senderKey)
-        let sender = try KeyPair(privateKeyHex: senderKey)
+        let sender = try KeyPair(privateKey: PrivateKey(hex: senderKey))
         let recipient = KeyPair()
         await client.dmRelayListStore.store(
             DirectMessageRelayList(relays: [inboxURL]), createdAt: Timestamp(rawValue: 1), for: recipient.publicKey)
@@ -98,7 +98,7 @@ struct GiftWrappedRumorDeliveryTests {
     func expirationOnBothWraps() async throws {
         let (client, socket) = try await ConnectedClientFixture.make()
         try await client.identity.setPrivateKey(senderKey)
-        let sender = try KeyPair(privateKeyHex: senderKey)
+        let sender = try KeyPair(privateKey: PrivateKey(hex: senderKey))
         let recipient = KeyPair()
         await client.dmRelayListStore.markNoList(for: recipient.publicKey)
         await client.dmRelayListStore.markNoList(for: sender.publicKey)
@@ -121,7 +121,7 @@ struct GiftWrappedRumorDeliveryTests {
     func rumorIsAuthoredUnderSignerKey() async throws {
         let (client, socket) = try await ConnectedClientFixture.make()
         try await client.identity.setPrivateKey(senderKey)
-        let sender = try KeyPair(privateKeyHex: senderKey)
+        let sender = try KeyPair(privateKey: PrivateKey(hex: senderKey))
         let recipient = KeyPair()
         await client.dmRelayListStore.markNoList(for: recipient.publicKey)
         await client.dmRelayListStore.markNoList(for: sender.publicKey)

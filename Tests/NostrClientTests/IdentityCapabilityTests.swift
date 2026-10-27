@@ -27,7 +27,7 @@ struct IdentityCapabilityTests {
         let identity: any NostrIdentityProviding = stub
         let keyPair = KeyPair()
 
-        try await identity.setPrivateKey(keyPair.privateKeyHex)
+        try await identity.setPrivateKey(keyPair.privateKey.hex)
 
         #expect(await installedLocalKeys(stub) == [keyPair.publicKey])
         #expect(await identity.publicKey == keyPair.publicKey)
@@ -41,7 +41,7 @@ struct IdentityCapabilityTests {
         let identity: any NostrIdentityProviding = stub
         let keyPair = KeyPair()
 
-        try await identity.setNsec(keyPair.nsec)
+        try await identity.setNsec(keyPair.privateKey.nsec)
 
         #expect(await installedLocalKeys(stub) == [keyPair.publicKey])
         #expect(await identity.publicKey == keyPair.publicKey)
@@ -57,7 +57,7 @@ struct IdentityCapabilityTests {
         let stub = RecordingIdentityCapabilities()
         let identity: any NostrIdentityProviding = stub
         let current = KeyPair()
-        try await identity.setPrivateKey(current.privateKeyHex)
+        try await identity.setPrivateKey(current.privateKey.hex)
 
         await #expect(throws: expected) {
             try await identity.setPrivateKey(privateKeyHex)
@@ -72,7 +72,7 @@ struct IdentityCapabilityTests {
         let stub = RecordingIdentityCapabilities()
         let identity: any NostrIdentityProviding = stub
         let current = KeyPair()
-        try await identity.setNsec(current.nsec)
+        try await identity.setNsec(current.privateKey.nsec)
         let npub = current.publicKey.npub
 
         await #expect(throws: KeyPair.Error.unexpectedPrefix("npub")) {

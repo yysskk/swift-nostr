@@ -11,18 +11,14 @@ struct NIP04Tests {
     let senderSecretHex = "91ba716fa9e7ea2fcbad360cf4f8e0d312f73984da63d90f524ad61a6a1e7dbe"
     let recipientSecretHex = "96f6fa197aa07477ab88f6981118466ae3a982faab8ad5db9d5426870c73d220"
 
-    private func bytes(_ hex: String) throws -> Data {
-        try #require(Data(hexString: hex))
-    }
-
     private func keyData(_ key: SymmetricKey) -> Data {
         key.withUnsafeBytes { Data($0) }
     }
 
     @Test("decrypts a known go-nostr ciphertext")
     func decryptKnownVector() throws {
-        let recipientSecret = try bytes(recipientSecretHex)
-        let senderPublicKey = try KeyPair(privateKeyHex: senderSecretHex).publicKey.data
+        let recipientSecret = try PrivateKey(hex: recipientSecretHex)
+        let senderPublicKey = try KeyPair(privateKey: PrivateKey(hex: senderSecretHex)).publicKey.data
         let content = "zJxfaJ32rN5Dg1ODjOlEew==?iv=EV5bUjcc4OX2Km/zPp4ndQ=="
 
         let plaintext = try NIP04.decrypt(content, privateKey: recipientSecret, peerPublicKeyXOnly: senderPublicKey)
@@ -32,8 +28,8 @@ struct NIP04Tests {
 
     @Test("decrypts a known multi-block go-nostr ciphertext")
     func decryptKnownBigVector() throws {
-        let recipientSecret = try bytes(recipientSecretHex)
-        let senderPublicKey = try KeyPair(privateKeyHex: senderSecretHex).publicKey.data
+        let recipientSecret = try PrivateKey(hex: recipientSecretHex)
+        let senderPublicKey = try KeyPair(privateKey: PrivateKey(hex: senderSecretHex)).publicKey.data
         let content =
             "6f8dMstm+udOu7yipSn33orTmwQpWbtfuY95NH+eTU1kArysWJIDkYgI2D25EAGIDJsNd45jOJ2NbVOhFiL3ZP/NWsTwXokk34iyHyA"
             + "/lkjzugQ1bHXoMD1fP/Ay4hB4al1NHb8HXHKZaxPrErwdRDb8qa/I6dXb/1xxyVvNQBHHvmsM5yIFaPwnCN1DZqXf2KbTA/Ekz7Hy"

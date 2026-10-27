@@ -70,7 +70,8 @@ struct EventTests {
 
     @Test("Sign a text note template")
     func signedTextNote() throws {
-        let signer = try EventSigner(privateKeyHex: "e8f32e723decf4051aefac8e2c93c9c5b214313817cdb01a1494b917c8436b35")
+        let privateKey = try PrivateKey(hex: "e8f32e723decf4051aefac8e2c93c9c5b214313817cdb01a1494b917c8436b35")
+        let signer = EventSigner(privateKey: privateKey)
 
         let event = signer.sign(.textNote("Hello!"))
 

@@ -6,10 +6,10 @@ import NostrCore
 extension NostrIdentityProviding {
     /// Sets a local signer from a private key hex string. See ``NostrIdentityProviding/setSigner(_:)-(EventSigner)``.
     /// - Parameter privateKeyHex: The private key as 64 hex characters.
-    /// - Throws: What ``EventSigner/init(privateKeyHex:)`` throws for a malformed key; the current
-    ///   signer is then left in place.
+    /// - Throws: What ``PrivateKey/init(hex:)`` throws for a malformed key; the current signer is
+    ///   then left in place.
     public func setPrivateKey(_ privateKeyHex: String) async throws(KeyPair.Error) {
-        let signer = try EventSigner(privateKeyHex: privateKeyHex)
+        let signer = EventSigner(privateKey: try PrivateKey(hex: privateKeyHex))
         await setSigner(signer)
     }
 

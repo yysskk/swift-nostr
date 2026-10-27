@@ -15,8 +15,7 @@ struct KeyDerivationTests {
 
         let privateKey = try KeyDerivation.deriveNostrKey(seed: seed)
 
-        #expect(privateKey.count == 32)
-        #expect(privateKey.hexEncodedString() == expectedPrivateKey)
+        #expect(privateKey.hex == expectedPrivateKey)
     }
 
     @Test("A non-zero account derives a different key than account 0")
@@ -26,7 +25,7 @@ struct KeyDerivationTests {
         let account0 = try KeyDerivation.deriveNostrKey(seed: seed, account: 0)
         let account1 = try KeyDerivation.deriveNostrKey(seed: seed, account: 1)
 
-        #expect(account0.hexEncodedString() == expectedPrivateKey)
+        #expect(account0.hex == expectedPrivateKey)
         #expect(account0 != account1)
     }
 }
