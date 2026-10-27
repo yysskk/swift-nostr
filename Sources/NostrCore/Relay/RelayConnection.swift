@@ -479,6 +479,10 @@ public actor RelayConnection {
     /// like ``publish(_:)``, a send never connects inline. Call ``connect()`` first; reconnection
     /// after a drop is owned by the background auto-reconnect.
     ///
+    /// Cancelling the calling task does not interrupt the send: the frame is still written, and
+    /// the call returns or throws as it would have — only a socket failure or the send timeout
+    /// fails the connection. A cancelled caller learns of it at its next cancellation check.
+    ///
     /// - Throws: ``RelayConnection/Error/notConnected`` when the connection is not established or
     ///   the socket fails the send, the error ``ClientMessage/serialize()`` throws, or
     ///   ``RelayConnection/Error/timedOut`` when the send does not complete within
@@ -511,21 +515,28 @@ public actor RelayConnection {
             break
         }
 
-        do {
-            // Send with timeout
+        // The write runs in a task of its own so the caller's cancellation does not reach it: a
+        // cancelled child would end the race at once, and the connection would be failed and torn
+        // down over a socket that is healthy — just because one caller went away.
+        let sendTimeout = config.sendTimeout
+        let write = Task {
             try await withThrowingTaskGroup(of: Void.self) { group in
                 group.addTask {
                     try await task.send(.string(text))
                 }
 
                 group.addTask {
-                    try await Task.sleep(for: self.config.sendTimeout)
+                    try await Task.sleep(for: sendTimeout)
                     throw Error.timedOut
                 }
 
                 try await group.next()
                 group.cancelAll()
             }
+        }
+
+        do {
+            try await write.value
         } catch {
             // Update state on send failure, but only for the session this send belonged to: the
             // send timeout fires on a merely slow relay, and by the time it does the socket may
@@ -923,7 +934,8 @@ public actor RelayConnection {
     /// out only when the connection is established and holds the subscription; otherwise this does
     /// nothing, and it never connects — a dropped socket took the relay's subscription with it. A
     /// CLOSE that fails to send is not reported: the failure discards the socket, and the relay's
-    /// subscription with it.
+    /// subscription with it. Like every ``send(_:)``, the CLOSE goes out even when the calling task
+    /// is cancelled.
     public func unsubscribe(id subscriptionID: SubscriptionID) async {
         guard subscriptions[subscriptionID] != nil else { return }
         forgetSubscription(subscriptionID)

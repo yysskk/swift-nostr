@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Cancelling a send no longer drops the relay connection**: `RelayConnection.send(_:)` raced the
+  socket write against its timeout in child tasks of the caller, so cancelling the caller ended the
+  race at once and the healthy connection was marked failed and torn down. The write now runs apart
+  from the caller: the frame is sent even when the caller is cancelled, and only a socket failure or
+  the send timeout fails the connection. Subscribing, unsubscribing, publishing, counting, and
+  authenticating all send this way, so the 0.9.0 workaround that let a timed-out fetch finish its
+  `CLOSE` frames is no longer needed and is removed.
+
 ## [0.9.0] - 2026-10-27
 
 A typing release. Raw strings and integers give way to value types — `PublicKey`, `EventID`,
