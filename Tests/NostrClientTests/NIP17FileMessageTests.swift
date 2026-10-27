@@ -114,8 +114,9 @@ struct NIP17FileMessageTests {
             url: url, mimeType: "text/plain", encryption: encrypted,
             size: encrypted.ciphertext.count, to: recipient.publicKey)
 
-        let file = try #require(await DirectMessageParser(signer: EventSigner(keyPair: recipient)).open(
-            result.recipientGiftWrap).file)
+        let recipientParser = DirectMessageParser(signer: EventSigner(keyPair: recipient))
+
+        let file = try #require(await recipientParser.open(result.recipientGiftWrap).file)
         #expect(file.url == url)
         #expect(file.mimeType == "text/plain")
         #expect(file.senderPublicKey == sender.publicKey)
@@ -130,8 +131,8 @@ struct NIP17FileMessageTests {
 
         // The self-copy decrypts with the sender's own key and yields the same file, guarding
         // against a wrong-key regression when wrapping the self-copy.
-        let selfFile = try #require(await DirectMessageParser(signer: EventSigner(keyPair: sender)).open(
-            result.selfGiftWrap).file)
+        let senderParser = DirectMessageParser(signer: EventSigner(keyPair: sender))
+        let selfFile = try #require(await senderParser.open(result.selfGiftWrap).file)
         #expect(selfFile.rumorID == file.rumorID)
         #expect(selfFile.url == url)
         let selfDecrypted = try EncryptedFile.decrypt(
@@ -256,8 +257,8 @@ struct NIP17FileMessageTests {
             to: recipient.publicKey, expiration: expiry)
 
         #expect(result.recipientGiftWrap.expiration == expiry)
-        let file = try #require(await DirectMessageParser(signer: EventSigner(keyPair: recipient)).open(
-            result.recipientGiftWrap).file)
+        let recipientParser = DirectMessageParser(signer: EventSigner(keyPair: recipient))
+        let file = try #require(await recipientParser.open(result.recipientGiftWrap).file)
         #expect(file.expiresAt == expiry)
     }
 }

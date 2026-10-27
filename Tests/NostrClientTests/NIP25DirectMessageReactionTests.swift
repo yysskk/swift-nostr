@@ -44,8 +44,9 @@ struct NIP25DirectMessageReactionTests {
             reaction: "+", to: messageID, author: recipient.publicKey,
             recipientPublicKey: recipient.publicKey)
 
-        let reaction = try #require(await DirectMessageParser(signer: EventSigner(keyPair: recipient)).open(
-            result.recipientGiftWrap).reaction)
+        let recipientParser = DirectMessageParser(signer: EventSigner(keyPair: recipient))
+
+        let reaction = try #require(await recipientParser.open(result.recipientGiftWrap).reaction)
         #expect(reaction.content == "+")
         #expect(reaction.messageID == messageID)
         #expect(reaction.messageAuthorPublicKey == recipient.publicKey)
@@ -53,8 +54,8 @@ struct NIP25DirectMessageReactionTests {
 
         // The self-copy decrypts with the sender's own key and carries the identical reaction,
         // guarding against a wrong-key regression when wrapping the self-copy.
-        let selfCopy = try #require(await DirectMessageParser(signer: EventSigner(keyPair: sender)).open(
-            result.selfGiftWrap).reaction)
+        let senderParser = DirectMessageParser(signer: EventSigner(keyPair: sender))
+        let selfCopy = try #require(await senderParser.open(result.selfGiftWrap).reaction)
         #expect(selfCopy.rumorID == reaction.rumorID)
         #expect(selfCopy.content == "+")
         #expect(selfCopy.messageID == messageID)
@@ -156,8 +157,8 @@ struct NIP25DirectMessageReactionTests {
             recipientPublicKey: recipient.publicKey, expiration: expiry)
 
         #expect(result.recipientGiftWrap.expiration == expiry)
-        let parsed = try #require(await DirectMessageParser(signer: EventSigner(keyPair: recipient)).open(
-            result.recipientGiftWrap).reaction)
+        let recipientParser = DirectMessageParser(signer: EventSigner(keyPair: recipient))
+        let parsed = try #require(await recipientParser.open(result.recipientGiftWrap).reaction)
         #expect(parsed.expiresAt == expiry)
     }
 
