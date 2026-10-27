@@ -4,34 +4,44 @@ import NostrCore
 /// The signer the client authors events with, and the NIP-42 authentication that proves it
 /// to relays. Reached as ``NostrClient/identity``.
 ///
-/// Implements the ``NostrIdentityProviding`` primitives; ``NostrIdentityProviding/setPrivateKey(_:)``
-/// and ``NostrIdentityProviding/setNsec(_:)`` come from the protocol's extension.
 public struct NostrIdentityAPI: NostrIdentityProviding {
     let client: NostrClient
 
     // MARK: - Signer
 
-    /// Sets the signer for signing events.
+    /// Sets a local (``EventSigner``) or remote (NIP-46) signer, replacing any current one.
     ///
-    /// While ``authenticationMode`` is ``AuthenticationMode/automatic`` (the
-    /// default), setting a signer also starts answering NIP-42 AUTH challenges
-    /// with it on every relay in the pool.
-    public func setSigner(_ signer: EventSigner) async {
-        await client.install(signer)
-    }
-
-    /// Sets a local or remote signer for signing events.
-    ///
-    /// Accepts any ``NostrSigning`` — a local ``EventSigner`` or a remote NIP-46 signer (a
-    /// "bunker"). The signer's ``NostrSigning/publicKey`` is resolved once here and cached, so
-    /// ``publicKey`` stays a single actor hop even for a remote signer. Every feature
-    /// works with either kind: signing, publishing, the convenience `publish*` helpers, NIP-17
-    /// direct messages, NIP-51 private list items, NIP-44 encryption, and NIP-42 AUTH challenges.
+    /// The signer's ``NostrSigning/publicKey`` is resolved once here and cached, so ``publicKey``
+    /// stays a single actor hop even for a remote signer. Every feature works with either kind:
+    /// signing, publishing, the convenience `publish*` helpers, NIP-17 direct messages, NIP-51
+    /// private list items, NIP-44 encryption, and NIP-42 AUTH challenges.
     ///
     /// While ``authenticationMode`` is ``AuthenticationMode/automatic`` (the default), setting a
     /// signer also starts answering NIP-42 AUTH challenges with it on every relay in the pool.
-    public func setSigner(_ signer: any NostrSigning) async throws {
+    ///
+    /// Overlapping calls to this and ``removeSigner()`` take effect in the order they start: a
+    /// remote signer whose public key resolves after a later call started is discarded, so a
+    /// superseded call has no effect and does not throw.
+    ///
+    /// To set a local key, wrap it in an ``EventSigner``:
+    ///
+    /// ```swift
+    /// try await client.identity.setSigner(EventSigner(nsec: nsec))
+    /// ```
+    /// - Parameter signer: The signer to author events with.
+    /// - Throws: What the signer throws while resolving its public key; a local ``EventSigner``
+    ///   never throws. The current signer is then left in place.
+    public func setSigner(_ signer: some NostrSigning) async throws {
         try await client.install(signer)
+    }
+
+    /// Clears the signer and its cached public key; a no-op when none is set.
+    ///
+    /// Afterwards ``publicKey`` is nil, operations that need a signer throw
+    /// ``NostrClient/Error/signerNotSet``, and the relay pool stops answering NIP-42 AUTH
+    /// challenges automatically, as for a client that never had a signer.
+    public func removeSigner() async {
+        await client.uninstallSigner()
     }
 
     /// The public key events are authored under, or nil when no signer is set.

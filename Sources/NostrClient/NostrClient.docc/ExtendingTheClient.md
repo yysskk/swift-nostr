@@ -141,7 +141,7 @@ actor CannedEvents: NostrEventFetching {
 @Test func receivedZaps() async throws {
     let client = NostrClient()
     let signer = EventSigner(keyPair: KeyPair())
-    await client.identity.setSigner(signer)
+    try await client.identity.setSigner(signer)
     let events = CannedEvents([receipt])  // a kind-9735 event paying signer.publicKey
     let zaps = ZapsAPI(events: events, identity: client.identity)
 

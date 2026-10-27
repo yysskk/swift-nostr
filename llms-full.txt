@@ -36,7 +36,7 @@ import NostrClient
 let client = NostrClient()
 
 // Set signer
-try await client.identity.setNsec("nsec1...")
+try await client.identity.setSigner(EventSigner(nsec: "nsec1..."))
 
 // Add relays and connect in one step
 try await client.relays.connect(to: [
@@ -107,10 +107,10 @@ protocol extensions, so a stub implements four methods and a call through the pr
 as one through `client.events`. `NostrSubscribing` (`subscribe(filters:route:bufferingPolicy:)`,
 `unsubscribe(id:)`, `unsubscribeAll()`), `NostrRelayManaging` (`add(_:config:)`,
 `remove(_:)`, `connect()`, `disconnect()`, `connections`, `connectedRelayCount()`, `relay(for:)`,
-`clearDeduplicationCache()`), and `NostrIdentityProviding` (both `setSigner(_:)` overloads,
+`clearDeduplicationCache()`), and `NostrIdentityProviding` (`setSigner(_:)`, `removeSigner()`,
 `publicKey`, `sign(_:)`, NIP-44, and NIP-42 authentication) follow the same pattern: `add(_:)`,
-`connect(to:)`, `relayCount`, `setPrivateKey(_:)`, `setNsec(_:)`, and the short forms come from their
-extensions; a stub returns a `SubscriptionSequence(id:expectedRelays:stream:onClose:)` over its own
+`connect(to:)`, `relayCount`, and the short forms come from their extensions; a stub returns a
+`SubscriptionSequence(id:expectedRelays:stream:onClose:)` over its own
 `AsyncStream`. `NostrMessaging` requires `sendGiftWrapped(_:to:expiration:strategy:)` for an
 `EventTemplate`, `open(_:)`, and `subscribe(limit:)`; `send`, `react`, `sendFile`, and the short
 forms (`sendGiftWrapped(_:to:expiration:)`, `subscribe()`) come from its extension, and a stub
@@ -195,17 +195,22 @@ let zaps = ZapsAPI(events: CannedEvents([receipt]), identity: client.identity)
 ### Signer Setup
 
 ```swift
-await client.identity.setSigner(eventSigner)              // local EventSigner (async, non-throwing)
-try await client.identity.setSigner(remoteSigner)         // any NostrSigning, e.g. a NIP-46 RemoteSigner
-try await client.identity.setPrivateKey("hex...")         // hex private key
-try await client.identity.setNsec("nsec1...")             // bech32 nsec
+try await client.identity.setSigner(EventSigner(nsec: "nsec1..."))                    // bech32 nsec
+try await client.identity.setSigner(EventSigner(privateKey: PrivateKey(hex: "...")))  // hex private key
+try await client.identity.setSigner(remoteSigner)                                     // e.g. a NIP-46 RemoteSigner
+await client.identity.removeSigner()                                                  // no signer, e.g. on sign-out
 ```
 
-`identity.setSigner(_:)` is overloaded: it takes a local `EventSigner` or any `NostrSigning` (including a
-NIP-46 `RemoteSigner` from the `NostrConnect` library). The signer's `publicKey` is resolved once
-and cached, so `identity.publicKey` stays a single actor hop even for a remote signer.
+`identity.setSigner(_:)` takes any `NostrSigning`: a local `EventSigner` or a NIP-46 `RemoteSigner`
+from the `NostrConnect` library. It throws only what the signer throws while resolving its public key
+(a local `EventSigner` never throws). The signer's `publicKey` is resolved once and cached, so
+`identity.publicKey` stays a single actor hop even for a remote signer.
 
 Setting a signer also starts answering NIP-42 AUTH challenges automatically (see Authentication).
+`identity.removeSigner()` clears the signer and its public key: signing then throws
+`NostrClient.Error.signerNotSet` and challenges are no longer answered. Overlapping `setSigner(_:)`
+and `removeSigner()` calls take effect in the order they start: a remote signer whose public key
+resolves after a later call started is discarded, so a sign-out is never undone by a stale set.
 
 Every feature runs through the signer, so a remote one is a drop-in for a local key: `sign(_:)`,
 `publish(_:route:strategy:)` (a template or a signed event), the convenience `publish*` helpers, NIP-17 direct messages, NIP-51 private

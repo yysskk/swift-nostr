@@ -14,6 +14,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and receives. `init(url:mimeType:encryption:size:dimensions:blurhash:)` fills the key, nonce, and
   hashes from an `EncryptedFile`, and `decrypt(_:)` opens the downloaded blob with the attachment's
   key and nonce.
+- **`NostrIdentityProviding.removeSigner()` clears the client's signer**: `publicKey` becomes nil,
+  operations that need a signer throw `NostrClient.Error.signerNotSet`, and NIP-42 AUTH challenges
+  are no longer answered automatically until a signer is set again. Removing when none is set does
+  nothing.
 
 ### Changed
 
@@ -51,6 +55,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     (`file.url` → `file.attachment.url`), and its initializer takes `attachment:` in their place.
     `EncryptedFile.decrypt(blob, key: file.decryptionKey, nonce: file.decryptionNonce)` →
     `file.attachment.decrypt(blob)`.
+- **One way to set the client's signer** (breaking): `NostrIdentityProviding`'s
+  `setSigner(_: EventSigner) async` and `setSigner(_: any NostrSigning) async throws` collapse into
+  `setSigner(_: some NostrSigning) async throws`, which throws only what the signer throws while
+  resolving its public key (a local `EventSigner` never does): `await identity.setSigner(eventSigner)`
+  → `try await identity.setSigner(eventSigner)`. The `String` conveniences `setPrivateKey(_:)` and
+  `setNsec(_:)` are removed; wrap the key in an `EventSigner` instead:
+  `setPrivateKey(hex)` → `setSigner(EventSigner(privateKey: PrivateKey(hex: hex)))` and
+  `setNsec(nsec)` → `setSigner(EventSigner(nsec: nsec))`.
 
 ### Fixed
 

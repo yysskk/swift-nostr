@@ -35,25 +35,25 @@ import NostrCore
 
 /// Managing the signer the client authors events with, and proving it to relays (NIP-42).
 /// Implemented by ``NostrIdentityAPI``.
-///
-/// The requirements are the primitives; ``setPrivateKey(_:)`` and ``setNsec(_:)`` are provided by
-/// an extension built on ``setSigner(_:)-(EventSigner)``.
 public protocol NostrIdentityProviding: Sendable {
-    /// Sets a local signer.
-    ///
-    /// While ``authenticationMode`` is ``AuthenticationMode/automatic`` (the default), setting a
-    /// signer also starts answering NIP-42 AUTH challenges with it on every relay in the pool.
-    /// - Parameter signer: The local signer to author events with.
-    func setSigner(_ signer: EventSigner) async
-
-    /// Sets a local or remote (NIP-46) signer.
+    /// Sets a local (``EventSigner``) or remote (NIP-46) signer, replacing any current one.
     ///
     /// The signer's ``NostrSigning/publicKey`` is resolved once here and cached, so ``publicKey``
     /// stays a single actor hop even for a remote signer.
-    /// - Parameter signer: The signer to author events with — a local ``EventSigner`` or a remote
-    ///   NIP-46 signer.
-    /// - Throws: Anything the signer throws while resolving its public key.
-    func setSigner(_ signer: any NostrSigning) async throws
+    ///
+    /// While ``authenticationMode`` is ``AuthenticationMode/automatic`` (the default), setting a
+    /// signer also starts answering NIP-42 AUTH challenges with it on every relay in the pool.
+    /// - Parameter signer: The signer to author events with.
+    /// - Throws: What the signer throws while resolving its public key; a local ``EventSigner``
+    ///   never throws. The current signer is then left in place.
+    func setSigner(_ signer: some NostrSigning) async throws
+
+    /// Clears the signer and its cached public key; a no-op when none is set.
+    ///
+    /// Afterwards ``publicKey`` is nil, operations that need a signer throw
+    /// ``NostrClient/Error/signerNotSet``, and NIP-42 AUTH challenges are no longer answered
+    /// automatically.
+    func removeSigner() async
 
     /// The public key events are authored under, or nil when no signer is set.
     var publicKey: PublicKey? { get async }

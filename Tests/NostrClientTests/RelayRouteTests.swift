@@ -108,7 +108,7 @@ struct RelayRouteTests {
         let (client, sockets) = try await makeClient()
         let author = KeyPair()
         let mention = PublicKey.fixture("mention")
-        try await client.identity.setPrivateKey(author.privateKey.hex)
+        try await client.identity.setSigner(EventSigner(keyPair: author))
         await seedRelayList(client, for: author.publicKey, read: [urlC], write: [urlA])
         await seedRelayList(client, for: mention, read: [urlB], write: [urlC])
 
@@ -146,7 +146,7 @@ struct RelayRouteTests {
         let (client, sockets) = try await makeClient()
         let author = KeyPair()
         let mentions = ["one", "two", "three"].map { PublicKey.fixture($0) }
-        try await client.identity.setPrivateKey(author.privateKey.hex)
+        try await client.identity.setSigner(EventSigner(keyPair: author))
 
         _ = try await publishMentioning(mentions, with: client, sockets: sockets, frame: 0)
 
@@ -162,7 +162,7 @@ struct RelayRouteTests {
     func publishOutboxCachesMissingLists() async throws {
         let (client, sockets) = try await makeClient()
         let mentions = [PublicKey.fixture("one"), PublicKey.fixture("two")]
-        try await client.identity.setPrivateKey(KeyPair().privateKey.hex)
+        try await client.identity.setSigner(EventSigner(keyPair: KeyPair()))
 
         _ = try await publishMentioning(mentions, with: client, sockets: sockets, frame: 0)
         _ = try await publishMentioning(mentions, with: client, sockets: sockets, frame: 1)
@@ -177,7 +177,7 @@ struct RelayRouteTests {
         let (client, sockets) = try await makeClient(gossipPolicy: .addAndConnect, extra: extra)
         let author = KeyPair()
         let mention = PublicKey.fixture("mention")
-        try await client.identity.setPrivateKey(author.privateKey.hex)
+        try await client.identity.setSigner(EventSigner(keyPair: author))
         await seedRelayList(client, for: author.publicKey, read: [urlA])
         await seedRelayList(client, for: mention, read: [unknown])
 

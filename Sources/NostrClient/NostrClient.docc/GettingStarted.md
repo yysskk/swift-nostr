@@ -62,7 +62,7 @@ the per-relay keys of ``PublishResult`` — compares relays by that canonical fo
 ## Publish Events
 
 ```swift
-try await client.identity.setNsec("nsec1...")
+try await client.identity.setSigner(EventSigner(nsec: "nsec1..."))
 
 // Text note — returns the signed event plus the per-relay outcome
 let note = try await client.events.publishTextNote(content: "Hello, Nostr!")

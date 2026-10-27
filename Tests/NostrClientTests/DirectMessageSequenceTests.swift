@@ -196,7 +196,7 @@ struct DirectMessageSequenceTests {
     @Test("messages.subscribe opens and closes a subscription")
     func directMessagesOpensAndClosesSubscription() async throws {
         let (client, _) = try await ConnectedClientFixture.make()
-        try await client.identity.setPrivateKey(String(repeating: "1", count: 64))
+        try await client.identity.setSigner(EventSigner(privateKey: PrivateKey(hex: String(repeating: "1", count: 64))))
 
         let messages = try await client.messages.subscribe()
         #expect(await client.activeSubscriptionCount == 1)
@@ -209,7 +209,7 @@ struct DirectMessageSequenceTests {
     func directMessagesRequestFilter() async throws {
         let (client, socket) = try await ConnectedClientFixture.make()
         let bob = KeyPair()
-        await client.identity.setSigner(EventSigner(keyPair: bob))
+        try await client.identity.setSigner(EventSigner(keyPair: bob))
 
         let byDefault = try await client.messages.subscribe()
         let limited = try await client.messages.subscribe(limit: 5)

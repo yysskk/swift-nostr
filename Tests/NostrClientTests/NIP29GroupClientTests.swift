@@ -120,7 +120,7 @@ struct NIP29GroupClientTests {
         try await groupConnection.connect()
         let otherConnection = await client.relays.pool.addRelay(otherRelayURL)
         try await otherConnection.connect()
-        await client.identity.setSigner(EventSigner(keyPair: KeyPair()))
+        try await client.identity.setSigner(EventSigner(keyPair: KeyPair()))
 
         let group = GroupReference(relayURL: groupRelayURL, id: groupID, inviteCode: "welcome")
         let joinTask = Task { try await client.groups.join(group, reason: "please let me in") }
@@ -141,7 +141,7 @@ struct NIP29GroupClientTests {
     @Test("an explicit invite code overrides the reference's code")
     func joinGroupInviteCodeOverride() async throws {
         let (client, socket) = makeClient()
-        await client.identity.setSigner(EventSigner(keyPair: KeyPair()))
+        try await client.identity.setSigner(EventSigner(keyPair: KeyPair()))
         try await client.relays.connect(to: [groupRelayURL])
 
         let group = GroupReference(relayURL: groupRelayURL, id: groupID, inviteCode: "stale")
@@ -156,7 +156,7 @@ struct NIP29GroupClientTests {
     @Test("groups.leave publishes a kind-9022 event with the h tag")
     func leaveGroupPublishesLeaveRequest() async throws {
         let (client, socket) = makeClient()
-        await client.identity.setSigner(EventSigner(keyPair: KeyPair()))
+        try await client.identity.setSigner(EventSigner(keyPair: KeyPair()))
         try await client.relays.connect(to: [groupRelayURL])
 
         let group = GroupReference(relayURL: groupRelayURL, id: groupID)
@@ -174,7 +174,7 @@ struct NIP29GroupClientTests {
     @Test("groups.publishMessage defaults to kind 9 with h first and previous last")
     func publishGroupMessageLayout() async throws {
         let (client, socket) = makeClient()
-        await client.identity.setSigner(EventSigner(keyPair: KeyPair()))
+        try await client.identity.setSigner(EventSigner(keyPair: KeyPair()))
         try await client.relays.connect(to: [groupRelayURL])
 
         let group = GroupReference(relayURL: groupRelayURL, id: groupID)
@@ -198,7 +198,7 @@ struct NIP29GroupClientTests {
     @Test("groups.publishModeration putUser publishes kind 9000 with the roled p tag")
     func publishGroupModerationPutUser() async throws {
         let (client, socket) = makeClient()
-        await client.identity.setSigner(EventSigner(keyPair: KeyPair()))
+        try await client.identity.setSigner(EventSigner(keyPair: KeyPair()))
         try await client.relays.connect(to: [groupRelayURL])
         let member = KeyPair().publicKey
 
@@ -222,7 +222,7 @@ struct NIP29GroupClientTests {
     @Test("a group relay missing from the pool is added and connected automatically")
     func ensureGroupRelayAddsAndConnects() async throws {
         let (client, socket) = makeClient()
-        await client.identity.setSigner(EventSigner(keyPair: KeyPair()))
+        try await client.identity.setSigner(EventSigner(keyPair: KeyPair()))
         #expect(await client.relays.pool.relay(for: groupRelayURL) == nil)
 
         let group = GroupReference(relayURL: groupRelayURL, id: groupID)
@@ -241,7 +241,7 @@ struct NIP29GroupClientTests {
     func joinGroupWithRemoteSigner() async throws {
         let (client, socket) = makeClient()
         let keyPair = KeyPair()
-        try await client.identity.setSigner(StubRemoteSigner(keyPair: keyPair) as any NostrSigning)
+        try await client.identity.setSigner(StubRemoteSigner(keyPair: keyPair))
 
         let group = GroupReference(relayURL: groupRelayURL, id: groupID, inviteCode: "welcome")
         let joinTask = Task { try await client.groups.join(group) }

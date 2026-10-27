@@ -231,7 +231,7 @@ struct SubscriptionSequenceTests {
         // .requirePresent keeps the gossip resolver from dialing relays that are
         // not already in the pool, so the test stays on the single mock relay.
         let (client, socket) = try await makeConnectedClient(gossipPolicy: .requirePresent)
-        try await client.identity.setPrivateKey(String(repeating: "1", count: 64))
+        try await client.identity.setSigner(EventSigner(privateKey: PrivateKey(hex: String(repeating: "1", count: 64))))
         // Publishing our own relay list caches it, so no relay-list fetch is needed.
         try await PublishAckSupport.acknowledgingPublishes(on: socket) {
             try await client.routing.publishRelayList(write: [self.relayURL])

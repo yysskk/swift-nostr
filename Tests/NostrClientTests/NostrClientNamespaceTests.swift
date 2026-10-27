@@ -18,7 +18,7 @@ struct NostrClientNamespaceTests {
         #expect(await client.relays.relayCount == 1)
         #expect(await client.relays.pool.relayCount == 1)
 
-        try await client.identity.setPrivateKey(KeyPair().privateKey.hex)
+        try await client.identity.setSigner(EventSigner(keyPair: KeyPair()))
         // A signer installed through one namespace is visible from the others.
         #expect(await client.identity.publicKey != nil)
         #expect(await client.hasSigner)
@@ -44,7 +44,7 @@ struct NostrClientNamespaceTests {
     @Test("a feature can depend on one capability instead of the whole client")
     func capabilityProtocolDrivesAPublish() async throws {
         let (client, socket) = try await ConnectedClientFixture.make()
-        try await client.identity.setPrivateKey(KeyPair().privateKey.hex)
+        try await client.identity.setSigner(EventSigner(keyPair: KeyPair()))
 
         // The shape an app feature would hold: one namespace behind its protocol.
         let publishing: any NostrEventPublishing = client.events
@@ -67,17 +67,8 @@ struct NostrClientNamespaceTests {
         let keyPair = KeyPair()
 
         #expect(await identity.publicKey == nil)
-        try await identity.setPrivateKey(KeyPair().privateKey.hex)
-        try await identity.setNsec(keyPair.privateKey.nsec)
-        #expect(await identity.publicKey == keyPair.publicKey)
-
-        // Malformed keys throw before anything is installed, leaving the current signer in place.
-        await #expect(throws: KeyPair.Error.invalidHex) {
-            try await identity.setPrivateKey("not hex")
-        }
-        await #expect(throws: KeyPair.Error.unexpectedPrefix("npub")) {
-            try await identity.setNsec(keyPair.publicKey.npub)
-        }
+        try await identity.setSigner(EventSigner(keyPair: KeyPair()))
+        try await identity.setSigner(EventSigner(keyPair: keyPair))
         #expect(await identity.publicKey == keyPair.publicKey)
         #expect(await identity.authenticationMode == .automatic)
 
@@ -92,6 +83,9 @@ struct NostrClientNamespaceTests {
         let payload = try await identity.nip44Encrypt("sealed", to: peer.publicKey)
         #expect(try EventSigner(keyPair: peer).nip44Decrypt(payload, from: keyPair.publicKey) == "sealed")
         #expect(try await identity.nip44Decrypt(payload, from: peer.publicKey) == "sealed")
+
+        await identity.removeSigner()
+        #expect(await identity.publicKey == nil)
 
         await client.relays.disconnect()
     }
@@ -154,7 +148,7 @@ struct NostrClientNamespaceTests {
     @Test("routing conforms to NostrRelayRouting end to end")
     func relayRoutingCapability() async throws {
         let (client, socket) = try await ConnectedClientFixture.make()
-        try await client.identity.setPrivateKey(KeyPair().privateKey.hex)
+        try await client.identity.setSigner(EventSigner(keyPair: KeyPair()))
         let routing: any NostrRelayRouting = client.routing
 
         // The conveniences live in a protocol extension that carries the defaults, so a call
@@ -175,7 +169,7 @@ struct NostrClientNamespaceTests {
     func messagingCapability() async throws {
         let (client, socket) = try await ConnectedClientFixture.make()
         let user = KeyPair()
-        try await client.identity.setPrivateKey(user.privateKey.hex)
+        try await client.identity.setSigner(EventSigner(keyPair: user))
         let messaging: any NostrMessaging = client.messages
         let peer = KeyPair()
         await client.dmRelayListStore.markNoList(for: peer.publicKey)
@@ -204,7 +198,7 @@ struct NostrClientNamespaceTests {
     @Test("groups conforms to NostrGroupManaging end to end")
     func groupManagingCapability() async throws {
         let (client, socket) = try await ConnectedClientFixture.make()
-        try await client.identity.setPrivateKey(KeyPair().privateKey.hex)
+        try await client.identity.setSigner(EventSigner(keyPair: KeyPair()))
         let groups: any NostrGroupManaging = client.groups
         let list = SimpleGroupList(
             publicEntries: [GroupListEntry(groupID: "abc", relayURL: RelayURL("wss://groups.example.com")!)])
@@ -223,7 +217,7 @@ struct NostrClientNamespaceTests {
     @Test("lists conforms to NostrListManaging end to end")
     func listManagingCapability() async throws {
         let (client, socket) = try await ConnectedClientFixture.make()
-        try await client.identity.setPrivateKey(KeyPair().privateKey.hex)
+        try await client.identity.setSigner(EventSigner(keyPair: KeyPair()))
         let lists: any NostrListManaging = client.lists
         let bookmarks = NostrList(kind: .bookmarkList, publicItems: [.event(.fixture("note"))])
 
@@ -268,7 +262,7 @@ struct NostrClientNamespaceTests {
     @Test("a namespace is Sendable and survives being handed to another task")
     func namespaceCrossesTaskBoundaries() async throws {
         let (client, socket) = try await ConnectedClientFixture.make()
-        try await client.identity.setPrivateKey(KeyPair().privateKey.hex)
+        try await client.identity.setSigner(EventSigner(keyPair: KeyPair()))
         let events = client.events
 
         let published = try await PublishAckSupport.acknowledgingPublishes(on: socket) {

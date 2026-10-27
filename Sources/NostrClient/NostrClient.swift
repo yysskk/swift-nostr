@@ -11,7 +11,7 @@ import NostrCore
 ///
 /// ```swift
 /// let client = NostrClient()
-/// try await client.identity.setNsec("nsec1...")
+/// try await client.identity.setSigner(EventSigner(nsec: "nsec1..."))
 /// try await client.relays.connect(to: [RelayURL(string: "wss://relay.damus.io")])
 /// try await client.events.publishTextNote(content: "hello")
 /// ```
@@ -34,6 +34,10 @@ public actor NostrClient {
     /// The signer's public key, cached at set-time (a remote signer's `publicKey` is async).
     /// Readable module-wide so ``NostrIdentityAPI`` can surface it without a throwing lookup.
     private(set) var cachedPublicKey: PublicKey?
+
+    /// Bumped on entry to every ``install(_:)`` and ``uninstallSigner()``, so a remote install
+    /// whose public key resolves after a later call started can tell it was superseded.
+    private var signerGeneration = 0
 
     /// How the client reacts to NIP-42 AUTH challenges, published as
     /// ``NostrIdentityAPI/authenticationMode``.
@@ -79,22 +83,37 @@ public actor NostrClient {
 
     // MARK: - Signer
 
-    /// Installs a local signer, whose public key is available synchronously.
-    ///
-    /// Backs ``NostrIdentityAPI/setSigner(_:)-(EventSigner)``.
-    func install(_ signer: EventSigner) async {
-        activeSigner = signer
-        cachedPublicKey = signer.publicKey
-        await refreshAuthenticationResponder()
-    }
-
     /// Installs a local or remote signer, resolving its public key once so ``cachedPublicKey``
     /// stays synchronous afterwards.
     ///
-    /// Backs ``NostrIdentityAPI/setSigner(_:)-(any NostrSigning)``.
-    func install(_ signer: any NostrSigning) async throws {
-        cachedPublicKey = try await signer.publicKey
+    /// The last call to start wins: each call to this or ``uninstallSigner()`` takes a new
+    /// generation on entry, before any suspension. A local ``EventSigner`` is swapped in at once. A
+    /// remote signer is swapped in only if no later call started while its public key resolved;
+    /// otherwise this returns without changing anything.
+    ///
+    /// Backs ``NostrIdentityAPI/setSigner(_:)``.
+    func install(_ signer: some NostrSigning) async throws {
+        signerGeneration += 1
+        let generation = signerGeneration
+        let publicKey: PublicKey
+        if let local = signer as? EventSigner {
+            publicKey = local.publicKey
+        } else {
+            publicKey = try await signer.publicKey
+            guard generation == signerGeneration else { return }
+        }
         activeSigner = signer
+        cachedPublicKey = publicKey
+        await refreshAuthenticationResponder()
+    }
+
+    /// Clears the signer and its cached public key, and with them the pool-wide AUTH responder.
+    ///
+    /// Backs ``NostrIdentityAPI/removeSigner()``.
+    func uninstallSigner() async {
+        signerGeneration += 1
+        activeSigner = nil
+        cachedPublicKey = nil
         await refreshAuthenticationResponder()
     }
 
@@ -150,7 +169,7 @@ extension NostrClient {
         public var errorDescription: String? {
             switch self {
             case .signerNotSet:
-                return "No signer is set — call setSigner(_:), setPrivateKey(_:), or setNsec(_:) first"
+                return "No signer is set — call setSigner(_:) first"
             }
         }
     }
