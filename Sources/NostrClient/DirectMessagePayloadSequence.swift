@@ -2,8 +2,8 @@ import Foundation
 import NostrCore
 
 /// A live subscription to the current user's NIP-17 gift-wrap stream, delivering each gift
-/// wrap already unwrapped and classified as a ``DirectMessagePayload`` — a message or a
-/// reaction to one.
+/// wrap already unwrapped and classified as a ``DirectMessagePayload`` — a message, a reaction
+/// to one, or a file.
 ///
 /// Returned by ``NostrMessaging/payloads(limit:)``:
 ///
@@ -12,6 +12,7 @@ import NostrCore
 ///     switch payload {
 ///     case .message(let message): print("\(message.senderPublicKey): \(message.content)")
 ///     case .reaction(let reaction): print("\(reaction.senderPublicKey) reacted \(reaction.content)")
+///     case .file(let file): print("\(file.senderPublicKey) sent \(file.url)")
 ///     }
 /// }
 /// ```

@@ -224,8 +224,8 @@ let restored = try KeyPair(
 )
 
 // Work with Mnemonic directly
-let mnemonic = try Mnemonic.generate(wordCount: 12)
-let seed = mnemonic.seed(passphrase: "optional passphrase")
+let words = try Mnemonic.generate(wordCount: 12)
+let seed = words.seed(passphrase: "optional passphrase")
 let privateKey = try KeyDerivation.deriveNostrKey(seed: seed, account: 0)
 ```
 
@@ -311,7 +311,7 @@ let contacts = [
     Contact(publicKey: bob)
 ]
 // A contact list is an EventTemplate: sign it with any signer, then publish it like any event.
-let signed = try signer.sign(.contactList(contacts))
+let signed = try await signer.sign(.contactList(contacts))
 try await client.events.publish(signed)
 
 // Extract contacts from a kind-3 event; a `p` tag that is not a canonical hex key is skipped
@@ -649,7 +649,7 @@ every public key it mentions in `p` tags, with ``NostrRoutingAPI/publishGossip(_
 ```swift
 let signer = EventSigner(keyPair: keyPair)
 let alice = try PublicKey(npub: "npub1...")
-let note = try signer.sign(.textNote("gm!", tags: [.publicKey(alice)]))
+let note = try await signer.sign(.textNote("gm!", tags: [.publicKey(alice)]))
 try await client.routing.publishGossip(note)
 ```
 
@@ -674,7 +674,7 @@ guard pay.supportsZaps, let providerPublicKey = pay.nostrPublicKey else { return
 // 2. Sign a zap request (kind 9734) with any signer, local or remote — note it is NOT published
 //    to relays.
 let signer = EventSigner(keyPair: keyPair)
-let zapRequest = try signer.sign(.zapRequest(
+let zapRequest = try await signer.sign(.zapRequest(
     to: try PublicKey(npub: "npub1..."),
     relays: [try RelayURL(string: "wss://relay.example.com")],     // where the recipient's wallet should publish the receipt
     amountMillisats: 21_000,
@@ -740,7 +740,7 @@ let poolConfig = RelayPoolConfig(
     deduplicationCacheTTL: .seconds(300),
     queryTimeout: .seconds(10)
 )
-let client = NostrClient(config: poolConfig)
+let client = NostrClient(relayPoolConfig: poolConfig)
 ```
 
 ``RelayPoolConfig/queryTimeout`` is how long a one-shot fetch or count waits for relays to
@@ -814,7 +814,7 @@ connected — the publish path never connects inline. Connect relays up front wi
 
 ```swift
 let connection = RelayConnection(url: try RelayURL(string: "wss://relay.example.com"))
-await connection.connect()
+try await connection.connect()
 
 try await connection.subscribe(
     subscriptionID: "sub1",

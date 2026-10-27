@@ -12,7 +12,7 @@ import NostrCore
 /// ```swift
 /// let client = NostrClient()
 /// try await client.identity.setPrivateKey(privateKeyHex)
-/// try await client.relays.connect(to: ["wss://relay.damus.io"])
+/// try await client.relays.connect(to: [RelayURL(string: "wss://relay.damus.io")])
 /// try await client.events.publishTextNote(content: "hello")
 /// ```
 ///
