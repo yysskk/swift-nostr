@@ -53,7 +53,7 @@ if info.supports(.payInvoice) {
 
 print("Methods:", info.methods)             // every advertised command
 print("Encryptions:", info.encryptions)     // never empty; defaults to [.nip04]
-print("Notifications:", info.notifications) // e.g. ["payment_received", "payment_sent"]
+print("Notifications:", info.notifications) // e.g. [payment_received, payment_sent]
 ```
 
 ``WalletConnectMethod`` is open-ended: ``WalletInfo/methods`` keeps every token the wallet
@@ -77,7 +77,7 @@ print(created.invoice ?? "")   // a WalletConnectTransaction
 // Look up an invoice — by payment hash or by BOLT-11 string. The type guarantees exactly one key.
 let byHash = try await connection.lookupInvoice(.paymentHash("abc123..."))
 let byBolt11 = try await connection.lookupInvoice(.invoice("lnbc..."))
-print(byHash.state ?? "", byBolt11.amount)
+print(byHash.state == .settled, byBolt11.amount)
 
 // Balance, in millisatoshis.
 let balance = try await connection.fetchBalance()
@@ -96,7 +96,7 @@ let lastWeek = Timestamp.now.advanced(by: .seconds(-7 * 24 * 60 * 60))
 let outgoing = try await connection.listTransactions(
     ListTransactionsRequest(from: lastWeek, limit: 50, type: .outgoing))
 for tx in outgoing {
-    print("\(tx.type) \(tx.amount) msat — \(tx.state ?? "?")")
+    print("\(tx.type) \(tx.amount) msat — \(tx.state?.rawValue ?? "?")")
 }
 ```
 
@@ -190,14 +190,15 @@ one whose `result_type` names another method with
 (wallet events of kind 23197 for NIP-44 or 23196 for NIP-04), decrypted and parsed. Standard
 `payment_received` / `payment_sent` notifications expose a parsed ``WalletConnectTransaction`` via
 ``WalletConnectNotification/transaction``; the full payload is always available as
-``WalletConnectNotification/raw`` for other notification types:
+``WalletConnectNotification/raw`` for other notification types. ``WalletConnectNotificationType``,
+like ``WalletConnectMethod`` and ``TransactionState``, keeps values it has no constant for:
 
 ```swift
 for await notification in try await connection.notifications() {
     switch notification.type {
-    case "payment_received":
+    case .paymentReceived:
         if let tx = notification.transaction { print("received \(tx.amount) msat") }
-    case "payment_sent":
+    case .paymentSent:
         if let tx = notification.transaction { print("sent \(tx.amount) msat") }
     default:
         print("\(notification.type): \(notification.raw)")

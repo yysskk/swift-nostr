@@ -6,8 +6,8 @@ import Foundation
 /// `payment_received` / `payment_sent` notifications the payload is a transaction, exposed via
 /// ``transaction``; ``raw`` always holds the full payload for other notification types.
 public struct WalletConnectNotification: Sendable, Hashable {
-    /// The notification type, e.g. `"payment_received"` or `"payment_sent"`.
-    public let type: String
+    /// The notification type, including types this package has no constant for.
+    public let type: WalletConnectNotificationType
 
     /// The payload decoded as a transaction, when it is one.
     public let transaction: WalletConnectTransaction?
@@ -15,7 +15,7 @@ public struct WalletConnectNotification: Sendable, Hashable {
     /// The full notification payload.
     public let raw: [String: JSONValue]
 
-    public init(type: String, transaction: WalletConnectTransaction?, raw: [String: JSONValue]) {
+    public init(type: WalletConnectNotificationType, transaction: WalletConnectTransaction?, raw: [String: JSONValue]) {
         self.type = type
         self.transaction = transaction
         self.raw = raw
@@ -41,7 +41,7 @@ public struct WalletConnectNotification: Sendable, Hashable {
     }
 
     private struct Envelope: Decodable {
-        let notificationType: String
+        let notificationType: WalletConnectNotificationType
         let notification: [String: JSONValue]
 
         enum CodingKeys: String, CodingKey {
@@ -49,4 +49,39 @@ public struct WalletConnectNotification: Sendable, Hashable {
             case notification
         }
     }
+}
+
+/// A NIP-47 notification type.
+///
+/// The raw value is the `notification_type` of a notification and a token of a wallet's
+/// `notifications` list. The set is open-ended: the types this package documents are available as
+/// static constants, and any type a wallet emits can be represented with ``init(rawValue:)``. The
+/// value encodes to and from JSON as a bare string.
+public struct WalletConnectNotificationType: RawRepresentable, Codable, Sendable, Hashable,
+    CustomStringConvertible
+{
+    /// The wire notification type.
+    public let rawValue: String
+
+    public init(rawValue: String) {
+        self.rawValue = rawValue
+    }
+
+    public init(from decoder: any Decoder) throws {
+        self.init(rawValue: try decoder.singleValueContainer().decode(String.self))
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
+
+    public var description: String {
+        rawValue
+    }
+
+    /// The wallet received a payment (`payment_received`).
+    public static let paymentReceived = WalletConnectNotificationType(rawValue: "payment_received")
+    /// The wallet sent a payment (`payment_sent`).
+    public static let paymentSent = WalletConnectNotificationType(rawValue: "payment_sent")
 }

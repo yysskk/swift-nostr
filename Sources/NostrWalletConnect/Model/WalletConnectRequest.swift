@@ -275,10 +275,37 @@ public struct LookupInvoiceRequest: WalletConnectRequest, Codable, Hashable {
     }
 }
 
-/// A NIP-47 transaction direction.
-public enum TransactionType: String, Codable, Sendable, Hashable {
-    case incoming
-    case outgoing
+/// A NIP-47 transaction direction, as reported in ``WalletConnectTransaction/type`` and used to
+/// filter `list_transactions`.
+///
+/// The set is open-ended: the directions NIP-47 defines are available as static constants, and any
+/// other value a wallet reports is kept as is, so one unexpected transaction does not fail a whole
+/// response. The value encodes to and from JSON as a bare string.
+public struct TransactionType: RawRepresentable, Codable, Sendable, Hashable, CustomStringConvertible {
+    /// The wire direction name.
+    public let rawValue: String
+
+    public init(rawValue: String) {
+        self.rawValue = rawValue
+    }
+
+    public init(from decoder: any Decoder) throws {
+        self.init(rawValue: try decoder.singleValueContainer().decode(String.self))
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
+
+    public var description: String {
+        rawValue
+    }
+
+    /// A payment the wallet received (`incoming`).
+    public static let incoming = TransactionType(rawValue: "incoming")
+    /// A payment the wallet sent (`outgoing`).
+    public static let outgoing = TransactionType(rawValue: "outgoing")
 }
 
 /// A `list_transactions` request: lists transactions.

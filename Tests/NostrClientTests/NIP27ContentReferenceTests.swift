@@ -70,8 +70,7 @@ struct NIP27ContentReferenceTests {
 
     @Test("an nsec reference is skipped")
     func nsecReferenceSkipped() throws {
-        // Source a valid nsec bech32 by encoding a 32-byte key through the existing API.
-        let nsecBech32 = try NIP19Entity.nsec(publicKeyHex).encoded
+        let nsecBech32 = try PrivateKey(hex: publicKeyHex).nsec
         let content = "leaked nostr:\(nsecBech32) oops"
         #expect(NostrContentReference.references(in: content).isEmpty)
     }

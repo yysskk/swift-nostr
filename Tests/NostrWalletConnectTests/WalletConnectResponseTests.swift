@@ -23,8 +23,8 @@ struct WalletConnectResponseTests {
         #expect(result.alias == "Alby")
         #expect(result.nodePublicKey == "02abc")
         #expect(result.blockHeight == 830_000)
-        #expect(result.methods == ["pay_invoice", "get_balance"])
-        #expect(result.notifications == ["payment_received"])
+        #expect(result.methods == [.payInvoice, .getBalance])
+        #expect(result.notifications == [.paymentReceived])
     }
 
     @Test("get_info encodes nodePublicKey under the wire key public key")
@@ -48,7 +48,8 @@ struct WalletConnectResponseTests {
             """
         let response = try decode(json, as: WalletConnectTransaction.self)
         let tx = try #require(response.result)
-        #expect(tx.type == "incoming")
+        #expect(tx.type == .incoming)
+        #expect(tx.state == .settled)
         #expect(tx.paymentHash == "aaaa")
         #expect(tx.amount == 21000)
         #expect(tx.feesPaid == 0)
@@ -79,7 +80,7 @@ struct WalletConnectResponseTests {
     @Test("a transaction encodes its times as integer Unix seconds under the NIP-47 keys")
     func encodeTransactionTimes() throws {
         let transaction = WalletConnectTransaction(
-            type: "incoming", amount: 21000, createdAt: Timestamp(rawValue: 1_700_000_000),
+            type: .incoming, amount: 21000, createdAt: Timestamp(rawValue: 1_700_000_000),
             expiresAt: Timestamp(rawValue: 1_700_003_600), settledAt: Timestamp(rawValue: 1_700_000_100))
         let data = try JSONEncoder().encode(transaction)
         guard case .object(let object) = try JSONDecoder().decode(JSONValue.self, from: data) else {
@@ -111,8 +112,68 @@ struct WalletConnectResponseTests {
         let response = try decode(json, as: ListTransactionsResult.self)
         let result = try #require(response.result)
         #expect(result.transactions.count == 2)
-        #expect(result.transactions[0].type == "incoming")
+        #expect(result.transactions[0].type == .incoming)
+        #expect(result.transactions[1].type == .outgoing)
         #expect(result.transactions[1].feesPaid == 1)
+    }
+
+    @Test("get_info keeps methods and notification types it has no constant for, and encodes them as strings")
+    func getInfoUnknownMethodsAndNotifications() throws {
+        let json = """
+            {"result_type":"get_info","result":{"methods":["pay_invoice","sign_message"],
+            "notifications":["payment_sent","hold_invoice_accepted"]}}
+            """
+        let result = try #require(try decode(json, as: GetInfoResult.self).result)
+        #expect(result.methods == [.payInvoice, WalletConnectMethod(rawValue: "sign_message")])
+        #expect(
+            result.notifications == [.paymentSent, WalletConnectNotificationType(rawValue: "hold_invoice_accepted")])
+
+        let data = try JSONEncoder().encode(result)
+        guard case .object(let object) = try JSONDecoder().decode(JSONValue.self, from: data) else {
+            Issue.record("expected a JSON object")
+            return
+        }
+        #expect(object["methods"] == .array([.string("pay_invoice"), .string("sign_message")]))
+        #expect(object["notifications"] == .array([.string("payment_sent"), .string("hold_invoice_accepted")]))
+    }
+
+    @Test("a transaction encodes its type and state as the NIP-47 strings")
+    func encodeTransactionTypeAndState() throws {
+        let transaction = WalletConnectTransaction(type: .outgoing, state: .failed, amount: 1)
+        let data = try JSONEncoder().encode(transaction)
+        guard case .object(let object) = try JSONDecoder().decode(JSONValue.self, from: data) else {
+            Issue.record("a transaction should encode as a JSON object")
+            return
+        }
+        #expect(object["type"] == .string("outgoing"))
+        #expect(object["state"] == .string("failed"))
+        #expect(try JSONDecoder().decode(WalletConnectTransaction.self, from: data) == transaction)
+    }
+
+    @Test("a transaction keeps a state it has no constant for")
+    func decodeUnknownTransactionState() throws {
+        let json = #"{"result_type":"lookup_invoice","result":{"type":"incoming","state":"accepted","amount":1}}"#
+        let tx = try #require(try decode(json, as: WalletConnectTransaction.self).result)
+        #expect(tx.state == TransactionState(rawValue: "accepted"))
+    }
+
+    @Test("a transaction keeps a type it has no constant for, and a list with one still decodes")
+    func decodeUnknownTransactionType() throws {
+        let json =
+            #"{"result_type":"list_transactions","result":{"transactions":"#
+            + #"[{"type":"internal","amount":1},{"type":"incoming","amount":2}]}}"#
+        let result = try #require(try decode(json, as: ListTransactionsResult.self).result)
+        #expect(result.transactions.map(\.type) == [TransactionType(rawValue: "internal"), .incoming])
+    }
+
+    @Test("a list_transactions request encodes its type filter as the NIP-47 string")
+    func encodeListTransactionsTypeFilter() throws {
+        let data = try JSONEncoder().encode(ListTransactionsRequest(type: .outgoing))
+        guard case .object(let object) = try JSONDecoder().decode(JSONValue.self, from: data) else {
+            Issue.record("expected a JSON object")
+            return
+        }
+        #expect(object["type"] == .string("outgoing"))
     }
 
     @Test("decodes an error response")

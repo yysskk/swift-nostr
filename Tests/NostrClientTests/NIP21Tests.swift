@@ -96,17 +96,17 @@ struct NIP21Tests {
 
     @Test("decoding an nsec URI throws privateKeyInURI")
     func nsecURIRejected() throws {
-        // Source a valid nsec bech32 by encoding a 32-byte key through the existing API.
-        let nsecBech32 = try NIP19Entity.nsec(publicKeyHex).encoded
+        let nsecBech32 = try PrivateKey(hex: publicKeyHex).nsec
         #expect(throws: NIP19Entity.Error.privateKeyInURI) {
             _ = try NIP19Entity(nostrURI: "nostr:" + nsecBech32)
         }
     }
 
     @Test("encoding an nsec entity to a nostr: URI throws privateKeyInURI")
-    func nsecEncodeRejected() {
+    func nsecEncodeRejected() throws {
+        let privateKey = try PrivateKey(hex: publicKeyHex)
         #expect(throws: NIP19Entity.Error.privateKeyInURI) {
-            _ = try NIP19Entity.nsec(publicKeyHex).nostrURI
+            _ = try NIP19Entity.nsec(privateKey).nostrURI
         }
     }
 

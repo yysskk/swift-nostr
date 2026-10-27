@@ -231,8 +231,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `invalidBech32(Bech32.Error)` (was a bare `Bech32.Error`), `unknownPrefix(String)`,
   `unexpectedPrefix(String)` (another entity's prefix, was `unknownPrefix`), `malformedTLV` (was
   `invalidTLV`), `missingPublicKey` / `missingEventID` / `missingIdentifier` / `missingAuthor` /
-  `missingKind`, `invalidLength(Int)`, `fieldTooLong(Int)` (was `invalidTLV`), `kindOutOfRange(Int)`,
-  and `invalidHex` (each was `invalidNIP19Entity` or `invalidTLV`), and `missingNostrScheme` /
+  `missingKind`, `invalidLength(Int)`, `fieldTooLong(Int)` (was `invalidTLV`), and
+  `kindOutOfRange(Int)` (each was `invalidNIP19Entity` or `invalidTLV`), and `missingNostrScheme` /
   `privateKeyInURI` (were `invalidNostrURI`); `LongFormContent.naddr(author:relays:)` and
   `NostrListSet.naddr(author:relays:)` throw it too. `GroupReference` is
   `throws(GroupReference.Error)` — `invalidCoordinate(NIP19Entity.Error)`, `unexpectedKind(Event.Kind)`,
@@ -357,7 +357,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   typed `senderPubkey` and `messageAuthorPubkey`; `DirectMessageFile.rumorId` is now `rumorID`.
   `Contact.init(npub:relayURL:petname:)` is removed in favor of `Contact(pubkey: PublicKey(npub:))`.
 - **NIP-19 entities hold typed values** (breaking): `NIP19Entity.npub` carries a `PublicKey` and
-  `.note` an `EventID` (`nsec` keeps its hex string), `NProfile.publicKey` and `NAddr.author` are
+  `.note` an `EventID`, `NProfile.publicKey` and `NAddr.author` are
   `PublicKey`, and `NEvent.eventId` / `author` are now `eventID: EventID` and `author: PublicKey?`,
   with `NEvent.init(eventID:relays:author:kind:)`. Their initializers no longer throw `invalidHex`;
   decoding a key or id payload that is not 32 bytes throws `NIP19Entity.Error.invalidLength`.
@@ -762,6 +762,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   URL with a host fails to decode, and a file message whose content is not one is rejected with
   `DirectMessagePayload.Error.invalidFileURL`, which replaces `missingFileURL`, so a third party
   cannot point a download at a `file:`, `data:`, or custom-scheme URL.
+- **`NIP19Entity.nsec` carries a `PrivateKey`** (breaking), so its description never shows the
+  key. Decoding an `nsec` whose payload is not a valid secp256k1 scalar throws the new
+  `NIP19Entity.Error.invalidPrivateKey`, and encoding an `nsec` no longer fails.
+- **NIP-47 transaction and notification values are typed** (breaking):
+  `WalletConnectTransaction.type` is a `TransactionType`, `WalletConnectTransaction.state` the new
+  `TransactionState`, `WalletConnectNotification.type` the new `WalletConnectNotificationType`,
+  `GetInfoResult.methods` `[WalletConnectMethod]`, and `GetInfoResult.notifications` and
+  `WalletInfo.notifications` `[WalletConnectNotificationType]`. `TransactionType` is an open
+  `RawRepresentable` struct instead of an enum, like the two new types and `WalletConnectMethod`:
+  `.incoming` and `.outgoing` read the same, a `switch` over it needs a `default`, and a value
+  without a constant still decodes. The wire format is unchanged.
 
 ### Fixed
 

@@ -1762,7 +1762,7 @@ Both throw `Bech32.Error`: `invalidHumanReadablePart`, `mixedCase`, `missingSepa
 
 ## NIP19Entity
 
-A NIP-19 bech32-encoded entity (enum: Sendable, Hashable). Cases: `npub(PublicKey)`, `nsec(String)` (hex private key), `note(EventID)`, `nprofile(NProfile)`, `nevent(NEvent)`, `naddr(NAddr)`.
+A NIP-19 bech32-encoded entity (enum: Sendable, Hashable). Cases: `npub(PublicKey)`, `nsec(PrivateKey)` (redacted in descriptions), `note(EventID)`, `nprofile(NProfile)`, `nevent(NEvent)`, `naddr(NAddr)`.
 
 - `static func decode(_ bech32String: String) throws(NIP19Entity.Error) -> NIP19Entity` -- decode any bech32 entity
 - `var encoded: String { get throws(NIP19Entity.Error) }` -- canonical bech32 string
@@ -1780,8 +1780,8 @@ given to `NProfile`/`NEvent`/`NAddr(bech32String:)`), `malformedTLV` (a truncate
 `missingPublicKey` / `missingEventID` / `missingIdentifier` / `missingAuthor` / `missingKind` (a
 required TLV record is absent), `invalidLength(Int)` (a key or id that is not 32 bytes, a kind that
 is not 1-4 bytes), `fieldTooLong(Int)` (over the 255 bytes a TLV record holds), `kindOutOfRange(Event.Kind)`,
-`invalidHex` (an `nsec` case holding non-hex), `missingNostrScheme`, and `privateKeyInURI` (an `nsec`
-in a `nostr:` URI).
+`invalidPrivateKey` (an `nsec` payload that is not a valid secp256k1 scalar), `missingNostrScheme`,
+and `privateKeyInURI` (an `nsec` in a `nostr:` URI).
 - `var nostrURI: String { get throws }` -- canonical `nostr:` URI (no `//`, throws for `nsec`)
 
 ```swift

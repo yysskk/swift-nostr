@@ -8,10 +8,10 @@ import NostrCore
 /// differently for incoming vs outgoing and pending vs settled transactions.
 /// https://github.com/nostr-protocol/nips/blob/master/47.md
 public struct WalletConnectTransaction: Codable, Sendable, Hashable {
-    /// `"incoming"` or `"outgoing"`.
-    public let type: String
-    /// Settlement state, e.g. `"pending"`, `"settled"`, or `"failed"`.
-    public let state: String?
+    /// The direction, including directions this package has no constant for.
+    public let type: TransactionType
+    /// The settlement state, including states this package has no constant for.
+    public let state: TransactionState?
     /// The BOLT-11 invoice, when applicable.
     public let invoice: String?
     /// The invoice description.
@@ -53,7 +53,7 @@ public struct WalletConnectTransaction: Codable, Sendable, Hashable {
 
     /// Creates a transaction from its fields; every time encodes as integer Unix seconds.
     public init(
-        type: String, state: String? = nil, invoice: String? = nil, description: String? = nil,
+        type: TransactionType, state: TransactionState? = nil, invoice: String? = nil, description: String? = nil,
         descriptionHash: String? = nil, preimage: String? = nil, paymentHash: String? = nil,
         amount: Int64, feesPaid: Int64? = nil, createdAt: Timestamp? = nil,
         expiresAt: Timestamp? = nil, settledAt: Timestamp? = nil, metadata: [String: JSONValue]? = nil
@@ -72,4 +72,39 @@ public struct WalletConnectTransaction: Codable, Sendable, Hashable {
         self.settledAt = settledAt
         self.metadata = metadata
     }
+}
+
+/// The settlement state of a NIP-47 transaction.
+///
+/// The set is open-ended: the states NIP-47 defines are available as static constants, and any other
+/// state a wallet reports is kept as is. The value encodes to and from JSON as a bare string.
+public struct TransactionState: RawRepresentable, Codable, Sendable, Hashable, CustomStringConvertible {
+    /// The wire state name.
+    public let rawValue: String
+
+    public init(rawValue: String) {
+        self.rawValue = rawValue
+    }
+
+    public init(from decoder: any Decoder) throws {
+        self.init(rawValue: try decoder.singleValueContainer().decode(String.self))
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
+
+    public var description: String {
+        rawValue
+    }
+
+    /// Not yet paid or settled (`pending`).
+    public static let pending = TransactionState(rawValue: "pending")
+    /// Paid and settled (`settled`).
+    public static let settled = TransactionState(rawValue: "settled")
+    /// An invoice that expired unpaid (`expired`).
+    public static let expired = TransactionState(rawValue: "expired")
+    /// A payment that failed (`failed`).
+    public static let failed = TransactionState(rawValue: "failed")
 }
