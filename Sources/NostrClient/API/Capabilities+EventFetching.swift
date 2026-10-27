@@ -118,7 +118,7 @@ extension NostrEventFetching {
         timeout: Duration? = nil
     ) async throws -> LongFormContent? {
         var filter = Filter(authors: [author], kinds: [.longFormContent])
-        filter.addTagQuery(.identifier, values: [identifier])
+        filter[tag: .identifier] = [identifier]
         let events = try await fetch(filters: [filter], timeout: timeout)
         // Addressable event: the newest copy the named author signed under this identifier.
         guard
@@ -142,7 +142,7 @@ extension NostrEventFetching {
     /// - Returns: The article, or nil if none was found.
     public func fetchLongFormContent(naddr: NAddr, timeout: Duration? = nil) async throws -> LongFormContent? {
         var filter = Filter(authors: [naddr.author], kinds: [Event.Kind(rawValue: naddr.kind)])
-        filter.addTagQuery(.identifier, values: [naddr.identifier])
+        filter[tag: .identifier] = [naddr.identifier]
 
         let events: [Event]
         if naddr.relays.isEmpty {

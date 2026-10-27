@@ -272,7 +272,7 @@ struct NIP29GroupEventTests {
         let filter = Filter.groupTimeline(
             groupID: "abcdef", kinds: [.chatMessage, .thread], since: Timestamp(rawValue: 1_700_000_000), limit: 20)
 
-        #expect(filter.tagQuery("h") == ["abcdef"])
+        #expect(filter[tag: "h"] == ["abcdef"])
         #expect(filter.kinds == [.chatMessage, .thread])
         #expect(filter.since == Timestamp(rawValue: 1_700_000_000))
         #expect(filter.limit == 20)
@@ -285,7 +285,7 @@ struct NIP29GroupEventTests {
         #expect(filter.kinds == nil)
         #expect(filter.since == nil)
         #expect(filter.limit == nil)
-        #expect(filter.tagQuery("h") == ["abcdef"])
+        #expect(filter[tag: "h"] == ["abcdef"])
     }
 
     @Test("groupTimeline encodes the h tag query under the #h key")

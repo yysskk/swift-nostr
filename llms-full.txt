@@ -623,9 +623,11 @@ NIP-01 Subscription Filter (struct: Codable, Sendable, Hashable).
 
 ```swift
 var filter = Filter()
-filter.addTagQuery(.hashtag, values: ["nostr", "bitcoin"])  // #t tag; takes a Tag.Name
-let values = filter.tagQuery(.hashtag)
-// A leading "#" is ignored: addTagQuery("#t", values:) sets the same #t query.
+filter[tag: .hashtag] = ["nostr", "bitcoin"]  // #t on the wire; the key is a Tag.Name
+let values = filter[tag: .hashtag]
+filter[tag: .hashtag] = nil  // removes the query
+// filter[tag: .event] and filter[tag: .publicKey] are the #e and #p queries behind
+// eventReferences and publicKeyReferences, as hex strings.
 ```
 
 ### Convenience Builders
