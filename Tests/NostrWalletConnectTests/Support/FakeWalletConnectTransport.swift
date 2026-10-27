@@ -65,6 +65,13 @@ actor FakeWalletConnectTransport: RelayTransport {
         continuation?.yield(event)
     }
 
+    /// Ends the ``events()`` stream without disconnecting, standing in for every relay's message
+    /// stream finishing because automatic reconnection gave up.
+    func endEvents() {
+        continuation?.finish()
+        continuation = nil
+    }
+
     /// Holds the next `connect()` open until ``openGate()``, so a test can keep the connection
     /// setup in flight while another command arrives.
     func closeGate() {

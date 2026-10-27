@@ -54,6 +54,13 @@ actor FakeRemoteSignerTransport: RelayTransport {
         continuation?.yield(event)
     }
 
+    /// Ends the ``events()`` stream without disconnecting, standing in for every relay's message
+    /// stream finishing because automatic reconnection gave up.
+    func endEvents() {
+        continuation?.finish()
+        continuation = nil
+    }
+
     /// The most recently sent event, if any.
     var lastSentEvent: Event? {
         sentEvents.last

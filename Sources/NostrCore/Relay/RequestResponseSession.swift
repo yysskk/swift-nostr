@@ -21,7 +21,9 @@ package enum RequestResponseSessionError: Error, Equatable, Sendable {
 /// protocol-specific decision — encryption, decoding, and when a request is complete — to its owner.
 ///
 /// The owner drives it from three places:
-/// - ``ensureStarted(subscriptionID:filters:handler:)``, from every entry point, to connect lazily.
+/// - ``ensureStarted(subscriptionID:filters:handler:onEnded:)``, from every entry point, to connect
+///   lazily, and to learn when the session ends on its own so it can finish whatever streams it
+///   feeds from the handler.
 /// - ``perform(_:key:state:timeout:partialResult:)``, to send a request and await its response.
 /// - ``withPendingRequest(_:_:)``, from the handler, to fold each decoded response into the request
 ///   it belongs to.
@@ -37,6 +39,10 @@ package actor RequestResponseSession<Key: Hashable & Sendable, State: Sendable, 
     /// Receives every event the transport delivers, in arrival order.
     package typealias EventHandler = @Sendable (Event) async -> Void
 
+    /// Runs once when a session ends because the transport's event stream did, rather than through
+    /// ``disconnect()``.
+    package typealias EndHandler = @Sendable () async -> Void
+
     /// Derives the response a timed-out request resolves with, from the state it accumulated.
     package typealias PartialResult = @Sendable (State) -> Response
 
@@ -46,13 +52,20 @@ package actor RequestResponseSession<Key: Hashable & Sendable, State: Sendable, 
 
     private var startTask: Task<Void, any Error>?
     private var readerTask: Task<Void, Never>?
+    /// The owner's ``EndHandler`` running for a session whose event stream ended.
+    ///
+    /// A new session waits for it before starting, so the owner finishes the old session's streams
+    /// before anything can be registered against the new one — otherwise a stream opened on the
+    /// fresh session could be finished by the late notice about the previous one.
+    private var endNotification: Task<Void, Never>?
 
-    /// Identifies the current session, incremented on every start.
+    /// Identifies the current session, incremented on every start and on `disconnect()`.
     ///
     /// A reader loop outlives the stream it drains: `disconnect()` finishes the stream
     /// synchronously, but the loop only wakes up afterwards. By then a new session may already be
     /// running, and without this the stale loop's completion would retire it — clearing a healthy
-    /// `readerTask`/`startTask` and failing requests that session had legitimately in flight.
+    /// `readerTask`/`startTask` and failing requests that session had legitimately in flight — or,
+    /// with none running, report a teardown the owner asked for as the stream ending on its own.
     private var sessionGeneration: UInt64 = 0
 
     /// In-flight requests, keyed by whatever correlates a response back to its request.
@@ -85,11 +98,24 @@ package actor RequestResponseSession<Key: Hashable & Sendable, State: Sendable, 
     /// connect/subscribe work, rather than racing past a bool guard and sending before the transport
     /// is connected and the subscription exists. Later callers await that same task and their
     /// arguments are ignored; a failed attempt is discarded so the next call retries the setup.
+    ///
+    /// When the transport's event stream ends — automatic reconnection gave up, or the connections
+    /// went away — the session fails its in-flight requests, calls `onEnded`, and the next call here
+    /// starts it again. `onEnded` is not called for ``disconnect()``, whose caller already knows.
     package func ensureStarted(
         subscriptionID: String,
         filters: [Filter],
-        handler: @escaping EventHandler
+        handler: @escaping EventHandler,
+        onEnded: @escaping EndHandler
     ) async throws {
+        // Let the owner finish the previous session's streams first. Re-checked after each wait,
+        // since another session may have started and ended while this call was suspended.
+        while let endNotification {
+            await endNotification.value
+            if self.endNotification == endNotification {
+                self.endNotification = nil
+            }
+        }
         if let startTask {
             try await startTask.value
             return
@@ -104,7 +130,7 @@ package actor RequestResponseSession<Key: Hashable & Sendable, State: Sendable, 
         let task = Task { [weak self] in
             guard let self else { return }
             try await self.performStart(
-                subscriptionID: subscriptionID, filters: filters, handler: handler,
+                subscriptionID: subscriptionID, filters: filters, handler: handler, onEnded: onEnded,
                 generation: generation)
         }
         startTask = task
@@ -121,6 +147,7 @@ package actor RequestResponseSession<Key: Hashable & Sendable, State: Sendable, 
         subscriptionID: String,
         filters: [Filter],
         handler: @escaping EventHandler,
+        onEnded: @escaping EndHandler,
         generation: UInt64
     ) async throws {
         try await transport.connect()
@@ -138,17 +165,17 @@ package actor RequestResponseSession<Key: Hashable & Sendable, State: Sendable, 
             // session has to notice: left as it was, `isStarted` stayed true, `ensureStarted`
             // short-circuited, and every later request sent into a dead transport and waited out
             // its whole timeout with no error explaining why.
-            await self?.handleEventStreamEnded(generation: generation)
+            await self?.handleEventStreamEnded(generation: generation, onEnded: onEnded)
         }
     }
 
-    /// Retires a session whose event stream has ended, failing anything in flight and clearing the
+    /// Retires a session whose event stream has ended, failing anything in flight, clearing the
     /// started state so the next request reconnects rather than sending into a transport that can
-    /// no longer answer.
+    /// no longer answer, and telling the owner through `onEnded`.
     ///
     /// Ignored when `generation` is no longer current: the loop reporting the end belongs to a
-    /// session that has already been replaced, and the one running now is healthy.
-    private func handleEventStreamEnded(generation: UInt64) {
+    /// session that has already been replaced or disconnected, and the owner has nothing to learn.
+    private func handleEventStreamEnded(generation: UInt64, onEnded: @escaping EndHandler) {
         guard generation == sessionGeneration else { return }
         readerTask = nil
         startTask = nil
@@ -158,6 +185,9 @@ package actor RequestResponseSession<Key: Hashable & Sendable, State: Sendable, 
             request.continuation.finish(throwing: notConnected)
         }
         pending.removeAll()
+
+        // Run outside this actor's turn: the owner hops to its own isolation to finish its streams.
+        endNotification = Task { await onEnded() }
     }
 
     /// Opens an additional subscription, or replaces one under an id already in use.
@@ -171,9 +201,13 @@ package actor RequestResponseSession<Key: Hashable & Sendable, State: Sendable, 
     }
 
     /// Stops reading, fails every in-flight request with the session's `notConnected` error, and
-    /// disconnects the transport. A later ``ensureStarted(subscriptionID:filters:handler:)`` starts
-    /// the session again.
+    /// disconnects the transport. A later ``ensureStarted(subscriptionID:filters:handler:onEnded:)``
+    /// starts the session again.
+    ///
+    /// The owner's `onEnded` is not called: it asked for the teardown, and finishes its own streams.
     package func disconnect() async {
+        // Retire the generation so the cancelled reader's end is not reported as the stream ending.
+        sessionGeneration &+= 1
         readerTask?.cancel()
         readerTask = nil
         startTask?.cancel()

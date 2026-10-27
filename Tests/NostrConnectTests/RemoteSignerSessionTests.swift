@@ -288,6 +288,87 @@ struct RemoteSignerSessionTests {
         #expect(await transport.isConnected == false)
     }
 
+    // MARK: - Auth-challenge stream lifetime
+
+    /// The merged event stream ends when every relay's has — automatic reconnection gave up, or the
+    /// connections went away. No challenge can arrive after that, so a stream left open would keep
+    /// its consumer's `for await` loop suspended forever, with nothing saying why.
+    @Test("auth-challenge streams finish when the relays' event stream ends", .timeLimit(.minutes(1)))
+    func authChallengeStreamsFinishWhenEventStreamEnds() async throws {
+        let transport = FakeRemoteSignerTransport()
+        let remote = try makeSigner(transport: transport)
+        try await connectHandshake(remote, transport: transport)
+        let first = await remote.authChallenges()
+        let second = await remote.authChallenges()
+        let drained = Task {
+            var received = 0
+            for await _ in first { received += 1 }
+            return received
+        }
+
+        await transport.endEvents()
+
+        #expect(await drained.value == 0)
+        var iterator = second.makeAsyncIterator()
+        #expect(await iterator.next() == nil)
+    }
+
+    @Test(
+        "an auth-challenge stream opened after the event stream ended gets the next request's challenges",
+        .timeLimit(.minutes(1)))
+    func authChallengesAfterEventStreamEnded() async throws {
+        let transport = FakeRemoteSignerTransport()
+        let remote = try makeSigner(transport: transport, requestTimeout: .seconds(5))
+        try await connectHandshake(remote, transport: transport)
+        let ended = await remote.authChallenges()
+        await transport.endEvents()
+        for await _ in ended {}
+
+        var iterator = await remote.authChallenges().makeAsyncIterator()
+        // The next request reconnects rather than sending into the ended stream.
+        let ping = Task { try await remote.ping() }
+        let sent = try await RemoteSignerFixtures.waitForSentEvents(transport, count: 2)
+        #expect(await transport.connectCount == 2)
+        let request = try RemoteSignerFixtures.decryptRequest(sent[1], client: client, signer: signer)
+
+        try await transport.deliver(
+            RemoteSignerFixtures.response(
+                requestID: request.id, result: "auth_url", error: "https://auth.example",
+                client: client, signer: signer))
+        #expect(await iterator.next()?.requestID == request.id)
+
+        try await transport.deliver(
+            RemoteSignerFixtures.response(requestID: request.id, result: "pong", client: client, signer: signer))
+        try await ping.value
+    }
+
+    @Test("disconnect finishes auth-challenge streams, and one opened afterwards stays live", .timeLimit(.minutes(1)))
+    func disconnectFinishesAuthChallengeStreams() async throws {
+        let transport = FakeRemoteSignerTransport()
+        let remote = try makeSigner(transport: transport, requestTimeout: .seconds(5))
+        try await connectHandshake(remote, transport: transport)
+        let old = await remote.authChallenges()
+        await remote.disconnect()
+        for await _ in old {}
+
+        var iterator = await remote.authChallenges().makeAsyncIterator()
+        // Give the disconnected session's reader every chance to wake and finish the new stream.
+        try await Task.sleep(for: .milliseconds(200))
+
+        let ping = Task { try await remote.ping() }
+        let sent = try await RemoteSignerFixtures.waitForSentEvents(transport, count: 2)
+        let request = try RemoteSignerFixtures.decryptRequest(sent[1], client: client, signer: signer)
+        try await transport.deliver(
+            RemoteSignerFixtures.response(
+                requestID: request.id, result: "auth_url", error: "https://auth.example",
+                client: client, signer: signer))
+        #expect(await iterator.next()?.requestID == request.id)
+
+        try await transport.deliver(
+            RemoteSignerFixtures.response(requestID: request.id, result: "pong", client: client, signer: signer))
+        try await ping.value
+    }
+
     // MARK: - Helpers
 
     /// Drives the connect handshake to completion so a test can then exercise commands.
