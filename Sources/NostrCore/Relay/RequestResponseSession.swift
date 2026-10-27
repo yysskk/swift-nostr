@@ -122,7 +122,7 @@ package actor RequestResponseSession<
     /// - Throws: ``RequestResponseSessionError/transportFailed(_:)``, mapped, when the transport cannot
     ///   connect or subscribe.
     package func ensureStarted(
-        subscriptionID: String,
+        subscriptionID: SubscriptionID,
         filters: [Filter],
         handler: @escaping EventHandler,
         onEnded: @escaping EndHandler
@@ -168,7 +168,7 @@ package actor RequestResponseSession<
     }
 
     private func performStart(
-        subscriptionID: String,
+        subscriptionID: SubscriptionID,
         filters: [Filter],
         handler: @escaping EventHandler,
         onEnded: @escaping EndHandler,
@@ -218,7 +218,7 @@ package actor RequestResponseSession<
     /// Opens an additional subscription, or replaces one under an id already in use.
     /// - Throws: ``RequestResponseSessionError/transportFailed(_:)``, mapped, when the transport
     ///   cannot subscribe.
-    package func subscribe(id: String, filters: [Filter]) async throws(Failure) {
+    package func subscribe(id: SubscriptionID, filters: [Filter]) async throws(Failure) {
         do throws(RelayConnection.Error) {
             try await transport.subscribe(id: id, filters: filters)
         } catch {
@@ -227,7 +227,7 @@ package actor RequestResponseSession<
     }
 
     /// Closes the subscription with `id`.
-    package func unsubscribe(id: String) async {
+    package func unsubscribe(id: SubscriptionID) async {
         await transport.unsubscribe(id: id)
     }
 

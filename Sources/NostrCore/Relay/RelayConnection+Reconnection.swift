@@ -78,7 +78,7 @@ extension RelayConnection {
         let currentSubscriptions = subscriptions
         for (subscriptionID, filters) in currentSubscriptions {
             do {
-                try await subscribe(subscriptionID: subscriptionID, filters: filters)
+                try await subscribe(id: subscriptionID, filters: filters)
             } catch {
                 // Continue with other subscriptions even if one fails
             }

@@ -817,10 +817,7 @@ connected — the publish path never connects inline. Connect relays up front wi
 let connection = RelayConnection(url: try RelayURL(string: "wss://relay.example.com"))
 try await connection.connect()
 
-try await connection.subscribe(
-    subscriptionID: "sub1",
-    filters: [Filter(kinds: [1], limit: 10)]
-)
+try await connection.subscribe(id: .random(), filters: [Filter(kinds: [1], limit: 10)])
 
 for await message in await connection.messages() {
     switch message {

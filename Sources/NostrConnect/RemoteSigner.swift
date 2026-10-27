@@ -45,7 +45,7 @@ public actor RemoteSigner {
         }
     }
 
-    private static let responseSubscriptionID = "nip46-responses"
+    private static let responseSubscriptionID: SubscriptionID = "nip46-responses"
 
     /// The shared relay session, correlating each request by the `id` in its JSON body and holding
     /// the request's method so an `auth_url` challenge can be labeled with it.

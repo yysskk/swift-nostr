@@ -62,7 +62,7 @@ public struct NostrRoutingAPI: NostrRelayRouting {
     ) async throws(RelayPool.Error) -> SubscriptionSequence {
         let routeSet = await resolveOutboxRelays(authors: authors)
         let filter = Filter(authors: authors, kinds: kinds, limit: limit)
-        return try await client.subscribe(filters: [filter], toURLs: routeSet)
+        return try await client.pool.subscribe(filters: [filter], to: routeSet)
     }
 
     /// Publishes a signed event to the author's WRITE relays and its mentions' READ relays (the

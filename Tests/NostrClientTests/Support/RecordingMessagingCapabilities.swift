@@ -62,19 +62,19 @@ actor RecordingMessagingCapabilities: NostrMessaging {
     func payloads(limit: Int) async throws -> DirectMessagePayloadSequence {
         payloadLimits.append(limit)
         return DirectMessagePayloadSequence(
-            subscription: cannedSubscription(id: "payloads_\(payloadLimits.count)"),
+            subscription: cannedSubscription(id: SubscriptionID(rawValue: "payloads_\(payloadLimits.count)")),
             parser: DirectMessageParser(signer: signer)
         )
     }
 
     func giftWraps(limit: Int) async throws -> SubscriptionSequence {
         giftWrapLimits.append(limit)
-        return cannedSubscription(id: "gift_wraps_\(giftWrapLimits.count)")
+        return cannedSubscription(id: SubscriptionID(rawValue: "gift_wraps_\(giftWrapLimits.count)"))
     }
 
     // MARK: - Private
 
-    private func cannedSubscription(id: String) -> SubscriptionSequence {
+    private func cannedSubscription(id: SubscriptionID) -> SubscriptionSequence {
         let (stream, continuation) = AsyncStream.makeStream(of: SubscriptionEvent.self)
         for giftWrap in cannedGiftWraps {
             continuation.yield(.event(relayURL: relayURL, event: giftWrap))

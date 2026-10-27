@@ -18,7 +18,7 @@ extension NostrClient {
         timeout: Duration?
     ) async throws -> [Event] {
         let timeout = timeout ?? pool.config.queryTimeout
-        let subscription = try await subscribe(filters: filters, toURLs: relayURLs)
+        let subscription = try await pool.subscribe(filters: filters, to: relayURLs)
 
         let timeoutTask = Task {
             do {

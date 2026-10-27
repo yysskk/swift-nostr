@@ -75,7 +75,7 @@ struct RelayConnectionSocketTests {
         let (connection, mock) = makeConnection()
         try await connection.connect()
 
-        try await connection.subscribe(subscriptionID: "sub-1", filters: [Filter(kinds: [1])])
+        try await connection.subscribe(id: "sub-1", filters: [Filter(kinds: [1])])
 
         #expect(mock.sentTextFrames.contains { $0.contains("\"REQ\"") && $0.contains("sub-1") })
         await connection.disconnect()

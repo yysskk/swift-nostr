@@ -63,7 +63,7 @@ public struct NostrRelaysAPI: NostrRelayManaging {
     /// longer arrive. Reconnecting with ``connect()`` restores the relays; the subscriptions have
     /// to be opened again.
     public func disconnect() async {
-        await client.disconnectAllRelays()
+        await client.pool.disconnectAll()
     }
 
     // MARK: - Inspection

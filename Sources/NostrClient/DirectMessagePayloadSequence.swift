@@ -42,8 +42,8 @@ public struct DirectMessagePayloadSequence: AsyncSequence, Sendable {
         self.parser = parser
     }
 
-    /// The subscription ID, usable with ``NostrSubscriptionsAPI/unsubscribe(subscriptionID:)``.
-    public var id: String { base.id }
+    /// The subscription ID, usable with ``NostrSubscriptionsAPI/unsubscribe(id:)``.
+    public var id: SubscriptionID { base.id }
 
     /// The relays that accepted the REQ.
     public var expectedRelays: Set<RelayURL> { base.expectedRelays }

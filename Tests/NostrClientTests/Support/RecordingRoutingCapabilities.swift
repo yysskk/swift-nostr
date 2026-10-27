@@ -82,7 +82,8 @@ actor RecordingRoutingCapabilities: NostrRelayRouting {
         let (stream, continuation) = AsyncStream.makeStream(of: SubscriptionEvent.self)
         continuation.finish()
         return SubscriptionSequence(
-            id: "outbox_\(outboxSubscribes.count)", expectedRelays: [], stream: stream, onClose: {})
+            id: SubscriptionID(rawValue: "outbox_\(outboxSubscribes.count)"), expectedRelays: [], stream: stream,
+            onClose: {})
     }
 
     func publishGossip(_ event: Event, strategy: PublishStrategy?) async throws -> PublishResult {

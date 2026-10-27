@@ -15,7 +15,7 @@ import Testing
 @Suite("Relay Connection Tests")
 struct RelayConnectionTests {
 
-    private static let subscriptionID = "sub-1"
+    private static let subscriptionID: SubscriptionID = "sub-1"
     private static let eventID = String(repeating: "a", count: 64)
 
     /// Thread-safe recorder for the messages a ``RelayConnection/messages()`` consumer sees.
@@ -183,13 +183,13 @@ struct RelayConnectionTests {
         try await connection.connect()
 
         try await connection.subscribe(
-            subscriptionID: Self.subscriptionID,
+            id: Self.subscriptionID,
             filters: [Filter(kinds: [.textNote], limit: 5)]
         )
 
         let frame = try #require(Self.sentFrame("REQ", in: mock))
         #expect(frame.count == 3)
-        #expect(frame[1] as? String == Self.subscriptionID)
+        #expect(frame[1] as? String == Self.subscriptionID.rawValue)
         let filter = try #require(frame[2] as? [String: Any])
         #expect(filter["kinds"] as? [Int] == [Event.Kind.textNote.rawValue])
         #expect(filter["limit"] as? Int == 5)
@@ -209,7 +209,7 @@ struct RelayConnectionTests {
             }
         }
 
-        mock.deliver(.string(try Self.eventFrame(subscriptionID: Self.subscriptionID, eventID: Self.eventID)))
+        mock.deliver(.string(try Self.eventFrame(subscriptionID: Self.subscriptionID.rawValue, eventID: Self.eventID)))
         try await pollUntil { !received.snapshot.isEmpty }
 
         let message = try #require(received.snapshot.first)
@@ -228,13 +228,13 @@ struct RelayConnectionTests {
     func unsubscribeSendsCloseFrame() async throws {
         let (connection, mock) = makeConnection()
         try await connection.connect()
-        try await connection.subscribe(subscriptionID: Self.subscriptionID, filters: [Filter(kinds: [.textNote])])
+        try await connection.subscribe(id: Self.subscriptionID, filters: [Filter(kinds: [.textNote])])
 
-        await connection.unsubscribe(subscriptionID: Self.subscriptionID)
+        await connection.unsubscribe(id: Self.subscriptionID)
 
         let frame = try #require(Self.sentFrame("CLOSE", in: mock))
         #expect(frame.count == 2)
-        #expect(frame[1] as? String == Self.subscriptionID)
+        #expect(frame[1] as? String == Self.subscriptionID.rawValue)
         await connection.disconnect()
     }
 
@@ -257,7 +257,7 @@ struct RelayConnectionTests {
         let socketCount = SocketCount()
         let (connection, mock) = makeConnection(socketCount: socketCount)
 
-        try await connection.subscribe(subscriptionID: Self.subscriptionID, filters: [Filter(kinds: [.textNote])])
+        try await connection.subscribe(id: Self.subscriptionID, filters: [Filter(kinds: [.textNote])])
 
         #expect(socketCount.value == 1)
         #expect(await connection.state == .connected)
@@ -270,7 +270,7 @@ struct RelayConnectionTests {
         let socketCount = SocketCount()
         let (connection, mock) = makeConnection(socketCount: socketCount)
 
-        await connection.unsubscribe(subscriptionID: Self.subscriptionID)
+        await connection.unsubscribe(id: Self.subscriptionID)
 
         #expect(socketCount.value == 0)
         #expect(mock.sentTextFrames.isEmpty)
@@ -281,7 +281,7 @@ struct RelayConnectionTests {
     func unsubscribeAfterDropForgetsSubscriptionWithoutReconnecting() async throws {
         let socketCount = SocketCount()
         let (connection, mock) = makeConnection(socketCount: socketCount)
-        try await connection.subscribe(subscriptionID: Self.subscriptionID, filters: [Filter(kinds: [.textNote])])
+        try await connection.subscribe(id: Self.subscriptionID, filters: [Filter(kinds: [.textNote])])
 
         mock.deliver(error: URLError(.networkConnectionLost))
         try await pollUntil {
@@ -290,7 +290,7 @@ struct RelayConnectionTests {
         }
         #expect(await connection.hasSubscription(Self.subscriptionID))
 
-        await connection.unsubscribe(subscriptionID: Self.subscriptionID)
+        await connection.unsubscribe(id: Self.subscriptionID)
 
         #expect(socketCount.value == 1)
         #expect(Self.sentFrame("CLOSE", in: mock) == nil)
@@ -303,7 +303,7 @@ struct RelayConnectionTests {
         let (connection, mock) = makeConnection()
         try await connection.connect()
 
-        await connection.unsubscribe(subscriptionID: Self.subscriptionID)
+        await connection.unsubscribe(id: Self.subscriptionID)
 
         #expect(Self.sentFrame("CLOSE", in: mock) == nil)
         await connection.disconnect()
@@ -315,11 +315,11 @@ struct RelayConnectionTests {
         try await connection.connect()
 
         let subscribing = Task {
-            try await connection.subscribe(subscriptionID: Self.subscriptionID, filters: [Filter(kinds: [.textNote])])
+            try await connection.subscribe(id: Self.subscriptionID, filters: [Filter(kinds: [.textNote])])
         }
         try await pollUntil { socket.heldCount == 1 }
 
-        await connection.unsubscribe(subscriptionID: Self.subscriptionID)
+        await connection.unsubscribe(id: Self.subscriptionID)
         #expect(Self.sentFrame("CLOSE", in: socket.mock) != nil)
 
         socket.release()
@@ -336,7 +336,7 @@ struct RelayConnectionTests {
         try await connection.connect()
 
         let subscribing = Task {
-            try await connection.subscribe(subscriptionID: Self.subscriptionID, filters: [Filter(kinds: [.textNote])])
+            try await connection.subscribe(id: Self.subscriptionID, filters: [Filter(kinds: [.textNote])])
         }
         try await pollUntil { socket.heldCount == 1 }
         #expect(await connection.hasSubscription(Self.subscriptionID))
@@ -354,12 +354,12 @@ struct RelayConnectionTests {
         try await connection.connect()
 
         let first = Task {
-            try await connection.subscribe(subscriptionID: Self.subscriptionID, filters: [Filter(kinds: [.textNote])])
+            try await connection.subscribe(id: Self.subscriptionID, filters: [Filter(kinds: [.textNote])])
         }
         try await pollUntil { socket.heldCount == 1 }
-        await connection.unsubscribe(subscriptionID: Self.subscriptionID)
+        await connection.unsubscribe(id: Self.subscriptionID)
         let second = Task {
-            try await connection.subscribe(subscriptionID: Self.subscriptionID, filters: [Filter(kinds: [.reaction])])
+            try await connection.subscribe(id: Self.subscriptionID, filters: [Filter(kinds: [.reaction])])
         }
         try await pollUntil { socket.heldCount == 2 }
 

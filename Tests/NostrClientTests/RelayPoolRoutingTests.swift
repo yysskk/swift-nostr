@@ -180,7 +180,7 @@ struct RelayPoolRoutingTests {
 
     // MARK: - Subscribe failure cleanup
 
-    @Test("a subscribe that fails on every relay leaves no handler or listener state")
+    @Test("a subscribe that fails on every relay leaves no subscription state")
     func subscribeTotalFailureCleansUp() async throws {
         // Sockets whose keepalive ping fails make every connection attempt fail
         // deterministically, so each REQ send (which auto-connects) errors out.
@@ -197,10 +197,9 @@ struct RelayPoolRoutingTests {
         await pool.addRelay(urlB)
 
         await #expect(throws: RelayPool.Error.subscriptionFailed) {
-            try await pool.subscribe(subscriptionID: "sub", filters: [Filter()]) { _ in }
+            try await pool.subscribe(filters: [Filter()])
         }
-        #expect(await pool.subscriptionHandlerCount == 0)
-        #expect(await pool.subscriptionTaskCount == 0)
+        #expect(await pool.subscriptionCount == 0)
     }
 
     // MARK: - Pool lookups

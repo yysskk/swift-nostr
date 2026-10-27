@@ -26,12 +26,12 @@ public actor RelayConnection {
     // file stays `private`. All access remains actor-isolated either way.
 
     /// Active subscriptions (subscription ID -> filters) for resubscription after reconnect
-    var subscriptions: [String: [Filter]] = [:]
+    var subscriptions: [SubscriptionID: [Filter]] = [:]
 
     /// REQs still on their way out, by subscription ID: the send's token and the filters the ID
     /// was registered with before it. A failed REQ restores them only while its token is still
     /// here — a later subscribe, unsubscribe, or teardown on the ID replaces or removes the entry.
-    private var subscriptionRequestsInFlight: [String: (token: UInt64, previousFilters: [Filter]?)] = [:]
+    private var subscriptionRequestsInFlight: [SubscriptionID: (token: UInt64, previousFilters: [Filter]?)] = [:]
 
     /// The token of the most recent REQ sent.
     private var lastSubscriptionRequestToken: UInt64 = 0
@@ -100,7 +100,7 @@ public actor RelayConnection {
     /// COUNT subscription id. One waiter per subid: the ids are unique per
     /// request, so a reply correlates to exactly one in-flight ``countEvents(matching:timeout:)``.
     /// `internal` (not `private`) because the receive loop in `+Receiving` settles them.
-    var pendingCountWaiters: [String: AsyncThrowingStream<EventCount, any Swift.Error>.Continuation] = [:]
+    var pendingCountWaiters: [SubscriptionID: AsyncThrowingStream<EventCount, any Swift.Error>.Continuation] = [:]
 
     /// The most recent challenge received in an AUTH message from the relay (NIP-42).
     ///
@@ -152,7 +152,7 @@ public actor RelayConnection {
 
     /// Subscriptions the relay closed with `auth-required:`, re-requested
     /// automatically after the next successful authentication (NIP-42).
-    var subscriptionsAwaitingAuthentication: Set<String> = []
+    var subscriptionsAwaitingAuthentication: Set<SubscriptionID> = []
 
     /// Continuations suspended in ``waitForAuthentication()``, settled by the
     /// receive loop when an AUTH round-trip concludes.
@@ -468,7 +468,7 @@ public actor RelayConnection {
         Task {
             for subscriptionID in awaiting {
                 guard let filters = subscriptions[subscriptionID] else { continue }
-                try? await subscribe(subscriptionID: subscriptionID, filters: filters)
+                try? await subscribe(id: subscriptionID, filters: filters)
             }
         }
     }
@@ -496,7 +496,7 @@ public actor RelayConnection {
         // only afterwards, the REQ would register a subscription its caller already ended. A
         // `.count` message is intentionally not tracked: it is a one-shot request that must never
         // be replayed on reconnect.
-        var request: (subscriptionID: String, token: UInt64)?
+        var request: (subscriptionID: SubscriptionID, token: UInt64)?
         switch message {
         case .request(let subscriptionID, let filters):
             lastSubscriptionRequestToken &+= 1
@@ -556,7 +556,8 @@ public actor RelayConnection {
     /// had before — none for a new subscription — unless the ID changed hands while it was in
     /// flight: a newer subscribe's registration is not clobbered, and one an unsubscribe removed is
     /// not resurrected.
-    private func finishSubscriptionRequest(_ request: (subscriptionID: String, token: UInt64), succeeded: Bool) {
+    private func finishSubscriptionRequest(_ request: (subscriptionID: SubscriptionID, token: UInt64), succeeded: Bool)
+    {
         guard let inFlight = subscriptionRequestsInFlight[request.subscriptionID],
             inFlight.token == request.token
         else { return }
@@ -567,7 +568,7 @@ public actor RelayConnection {
 
     /// Forgets a subscription, including any REQ for it still in flight, so neither a reconnection
     /// nor a failing REQ brings it back.
-    private func forgetSubscription(_ subscriptionID: String) {
+    private func forgetSubscription(_ subscriptionID: SubscriptionID) {
         subscriptions.removeValue(forKey: subscriptionID)
         subscriptionRequestsInFlight.removeValue(forKey: subscriptionID)
     }
@@ -863,7 +864,7 @@ public actor RelayConnection {
         }
 
         let timeout = timeout ?? config.queryTimeout
-        let subscriptionID = "count-" + String(UUID().uuidString.prefix(12))
+        let subscriptionID = SubscriptionID.random()
         let (stream, continuation) = AsyncThrowingStream<EventCount, any Swift.Error>.makeStream()
         pendingCountWaiters[subscriptionID] = continuation
 
@@ -903,10 +904,10 @@ public actor RelayConnection {
     /// established.
     ///
     /// The subscription is re-requested after every automatic reconnection until
-    /// ``unsubscribe(subscriptionID:)`` or ``disconnect()``.
+    /// ``unsubscribe(id:)`` or ``disconnect()``.
     ///
     /// - Throws: Everything ``connect()`` throws, or what ``send(_:)`` throws.
-    public func subscribe(subscriptionID: String, filters: [Filter]) async throws {
+    public func subscribe(id subscriptionID: SubscriptionID, filters: [Filter]) async throws {
         if state != .connected {
             try await connect()
         }
@@ -921,7 +922,7 @@ public actor RelayConnection {
     /// nothing, and it never connects — a dropped socket took the relay's subscription with it. A
     /// CLOSE that fails to send is not reported: the failure discards the socket, and the relay's
     /// subscription with it.
-    public func unsubscribe(subscriptionID: String) async {
+    public func unsubscribe(id subscriptionID: SubscriptionID) async {
         guard subscriptions[subscriptionID] != nil else { return }
         forgetSubscription(subscriptionID)
         guard state == .connected else { return }
@@ -933,7 +934,7 @@ public actor RelayConnection {
     ///
     /// A stream is bound to the connection, not to one socket: it survives automatic reconnections
     /// and keeps delivering from the new session. Taking a stream before connecting is the normal
-    /// way to use it — register first, then ``connect()`` and ``subscribe(subscriptionID:filters:)``
+    /// way to use it — register first, then ``connect()`` and ``subscribe(id:filters:)``
     /// — so a stream taken while disconnected stays open and begins delivering when the next
     /// session arrives, rather than finishing on the spot.
     ///
@@ -1010,12 +1011,12 @@ public actor RelayConnection {
     }
 
     /// Checks if a subscription is active
-    public func hasSubscription(_ subscriptionID: String) -> Bool {
+    public func hasSubscription(_ subscriptionID: SubscriptionID) -> Bool {
         subscriptions[subscriptionID] != nil
     }
 
     /// Returns all active subscription IDs
-    public func activeSubscriptions() -> Set<String> {
+    public func activeSubscriptions() -> Set<SubscriptionID> {
         Set(subscriptions.keys)
     }
 

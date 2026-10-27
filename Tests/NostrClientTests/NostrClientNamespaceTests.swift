@@ -126,7 +126,7 @@ struct NostrClientNamespaceTests {
         let subscription = try await subscriptions.subscribe(filters: [Filter(kinds: [.textNote], limit: 1)])
         #expect(await client.activeSubscriptionCount == 1)
 
-        await subscriptions.unsubscribe(subscriptionID: subscription.id)
+        await subscriptions.unsubscribe(id: subscription.id)
         #expect(await client.activeSubscriptionCount == 0)
 
         _ = try await subscriptions.globalFeed(limit: 1)

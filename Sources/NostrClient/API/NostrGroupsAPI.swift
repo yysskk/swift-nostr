@@ -110,7 +110,7 @@ public struct NostrGroupsAPI: NostrGroupManaging {
             since: since,
             limit: limit
         )
-        return try await client.subscribe(filters: [filter], toURLs: [relayURL])
+        return try await client.pool.subscribe(filters: [filter], to: [relayURL])
     }
 
     // MARK: - Membership list (NIP-51 kind 10009)

@@ -22,7 +22,7 @@ struct RequestResponseSessionTests {
         case rejected
     }
 
-    private static let subscriptionID = "test-responses"
+    private static let subscriptionID: SubscriptionID = "test-responses"
 
     private func makeSession(_ transport: FakeTransport) -> Session {
         Session(transport: transport, mapError: TestError.session)
@@ -495,8 +495,8 @@ private actor EndCounter {
 private actor FakeTransport: RelayTransport {
     enum Operation: Equatable {
         case connect
-        case subscribe(String)
-        case unsubscribe(String)
+        case subscribe(SubscriptionID)
+        case unsubscribe(SubscriptionID)
         case send(String)
     }
 
@@ -523,11 +523,11 @@ private actor FakeTransport: RelayTransport {
         isConnected = true
     }
 
-    func subscribe(id: String, filters: [Filter]) async throws(RelayConnection.Error) {
+    func subscribe(id: SubscriptionID, filters: [Filter]) async throws(RelayConnection.Error) {
         log.append(.subscribe(id))
     }
 
-    func unsubscribe(id: String) async {
+    func unsubscribe(id: SubscriptionID) async {
         log.append(.unsubscribe(id))
     }
 

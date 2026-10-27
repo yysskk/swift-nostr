@@ -39,13 +39,6 @@ public actor NostrClient {
     /// ``NostrIdentityAPI/authenticationMode``.
     var currentAuthenticationMode: AuthenticationMode = .automatic
 
-    /// Subscription counter for generating unique IDs
-    var subscriptionCounter: Int = 0
-
-    /// Active subscriptions, keyed by subscription id.
-    /// Named for the state it holds rather than the ``subscriptions`` namespace accessor.
-    var openSubscriptions: [String: SubscriptionState] = [:]
-
     /// Per-public-key NIP-65 relay list cache and outbox/gossip resolver
     let relayListStore: RelayListStore
 
