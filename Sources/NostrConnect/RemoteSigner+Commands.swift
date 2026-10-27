@@ -40,11 +40,11 @@ extension RemoteSigner {
         guard let signed = try? JSONDecoder().decode(Event.self, from: Data(result.utf8)) else {
             throw RemoteSignerError.responseDecodingFailed
         }
-        // verify() only proves the returned event is self-consistent (its id/sig match its own
+        // isValid only proves the returned event is self-consistent (its id/sig match its own
         // public key), not that it was signed by the expected key. Require the signer to have authored
         // it under the public key the caller asked for, so a validly-signed event from a different key
         // cannot be substituted.
-        guard (try? signed.verify()) == true,
+        guard signed.isValid,
             signed.publicKey == event.publicKey,
             signed.kind == event.kind,
             signed.content == event.content,

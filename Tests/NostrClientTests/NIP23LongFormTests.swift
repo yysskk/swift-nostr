@@ -111,14 +111,14 @@ struct NIP23LongFormTests {
     func signDraftKind() throws {
         let event = try makeSigner().sign(.longFormContent(LongFormContent(identifier: "d"), draft: true))
         #expect(event.kind == .longFormDraft)
-        #expect(try event.verify())
+        try event.verify()
     }
 
     @Test("longFormContent(_:draft: false) signs a kind 30023 event")
     func signArticleKind() throws {
         let event = try makeSigner().sign(.longFormContent(LongFormContent(identifier: "d"), draft: false))
         #expect(event.kind == .longFormContent)
-        #expect(try event.verify())
+        try event.verify()
     }
 
     @Test("publishedAt is auto-filled when nil")

@@ -137,7 +137,7 @@ struct DirectMessageRelayListTests {
         #expect(event.kind == 10050)
         #expect(event.content == "")
         #expect(event.tags == list.tags)
-        #expect(try event.verify())
+        try event.verify()
     }
 
     @Test("Sign DM relay list from relay URLs")

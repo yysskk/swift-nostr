@@ -26,7 +26,7 @@ struct PublishedEventTests {
 
         #expect(published.event.kind == .textNote)
         #expect(published.event.content == "hello nostr")
-        #expect(try published.event.verify())
+        try published.event.verify()
         #expect(published.result.acceptedRelays == [relayURL])
         await client.relays.disconnect()
     }

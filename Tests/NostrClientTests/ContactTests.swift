@@ -218,7 +218,7 @@ struct ContactListEventTests {
         #expect(event.tags[0].rawArray == ["p", publicKey1.hex, "wss://relay1.com", "alice"])
         #expect(event.tags[1].rawArray == ["p", publicKey2.hex, "wss://relay2.com"])
         #expect(event.tags[2].rawArray == ["p", publicKey3.hex])
-        #expect(try event.verify())
+        try event.verify()
     }
 
     @Test("Contacts without a relay or petname become bare p tags")

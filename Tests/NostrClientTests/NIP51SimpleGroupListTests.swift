@@ -212,7 +212,7 @@ struct NIP51SimpleGroupListTests {
 
         let event = try await signer.sign(EventTemplate.list(typed.list, encryptingWith: signer))
         #expect(event.kind == .simpleGroupList)
-        #expect(try event.verify())
+        try event.verify()
         // The private entries are encrypted: the content leaks neither ("-" and " " are
         // not base64 alphabet characters, so these strings cannot appear by chance).
         #expect(!event.content.isEmpty)
@@ -383,7 +383,7 @@ struct NIP51SimpleGroupListClientTests {
             ]
         )
         #expect(sentFirst.content == "")
-        #expect(try sentFirst.verify())
+        try sentFirst.verify()
         #expect(published.event == sentFirst)
         #expect(Set(published.result.acceptedRelays) == [firstRelayURL, secondRelayURL])
         await client.relays.disconnect()

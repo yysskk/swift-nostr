@@ -109,7 +109,7 @@ before it is returned:
 
 ```swift
 let signed = try await signer.sign(.textNote("Signed by my bunker"))
-print(signed.id, try signed.verify())
+print(signed.id, signed.isValid)
 ```
 
 ## Handle Authentication Challenges

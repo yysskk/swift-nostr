@@ -133,12 +133,12 @@ public struct EventSigner: Sendable {
 
 // MARK: - Event Verification
 extension Event {
-    /// Verifies the event's id and signature.
-    /// - Returns: Whether ``signature`` is a valid Schnorr signature by ``publicKey`` over ``id``.
+    /// Verifies the event's id and signature, throwing if either does not check out.
     /// - Throws: ``Event/VerificationError/idMismatch`` if ``id`` is not the hash of the event's
     ///   other fields; ``Event/VerificationError/missingSignature`` if the event is an unsigned
-    ///   rumor (``signature`` is `nil`).
-    public func verify() throws(Event.VerificationError) -> Bool {
+    ///   rumor (``signature`` is `nil`); ``Event/VerificationError/invalidSignature`` if
+    ///   ``signature`` is not a valid Schnorr signature by ``publicKey`` over ``id``.
+    public func verify() throws(Event.VerificationError) {
         // Reconstruct the unsigned event
         let unsigned = UnsignedEvent(
             publicKey: publicKey,
@@ -165,19 +165,29 @@ extension Event {
         // the lengths are guaranteed by the types rather than checked here — and `SchnorrSignature`
         // rejects nothing but a buffer that is not 64 bytes, so its parse cannot fail either.
         let xonlyKey = P256K.Schnorr.XonlyKey(dataRepresentation: publicKey.data, keyParity: 0)
-        guard let schnorrSignature = try? P256K.Schnorr.SchnorrSignature(dataRepresentation: signature.data) else {
-            return false
+        guard let schnorrSignature = try? P256K.Schnorr.SchnorrSignature(dataRepresentation: signature.data),
+            xonlyKey.isValidSignature(schnorrSignature, for: hash)
+        else {
+            throw .invalidSignature
         }
-
-        return xonlyKey.isValidSignature(schnorrSignature, for: hash)
     }
 
-    /// Why ``Event/verify()`` could not check an event's signature.
+    /// Whether the event's id and signature verify.
+    ///
+    /// The convenience for when the reason does not matter; ``verify()`` throws it as an error.
+    public var isValid: Bool {
+        (try? verify()) != nil
+    }
+
+    /// Why an event failed ``Event/verify()``.
     public enum VerificationError: Swift.Error, LocalizedError, Sendable, Equatable {
         /// The event's ``Event/id`` is not the hash of its other fields.
         case idMismatch
         /// The event is an unsigned rumor: its ``Event/signature`` is `nil`.
         case missingSignature
+        /// The event's ``Event/signature`` is not a valid Schnorr signature by its
+        /// ``Event/publicKey`` over its ``Event/id``.
+        case invalidSignature
 
         public var errorDescription: String? {
             switch self {
@@ -185,6 +195,8 @@ extension Event {
                 return "The event id does not match the hash of its contents"
             case .missingSignature:
                 return "The event has no signature"
+            case .invalidSignature:
+                return "The event signature is not valid"
             }
         }
     }

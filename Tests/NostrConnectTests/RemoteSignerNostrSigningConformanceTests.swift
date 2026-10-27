@@ -80,7 +80,7 @@ struct RemoteSignerNostrSigningConformanceTests {
                 requestID: request.id, result: json, client: client, signer: signer))
 
         let event = try await signed
-        #expect(try event.verify())
+        try event.verify()
         #expect(event.kind == .textNote)
         #expect(event.content == "hello via protocol")
         #expect(event.publicKey == signer.publicKey)

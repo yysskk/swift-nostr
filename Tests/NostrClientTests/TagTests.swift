@@ -238,7 +238,7 @@ struct TagTests {
         let signer = EventSigner(keyPair: KeyPair())
         let event = signer.sign(.textNote("hi", tags: [.hashtag("nostr")]))
         #expect(event.tags.map(\.rawArray) == [["t", "nostr"]])
-        #expect(try event.verify())
+        try event.verify()
     }
 
     // MARK: - Event Accessors

@@ -107,6 +107,6 @@ struct EventKindTests {
         )
         let event = try signer.sign(unsigned)
         #expect(event.kind.rawValue == 31337)
-        #expect(try event.verify())
+        try event.verify()
     }
 }

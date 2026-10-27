@@ -26,7 +26,7 @@ struct NIP56ReportTests {
         #expect(event.kind == .report)
         #expect(event.content == "explicit content")
         #expect(event.tags.contains(Event.Tag(rawArray: ["p", target.publicKey.hex, "nudity"])))
-        #expect(try event.verify())
+        try event.verify()
     }
 
     @Test("report(_:type:reason:) of a public key supports impersonation, the spec's canonical example")
@@ -39,7 +39,7 @@ struct NIP56ReportTests {
         #expect(event.kind == .report)
         #expect(event.content.isEmpty)
         #expect(event.tags.contains(Event.Tag(rawArray: ["p", target.publicKey.hex, "impersonation"])))
-        #expect(try event.verify())
+        try event.verify()
     }
 
     @Test("report(_:type:reason:) of an event tags the event with a type and names the author with a bare p tag")
@@ -56,7 +56,7 @@ struct NIP56ReportTests {
         // The author is named by a bare "p" tag carrying no report type.
         let authorTag = event.tags(named: "p").first
         #expect(authorTag?.rawArray == ["p", note.publicKey.hex])
-        #expect(try event.verify())
+        try event.verify()
     }
 
     @Test("report(_:type:reason:) of an event keeps the author p tag even when the reason is empty")
@@ -71,7 +71,7 @@ struct NIP56ReportTests {
         #expect(event.tags.contains(Event.Tag(rawArray: ["e", note.id.hex, "spam"])))
         let authorTag: Event.Tag? = event.tags(named: "p").first
         #expect(authorTag?.rawArray == ["p", note.publicKey.hex])
-        #expect(try event.verify())
+        try event.verify()
     }
 
     @Test("publishReport(publicKey:) without a signer throws signerNotSet")

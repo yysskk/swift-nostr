@@ -65,8 +65,7 @@ struct EventTests {
         #expect(signed.content == "Test message")
 
         // Verify the signature
-        let isValid = try signed.verify()
-        #expect(isValid)
+        try signed.verify()
     }
 
     @Test("Sign a text note template")
@@ -77,7 +76,7 @@ struct EventTests {
 
         #expect(event.kind == 1)
         #expect(event.content == "Hello!")
-        #expect(try event.verify())
+        try event.verify()
     }
 
     @Test("Sign metadata event")
@@ -95,7 +94,7 @@ struct EventTests {
 
         #expect(event.kind == 0)
         #expect(event.content.contains("TestUser"))
-        #expect(try event.verify())
+        try event.verify()
     }
 
     @Test("Sign reaction event")
@@ -112,7 +111,7 @@ struct EventTests {
         #expect(reaction.content == "🤙")
         #expect(reaction.tags.contains { $0.name == .event && $0.primaryValue == targetEvent.id.hex })
         #expect(reaction.tags.contains { $0.name == .publicKey && $0.primaryValue == targetEvent.publicKey.hex })
-        #expect(try reaction.verify())
+        try reaction.verify()
     }
 
     @Test("Event kind constants")

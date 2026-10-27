@@ -418,7 +418,7 @@ struct NIP01VectorTests {
     @Test("pinned bip-340 signatures verify", arguments: signatureVectors)
     func pinnedSignaturesVerify(_ vector: SignatureVector) throws {
         #expect(try vector.unsignedEvent.computedID.hex == vector.id)
-        #expect(try vector.event().verify())
+        try vector.event().verify()
     }
 
     /// A one-character change to the content must change the id. With the pinned id left in
@@ -443,7 +443,7 @@ struct NIP01VectorTests {
     }
 
     /// Corrupting the signature alone leaves the id consistent, so verification gets all the
-    /// way to schnorr and must return `false` rather than throw.
+    /// way to schnorr, which must reject it.
     @Test("a corrupted signature fails verification")
     func corruptedSignatureFailsVerification() throws {
         let vector = Self.signatureVectors[0]
@@ -451,6 +451,8 @@ struct NIP01VectorTests {
         // right length so the failure comes from schnorr and not from decoding.
         let corruptedSig = vector.sig.dropLast() + (vector.sig.hasSuffix("0") ? "1" : "0")
 
-        #expect(try vector.event(sig: String(corruptedSig)).verify() == false)
+        #expect(throws: Event.VerificationError.invalidSignature) {
+            try vector.event(sig: String(corruptedSig)).verify()
+        }
     }
 }

@@ -24,7 +24,7 @@ struct NostrSigningTests {
         #expect(event.publicKey == keyPair.publicKey)
         #expect(event.kind == .textNote)
         #expect(event.content == "hello")
-        #expect(try event.verify())
+        try event.verify()
     }
 
     @Test("sign(_:) signs a template under the signer's public key through any NostrSigning")
@@ -41,7 +41,7 @@ struct NostrSigningTests {
         #expect(event.tags.map(\.rawArray) == [["t", "nostr"]])
         #expect(event.content == "hello")
         #expect(event.createdAt == template.createdAt)
-        #expect(try event.verify())
+        try event.verify()
     }
 
     @Test("an EventSigner signs a template synchronously in async code, without await")
@@ -53,7 +53,7 @@ struct NostrSigningTests {
 
         #expect(event.publicKey == keyPair.publicKey)
         #expect(event.content == "gm")
-        #expect(try event.verify())
+        try event.verify()
     }
 
     @Test("sign(_:) resolves the public key of a signer that is not an EventSigner")
@@ -65,7 +65,7 @@ struct NostrSigningTests {
 
         #expect(event.publicKey == keyPair.publicKey)
         #expect(event.content == "hello")
-        #expect(try event.verify())
+        try event.verify()
     }
 
     @Test("a zap request is signed by a signer that is not an EventSigner (NIP-57)")
@@ -80,7 +80,7 @@ struct NostrSigningTests {
         #expect(zap.publicKey == keyPair.publicKey)
         #expect(zap.firstTagValue(named: "p") == PublicKey.fixture("recipient").hex)
         #expect(zap.firstTagValue(named: "amount") == "21000")
-        #expect(try zap.verify())
+        try zap.verify()
     }
 
     @Test("NIP-44 encrypt then decrypt round-trips through any NostrSigning")

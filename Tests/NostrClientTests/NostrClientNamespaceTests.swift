@@ -86,7 +86,7 @@ struct NostrClientNamespaceTests {
 
         let signed = try await identity.sign(.textNote("signed"))
         #expect(signed.publicKey == keyPair.publicKey)
-        #expect(try signed.verify())
+        try signed.verify()
 
         let peer = KeyPair()
         let payload = try await identity.nip44Encrypt("sealed", to: peer.publicKey)

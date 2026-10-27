@@ -57,7 +57,7 @@ struct HTTPAuthTests {
         #expect(event.publicKey == signer.keyPair.publicKey)
         #expect(event.createdAt.rawValue == 1_682_327_852)
         #expect(event.tags.map(\.rawArray) == [["u", url.absoluteString], ["method", "GET"]])
-        #expect(try event.verify())
+        try event.verify()
     }
 
     @Test("the header value is the Nostr scheme plus the base64 event JSON")

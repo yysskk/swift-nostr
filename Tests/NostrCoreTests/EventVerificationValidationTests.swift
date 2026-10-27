@@ -69,7 +69,7 @@ struct EventVerificationValidationTests {
     @Test("a signed event does not decode under a padded spelling of its own public key")
     func paddedPublicKeyIsRejected() throws {
         let event = try EventSigner(privateKeyHex: Self.secretKeyHex).sign(.textNote("gm"))
-        #expect(try event.verify())
+        try event.verify()
 
         let json = try eventJSON(overriding: ["pubkey": event.publicKey.hex + "00"])
 
@@ -82,7 +82,7 @@ struct EventVerificationValidationTests {
     func genuineEventVerifies() throws {
         let event = try JSONDecoder().decode(Event.self, from: try eventJSON())
 
-        #expect(try event.verify())
+        try event.verify()
     }
 
     @Test("an event with a signature from another key does not verify")
@@ -93,7 +93,9 @@ struct EventVerificationValidationTests {
             id: event.id, publicKey: event.publicKey, createdAt: event.createdAt, kind: event.kind,
             tags: event.tags, content: event.content, signature: other.signature)
 
-        #expect(try forged.verify() == false)
+        #expect(throws: Event.VerificationError.invalidSignature) {
+            try forged.verify()
+        }
     }
 
     @Test("an unsigned rumor does not verify")

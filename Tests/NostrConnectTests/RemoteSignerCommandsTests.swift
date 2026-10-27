@@ -85,7 +85,7 @@ struct RemoteSignerCommandsTests {
                 requestID: request.id, result: json, client: client, signer: signer))
 
         let event = try await signed
-        #expect(try event.verify() == true)
+        try event.verify()
         #expect(event.kind == .textNote)
         #expect(event.content == "hello from the bunker")
         #expect(event.tags.map(\.rawArray) == [["t", "nostr"]])

@@ -47,7 +47,7 @@ struct ProofOfWorkTests {
 
     @Test("spec example event has a valid signature")
     func specVectorSignatureVerifies() throws {
-        #expect(try specEvent.verify())
+        try specEvent.verify()
     }
 
     // MARK: - Difficulty Edges
@@ -109,7 +109,7 @@ struct ProofOfWorkTests {
 
         let signed = try signer.sign(mined)
         #expect(ProofOfWork.difficulty(of: signed.id) >= difficulty)
-        #expect(try signed.verify())
+        try signed.verify()
         #expect(ProofOfWork.validate(event: signed, minimumDifficulty: difficulty))
     }
 
@@ -168,7 +168,7 @@ struct ProofOfWorkTests {
         #expect(signed.tags(named: .nonce).count == 1)
         #expect(signed.tags.contains(.hashtag("nostr")))
         #expect(ProofOfWork.difficulty(of: signed.id) >= 8)
-        #expect(try signed.verify())
+        try signed.verify()
         #expect(ProofOfWork.validate(event: signed, minimumDifficulty: 8))
     }
 
@@ -180,7 +180,7 @@ struct ProofOfWorkTests {
         let signed = try await signer.sign(.textNote("mined remotely"), proofOfWork: 8)
 
         #expect(signed.publicKey == keyPair.publicKey)
-        #expect(try signed.verify())
+        try signed.verify()
         #expect(ProofOfWork.validate(event: signed, minimumDifficulty: 8))
     }
 
