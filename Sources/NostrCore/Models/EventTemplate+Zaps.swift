@@ -16,7 +16,7 @@ extension EventTemplate {
     ///   - lnurl: The recipient's lnurl-pay URL, bech32-encoded with the `lnurl` prefix. Recommended.
     ///   - eventID: The id of the event being zapped, when zapping an event rather than a person
     ///     (the `e` tag).
-    ///   - eventCoordinate: An event coordinate when zapping an addressable event (the `a` tag).
+    ///   - eventCoordinate: The coordinate of the addressable event being zapped, if any (the `a` tag).
     ///   - comment: An optional message sent with the payment (the event content).
     /// - Returns: The template for the zap request.
     /// - Throws: ``EventTemplate/ZapRequestError/missingRelays`` if `relays` is empty.
@@ -26,7 +26,7 @@ extension EventTemplate {
         amountMillisats: Int64? = nil,
         lnurl: String? = nil,
         eventID: EventID? = nil,
-        eventCoordinate: String? = nil,
+        eventCoordinate: EventCoordinate? = nil,
         comment: String = ""
     ) throws(ZapRequestError) -> EventTemplate {
         // NIP-57 requires at least one relay so the recipient's wallet knows where to publish the
@@ -49,7 +49,7 @@ extension EventTemplate {
             tags.append(.event(eventID))
         }
         if let eventCoordinate {
-            tags.append(Tag(name: .address, values: [eventCoordinate]))
+            tags.append(.address(eventCoordinate))
         }
 
         return EventTemplate(kind: .zapRequest, tags: tags, content: comment)

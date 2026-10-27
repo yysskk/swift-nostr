@@ -693,7 +693,8 @@ if let invoice = Bolt11Invoice(bolt11) {
 // 4. When the kind-9735 zap receipt arrives over relays, verify it is authentic.
 if let receipt = ZapReceipt(event: receiptEvent) {
     try receipt.validate(lnurlProviderPublicKey: providerPublicKey, expectedAmountMillisats: 21_000)
-    // receipt.recipientPublicKey, receipt.amountMillisats, receipt.zappedEventID, …
+    // receipt.recipientPublicKey, receipt.amountMillisats, receipt.zappedEventID,
+    // receipt.zappedEventCoordinate (an EventCoordinate), …
 }
 ```
 

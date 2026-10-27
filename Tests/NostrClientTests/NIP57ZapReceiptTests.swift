@@ -178,15 +178,25 @@ struct NIP57ZapReceiptTests {
         let payee = KeyPair()
         let sender = PublicKey.fixture("sender")
         let zapped = EventID.fixture("zapped")
+        let coordinate = EventCoordinate(kind: .longFormContent, publicKey: .fixture("author"), identifier: "post")
         let wellFormed = try #require(
-            ZapReceipt(event: try makeReceipt(signedBy: payee, tags: [["P", sender.hex], ["e", zapped.hex]])))
+            ZapReceipt(
+                event: try makeReceipt(
+                    signedBy: payee,
+                    tags: [
+                        ["P", sender.hex], ["e", zapped.hex], ["a", "30023:\(PublicKey.fixture("author").hex):post"],
+                    ])))
         let malformed = try #require(
-            ZapReceipt(event: try makeReceipt(signedBy: payee, tags: [["P", "sender"], ["e", "zapped"]])))
+            ZapReceipt(
+                event: try makeReceipt(
+                    signedBy: payee, tags: [["P", "sender"], ["e", "zapped"], ["a", "30023:author:post"]])))
 
         #expect(wellFormed.senderPublicKey == sender)
         #expect(wellFormed.zappedEventID == zapped)
+        #expect(wellFormed.zappedEventCoordinate == coordinate)
         #expect(malformed.senderPublicKey == nil)
         #expect(malformed.zappedEventID == nil)
+        #expect(malformed.zappedEventCoordinate == nil)
     }
 
     /// A non-numeric amount read as "no amount at all", quietly dropping the comparison against the

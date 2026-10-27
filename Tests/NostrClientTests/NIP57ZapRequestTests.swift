@@ -78,8 +78,9 @@ struct NIP57ZapRequestTests {
         let event = try signer.sign(
             .zapRequest(
                 to: .fixture("recipient"), relays: [RelayURL("wss://r.example.com")!],
-                eventCoordinate: "30023:author:identifier"))
-        #expect(event.firstTagValue(named: "a") == "30023:author:identifier")
+                eventCoordinate: EventCoordinate(
+                    kind: .longFormContent, publicKey: .fixture("author"), identifier: "identifier")))
+        #expect(event.firstTagValue(named: "a") == "30023:\(PublicKey.fixture("author").hex):identifier")
     }
 
     // MARK: - LNURL resolution

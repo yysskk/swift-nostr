@@ -246,7 +246,7 @@ struct NIP51SetTests {
     func coordinate() throws {
         let author = PublicKey.fixture("author")
         let set = try NostrListSet(kind: .bookmarkSet, identifier: "reading")
-        #expect(set.coordinate(author: author) == "30003:\(author.hex):reading")
+        #expect(set.coordinate(author: author).description == "30003:\(author.hex):reading")
     }
 
     @Test("naddr round-trips and matches NAddr(event:)")
@@ -269,6 +269,8 @@ struct NIP51SetTests {
         #expect(fromEvent.identifier == naddr.identifier)
         #expect(fromEvent.author == naddr.author)
         #expect(fromEvent.kind == naddr.kind)
+        #expect(naddr.coordinate == set.coordinate(author: signer.publicKey))
+        #expect(event.coordinate == naddr.coordinate)
     }
 
     // MARK: - Lossless read-modify-write

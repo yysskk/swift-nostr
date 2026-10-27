@@ -247,7 +247,8 @@ struct EventTemplateTests {
             amountMillisats: 21000,
             lnurl: "lnurl1example",
             eventID: .fixture("note"),
-            eventCoordinate: "30023:author:identifier",
+            eventCoordinate: EventCoordinate(
+                kind: .longFormContent, publicKey: .fixture("author"), identifier: "identifier"),
             comment: "great post"
         )
 
@@ -260,7 +261,7 @@ struct EventTemplateTests {
                 ["amount", "21000"],
                 ["lnurl", "lnurl1example"],
                 ["e", EventID.fixture("note").hex],
-                ["a", "30023:author:identifier"],
+                ["a", "30023:\(PublicKey.fixture("author").hex):identifier"],
             ])
     }
 

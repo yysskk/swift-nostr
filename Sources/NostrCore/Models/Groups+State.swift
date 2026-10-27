@@ -437,9 +437,8 @@ extension Groups {
     public enum PinnedItem: Sendable, Hashable {
         /// A pinned event, referenced by id in an "e" tag.
         case event(id: EventID)
-        /// A pinned addressable event, referenced by its "kind:pubkey:identifier"
-        /// coordinate in an "a" tag.
-        case address(String)
+        /// A pinned addressable event, referenced by its coordinate in an "a" tag.
+        case address(EventCoordinate)
     }
 
     /// A group's kind-39005 pin list, generated and signed by the group's relay.
@@ -461,8 +460,9 @@ extension Groups {
 
         /// Parses a relay-generated kind-39005 pin list event.
         ///
-        /// An "e" tag whose value is not a canonical hex event id is skipped. Never verifies the event signature — callers check ``Event/verify()``
-        /// themselves.
+        /// An "e" tag whose value is not a canonical hex event id, or an "a" tag whose value is not
+        /// a valid ``EventCoordinate``, is skipped. Never verifies the event signature — callers
+        /// check ``Event/verify()`` themselves.
         ///
         /// - Parameters:
         ///   - event: The kind-39005 event to parse.
@@ -477,7 +477,7 @@ extension Groups {
                 case .event:
                     return tag.primaryValue.flatMap(EventID.init).map { PinnedItem.event(id: $0) }
                 case .address:
-                    return tag.primaryValue.map { PinnedItem.address($0) }
+                    return tag.primaryValue.flatMap(EventCoordinate.init).map { PinnedItem.address($0) }
                 default:
                     return nil
                 }
@@ -492,8 +492,8 @@ extension Groups {
                     switch item {
                     case .event(let id):
                         return .event(id)
-                    case .address(let address):
-                        return Tag(name: .address, values: [address])
+                    case .address(let coordinate):
+                        return .address(coordinate)
                     }
                 }
         }

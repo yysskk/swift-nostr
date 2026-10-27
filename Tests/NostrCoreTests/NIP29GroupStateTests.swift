@@ -259,9 +259,10 @@ struct NIP29GroupStateTests {
         let first = EventID.fixture("first")
         let second = EventID.fixture("second")
         let address = "39000:\(String(repeating: "b", count: 64)):abcdef"
+        let coordinate = try #require(EventCoordinate(address))
         let list = Groups.PinList(
             groupID: "abcdef",
-            items: [.event(id: first), .address(address), .event(id: second)]
+            items: [.event(id: first), .address(coordinate), .event(id: second)]
         )
 
         #expect(
@@ -271,12 +272,12 @@ struct NIP29GroupStateTests {
         let event = try stateEvent(kind: .groupPinList, tags: list.tags, signer: relay)
         let parsed = try Groups.PinList(event: event)
         #expect(parsed == list)
-        #expect(parsed.items == [.event(id: first), .address(address), .event(id: second)])
+        #expect(parsed.items == [.event(id: first), .address(coordinate), .event(id: second)])
     }
 
-    /// State events come from the group's relay, so a "p" or "e" value that is not a canonical key
-    /// or id is dropped while the well-formed entries around it are kept.
-    @Test("admin, member, and pin lists skip entries whose key or id is malformed")
+    /// State events come from the group's relay, so a "p", "e", or "a" value that is not a canonical
+    /// key, id, or coordinate is dropped while the well-formed entries around it are kept.
+    @Test("admin, member, and pin lists skip entries whose key, id, or coordinate is malformed")
     func listsSkipMalformedEntries() throws {
         let relay = EventSigner(keyPair: KeyPair())
         let member = PublicKey.fixture("member")
@@ -298,7 +299,11 @@ struct NIP29GroupStateTests {
 
         let pins = try stateEvent(
             kind: .groupPinList,
-            tags: [.identifier("abcdef"), Event.Tag(name: .event, values: ["not-an-id"]), .event(pinned)], signer: relay
+            tags: [
+                .identifier("abcdef"), Event.Tag(name: .event, values: ["not-an-id"]), .event(pinned),
+                Event.Tag(name: .address, values: ["39000:pubkey:abcdef"]),
+            ],
+            signer: relay
         )
         #expect(try Groups.PinList(event: pins).items == [.event(id: pinned)])
     }

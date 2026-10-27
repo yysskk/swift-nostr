@@ -97,9 +97,9 @@ public struct NostrListSet: Sendable, Hashable {
     /// rather than as free-form public items, so they are never emitted twice.
     static let reservedTagNames: Set<Tag.Name> = [.identifier, "title", "image", "description"]
 
-    /// The `kind:pubkey:identifier` coordinate used in `a`-tag references to this set.
-    public func coordinate(author: PublicKey) -> String {
-        "\(kind.rawValue):\(author.hex):\(identifier)"
+    /// The coordinate used in `a`-tag references to this set for `author`.
+    public func coordinate(author: PublicKey) -> EventCoordinate {
+        EventCoordinate(kind: kind, publicKey: author, identifier: identifier)
     }
 
     /// A NIP-19 `naddr` addressing this set for `author`.

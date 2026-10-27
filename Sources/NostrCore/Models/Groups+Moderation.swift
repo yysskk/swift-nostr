@@ -72,8 +72,8 @@ extension Groups {
                     switch item {
                     case .event(let id):
                         return .event(id)
-                    case .address(let address):
-                        return Tag(name: .address, values: [address])
+                    case .address(let coordinate):
+                        return .address(coordinate)
                     }
                 }
             }
@@ -116,7 +116,8 @@ extension Groups {
         ///   ``ValidationError/missingGroupID(_:)`` when no non-empty "h" tag is present,
         ///   or ``ValidationError/missingTag(name:kind:)`` when a tag the kind requires is
         ///   absent. A "p" or "e" target whose value is not a canonical hex public key or event
-        ///   id counts as absent, and a pinned "e" item with such a value is skipped.
+        ///   id counts as absent, and a pinned "e" item with such a value, or a pinned "a" item whose
+        ///   value is not a valid ``EventCoordinate``, is skipped.
         public init(event: Event) throws(ValidationError) {
             guard Self.moderationKinds.contains(event.kind) else {
                 throw ValidationError.unsupportedModerationKind(event.kind)
@@ -166,7 +167,7 @@ extension Groups {
                         case .event:
                             return tag.primaryValue.flatMap(EventID.init).map { PinnedItem.event(id: $0) }
                         case .address:
-                            return tag.primaryValue.map { PinnedItem.address($0) }
+                            return tag.primaryValue.flatMap(EventCoordinate.init).map { PinnedItem.address($0) }
                         default:
                             return nil
                         }

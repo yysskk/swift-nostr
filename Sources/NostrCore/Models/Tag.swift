@@ -301,15 +301,10 @@ extension Tag {
         Tag(name: .word, values: [word])
     }
 
-    /// An "a" tag referencing an addressable event coordinate (NIP-01/NIP-51):
+    /// An "a" tag referencing a replaceable or addressable event by its coordinate (NIP-01/NIP-51):
     /// `["a", "kind:pubkey:identifier", relay?]`, with the relay URL in its canonical form.
-    public static func address(
-        kind: Event.Kind,
-        publicKey: PublicKey,
-        identifier: String,
-        relayURL: RelayURL? = nil
-    ) -> Tag {
-        var values = ["\(kind.rawValue):\(publicKey.hex):\(identifier)"]
+    public static func address(_ coordinate: EventCoordinate, relayURL: RelayURL? = nil) -> Tag {
+        var values = [coordinate.description]
         if let relayURL {
             values.append(relayURL.description)
         }

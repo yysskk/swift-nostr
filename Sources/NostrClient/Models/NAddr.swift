@@ -31,6 +31,11 @@ public struct NAddr: Sendable, Hashable {
         self.relays = try TLV.validatedRelays(relays)
     }
 
+    /// The event's coordinate, without the relay hints.
+    public var coordinate: EventCoordinate {
+        EventCoordinate(kind: Event.Kind(rawValue: kind), publicKey: author, identifier: identifier)
+    }
+
     /// Decodes an `naddr` bech32 string.
     /// - Throws: ``NIP19Entity/Error/invalidBech32(_:)`` if the string is not valid bech32,
     ///   ``NIP19Entity/Error/unexpectedPrefix(_:)`` if its prefix is not `naddr`,
