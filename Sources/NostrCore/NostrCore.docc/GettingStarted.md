@@ -49,7 +49,7 @@ print(Timestamp.now.rawValue, dayAgo.date)
 
 ## Sign and Verify
 
-An ``EventTemplate`` holds what you decide about an event — its kind, tags, content, and creation time. ``EventSigner`` signs it under its key into a complete ``Event``, and ``Event/verify()`` checks an event's id and signature.
+An ``EventTemplate`` holds what you decide about an event — its kind, tags, content, and creation time. ``EventSigner`` signs it under its key into a complete ``Event``, and ``Event/verify()`` checks an event's id and signature, throwing if either is wrong — ``Event/isValid`` is the same check as a `Bool`.
 
 ```swift
 let signer = EventSigner(keyPair: keyPair)
@@ -66,8 +66,7 @@ let custom = signer.sign(
         content: "gm")
 )
 
-let isValid = try note.verify()
-assert(isValid)
+try note.verify()
 ```
 
 A template's properties are mutable, so a factory's result can be adjusted before signing:

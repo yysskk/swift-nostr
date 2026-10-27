@@ -54,7 +54,7 @@ struct NIP29ModerationTemplateTests {
         let signed = EventSigner(keyPair: KeyPair()).sign(template)
 
         #expect(signed.createdAt == createdAt)
-        #expect(try signed.verify())
+        try signed.verify()
     }
 
     @Test("a put-user event carries the p tag with roles after the h tag")
@@ -178,7 +178,7 @@ struct NIP29ModerationTemplateTests {
         #expect(event.createdAt == createdAt)
         #expect(event.tags.map(\.rawArray) == [["h", "abcdef"], ["p", target.hex]])
         #expect(event.content == "spam")
-        #expect(try event.verify())
+        try event.verify()
     }
 }
 

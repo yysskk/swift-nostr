@@ -106,7 +106,9 @@ public struct GiftWrap: Sendable {
         }
 
         // Verify seal signature
-        guard try seal.verify() else {
+        do {
+            try seal.verify()
+        } catch .invalidSignature {
             throw Error.invalidSealSignature
         }
 

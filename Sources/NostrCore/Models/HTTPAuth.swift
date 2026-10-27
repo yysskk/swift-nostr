@@ -166,7 +166,7 @@ extension HTTPAuth {
         guard event.kind == .httpAuth else {
             throw ValidationError.invalidEventKind(event.kind)
         }
-        guard (try? event.verify()) == true else {
+        guard event.isValid else {
             throw ValidationError.invalidSignature
         }
         let skew = now.duration(to: event.createdAt)

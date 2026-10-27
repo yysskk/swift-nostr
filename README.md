@@ -235,7 +235,7 @@ let signer = RemoteSigner(bunker: try BunkerURI(string: "bunker://..."))
 // Prove the user's key and sign an event remotely — the signed event is verified locally.
 let userPublicKey = try await signer.userPublicKey()
 let signed = try await signer.sign(.textNote("Signed by my bunker"))
-print(signed.publicKey == userPublicKey, try signed.verify())
+print(signed.publicKey == userPublicKey, signed.isValid)
 ```
 
 Or start the handshake from the client: generate a `nostrconnect://` invitation, show it as a QR code or link, and wait for the signer to accept — its public key is discovered from the response, which is validated against the invitation secret.

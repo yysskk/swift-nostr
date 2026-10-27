@@ -30,7 +30,7 @@ struct NIP57ZapRequestTests {
             event.tags(named: "relays").first?.values == [
                 "wss://relay1.example.com", "wss://relay2.example.com",
             ])
-        #expect(try event.verify())
+        try event.verify()
     }
 
     @Test("zapRequest tags the event when zapping a note")

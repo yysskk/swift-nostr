@@ -13,7 +13,7 @@ import NostrCore
 
 let signer = try EventSigner(nsec: "nsec1...")
 let event = signer.sign(.textNote("Hello, Nostr!"))
-let isValid = try event.verify()
+try event.verify()
 ```
 
 ## Topics

@@ -121,7 +121,7 @@ struct NostrClientTargetedPublishTests {
 
         #expect(published.event.content == "templated")
         #expect(published.event.publicKey == keyPair.publicKey)
-        #expect(try published.event.verify())
+        try published.event.verify()
         #expect(sentToA == published.event)
         #expect(sentToC == published.event)
         #expect(published.result.acceptedRelays == [urlA, urlC])

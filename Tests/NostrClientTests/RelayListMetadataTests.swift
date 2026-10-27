@@ -214,7 +214,7 @@ struct RelayListMetadataEventTests {
         #expect(event.kind == 10002)
         #expect(event.content == "")
         #expect(event.tags == list.tags)
-        #expect(try event.verify())
+        try event.verify()
     }
 
     @Test("Sign relay list from read/write URLs")

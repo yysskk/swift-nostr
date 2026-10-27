@@ -139,7 +139,7 @@ struct ExtendingTheClientTests {
         #expect(sent.content == "Reading NIP-38")
         #expect(sent.tags.map(\.rawArray) == [["d", "general"], ["expiration", expiration.description]])
         #expect(sent.publicKey == signer.publicKey)
-        #expect(try sent.verify())
+        try sent.verify()
         #expect(published.result.statuses[relayURL] == .accepted)
         await client.relays.disconnect()
     }
@@ -180,7 +180,7 @@ struct ExtendingTheClientTests {
         #expect(request.content == "thanks")
         #expect(request.firstTagValue(named: "p") == recipient.hex)
         #expect(request.firstTagValue(named: "amount") == "21000")
-        #expect(try request.verify())
+        try request.verify()
     }
 
     @Test("a composed namespace fetches through client.events for client.identity's key")

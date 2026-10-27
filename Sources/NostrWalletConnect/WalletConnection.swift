@@ -339,7 +339,7 @@ public actor WalletConnection {
         // The relay filter already restricts authors, but enforce it here too as defense in depth —
         // and require the event to say what it was signed to say, so nothing downstream reads a
         // payload whose author has not actually vouched for it.
-        guard event.publicKey == walletPublicKey, (try? event.verify()) == true else { return }
+        guard event.publicKey == walletPublicKey, event.isValid else { return }
         switch event.kind {
         case .walletConnectResponse:
             await handleResponse(event)

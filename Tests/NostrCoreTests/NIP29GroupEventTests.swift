@@ -165,7 +165,7 @@ struct NIP29GroupEventTests {
             template.createdAt = createdAt
             let signed = signer.sign(template)
             #expect(signed.createdAt == createdAt)
-            #expect(try signed.verify())
+            try signed.verify()
         }
     }
 
@@ -182,7 +182,7 @@ struct NIP29GroupEventTests {
         #expect(event.createdAt == createdAt)
         #expect(event.tags.map(\.rawArray) == [["h", "abcdef"], ["code", "invite123"]])
         #expect(event.content == "let me in")
-        #expect(try event.verify())
+        try event.verify()
     }
 
     // MARK: Leave Requests
@@ -207,7 +207,7 @@ struct NIP29GroupEventTests {
         #expect(event.publicKey == signer.keyPair.publicKey)
         #expect(event.tags.map(\.rawArray) == [["h", "abcdef"]])
         #expect(event.content.isEmpty)
-        #expect(try event.verify())
+        try event.verify()
     }
 
     // MARK: Group-Scoped Content
@@ -262,7 +262,7 @@ struct NIP29GroupEventTests {
         #expect(event.createdAt == createdAt)
         #expect(event.tags.map(\.rawArray) == [["h", "abcdef"], ["previous", "00000001"]])
         #expect(event.content == "hello")
-        #expect(try event.verify())
+        try event.verify()
     }
 
     // MARK: Timeline Filters

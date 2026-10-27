@@ -32,7 +32,7 @@ enum VerifiedEventSelection {
             guard matches(event, kind: kind, author: author, identifier: identifier) else { continue }
             // Checked last: it is the expensive test, and the cheap coordinate checks have already
             // discarded most of what a misbehaving relay might send.
-            guard (try? event.verify()) == true else { continue }
+            guard event.isValid else { continue }
 
             if let current = newest {
                 let supersedes =
@@ -50,7 +50,7 @@ enum VerifiedEventSelection {
     /// A relay that ignores an id filter can substitute any event; without this the caller believes
     /// it holds the event it asked for.
     static func event(withID id: EventID, in events: [Event]) -> Event? {
-        events.first { $0.id == id && (try? $0.verify()) == true }
+        events.first { $0.id == id && $0.isValid }
     }
 
     private static func matches(

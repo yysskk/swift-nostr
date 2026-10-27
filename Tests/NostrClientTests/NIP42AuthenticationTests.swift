@@ -37,7 +37,7 @@ struct NIP42AuthenticationEventTests {
         #expect(event.firstTagValue(named: "relay") == "wss://relay.example.com")
         #expect(event.firstTagValue(named: "challenge") == "challengestringhere")
         #expect(event.content.isEmpty)
-        #expect(try event.verify())
+        try event.verify()
     }
 
     @Test("clientAuthentication timestamps the event with the current time")
@@ -254,7 +254,7 @@ struct NIP42RelayConnectionTests {
         #expect(sent.publicKey == signer.publicKey)
         #expect(sent.firstTagValue(named: "relay") == relayURL.description)
         #expect(sent.firstTagValue(named: "challenge") == "challengestringhere")
-        #expect(try sent.verify())
+        try sent.verify()
 
         mock.deliver(.string("[\"OK\",\"\(sent.id)\",true,\"\"]"))
 
@@ -278,7 +278,7 @@ struct NIP42RelayConnectionTests {
         let sent = try sentAuthEvent(in: mock)
         #expect(sent.publicKey == keyPair.publicKey)
         #expect(sent.firstTagValue(named: "challenge") == "challengestringhere")
-        #expect(try sent.verify())
+        try sent.verify()
 
         mock.deliver(.string("[\"OK\",\"\(sent.id)\",true,\"\"]"))
 

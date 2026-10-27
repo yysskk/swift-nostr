@@ -97,6 +97,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`Event.verify()` throws for every failure** (breaking): it returns `Void` and throws the new
+  `Event.VerificationError.invalidSignature` for a signature that does not verify, instead of
+  returning `false`. `Event.isValid` is the same check as a `Bool`, for when the reason does not
+  matter.
 - **`RelayConnection.send(_:)` no longer connects** (breaking): like `publish(_:)`, it throws
   `RelayConnection.Error.notConnected` when the connection is not established instead of spending
   up to `connectionTimeout` on a reconnect; call `connect()` first. `subscribe(subscriptionID:filters:)`
@@ -189,7 +193,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `unsupportedVersion(UInt8)` (was `unsupportedEncryptionVersion`), `invalidMAC` (was
   `hmacVerificationFailed`), and `invalidPadding`. `Event.verify()` is
   `throws(Event.VerificationError)` — `idMismatch` (was `invalidEventID`) or `missingSignature` (was
-  `invalidSignature`) — and returns `false` for a signature that does not verify.
+  `invalidSignature`).
   `RelayMessage.parse(_:)` is `throws(RelayMessage.Error)`, whose `malformed` replaces
   `invalidMessageFormat` and the `DecodingError` of an `EVENT` carrying a malformed event.
   `RelayURL(string:)` / `RelayURL(url:)` are `throws(RelayURL.Error)` — `malformed`,
@@ -260,7 +264,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `EventID`, `pubkey` a `PublicKey`, and `sig: String` is now `signature: Signature?` — still the
   `sig` field on the wire. `Event.init` takes `signature:` instead of `sig:`. A `nil` signature is an
   unsigned NIP-59 rumor: it encodes without `sig`, a missing or empty `sig` decodes as `nil`, and
-  `verify()` throws `invalidSignature` for it. `UnsignedEvent.asRumor()` and gift-wrap unwrapping
+  `verify()` throws `missingSignature` for it. `UnsignedEvent.asRumor()` and gift-wrap unwrapping
   return rumors with a `nil` signature instead of an empty string.
 - **Malformed events no longer decode** (breaking): an event whose `id`, `pubkey`, or `sig` is not
   canonical hex of the right length fails decoding rather than failing `verify()` later, so

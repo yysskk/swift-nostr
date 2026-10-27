@@ -56,7 +56,7 @@ struct EventTemplateTests {
         #expect(event.content == "final")
         #expect(event.tags.map(\.rawArray) == [["expiration", "1700003600"]])
         #expect(event.createdAt == Timestamp(rawValue: 1_700_000_000))
-        #expect(try event.verify())
+        try event.verify()
     }
 
     // MARK: - Factories

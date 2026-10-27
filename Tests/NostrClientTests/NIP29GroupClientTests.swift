@@ -131,7 +131,7 @@ struct NIP29GroupClientTests {
         #expect(sent.tags.first == .group(groupID))
         #expect(sent.firstTagValue(named: "code") == "welcome")
         #expect(sent.content == "please let me in")
-        #expect(try sent.verify())
+        try sent.verify()
         #expect(published.event == sent)
         #expect(published.result.acceptedRelays == [groupRelayURL])
         #expect(!hasEventFrame(otherSocket))
@@ -167,7 +167,7 @@ struct NIP29GroupClientTests {
         #expect(sent.kind == .groupLeaveRequest)
         #expect(sent.tags == [.group(groupID)])
         #expect(sent.content == "goodbye")
-        #expect(try sent.verify())
+        try sent.verify()
         await client.relays.disconnect()
     }
 
@@ -251,7 +251,7 @@ struct NIP29GroupClientTests {
         #expect(sent.kind == .groupJoinRequest)
         #expect(sent.publicKey == keyPair.publicKey)
         #expect(sent.firstTagValue(named: "code") == "welcome")
-        #expect(try sent.verify())
+        try sent.verify()
         await client.relays.disconnect()
     }
 

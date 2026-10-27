@@ -17,7 +17,8 @@ struct EventSignerTests {
         #expect(event.publicKey == signer.publicKey)
         #expect(event.kind == .textNote)
         #expect(event.content == "hello")
-        #expect(try event.verify())
+        try event.verify()
+        #expect(event.isValid)
     }
 
     @Test("sign rejects an unsigned event keyed to another public key")
@@ -45,7 +46,7 @@ struct EventSignerTests {
         #expect(event.tags.map(\.rawArray) == [["t", "nostr"]])
         #expect(event.content == "gm")
         #expect(event.createdAt == template.createdAt)
-        #expect(try event.verify())
+        try event.verify()
     }
 
     @Test("publicKey is the key pair's typed public key")
@@ -75,5 +76,28 @@ struct EventSignerTests {
         #expect(throws: Event.VerificationError.idMismatch) {
             try tampered.verify()
         }
+        #expect(!tampered.isValid)
+    }
+
+    @Test("verify rejects an event whose signature was tampered with")
+    func verifyRejectsTamperedSignature() throws {
+        let signer = try makeSigner()
+        let event = signer.sign(.textNote("original"))
+        var signatureBytes = try #require(event.signature).data
+        signatureBytes[signatureBytes.startIndex] ^= 0x01
+        let tampered = Event(
+            id: event.id,
+            publicKey: event.publicKey,
+            createdAt: event.createdAt,
+            kind: event.kind,
+            tags: event.tags,
+            content: event.content,
+            signature: try Signature(data: signatureBytes)
+        )
+
+        #expect(throws: Event.VerificationError.invalidSignature) {
+            try tampered.verify()
+        }
+        #expect(!tampered.isValid)
     }
 }

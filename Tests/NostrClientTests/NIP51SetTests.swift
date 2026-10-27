@@ -74,7 +74,7 @@ struct NIP51SetTests {
         let event = try await sign(set, with: signer)
         #expect(event.kind == .bookmarkSet)
         #expect(event.publicKey == keyPair.publicKey)
-        #expect(try event.verify())
+        try event.verify()
 
         let opened = try await NostrListSet(event: event, decryptingWith: signer)
         #expect(opened.kind == .bookmarkSet)

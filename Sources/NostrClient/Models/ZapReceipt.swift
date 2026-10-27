@@ -174,7 +174,7 @@ extension ZapReceipt {
 
         // 3. The signature confirms the provider really issued this receipt — the trust anchor, so
         //    it is checked before the receipt's contents (including the bolt11) are trusted.
-        guard (try? event.verify()) == true else { throw ValidationError.invalidSignature }
+        guard event.isValid else { throw ValidationError.invalidSignature }
 
         // 4. The invoice must parse.
         guard let invoice = Bolt11Invoice(bolt11) else { throw ValidationError.invalidBolt11 }

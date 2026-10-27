@@ -429,7 +429,7 @@ NIP-01 Nostr Event (struct: Codable, Identifiable, Hashable, Sendable).
 - `kind: Event.Kind` -- event kind (RawRepresentable struct, encodes as bare integer)
 - `tags: [Tag]` -- the event's tags, each encoded as its raw NIP-01 string array
 - `content: String` -- arbitrary string content
-- `signature: Signature?` -- Schnorr signature, the `sig` field on the wire; `nil` for an unsigned NIP-59 rumor, which encodes without `sig` (decoding treats a missing or empty `sig` as `nil`). A malformed `id`, `pubkey`, or `sig` fails decoding, so a relay frame carrying one is dropped. `verify()` throws `Event.VerificationError`: `idMismatch` when the id is not the hash of the other fields, `missingSignature` for a rumor.
+- `signature: Signature?` -- Schnorr signature, the `sig` field on the wire; `nil` for an unsigned NIP-59 rumor, which encodes without `sig` (decoding treats a missing or empty `sig` as `nil`). A malformed `id`, `pubkey`, or `sig` fails decoding, so a relay frame carrying one is dropped. `verify()` throws `Event.VerificationError`: `idMismatch` when the id is not the hash of the other fields, `missingSignature` for a rumor, `invalidSignature` when the signature does not verify; `isValid` is the same check as a `Bool`.
 
 ### Tag
 
@@ -525,7 +525,8 @@ Event.Kind.groupMetadata         // 39000 (NIP-29 relay-generated state: 39000-3
 ### Verification
 
 ```swift
-let isValid = try event.verify()  // verifies Schnorr signature
+try event.verify()            // throws Event.VerificationError if the id or signature is invalid
+let isValid = event.isValid   // the same check as a Bool
 ```
 
 ## PublishedEvent

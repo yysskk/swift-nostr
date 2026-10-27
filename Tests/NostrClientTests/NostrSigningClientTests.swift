@@ -60,7 +60,7 @@ struct NostrSigningClientTests {
         #expect(signed.content == "hello")
         #expect(signed.tags.map(\.rawArray) == [["t", "nostr"]])
         #expect(signed.createdAt == template.createdAt)
-        #expect(try signed.verify())
+        try signed.verify()
     }
 
     @Test("sign(_:) with a local signer returns a verifying event")
@@ -73,7 +73,7 @@ struct NostrSigningClientTests {
 
         #expect(signed.publicKey == keyPair.publicKey)
         #expect(signed.content == "hi")
-        #expect(try signed.verify())
+        try signed.verify()
     }
 
     @Test("sign(_:) without a signer throws signerNotSet")
@@ -144,7 +144,7 @@ struct NostrSigningClientTests {
         #expect(published.event.kind == .textNote)
         #expect(published.event.publicKey == keyPair.publicKey)
         #expect(published.event.content == "signed by my bunker")
-        #expect(try published.event.verify())
+        try published.event.verify()
         await client.relays.disconnect()
     }
 
@@ -239,7 +239,7 @@ struct NostrSigningClientTests {
         #expect(sent.publicKey == keyPair.publicKey)
         #expect(sent.firstTagValue(named: "relay") == relayURL.description)
         #expect(sent.firstTagValue(named: "challenge") == "remote-challenge")
-        #expect(try sent.verify())
+        try sent.verify()
 
         mock.deliver(.string("[\"OK\",\"\(sent.id)\",true,\"\"]"))
         try await pollUntil { await connection.isAuthenticated }
@@ -266,7 +266,7 @@ struct NostrSigningClientTests {
         #expect(sent.kind == .clientAuthentication)
         #expect(sent.publicKey == keyPair.publicKey)
         #expect(sent.firstTagValue(named: "challenge") == "manual-challenge")
-        #expect(try sent.verify())
+        try sent.verify()
 
         mock.deliver(.string("[\"OK\",\"\(sent.id)\",true,\"\"]"))
         try await authTask.value

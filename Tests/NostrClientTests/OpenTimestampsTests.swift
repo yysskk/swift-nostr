@@ -46,7 +46,7 @@ struct OpenTimestampsTests {
         #expect(event.tags.map(\.rawArray) == [["t", "test"], ["ots", otsData]])
         #expect(event.hasOpenTimestampsAttestation)
         #expect(event.openTimestamps?.otsData == otsData)
-        #expect(try event.verify())
+        try event.verify()
     }
 
     @Test("Event without OpenTimestamps attestation")

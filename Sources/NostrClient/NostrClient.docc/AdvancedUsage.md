@@ -846,7 +846,7 @@ let template = EventTemplate(
 )
 
 let signed = signer.sign(template)
-let isValid = try signed.verify()
+try signed.verify()
 ```
 
 NostrClient's models have template factories too — ``EventTemplate/metadata(_:)``,

@@ -30,7 +30,7 @@ struct EventCodingTests {
 
         let decoded = try decode(object)
         #expect(decoded == event)
-        #expect(try decoded.verify())
+        try decoded.verify()
     }
 
     @Test("a NIP-01 event decodes its pubkey field into publicKey")
@@ -153,6 +153,6 @@ struct EventCodingTests {
     @Test("a received event with unusual tags verifies")
     func receivedEventWithUnusualTagsVerifies() throws {
         let event = try JSONDecoder().decode(Event.self, from: Data(try receivedEventJSON().utf8))
-        #expect(try event.verify())
+        try event.verify()
     }
 }
