@@ -35,8 +35,8 @@ public actor WalletConnection {
         }
     }
 
-    private static let responseSubscriptionID = "nwc-responses"
-    private static let infoSubscriptionID = "nwc-info"
+    private static let responseSubscriptionID: SubscriptionID = "nwc-responses"
+    private static let infoSubscriptionID: SubscriptionID = "nwc-info"
 
     /// The shared relay session, correlating each request by its event id (which responses echo in
     /// their `e` tag) and holding the parts collected for it so far.

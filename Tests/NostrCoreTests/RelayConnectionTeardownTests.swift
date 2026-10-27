@@ -60,7 +60,7 @@ struct RelayConnectionTeardownTests {
         let socket = MockWebSocketSession()
         let connection = makeConnection(socket: socket)
         try await connection.connect()
-        try await connection.subscribe(subscriptionID: "sub1", filters: [Filter(kinds: [1])])
+        try await connection.subscribe(id: "sub1", filters: [Filter(kinds: [1])])
 
         #expect(await connection.subscriptions.keys.contains("sub1"))
 

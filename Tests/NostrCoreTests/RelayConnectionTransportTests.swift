@@ -18,7 +18,7 @@ struct RelayConnectionTransportTests {
         RelayURL("wss://relay-one.example.com")!,
         RelayURL("wss://relay-two.example.com")!,
     ]
-    private static let subscriptionID = "sub-1"
+    private static let subscriptionID: SubscriptionID = "sub-1"
     private static let eventID = String(repeating: "a", count: 64)
     private static let otherEventID = String(repeating: "d", count: 64)
 
@@ -156,7 +156,7 @@ struct RelayConnectionTransportTests {
             "content": "sealed",
             "sig": String(repeating: "c", count: 128),
         ]
-        let frame: [Any] = ["EVENT", subscriptionID, event]
+        let frame: [Any] = ["EVENT", subscriptionID.rawValue, event]
         return String(decoding: try JSONSerialization.data(withJSONObject: frame), as: UTF8.self)
     }
 
@@ -187,9 +187,9 @@ struct RelayConnectionTransportTests {
         for index in Self.relayURLs.indices {
             let mock = try #require(dispenser.socket(at: index))
             let request = try #require(Self.sentFrame("REQ", in: mock))
-            #expect(request[1] as? String == Self.subscriptionID)
+            #expect(request[1] as? String == Self.subscriptionID.rawValue)
             let close = try #require(Self.sentFrame("CLOSE", in: mock))
-            #expect(close[1] as? String == Self.subscriptionID)
+            #expect(close[1] as? String == Self.subscriptionID.rawValue)
         }
         await transport.disconnect()
     }

@@ -87,7 +87,8 @@ actor RecordingGroupCapabilities: NostrGroupManaging {
         let (stream, continuation) = AsyncStream.makeStream(of: SubscriptionEvent.self)
         continuation.finish()
         return SubscriptionSequence(
-            id: "timeline_\(timelines.count)", expectedRelays: [group.relayURL], stream: stream, onClose: {})
+            id: SubscriptionID(rawValue: "timeline_\(timelines.count)"), expectedRelays: [group.relayURL],
+            stream: stream, onClose: {})
     }
 
     func fetchSimpleGroupList(for publicKey: PublicKey?, timeout: Duration?) async throws -> SimpleGroupList? {

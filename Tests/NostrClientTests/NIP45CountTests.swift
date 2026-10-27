@@ -219,7 +219,7 @@ struct NIP45CountTests {
         // The COUNT frame is a one-shot request: it is sent exactly once and never
         // registered as a subscription, so a reconnect would not replay it.
         #expect(countFrames(in: mock).count == 1)
-        #expect(await connection.hasSubscription(receivedID) == false)
+        #expect(await connection.hasSubscription(SubscriptionID(rawValue: receivedID)) == false)
         await connection.disconnect()
     }
 

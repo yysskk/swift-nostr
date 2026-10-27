@@ -50,13 +50,13 @@ public struct NostrMessagesAPI: NostrMessaging {
     /// unwrapped.
     public func payloads(limit: Int) async throws -> DirectMessagePayloadSequence {
         let parser = try await parser()
-        let subscription = try await client.subscribe(filters: [try await giftWrapFilter(limit: limit)], toURLs: nil)
+        let subscription = try await client.pool.subscribe(filters: [try await giftWrapFilter(limit: limit)])
         return DirectMessagePayloadSequence(subscription: subscription, parser: parser)
     }
 
     /// Subscribes to the raw gift wraps addressed to the current user, on the whole pool.
     public func giftWraps(limit: Int) async throws -> SubscriptionSequence {
-        try await client.subscribe(filters: [try await giftWrapFilter(limit: limit)], toURLs: nil)
+        try await client.pool.subscribe(filters: [try await giftWrapFilter(limit: limit)])
     }
 
     // MARK: - Private

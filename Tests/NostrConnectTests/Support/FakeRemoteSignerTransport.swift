@@ -11,7 +11,7 @@ actor FakeRemoteSignerTransport: RelayTransport {
     private(set) var isConnected = false
     private(set) var connectCount = 0
     private(set) var sentEvents: [Event] = []
-    private(set) var subscriptions: [String: [Filter]] = [:]
+    private(set) var subscriptions: [SubscriptionID: [Filter]] = [:]
     private var continuation: AsyncStream<Event>.Continuation?
     private var nextConnectError: RelayConnection.Error?
     private var nextSendError: RelayConnection.Error?
@@ -27,11 +27,11 @@ actor FakeRemoteSignerTransport: RelayTransport {
         isConnected = true
     }
 
-    func subscribe(id: String, filters: [Filter]) async throws(RelayConnection.Error) {
+    func subscribe(id: SubscriptionID, filters: [Filter]) async throws(RelayConnection.Error) {
         subscriptions[id] = filters
     }
 
-    func unsubscribe(id: String) async {
+    func unsubscribe(id: SubscriptionID) async {
         subscriptions[id] = nil
     }
 

@@ -3,8 +3,9 @@ import NostrCore
 
 /// A live relay subscription delivered as an async sequence of relay-aware events.
 ///
-/// Returned by ``NostrSubscribing/subscribe(filters:to:bufferingPolicy:)-(_,Set<RelayURL>?,_)`` and
-/// the convenience subscription methods. Iterate it with `for await`:
+/// Returned by ``NostrSubscribing/subscribe(filters:to:bufferingPolicy:)-(_,Set<RelayURL>?,_)``,
+/// ``RelayPool/subscribe(filters:to:bufferingPolicy:)``, and the convenience subscription methods.
+/// Iterate it with `for await`:
 ///
 /// ```swift
 /// let subscription = try await client.subscriptions.subscribe(filters: [filter])
@@ -29,8 +30,9 @@ import NostrCore
 public struct SubscriptionSequence: AsyncSequence, Sendable {
     public typealias Element = SubscriptionEvent
 
-    /// The subscription ID, usable with ``NostrSubscriptionsAPI/unsubscribe(subscriptionID:)``.
-    public let id: String
+    /// The id the pool generated for the subscription, usable with
+    /// ``NostrSubscriptionsAPI/unsubscribe(id:)``.
+    public let id: SubscriptionID
 
     /// The relays that accepted the REQ. EOSE completion is measured against
     /// this set (see ``NostrEventFetching/fetch(filters:from:timeout:)-(_,Set<RelayURL>?,_)``).
@@ -47,7 +49,7 @@ public struct SubscriptionSequence: AsyncSequence, Sendable {
     ///   - stream: The relay-aware items the subscription yields.
     ///   - onClose: Runs on every call to ``close()``.
     public init(
-        id: String,
+        id: SubscriptionID,
         expectedRelays: Set<RelayURL>,
         stream: AsyncStream<SubscriptionEvent>,
         onClose: @escaping @Sendable () async -> Void
@@ -89,8 +91,8 @@ public struct SubscriptionSequence: AsyncSequence, Sendable {
 
         let base: SubscriptionSequence
 
-        /// The subscription ID, usable with ``NostrSubscriptionsAPI/unsubscribe(subscriptionID:)``.
-        public var id: String { base.id }
+        /// The subscription ID, usable with ``NostrSubscriptionsAPI/unsubscribe(id:)``.
+        public var id: SubscriptionID { base.id }
 
         /// The relays that accepted the REQ.
         public var expectedRelays: Set<RelayURL> { base.expectedRelays }

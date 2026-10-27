@@ -62,19 +62,19 @@ public actor RelayConnectionTransport: RelayTransport {
 
     /// Opens the subscription on every relay.
     /// - Throws: ``RelayConnection/Error/notConnected`` when no relay accepts the request.
-    public func subscribe(id: String, filters: [Filter]) async throws(RelayConnection.Error) {
+    public func subscribe(id: SubscriptionID, filters: [Filter]) async throws(RelayConnection.Error) {
         var subscribed = 0
         for relay in relays {
-            if (try? await relay.subscribe(subscriptionID: id, filters: filters)) != nil {
+            if (try? await relay.subscribe(id: id, filters: filters)) != nil {
                 subscribed += 1
             }
         }
         guard subscribed > 0 else { throw .notConnected }
     }
 
-    public func unsubscribe(id: String) async {
+    public func unsubscribe(id: SubscriptionID) async {
         for relay in relays {
-            await relay.unsubscribe(subscriptionID: id)
+            await relay.unsubscribe(id: id)
         }
     }
 

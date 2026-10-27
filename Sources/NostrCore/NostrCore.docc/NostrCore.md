@@ -68,6 +68,7 @@ try event.verify()
 
 - ``ClientMessage``
 - ``RelayMessage``
+- ``SubscriptionID``
 - ``EventCount``
 - ``RelayResponsePrefix``
 - ``RelayRejection``

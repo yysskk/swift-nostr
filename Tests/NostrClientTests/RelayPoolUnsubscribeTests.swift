@@ -29,8 +29,6 @@ struct RelayPoolUnsubscribeTests {
         }
     }
 
-    private static let subscriptionID = "sub"
-
     private let holding = RelayURL("wss://holding.example.com")!
     private let dropped = RelayURL("wss://dropped.example.com")!
     private let lateConnected = RelayURL("wss://late-connected.example.com")!
@@ -63,7 +61,7 @@ struct RelayPoolUnsubscribeTests {
         let droppedConnection = await pool.addRelay(dropped)
         try await holdingConnection.connect()
         try await droppedConnection.connect()
-        _ = try await pool.subscribe(subscriptionID: Self.subscriptionID, filters: [Filter(kinds: [1])]) { _ in }
+        let subscription = try await pool.subscribe(filters: [Filter(kinds: [1])])
 
         // Added after the REQ went out: one connected relay that never received it, and one
         // relay that was never connected at all.
@@ -79,7 +77,7 @@ struct RelayPoolUnsubscribeTests {
             return false
         }
 
-        await pool.unsubscribe(subscriptionID: Self.subscriptionID)
+        await pool.unsubscribe(id: subscription.id)
 
         #expect(closeFrames(on: holding, in: sockets).count == 1)
         #expect(closeFrames(on: dropped, in: sockets).isEmpty)
@@ -88,7 +86,7 @@ struct RelayPoolUnsubscribeTests {
         #expect(sockets.sockets(for: dropped).count == 1)
         #expect(sockets.sockets(for: neverConnected).isEmpty)
         #expect(await pool.relay(for: neverConnected)?.state == .disconnected)
-        #expect(await !droppedConnection.hasSubscription(Self.subscriptionID))
+        #expect(await !droppedConnection.hasSubscription(subscription.id))
         await pool.disconnectAll()
     }
 }

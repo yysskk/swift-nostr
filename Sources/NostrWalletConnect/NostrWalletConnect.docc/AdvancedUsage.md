@@ -252,8 +252,8 @@ stream. Inject your own transport to run on a different relay stack or to test w
 ```swift
 struct InMemoryTransport: RelayTransport {
     func connect() async throws(RelayConnection.Error) { /* ... */ }
-    func subscribe(id: String, filters: [Filter]) async throws(RelayConnection.Error) { /* ... */ }
-    func unsubscribe(id: String) async { /* ... */ }
+    func subscribe(id: SubscriptionID, filters: [Filter]) async throws(RelayConnection.Error) { /* ... */ }
+    func unsubscribe(id: SubscriptionID) async { /* ... */ }
     func send(_ event: Event) async throws(RelayConnection.Error) { /* ... */ }
     func events() async -> AsyncStream<Event> { /* ... */ }
     func disconnect() async { /* ... */ }

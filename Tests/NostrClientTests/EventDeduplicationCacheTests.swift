@@ -115,7 +115,7 @@ struct EventDeduplicationCacheTests {
         for index in 0..<100 {
             let isNew = cache.record(
                 eventID: .fixture("event_\(index)"),
-                subscriptionID: "sub_\(index % 4)",
+                subscriptionID: SubscriptionID(rawValue: "sub_\(index % 4)"),
                 now: now + .seconds(index)
             )
             #expect(isNew)

@@ -6,17 +6,17 @@ public enum ClientMessage: Sendable {
     case event(Event)
 
     /// Used to request events and subscribe
-    case request(subscriptionID: String, filters: [Filter])
+    case request(subscriptionID: SubscriptionID, filters: [Filter])
 
     /// Used to stop a subscription
-    case close(subscriptionID: String)
+    case close(subscriptionID: SubscriptionID)
 
     /// Used for authentication (NIP-42)
     case auth(Event)
 
     /// Used to request the number of events matching the filters (NIP-45).
     /// https://github.com/nostr-protocol/nips/blob/master/45.md
-    case count(subscriptionID: String, filters: [Filter])
+    case count(subscriptionID: SubscriptionID, filters: [Filter])
 
     /// Serializes the message to JSON array format
     public func serialize() -> String {
@@ -28,7 +28,7 @@ public enum ClientMessage: Sendable {
             array = ["EVENT", eventDict]
 
         case .request(let subscriptionID, let filters):
-            var arr: [Any] = ["REQ", subscriptionID]
+            var arr: [Any] = ["REQ", subscriptionID.rawValue]
             for filter in filters {
                 let filterDict = filter.jsonObject()
                 arr.append(filterDict)
@@ -36,14 +36,14 @@ public enum ClientMessage: Sendable {
             array = arr
 
         case .close(let subscriptionID):
-            array = ["CLOSE", subscriptionID]
+            array = ["CLOSE", subscriptionID.rawValue]
 
         case .auth(let event):
             let eventDict = event.jsonObject()
             array = ["AUTH", eventDict]
 
         case .count(let subscriptionID, let filters):
-            var arr: [Any] = ["COUNT", subscriptionID]
+            var arr: [Any] = ["COUNT", subscriptionID.rawValue]
             for filter in filters {
                 let filterDict = filter.jsonObject()
                 arr.append(filterDict)
@@ -64,10 +64,10 @@ public enum ClientMessage: Sendable {
 /// Messages received from a relay (NIP-01)
 public enum RelayMessage: Sendable {
     /// Event sent by the relay
-    case event(subscriptionID: String, event: Event)
+    case event(subscriptionID: SubscriptionID, event: Event)
 
     /// End of stored events notice
-    case endOfStoredEvents(subscriptionID: String)
+    case endOfStoredEvents(subscriptionID: SubscriptionID)
 
     /// Notice message from the relay
     case notice(message: String)
@@ -80,11 +80,11 @@ public enum RelayMessage: Sendable {
     case auth(challenge: String)
 
     /// Closed subscription notice
-    case closed(subscriptionID: String, message: String)
+    case closed(subscriptionID: SubscriptionID, message: String)
 
     /// Count of events matching the requested filters (NIP-45).
     /// https://github.com/nostr-protocol/nips/blob/master/45.md
-    case count(subscriptionID: String, count: Int, approximate: Bool?)
+    case count(subscriptionID: SubscriptionID, count: Int, approximate: Bool?)
 
     /// Unknown message type
     case unknown(type: String, rawData: String)
@@ -106,7 +106,7 @@ public enum RelayMessage: Sendable {
         switch type {
         case "EVENT":
             guard array.count >= 3,
-                let subscriptionID = array[1] as? String,
+                let subscriptionID = (array[1] as? String).map(SubscriptionID.init(rawValue:)),
                 let eventDict = array[2] as? [String: Any]
             else {
                 throw .malformed
@@ -118,7 +118,7 @@ public enum RelayMessage: Sendable {
 
         case "EOSE":
             guard array.count >= 2,
-                let subscriptionID = array[1] as? String
+                let subscriptionID = (array[1] as? String).map(SubscriptionID.init(rawValue:))
             else {
                 throw .malformed
             }
@@ -152,7 +152,7 @@ public enum RelayMessage: Sendable {
 
         case "CLOSED":
             guard array.count >= 3,
-                let subscriptionID = array[1] as? String,
+                let subscriptionID = (array[1] as? String).map(SubscriptionID.init(rawValue:)),
                 let message = array[2] as? String
             else {
                 throw .malformed
@@ -163,7 +163,7 @@ public enum RelayMessage: Sendable {
             // The payload carries `count` and an optional `approximate` flag; any
             // other keys (e.g. the NIP-45 `hll` HyperLogLog value) are ignored.
             guard array.count >= 3,
-                let subscriptionID = array[1] as? String,
+                let subscriptionID = (array[1] as? String).map(SubscriptionID.init(rawValue:)),
                 let payload = array[2] as? [String: Any],
                 let count = payload["count"] as? Int
             else {

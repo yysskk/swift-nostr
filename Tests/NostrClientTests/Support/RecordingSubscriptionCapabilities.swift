@@ -21,7 +21,7 @@ actor RecordingSubscriptionCapabilities: NostrSubscribing {
     let cannedItems: [SubscriptionEvent]
 
     private(set) var subscribes: [Subscribe] = []
-    private(set) var unsubscribedIDs: [String] = []
+    private(set) var unsubscribedIDs: [SubscriptionID] = []
     private(set) var unsubscribeAllCount = 0
 
     init(pooledRelays: Set<RelayURL>? = nil, cannedItems: [SubscriptionEvent] = []) {
@@ -45,15 +45,15 @@ actor RecordingSubscriptionCapabilities: NostrSubscribing {
         }
         continuation.finish()
         return SubscriptionSequence(
-            id: "stub_\(subscribes.count)",
+            id: SubscriptionID(rawValue: "stub_\(subscribes.count)"),
             expectedRelays: relayURLs ?? pooledRelays ?? [],
             stream: stream,
             onClose: {}
         )
     }
 
-    func unsubscribe(subscriptionID: String) async {
-        unsubscribedIDs.append(subscriptionID)
+    func unsubscribe(id: SubscriptionID) async {
+        unsubscribedIDs.append(id)
     }
 
     func unsubscribeAll() async {

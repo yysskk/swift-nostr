@@ -45,6 +45,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   non-canonical public key, and decoding such a string fails with `DecodingError.dataCorrupted`.
   `Event.coordinate` gives an event's coordinate (nil unless its kind is replaceable or addressable),
   and `NAddr.coordinate` an `naddr`'s, without its relay hints.
+- **`SubscriptionID` is a typed subscription id**: the NIP-01 id `REQ` and `COUNT` send and `EVENT`,
+  `EOSE`, `CLOSED`, and `COUNT` echo back, with `rawValue` as its wire string, `description`, and
+  bare-string JSON encoding. It is not validated, so a relay frame is never dropped for its id, and
+  it is `ExpressibleByStringLiteral`. `SubscriptionID.random()` returns a fresh UUID-based id,
+  36 characters, within NIP-01's limit of 64.
 - **One-shot fetches and counts take their default timeout from configuration**:
   `RelayPoolConfig.queryTimeout` is how long a fetch or count through `NostrClient` or `RelayPool`
   waits for relays (EOSE, or COUNT) when the call passes no timeout, and
@@ -121,10 +126,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Event.VerificationError.invalidSignature` for a signature that does not verify, instead of
   returning `false`. `Event.isValid` is the same check as a `Bool`, for when the reason does not
   matter.
+- **Subscription ids are `SubscriptionID`s, and the pool generates them** (breaking): the
+  associated values of `ClientMessage.request`, `close`, and `count` and of `RelayMessage.event`,
+  `endOfStoredEvents`, `closed`, and `count`, `RelayConnection.hasSubscription(_:)` and
+  `activeSubscriptions()`, and `SubscriptionSequence.id` (with `Events.id`,
+  `DirectMessageSequence.id`, and `DirectMessagePayloadSequence.id`) are `SubscriptionID`s instead
+  of `String`s. Where the method already names the subscription, the id is labeled `id:`:
+  `RelayConnection.subscribe(subscriptionID:filters:)` and `unsubscribe(subscriptionID:)` are
+  `subscribe(id:filters:)` and `unsubscribe(id:)`, matching `RelayTransport`, and
+  `RelayPool.unsubscribe(subscriptionID:)`, `NostrSubscriptionsAPI.unsubscribe(subscriptionID:)`,
+  and the `NostrSubscribing` requirement are `unsubscribe(id:)`.
+  `RelayPool.subscribe(subscriptionID:filters:to:handler:)`, which took a caller-chosen id that could
+  collide with the client's own, is `subscribe(filters:to:bufferingPolicy:)`: the pool names the
+  subscription and returns it as a `SubscriptionSequence`, as `client.subscriptions.subscribe` does.
+  With ids never reused, `RelayPool.Error.subscriptionSuperseded` is removed. `RelayPool` gains
+  `unsubscribeAll()`, and `disconnectAll()` now closes every subscription and ends its sequence
+  before disconnecting. The wire format is unchanged.
 - **`RelayConnection.send(_:)` no longer connects** (breaking): like `publish(_:)`, it throws
   `RelayConnection.Error.notConnected` when the connection is not established instead of spending
-  up to `connectionTimeout` on a reconnect; call `connect()` first. `subscribe(subscriptionID:filters:)`
-  still connects on demand. `RelayConnection.unsubscribe(subscriptionID:)` no longer throws: it
+  up to `connectionTimeout` on a reconnect; call `connect()` first. `subscribe(id:filters:)`
+  still connects on demand. `RelayConnection.unsubscribe(id:)` no longer throws: it
   forgets the subscription and sends `CLOSE` only when the connection is established and holds it,
   so drop the `try` at call sites. `RelayConnectionTransport.send(_:)` still reconnects a relay
   that dropped before sending to it.
@@ -272,9 +293,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Pool and client failures have their own error types, and `NostrError` is removed** (breaking):
   `RelayPool` throws `RelayPool.Error` — `emptyPool` (was `noRelaysInPool`), `noMatchingRelays([RelayURL])`,
   `cannotPublishAuthenticationEvent`, `quorumNotMet(acknowledged:required:)` (was
-  `relayError("Publish quorum not met: …")`), `subscriptionSuperseded` and `subscriptionFailed` (were
-  `relayError` strings), and `allConnectionsFailed` (was `connectionFailed("All relays failed to connect")`).
-  `RelayPool.connectAll()`, `RelayPool.subscribe(subscriptionID:filters:to:handler:)`,
+  `relayError("Publish quorum not met: …")`), `subscriptionFailed` (was a `relayError` string), and
+  `allConnectionsFailed` (was `connectionFailed("All relays failed to connect")`).
+  `RelayPool.connectAll()`, `RelayPool.subscribe(filters:to:bufferingPolicy:)`,
   `client.relays.connect()`, and `client.subscriptions.subscribe(filters:to:bufferingPolicy:)` are
   `throws(RelayPool.Error)`. Operations that need a signer throw `NostrClient.Error.signerNotSet`
   (was `NostrError.signerNotSet`), which capability extensions can throw too, and
@@ -473,9 +494,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`subscriptionId` is spelled `subscriptionID`** (breaking): the acronym is now cased the same way
   as `groupID`, `eventID`, and `computedID` throughout. This renames the associated values of
   `ClientMessage.request`, `close`, and `count` and of `RelayMessage.event`, `endOfStoredEvents`,
-  `closed`, and `count`, and the parameters of `RelayConnection.subscribe(subscriptionID:filters:)`,
-  `unsubscribe(subscriptionID:)`, `RelayPool.unsubscribe(subscriptionID:)`, and
-  `NostrSubscriptionsAPI.unsubscribe(subscriptionID:)`. The wire format is unchanged.
+  `closed`, and `count`. The wire format is unchanged.
 - **Conversions are initializers and properties** (breaking): following the Swift API Design
   Guidelines, which discourage `to`/`from` prefixes. `Mnemonic.fromEntropy(_:)` is
   `Mnemonic(entropy:)` and `Mnemonic.toSeed(passphrase:)` is `seed(passphrase:)`.
@@ -650,7 +669,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **`NostrSubscribing`, `NostrRelayManaging`, and `NostrIdentityProviding` require only their
   primitives** (breaking): `NostrSubscribing` requires `subscribe(filters:to:bufferingPolicy:)`,
-  `unsubscribe(subscriptionID:)`, and `unsubscribeAll()`; `NostrRelayManaging` requires
+  `unsubscribe(id:)`, and `unsubscribeAll()`; `NostrRelayManaging` requires
   `add(_:config:)`, `remove(_:)`, `connect()`, `disconnect()`, `connections`,
   `connectedRelayCount()`, `relay(for:)`, and `clearDeduplicationCache()`; `NostrIdentityProviding`
   keeps every requirement but `setPrivateKey(_:)` and `setNsec(_:)`. Both `events(filters:…)`
@@ -785,7 +804,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   each disconnected, failed, or backing-off relay reconnected (blocking up to `connectionTimeout`)
   just to send it. `CLOSE` now goes only to the connected relays holding the subscription.
 - **Unsubscribing while the REQ is still being sent ends the subscription**: `RelayConnection`
-  recorded a subscription only once its REQ had gone out, so an `unsubscribe(subscriptionID:)` in
+  recorded a subscription only once its REQ had gone out, so an `unsubscribe(id:)` in
   that window found nothing to close and the REQ then registered it, leaving it open on the relay
   and replayed on reconnect. It is now recorded before the REQ is sent, and a REQ that fails to
   send restores what its ID held before unless a newer subscribe or unsubscribe has replaced it.

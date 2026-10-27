@@ -9,7 +9,7 @@ import NostrCore
 /// ``subscribe(filters:to:bufferingPolicy:)`` come from the protocol's extension.
 ///
 /// Iteration termination — breaking out of the loop, task cancellation, or discarding the
-/// sequence — sends CLOSE to the relays, so most call sites never need ``unsubscribe(subscriptionID:)``.
+/// sequence — sends CLOSE to the relays, so most call sites never need ``unsubscribe(id:)``.
 /// For a one-time read that ends at EOSE use
 /// ``NostrEventFetching/fetch(filters:from:timeout:)-(_,Set<RelayURL>?,_)`` instead.
 public struct NostrSubscriptionsAPI: NostrSubscribing {
@@ -37,22 +37,18 @@ public struct NostrSubscriptionsAPI: NostrSubscribing {
         to relayURLs: Set<RelayURL>?,
         bufferingPolicy: AsyncStream<SubscriptionEvent>.Continuation.BufferingPolicy
     ) async throws(RelayPool.Error) -> SubscriptionSequence {
-        try await client.subscribe(
-            filters: filters,
-            toURLs: relayURLs,
-            bufferingPolicy: bufferingPolicy
-        )
+        try await client.pool.subscribe(filters: filters, to: relayURLs, bufferingPolicy: bufferingPolicy)
     }
 
     /// Closes one subscription.
     /// No-op for unknown IDs, so the re-entrant call triggered by ending iteration
     /// cannot send a second CLOSE.
-    public func unsubscribe(subscriptionID: String) async {
-        await client.closeSubscription(id: subscriptionID)
+    public func unsubscribe(id: SubscriptionID) async {
+        await client.pool.unsubscribe(id: id)
     }
 
     /// Closes every open subscription.
     public func unsubscribeAll() async {
-        await client.closeAllSubscriptions()
+        await client.pool.unsubscribeAll()
     }
 }

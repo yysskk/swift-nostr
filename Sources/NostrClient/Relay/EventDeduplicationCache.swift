@@ -21,14 +21,14 @@ struct EventDeduplicationCache {
 
     /// One recorded delivery.
     private struct Entry {
-        let subscriptionID: String
+        let subscriptionID: SubscriptionID
         let eventID: EventID
         let recordedAt: ContinuousClock.Instant
     }
 
     /// The event ids each subscription has seen: the membership test on the hot path, and what
     /// lets a whole subscription be forgotten at once.
-    private var seenEventIDs: [String: Set<EventID>] = [:]
+    private var seenEventIDs: [SubscriptionID: Set<EventID>] = [:]
 
     /// Every entry in the order it was recorded, oldest first, so eviction and expiry take from
     /// the front rather than searching for the oldest. Holds exactly what `seenEventIDs` holds,
@@ -53,7 +53,7 @@ struct EventDeduplicationCache {
     }
 
     /// The number of entries held for `subscriptionID`.
-    func count(forSubscription subscriptionID: String) -> Int {
+    func count(forSubscription subscriptionID: SubscriptionID) -> Int {
         seenEventIDs[subscriptionID]?.count ?? 0
     }
 
@@ -62,7 +62,8 @@ struct EventDeduplicationCache {
     ///
     /// Recording beyond ``maximumSize`` evicts as many of the oldest entries as it takes to stay
     /// within the limit, so the bound holds on return.
-    mutating func record(eventID: EventID, subscriptionID: String, now: ContinuousClock.Instant = .now) -> Bool {
+    mutating func record(eventID: EventID, subscriptionID: SubscriptionID, now: ContinuousClock.Instant = .now) -> Bool
+    {
         guard seenEventIDs[subscriptionID]?.contains(eventID) != true else { return false }
         seenEventIDs[subscriptionID, default: []].insert(eventID)
         entries.append(Entry(subscriptionID: subscriptionID, eventID: eventID, recordedAt: now))
@@ -78,7 +79,7 @@ struct EventDeduplicationCache {
     /// keeping the two stores in step: subscriptions end far less often than events arrive, and
     /// leaving its entries behind as tombstones would make every ``count`` a sum instead of a
     /// subtraction.
-    mutating func removeSubscription(_ subscriptionID: String) {
+    mutating func removeSubscription(_ subscriptionID: SubscriptionID) {
         guard seenEventIDs.removeValue(forKey: subscriptionID) != nil else { return }
         entries = entries[oldestIndex...].filter { $0.subscriptionID != subscriptionID }
         oldestIndex = 0

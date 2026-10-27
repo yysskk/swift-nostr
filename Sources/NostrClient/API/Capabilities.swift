@@ -233,7 +233,7 @@ public protocol NostrSubscribing: Sendable {
     ) async throws(RelayPool.Error) -> SubscriptionSequence
 
     /// Closes one subscription; a no-op for unknown IDs.
-    func unsubscribe(subscriptionID: String) async
+    func unsubscribe(id: SubscriptionID) async
     /// Closes every open subscription.
     func unsubscribeAll() async
 }

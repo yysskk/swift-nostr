@@ -17,10 +17,10 @@ public protocol RelayTransport: Sendable {
 
     /// Opens a subscription for `filters` under `id`.
     /// - Throws: ``RelayConnection/Error`` when no relay accepts the subscription.
-    func subscribe(id: String, filters: [Filter]) async throws(RelayConnection.Error)
+    func subscribe(id: SubscriptionID, filters: [Filter]) async throws(RelayConnection.Error)
 
     /// Closes the subscription with `id`.
-    func unsubscribe(id: String) async
+    func unsubscribe(id: SubscriptionID) async
 
     /// Publishes `event` to the relay(s) without waiting for an acknowledgment.
     /// - Throws: ``RelayConnection/Error`` when no relay accepts the event.

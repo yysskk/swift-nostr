@@ -6,8 +6,8 @@ public actor RelayPool {
     /// All relay connections
     private var relays: [RelayURL: RelayConnection] = [:]
 
-    /// Subscription handlers by subscription ID
-    private var subscriptionHandlers: [String: @Sendable (RelaySubscriptionMessage) async -> Void] = [:]
+    /// The subscriptions this pool is serving, by id.
+    private var subscriptions: [SubscriptionID: ActiveSubscription] = [:]
 
     /// Pool configuration
     public let config: RelayPoolConfig
@@ -24,24 +24,8 @@ public actor RelayPool {
     /// Last time expired cache entries were swept
     private var lastCacheCleanup: ContinuousClock.Instant = .now
 
-    /// Message listener tasks for subscriptions (keyed by subscription ID)
-    private var subscriptionTasks: [String: [Task<Void, Never>]] = [:]
-
-    /// Identifies the current listener generation for each subscription id, so a frame already in
-    /// flight when the id was re-subscribed is dropped instead of reaching the new handler.
-    private var subscriptionGeneration: [String: UInt64] = [:]
-
-    /// Hands out listener generations. Pool-wide and never reset, so a number is never reused:
-    /// counting per id from zero meant an unsubscribe followed by a fresh subscribe produced
-    /// generation 1 both times, and a straggler from the first set matched the second.
-    private var nextSubscriptionGeneration: UInt64 = 0
-
     /// The automatic AUTH-challenge responder applied to every relay (NIP-42)
     private var authenticationResponder: RelayConnection.AuthenticationResponder?
-
-    /// Runs inside a subscribe after its listeners are registered and before it checks it is still
-    /// the current generation (test hook: lets a test run an overlapping subscribe at that point).
-    private var listenersRegisteredHook: (@Sendable (String) async -> Void)?
 
     public init(config: RelayPoolConfig = .default) {
         self.init(config: config, webSocketFactory: URLSessionWebSocketFactory(urlSession: .shared))
@@ -138,26 +122,14 @@ public actor RelayPool {
         return successCount
     }
 
-    /// Disconnects from all relays in the pool, dropping every subscription it was serving.
+    /// Disconnects from all relays in the pool, ending every subscription it was serving.
     ///
-    /// Nothing recreates the listener tasks, and each connection clears its own tracked
-    /// subscriptions on disconnect, so a later `connectAll()` restores the sockets but not the
-    /// subscriptions — they have to be opened again. The handlers and dedup state are therefore
-    /// dropped with the tasks rather than left behind: keeping them meant every connect/disconnect
-    /// cycle grew both dictionaries while the pool reported subscriptions it could no longer serve.
-    ///
-    /// Callers going through ``NostrClient`` should use `relays.disconnect()`, which ends the
-    /// client-facing subscription sequences before this runs.
+    /// Each subscription is closed first — CLOSE goes out while the connections are still up and
+    /// its sequence ends — because nothing would deliver to it afterwards: each connection clears
+    /// its own tracked subscriptions on disconnect, so a later `connectAll()` restores the sockets
+    /// but not the subscriptions. They have to be opened again.
     public func disconnectAll() async {
-        // Cancel all subscription listener tasks
-        for tasks in subscriptionTasks.values {
-            for task in tasks {
-                task.cancel()
-            }
-        }
-        subscriptionTasks.removeAll()
-        subscriptionHandlers.removeAll()
-        subscriptionGeneration.removeAll()
+        await unsubscribeAll()
         eventCache.removeAll()
 
         await withTaskGroup(of: Void.self) { group in
@@ -336,150 +308,76 @@ public actor RelayPool {
         }
     }
 
-    /// Subscribes to events on the targeted relays.
-    /// Tolerates partial failures - succeeds if at least one relay accepts the subscription.
-    /// Events are deduplicated across the relays of this subscription: each event is
-    /// delivered once here however many relays send it, while other subscriptions matching
-    /// the same event still receive their own copy.
+    /// Opens a subscription under a fresh ``SubscriptionID`` on the whole pool (nil) or the given
+    /// relays, as an async sequence of relay-aware events.
     ///
-    /// `relayURLs` is nil (the default) to subscribe on the whole pool, or the relays to
-    /// target a subset; targets not in the pool are skipped. An empty set always throws — an
-    /// accidentally-empty computed target list must not fan out to the whole pool.
-    /// - Returns: The number of relays that successfully subscribed
+    /// Tolerates partial failures — succeeds if at least one relay accepts the REQ. Events are
+    /// deduplicated across the relays of this subscription: each event is delivered once however
+    /// many relays send it, while other subscriptions matching the same event still receive their
+    /// own copy.
+    ///
+    /// Targets not in the pool are skipped; an empty set always throws — an accidentally-empty
+    /// computed target list must not fan out to the whole pool. Ending iteration, cancelling the
+    /// consuming task, discarding the sequence, or ``unsubscribe(id:)`` sends CLOSE.
+    /// - Parameters:
+    ///   - filters: The NIP-01 filters the relays match events against.
+    ///   - relayURLs: The relays to subscribe on, or nil for the whole pool.
+    ///   - bufferingPolicy: How items are buffered while the consumer is slower than the relays.
+    /// - Returns: The subscription; its ``SubscriptionSequence/expectedRelays`` are the relays that
+    ///   accepted the REQ.
     /// - Throws: ``RelayPool/Error/emptyPool`` when the pool is empty,
     ///   ``RelayPool/Error/noMatchingRelays(_:)`` when none of the targeted URLs are in the
-    ///   pool, ``RelayPool/Error/subscriptionFailed`` when every relay fails to subscribe, or
-    ///   ``RelayPool/Error/subscriptionSuperseded`` when another subscribe under the same id
-    ///   replaced this one before it was established.
-    @discardableResult
+    ///   pool, or ``RelayPool/Error/subscriptionFailed`` when every relay fails to subscribe.
     public func subscribe(
-        subscriptionID: String,
         filters: [Filter],
         to relayURLs: Set<RelayURL>? = nil,
-        handler: @escaping @Sendable (RelayMessage) -> Void
-    ) async throws(Error) -> Int {
-        let successfulRelayURLs = try await subscribeWithRelayContext(
-            subscriptionID: subscriptionID,
-            filters: filters,
-            to: relayURLs
-        ) { relayMessage in
-            handler(relayMessage.message)
-        }
-
-        return successfulRelayURLs.count
-    }
-
-    /// Core of the subscribe paths, taking the target relays (nil = whole pool) and a
-    /// relay-aware handler.
-    @discardableResult
-    func subscribeWithRelayContext(
-        subscriptionID: String,
-        filters: [Filter],
-        to relayURLs: Set<RelayURL>?,
-        handler: @escaping @Sendable (RelaySubscriptionMessage) async -> Void
-    ) async throws(Error) -> Set<RelayURL> {
+        bufferingPolicy: AsyncStream<SubscriptionEvent>.Continuation.BufferingPolicy = .unbounded
+    ) async throws(Error) -> SubscriptionSequence {
         let connections = try targetConnections(relayURLs)
-
-        // Re-subscribing under an id already in use replaces the previous generation. Its tasks are
-        // cancelled, but cancellation alone does not stop a frame already in flight: the listener
-        // resolves the handler at delivery time, so a straggler would be handed to the *new*
-        // handler and every control message delivered twice. The generation is what a straggler
-        // fails, so only the current one delivers.
-        cancelListenerTasks(for: subscriptionID)
-        nextSubscriptionGeneration &+= 1
-        let generation = nextSubscriptionGeneration
-        subscriptionGeneration[subscriptionID] = generation
-        subscriptionHandlers[subscriptionID] = handler
-        // The dedup cache is scoped to the id, not the generation, and a fresh REQ makes the relay
-        // resend its stored events. Left in place, everything the previous generation already saw
-        // would be discarded as a duplicate before the new handler — which never received it — had
-        // a chance to.
-        eventCache.removeSubscription(subscriptionID)
+        let id = SubscriptionID.random()
+        let (stream, continuation) = AsyncStream.makeStream(
+            of: SubscriptionEvent.self,
+            bufferingPolicy: bufferingPolicy
+        )
+        continuation.onTermination = { [weak self] _ in
+            Task { await self?.unsubscribe(id: id) }
+        }
+        // Registered before anything suspends, so an `unsubscribeAll()` or `disconnectAll()` that
+        // runs while this subscription is being set up ends it too.
+        subscriptions[id] = ActiveSubscription(continuation: continuation)
 
         // Start listening for messages BEFORE sending the subscription request, so nothing that
         // arrives immediately after it is missed. `messages()` is awaited here rather than inside
         // the task: that registers the stream on the connection before this call proceeds, whereas
         // spawning a task and yielding only made it *likely* the registration had happened.
-        var tasks: [Task<Void, Never>] = []
+        var listeners: [Task<Void, Never>] = []
         for connection in connections {
             let messages = await connection.messages()
-            let task = Task {
-                for await message in messages {
-                    guard !Task.isCancelled else { break }
-                    let relayURL = connection.url
-                    switch message {
-                    case .event(let incomingID, let event) where incomingID == subscriptionID:
-                        // Deduplicate the copies of one event arriving from several relays,
-                        // scoped to this subscription so a different subscription matching the
-                        // same event still receives it.
-                        let isNewToSubscription = self.recordEvent(
-                            eventID: event.id,
-                            subscriptionID: subscriptionID
-                        )
-                        if isNewToSubscription,
-                            let currentHandler = self.handler(
-                                for: subscriptionID, generation: generation)
-                        {
-                            await currentHandler(
-                                RelaySubscriptionMessage(
-                                    relayURL: relayURL,
-                                    message: message
-                                )
-                            )
-                        }
-                    case .endOfStoredEvents(let incomingID) where incomingID == subscriptionID:
-                        if let currentHandler = self.handler(for: subscriptionID, generation: generation) {
-                            await currentHandler(
-                                RelaySubscriptionMessage(
-                                    relayURL: relayURL,
-                                    message: message
-                                )
-                            )
-                        }
-                    case .closed(let incomingID, _) where incomingID == subscriptionID:
-                        if let currentHandler = self.handler(for: subscriptionID, generation: generation) {
-                            await currentHandler(
-                                RelaySubscriptionMessage(
-                                    relayURL: relayURL,
-                                    message: message
-                                )
-                            )
-                        }
-                    case .notice, .auth:
-                        if let currentHandler = self.handler(for: subscriptionID, generation: generation) {
-                            await currentHandler(
-                                RelaySubscriptionMessage(
-                                    relayURL: relayURL,
-                                    message: message
-                                )
-                            )
-                        }
-                    default:
-                        break
+            let relayURL = connection.url
+            listeners.append(
+                Task {
+                    for await message in messages {
+                        guard !Task.isCancelled else { break }
+                        self.deliver(message, from: relayURL, to: id)
                     }
-                }
-            }
-            tasks.append(task)
+                })
         }
-        await listenersRegisteredHook?(subscriptionID)
-
-        // Registering the stream suspends, so another subscribe on this id may have run to
-        // completion in between. Publishing these tasks then would strand its listeners with no
-        // way to cancel them; this generation is finished instead.
-        guard subscriptionGeneration[subscriptionID] == generation else {
-            for task in tasks { task.cancel() }
-            throw .subscriptionSuperseded
+        // Registering the streams suspends, so the subscription may have been closed in between:
+        // its sequence has already ended, and these listeners have no one left to cancel them.
+        guard subscriptions[id] != nil else {
+            for listener in listeners { listener.cancel() }
+            return SubscriptionSequence(id: id, expectedRelays: [], stream: stream, onClose: {})
         }
-        subscriptionTasks[subscriptionID] = tasks
+        subscriptions[id]?.listeners = listeners
 
         // Now send subscription requests to all relays, tolerating failures
-        var successfulRelayURLs: Set<RelayURL> = []
+        var acceptingRelayURLs: Set<RelayURL> = []
 
         await withTaskGroup(of: RelayURL?.self) { group in
             for connection in connections {
                 group.addTask {
                     do {
-                        try await connection.subscribe(subscriptionID: subscriptionID, filters: filters)
+                        try await connection.subscribe(id: id, filters: filters)
                         return connection.url
                     } catch {
                         return nil
@@ -489,66 +387,98 @@ public actor RelayPool {
 
             for await relayURL in group {
                 if let relayURL {
-                    successfulRelayURLs.insert(relayURL)
+                    acceptingRelayURLs.insert(relayURL)
                 }
             }
         }
 
-        // A failed subscribe must not leak handler/listener/cache state when the pool is
-        // used directly.
-        // Only tear down what this generation registered: a newer subscribe on the same id may
-        // have replaced it while the REQs were in flight, and its state is not ours to remove.
-        if successfulRelayURLs.isEmpty {
-            if subscriptionGeneration[subscriptionID] == generation {
-                subscriptionHandlers.removeValue(forKey: subscriptionID)
-                cancelListenerTasks(for: subscriptionID)
-                subscriptionGeneration.removeValue(forKey: subscriptionID)
-                eventCache.removeSubscription(subscriptionID)
-            }
+        // No relay holds the subscription, so there is nothing to CLOSE — only this pool's state.
+        if acceptingRelayURLs.isEmpty {
+            removeSubscription(id)
             throw .subscriptionFailed
         }
+        // Closed while the REQs were in flight: its CLOSE may have reached a connection before the
+        // REQ did, leaving the subscription open on that relay, so close it again now.
+        if subscriptions[id] == nil {
+            await sendClose(id)
+        }
 
-        return successfulRelayURLs
+        return SubscriptionSequence(
+            id: id,
+            expectedRelays: acceptingRelayURLs,
+            stream: stream,
+            onClose: { [weak self] in
+                await self?.unsubscribe(id: id)
+            }
+        )
     }
 
-    /// The handler for `subscriptionID`, or nil when `generation` is no longer the current listener
-    /// generation — the id has since been re-subscribed, and this frame belongs to the old one.
-    private func handler(
-        for subscriptionID: String,
-        generation: UInt64
-    ) -> (@Sendable (RelaySubscriptionMessage) async -> Void)? {
-        guard subscriptionGeneration[subscriptionID] == generation else { return nil }
-        return subscriptionHandlers[subscriptionID]
-    }
-
-    /// Cancels and forgets the listener tasks for `subscriptionID`, if any.
-    private func cancelListenerTasks(for subscriptionID: String) {
-        guard let tasks = subscriptionTasks.removeValue(forKey: subscriptionID) else { return }
-        for task in tasks {
-            task.cancel()
+    /// Hands a message from `relayURL` to subscription `id` while it is open: its own EVENT, EOSE,
+    /// and CLOSED, and every NOTICE and AUTH challenge, which concern all of the relay's
+    /// subscriptions.
+    private func deliver(_ message: RelayMessage, from relayURL: RelayURL, to id: SubscriptionID) {
+        guard let continuation = subscriptions[id]?.continuation else { return }
+        switch message {
+        case .event(let subscriptionID, let event) where subscriptionID == id:
+            // Deduplicate the copies of one event arriving from several relays, scoped to this
+            // subscription so a different subscription matching the same event still receives it.
+            guard recordEvent(eventID: event.id, subscriptionID: id) else { return }
+            continuation.yield(.event(relayURL: relayURL, event: event))
+        case .endOfStoredEvents(let subscriptionID) where subscriptionID == id:
+            continuation.yield(.eose(relayURL: relayURL))
+        case .closed(let subscriptionID, let message) where subscriptionID == id:
+            continuation.yield(.closed(relayURL: relayURL, message: message))
+        case .notice(let message):
+            continuation.yield(.notice(relayURL: relayURL, message: message))
+        case .auth(let challenge):
+            continuation.yield(.auth(relayURL: relayURL, challenge: challenge))
+        default:
+            break
         }
     }
 
-    /// Unsubscribes from a subscription on all relays, discarding its deduplication cache.
+    /// Closes one subscription: ends its sequence, discards its deduplication cache, and sends
+    /// CLOSE to the relays. A no-op for an id this pool is not serving, so the call made again when
+    /// the sequence ends cannot send a second CLOSE.
     ///
     /// A CLOSE goes only to the connected relays holding the subscription; a disconnected,
     /// failed, or reconnecting relay is not reconnected to receive one (see
-    /// ``RelayConnection/unsubscribe(subscriptionID:)``). Best effort: a CLOSE that fails to send is
+    /// ``RelayConnection/unsubscribe(id:)``). Best effort: a CLOSE that fails to send is
     /// not reported.
-    public func unsubscribe(subscriptionID: String) async {
-        subscriptionHandlers.removeValue(forKey: subscriptionID)
-        cancelListenerTasks(for: subscriptionID)
-        subscriptionGeneration.removeValue(forKey: subscriptionID)
+    public func unsubscribe(id: SubscriptionID) async {
+        guard removeSubscription(id) else { return }
+        await sendClose(id)
+    }
 
-        eventCache.removeSubscription(subscriptionID)
+    /// Closes every subscription this pool is serving.
+    public func unsubscribeAll() async {
+        for id in subscriptions.keys {
+            await unsubscribe(id: id)
+        }
+    }
 
+    /// Sends CLOSE for `id` to every connected relay holding it.
+    private func sendClose(_ id: SubscriptionID) async {
         await withTaskGroup(of: Void.self) { group in
             for connection in relays.values {
                 group.addTask {
-                    await connection.unsubscribe(subscriptionID: subscriptionID)
+                    await connection.unsubscribe(id: id)
                 }
             }
         }
+    }
+
+    /// Forgets subscription `id` — cancelling its listeners, ending its sequence, and discarding
+    /// its deduplication cache — and returns whether it was open.
+    @discardableResult
+    private func removeSubscription(_ id: SubscriptionID) -> Bool {
+        guard let subscription = subscriptions.removeValue(forKey: id) else { return false }
+        for listener in subscription.listeners {
+            listener.cancel()
+        }
+        subscription.continuation.finish()
+        eventCache.removeSubscription(id)
+        return true
     }
 
     /// Returns all relay connections
@@ -580,25 +510,12 @@ public actor RelayPool {
         return connections
     }
 
-    /// The number of registered subscription handlers (test hook).
-    var subscriptionHandlerCount: Int { subscriptionHandlers.count }
+    /// The number of open subscriptions (test hook).
+    var subscriptionCount: Int { subscriptions.count }
 
-    /// The listener generation currently serving `subscriptionID` (for tests).
-    func subscriptionGeneration(for subscriptionID: String) -> UInt64? {
-        subscriptionGeneration[subscriptionID]
-    }
-
-    /// The number of listener tasks registered for `subscriptionID` (for tests).
-    func listenerTaskCount(for subscriptionID: String) -> Int {
-        subscriptionTasks[subscriptionID]?.count ?? 0
-    }
-
-    /// The number of subscriptions with live listener tasks (test hook).
-    var subscriptionTaskCount: Int { subscriptionTasks.count }
-
-    /// Installs ``listenersRegisteredHook`` (test hook).
-    func setListenersRegisteredHook(_ hook: (@Sendable (String) async -> Void)?) {
-        listenersRegisteredHook = hook
+    /// The number of listener tasks registered for subscription `id` (test hook).
+    func listenerTaskCount(for id: SubscriptionID) -> Int {
+        subscriptions[id]?.listeners.count ?? 0
     }
 
     /// Returns the number of relays in the pool
@@ -631,8 +548,8 @@ extension RelayPool {
 // MARK: - Event Deduplication
 extension RelayPool {
     /// Records that `subscriptionID` has seen `eventID`, returning whether it is new to that
-    /// subscription — that is, whether this copy should be delivered to its handler.
-    private func recordEvent(eventID: EventID, subscriptionID: String) -> Bool {
+    /// subscription — that is, whether this copy should be delivered to its sequence.
+    private func recordEvent(eventID: EventID, subscriptionID: SubscriptionID) -> Bool {
         expireCachedEventsIfNeeded()
         return eventCache.record(eventID: eventID, subscriptionID: subscriptionID)
     }
@@ -664,7 +581,7 @@ extension RelayPool {
     }
 
     /// The number of cached event IDs for a single subscription (test hook).
-    func deduplicationCacheSize(forSubscription subscriptionID: String) -> Int {
+    func deduplicationCacheSize(forSubscription subscriptionID: SubscriptionID) -> Int {
         eventCache.count(forSubscription: subscriptionID)
     }
 }
@@ -687,9 +604,6 @@ extension RelayPool {
         /// A ``PublishStrategy/quorum(_:)`` publish settled with fewer acknowledgments than it required
         /// (payload: the number of relays that accepted the event, and the quorum).
         case quorumNotMet(acknowledged: Int, required: Int)
-        /// Another subscribe under the same subscription id replaced this one before its REQs
-        /// were sent.
-        case subscriptionSuperseded
         /// Every targeted relay failed to accept the subscription.
         case subscriptionFailed
         /// Every relay in the pool failed to connect.
@@ -710,8 +624,6 @@ extension RelayPool {
                     "NIP-42 authentication events (kind 22242) must not be published; they are only sent as AUTH responses"
             case .quorumNotMet(let acknowledged, let required):
                 return "Publish quorum not met: \(acknowledged)/\(required) relays acknowledged"
-            case .subscriptionSuperseded:
-                return "The subscription was superseded before it was established"
             case .subscriptionFailed:
                 return "Failed to subscribe on any relay"
             case .allConnectionsFailed:
@@ -719,4 +631,12 @@ extension RelayPool {
             }
         }
     }
+}
+
+/// A subscription a ``RelayPool`` is serving.
+private struct ActiveSubscription {
+    /// Feeds the subscription's ``SubscriptionSequence``.
+    let continuation: AsyncStream<SubscriptionEvent>.Continuation
+    /// One task per targeted relay, reading its messages.
+    var listeners: [Task<Void, Never>] = []
 }
