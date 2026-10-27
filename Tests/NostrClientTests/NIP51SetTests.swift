@@ -141,7 +141,7 @@ struct NIP51SetTests {
         #expect(template.content == "")
 
         // Reading empty content back needs no decryption either.
-        let event = try await EventSigner(keyPair: try KeyPair()).sign(template)
+        let event = try EventSigner(keyPair: try KeyPair()).sign(template)
         let opened = try await NostrListSet(event: event, decryptingWith: FailingSigner())
         #expect(opened.privateItems.isEmpty)
         #expect(opened.publicItems == [.hashtag("nostr")])
@@ -181,7 +181,7 @@ struct NIP51SetTests {
     func decryptingInitRequiresIdentifier() async throws {
         let signer = EventSigner(keyPair: try KeyPair())
         let content = try signer.nip44Encrypt(#"[["t","secret"]]"#, to: signer.publicKey)
-        let event = try await signer.sign(
+        let event = try signer.sign(
             EventTemplate(kind: .bookmarkSet, tags: [.hashtag("nostr")], content: content))
 
         await #expect(throws: NostrListSet.Error.missingIdentifier) {
@@ -193,7 +193,7 @@ struct NIP51SetTests {
     func nonTagArrayContentThrows() async throws {
         let signer = EventSigner(keyPair: try KeyPair())
         let content = try signer.nip44Encrypt(#"{"not":"a tag array"}"#, to: signer.publicKey)
-        let event = try await signer.sign(
+        let event = try signer.sign(
             EventTemplate(kind: .bookmarkSet, tags: [.identifier("reading")], content: content))
 
         await #expect(throws: NostrListSet.Error.malformedPrivateItems) {

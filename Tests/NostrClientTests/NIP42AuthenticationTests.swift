@@ -73,7 +73,7 @@ struct NIP42AuthenticationEventTests {
         let pool = RelayPool()
         await pool.addRelay(RelayURL("wss://relay.example.com")!)
         let signer = EventSigner(keyPair: try KeyPair())
-        let authEvent = try await signer.sign(
+        let authEvent = try signer.sign(
             .clientAuthentication(
                 relayURL: RelayURL("wss://relay.example.com")!, challenge: "abc"))
 
@@ -216,7 +216,7 @@ struct NIP42RelayConnectionTests {
         try await connection.connect()
 
         let signer = EventSigner(keyPair: try KeyPair())
-        let note = try await signer.sign(.textNote("not an auth event"))
+        let note = try signer.sign(.textNote("not an auth event"))
 
         await #expect(throws: RelayConnection.Error.invalidAuthenticationEventKind(.textNote)) {
             try await connection.authenticate(with: note)
@@ -369,7 +369,7 @@ struct NIP42RelayConnectionTests {
         try await connection.connect()
 
         let signer = EventSigner(keyPair: try KeyPair())
-        let event = try await signer.sign(.textNote("gm"))
+        let event = try signer.sign(.textNote("gm"))
 
         let publishTask = Task { try await connection.publish(event) }
 

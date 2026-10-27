@@ -19,6 +19,10 @@ public struct StubRemoteSigner: NostrSigning {
         try EventSigner(keyPair: keyPair).sign(event)
     }
 
+    public func sign(_ template: EventTemplate) async throws -> Event {
+        try await sign(UnsignedEvent(template, publicKey: publicKey))
+    }
+
     public func nip44Encrypt(_ plaintext: String, to recipientPublicKey: PublicKey) async throws -> String {
         try EventSigner(keyPair: keyPair).nip44Encrypt(plaintext, to: recipientPublicKey)
     }

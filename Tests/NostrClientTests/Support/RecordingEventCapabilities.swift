@@ -66,7 +66,7 @@ actor RecordingEventCapabilities: NostrEventPublishing, NostrEventFetching {
     ) async throws -> PublishedEvent {
         templatePublishes.append(TemplatePublish(template: template, relayURLs: relayURLs, strategy: strategy))
         try checkTargets(relayURLs)
-        return PublishedEvent(event: try await signer.sign(template), result: cannedResult)
+        return PublishedEvent(event: try signer.sign(template), result: cannedResult)
     }
 
     func publish(

@@ -8,7 +8,7 @@ import Foundation
 /// define, and the properties stay mutable for adjusting a template before it is signed:
 ///
 /// ```swift
-/// let note = try await signer.sign(.textNote("gm"))
+/// let note = try signer.sign(.textNote("gm"))  // a local EventSigner signs synchronously
 ///
 /// var expiring = EventTemplate.textNote("gone in an hour")
 /// expiring.tags.append(.expiration(.now.advanced(by: .seconds(3600))))

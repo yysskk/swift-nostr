@@ -562,7 +562,7 @@ EventTemplate.groupJoinRequest(groupID: "abcdef")           // NIP-29 group fact
 var note = EventTemplate.textNote("expiring")
 note.tags.append(.expiration(.now.advanced(by: .seconds(3600))))
 note.createdAt = Timestamp(rawValue: 1_700_000_000)
-let event = try await signer.sign(note)                      // EventSigner: synchronous outside async code
+let event = try signer.sign(note)                            // EventSigner: synchronous
 let remote = try await bunker.sign(.textNote("gm"))         // any NostrSigning: async
 let unsigned = UnsignedEvent(note, publicKey: pk)            // the template under an explicit key
 ```
@@ -911,13 +911,13 @@ let signer = try EventSigner(nsec: "nsec1...")
 ### Signing Methods
 
 ```swift
-// Synchronous outside async code; inside it Swift picks the async NostrSigning overload, so add await.
-let note = try await signer.sign(.textNote("Hello"))     // any EventTemplate (see EventTemplate)
-let signed = try await signer.sign(unsignedEvent)        // a pre-keyed UnsignedEvent
-let meta = try await signer.sign(.metadata(UserMetadata(name: "Alice")))
-let contacts = try await signer.sign(.contactList([Contact(publicKey: alice)]))
+// Synchronous, without await even in async code.
+let note = try signer.sign(.textNote("Hello"))     // any EventTemplate (see EventTemplate)
+let signed = try signer.sign(unsignedEvent)        // a pre-keyed UnsignedEvent
+let meta = try signer.sign(.metadata(UserMetadata(name: "Alice")))
+let contacts = try signer.sign(.contactList([Contact(publicKey: alice)]))
 let pow = try await signer.sign(.textNote("Hello"), proofOfWork: 20)  // mine to 20 leading zero bits, then sign (NIP-13)
-let report = try await signer.sign(.report(author, type: .impersonation))  // kind 1984, NIP-56
+let report = try signer.sign(.report(author, type: .impersonation))  // kind 1984, NIP-56
 ```
 
 ### NIP-44 Encryption
@@ -930,19 +930,24 @@ let pt = try signer.nip44Decrypt(ct, from: senderPublicKey)
 
 ## NostrSigning
 
-A signer abstraction over a local key (`EventSigner`) and a remote NIP-46 signer (`RemoteSigner`, `NostrConnect` library), so callers can accept either interchangeably (protocol: Sendable). All requirements are `async throws` so a remote conformance may perform relay round-trips; `EventSigner` satisfies them synchronously. NIP-04 is intentionally excluded (legacy, NostrWalletConnect-only).
+A signer abstraction over a local key (`EventSigner`) and a remote NIP-46 signer (`RemoteSigner`, `NostrConnect` library), so callers can accept either interchangeably (protocol: Sendable). All requirements are `async throws` so a remote conformance may perform relay round-trips; `EventSigner` satisfies them synchronously, so a concrete `EventSigner` is called without `await`. NIP-04 is intentionally excluded (legacy, NostrWalletConnect-only).
 
 ```swift
 public protocol NostrSigning: Sendable {
     var publicKey: PublicKey { get async throws }   // author key (the user key for a remote signer)
     func sign(_ event: UnsignedEvent) async throws -> Event
+    func sign(_ template: EventTemplate) async throws -> Event   // no default: sign as publicKey
     func nip44Encrypt(_ plaintext: String, to recipientPublicKey: PublicKey) async throws -> String
     func nip44Decrypt(_ ciphertext: String, from senderPublicKey: PublicKey) async throws -> String
 }
 
-// Protocol extensions, for any signer: resolve publicKey, then sign (or mine, then sign).
+// A conformance implements the template requirement as a one-liner:
+//     func sign(_ template: EventTemplate) async throws -> Event {
+//         try await sign(UnsignedEvent(template, publicKey: publicKey))
+//     }
+
+// Protocol extension, for any signer: resolve publicKey, mine, then sign.
 extension NostrSigning {
-    func sign(_ template: EventTemplate) async throws -> Event
     func sign(_ template: EventTemplate, proofOfWork difficulty: Int) async throws -> Event  // NIP-13
 }
 
@@ -1295,7 +1300,7 @@ let naddr = try article.naddr(author: publicKey, relays: [try RelayURL(string: "
 let byCoord = try await client.events.fetchLongFormContent(naddr: naddr)
 
 // Sign without publishing
-let event = try await signer.sign(.longFormContent(article, draft: false))
+let event = try signer.sign(.longFormContent(article, draft: false))
 ```
 
 ## Groups (NIP-29)
@@ -1461,11 +1466,11 @@ The reason category of a NIP-56 report, kind 1984 (enum: String, Sendable, Hasha
 
 ```swift
 // Report a public key: the type rides on the "p" tag.
-let report = try await signer.sign(.report(author, type: .impersonation, reason: ""))   // PublicKey
+let report = try signer.sign(.report(author, type: .impersonation, reason: ""))   // PublicKey
 try await client.events.publishReport(publicKey: author, type: .impersonation)
 
 // Report an event: the type rides on the "e" tag, plus a bare "p" tag naming the author.
-let eventReport = try await signer.sign(.report(note, type: .illegal, reason: "against the law"))
+let eventReport = try signer.sign(.report(note, type: .illegal, reason: "against the law"))
 try await client.events.publishReport(event: note, type: .spam, reason: "unsolicited")
 ```
 

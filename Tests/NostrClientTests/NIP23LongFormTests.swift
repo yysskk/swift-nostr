@@ -242,7 +242,7 @@ struct NIP23LongFormTests {
     @Test("fetchLongFormContent(author:identifier:) keeps the newest version across relays")
     func fetchNewestWins() async throws {
         let signer = try makeSigner()
-        let older = try await signer.sign(
+        let older = try signer.sign(
             .longFormContent(
                 LongFormContent(
                     identifier: "same-d",
@@ -299,7 +299,7 @@ struct NIP23LongFormTests {
     func fetchByNAddr() async throws {
         let signer = try makeSigner()
         let article = LongFormContent(identifier: "coord-d", title: "Coordinated")
-        let event = try await signer.sign(.longFormContent(article, draft: false))
+        let event = try signer.sign(.longFormContent(article, draft: false))
 
         let mock = MockWebSocketSession()
         let pool = RelayPool(
@@ -337,7 +337,7 @@ struct NIP23LongFormTests {
     func fetchByNAddrFallsBackToThePool() async throws {
         let signer = try makeSigner()
         let article = LongFormContent(identifier: "fallback-d", title: "Fallback")
-        let event = try await signer.sign(.longFormContent(article, draft: false))
+        let event = try signer.sign(.longFormContent(article, draft: false))
         let (client, mock) = try await ConnectedClientFixture.make(relayURL: relayURL)
         let naddr = try article.naddr(author: signer.publicKey, relays: [RelayURL("wss://elsewhere.example.com")!])
 

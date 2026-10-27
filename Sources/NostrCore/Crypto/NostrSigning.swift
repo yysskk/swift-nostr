@@ -4,7 +4,8 @@
 /// The abstraction lets callers accept either a private key held in-process or a remote signer (a
 /// "bunker") that holds the key on the user's behalf, without knowing which. All requirements are
 /// `async throws` so a conformance is free to perform relay round-trips; a local ``EventSigner``
-/// satisfies them synchronously.
+/// satisfies them synchronously, so code holding an ``EventSigner`` itself signs without `await`,
+/// even inside async code, while code holding any `NostrSigning` awaits.
 ///
 /// NIP-04 is deliberately absent: it is legacy encryption whose only implementation lives in the
 /// NostrWalletConnect layer, and pulling it into this abstraction would force every signer to
@@ -27,6 +28,29 @@ public protocol NostrSigning: Sendable {
     ///   ``EventSigner/Error/publicKeyMismatch`` from a local ``EventSigner`` — or cannot be signed.
     func sign(_ event: UnsignedEvent) async throws -> Event
 
+    /// Signs `template` as this signer's ``publicKey``, returning the complete signed event.
+    ///
+    /// Works with any signer, local or remote:
+    ///
+    /// ```swift
+    /// let zap = try await bunker.sign(.zapRequest(to: alice, relays: [relay]))
+    /// ```
+    ///
+    /// A conformance must sign `template` under its own ``publicKey``, never another key. The
+    /// requirement has no default so that a local ``EventSigner`` exposes only its synchronous
+    /// method; a conformance keys the template with ``UnsignedEvent/init(_:publicKey:)`` and passes
+    /// it to ``sign(_:)-(UnsignedEvent)``, which applies the same public-key check:
+    ///
+    /// ```swift
+    /// func sign(_ template: EventTemplate) async throws -> Event {
+    ///     try await sign(UnsignedEvent(template, publicKey: publicKey))
+    /// }
+    /// ```
+    /// - Parameter template: The event to sign.
+    /// - Returns: The signed ``Event``, authored by this signer's ``publicKey``.
+    /// - Throws: Anything resolving ``publicKey`` or ``sign(_:)-(UnsignedEvent)`` throws.
+    func sign(_ template: EventTemplate) async throws -> Event
+
     /// Encrypts `plaintext` to `recipientPublicKey` with NIP-44 as this signer's identity.
     /// - Parameters:
     ///   - plaintext: The message to encrypt.
@@ -43,20 +67,6 @@ public protocol NostrSigning: Sendable {
 }
 
 extension NostrSigning {
-    /// Signs `template` as this signer's ``publicKey``, returning the complete signed event.
-    ///
-    /// Works with any signer, local or remote:
-    ///
-    /// ```swift
-    /// let zap = try await bunker.sign(.zapRequest(to: alice, relays: [relay]))
-    /// ```
-    /// - Parameter template: The event to sign.
-    /// - Returns: The signed ``Event``.
-    /// - Throws: Anything resolving ``publicKey`` or signing throws.
-    public func sign(_ template: EventTemplate) async throws -> Event {
-        try await sign(UnsignedEvent(template, publicKey: publicKey))
-    }
-
     /// Mines `template` to the given NIP-13 difficulty (leading zero bits) as this signer's
     /// ``publicKey``, then signs it.
     ///

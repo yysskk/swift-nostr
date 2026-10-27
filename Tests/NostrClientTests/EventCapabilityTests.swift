@@ -367,7 +367,7 @@ struct EventCapabilityTests {
         var impostor = try EventTemplate.metadata(UserMetadata(name: "Impostor"))
         impostor.createdAt = Timestamp(rawValue: 1_800_000_000)
         let stub = try makeStub(cannedEvents: [
-            try await author.sign(older), try await stranger.sign(impostor), try await author.sign(newer),
+            try author.sign(older), try stranger.sign(impostor), try author.sign(newer),
         ])
 
         let metadata = try await stub.fetchMetadata(publicKey: author.publicKey)
@@ -382,8 +382,8 @@ struct EventCapabilityTests {
     @Test("fetchLongFormContent by author and identifier filters on both and keeps the matching article")
     func fetchLongFormContentByAuthor() async throws {
         let author = EventSigner(keyPair: try KeyPair())
-        let wanted = try await author.sign(.longFormContent(LongFormContent(identifier: "essay", title: "Wanted")))
-        let otherIdentifier = try await author.sign(
+        let wanted = try author.sign(.longFormContent(LongFormContent(identifier: "essay", title: "Wanted")))
+        let otherIdentifier = try author.sign(
             .longFormContent(LongFormContent(identifier: "other", title: "Other")))
         let stub = try makeStub(cannedEvents: [otherIdentifier, wanted])
 
@@ -403,7 +403,7 @@ struct EventCapabilityTests {
     func fetchByNAddrUsesPooledHints() async throws {
         let author = EventSigner(keyPair: try KeyPair())
         let article = LongFormContent(identifier: "essay", title: "Hinted")
-        let stored = try await author.sign(.longFormContent(article))
+        let stored = try author.sign(.longFormContent(article))
         let stub = try makeStub(pooledRelays: [relayA], cannedEvents: [stored])
         let naddr = try article.naddr(author: author.publicKey, relays: [relayA, relayB])
 
@@ -423,7 +423,7 @@ struct EventCapabilityTests {
     func fetchByNAddrFallsBackWhenNoHintIsPooled() async throws {
         let author = EventSigner(keyPair: try KeyPair())
         let article = LongFormContent(identifier: "essay", title: "Fallback")
-        let stored = try await author.sign(.longFormContent(article))
+        let stored = try author.sign(.longFormContent(article))
         let stub = try makeStub(pooledRelays: [relayA], cannedEvents: [stored])
         let naddr = try article.naddr(author: author.publicKey, relays: [relayB])
 
@@ -441,9 +441,9 @@ struct EventCapabilityTests {
         let author = EventSigner(keyPair: try KeyPair())
         let article = LongFormContent(identifier: "essay", title: "Unhinted")
         // A draft under the same identifier is another kind, so the coordinate does not select it.
-        let draft = try await author.sign(
+        let draft = try author.sign(
             .longFormContent(LongFormContent(identifier: "essay", title: "Draft"), draft: true))
-        let stub = try makeStub(cannedEvents: [draft, try await author.sign(.longFormContent(article))])
+        let stub = try makeStub(cannedEvents: [draft, try author.sign(.longFormContent(article))])
         let naddr = try article.naddr(author: author.publicKey)
 
         let fetched = try await stub.fetchLongFormContent(naddr: naddr)

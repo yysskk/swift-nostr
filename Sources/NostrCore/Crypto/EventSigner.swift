@@ -3,6 +3,10 @@ import Foundation
 import P256K
 
 /// Handles signing and verification of Nostr events
+///
+/// A local ``NostrSigning`` source: it signs and encrypts synchronously with the key it holds, so
+/// its methods are called without `await` — in async code too — unless it is used as a
+/// `NostrSigning`.
 public struct EventSigner: Sendable {
     /// The signer's key pair. `private`: nothing outside this type reads the private key —
     /// callers that need one go through ``NostrSigning``, whose signing and NIP-44 requirements
@@ -71,7 +75,8 @@ public struct EventSigner: Sendable {
 
     /// Signs `template` as this signer's ``publicKey``, returning the complete signed event.
     ///
-    /// The synchronous counterpart of ``NostrSigning/sign(_:)-(EventTemplate)``:
+    /// This method satisfies ``NostrSigning/sign(_:)-(EventTemplate)`` synchronously, so an
+    /// ``EventSigner`` signs a template without `await`, in synchronous and async code alike:
     ///
     /// ```swift
     /// let note = try signer.sign(.textNote("gm"))

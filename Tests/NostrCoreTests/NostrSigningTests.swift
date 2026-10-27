@@ -44,6 +44,18 @@ struct NostrSigningTests {
         #expect(try event.verify())
     }
 
+    @Test("an EventSigner signs a template synchronously in async code, without await")
+    func eventSignerSignsTemplateWithoutAwaitInAsyncCode() async throws {
+        let keyPair = try KeyPair()
+        let signer = EventSigner(keyPair: keyPair)
+
+        let event = try signer.sign(EventTemplate.textNote("gm"))
+
+        #expect(event.publicKey == keyPair.publicKey)
+        #expect(event.content == "gm")
+        #expect(try event.verify())
+    }
+
     @Test("sign(_:) resolves the public key of a signer that is not an EventSigner")
     func signTemplateThroughRemoteSigner() async throws {
         let keyPair = try KeyPair()

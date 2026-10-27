@@ -54,7 +54,7 @@ struct RoutingCapabilityTests {
         let routing: any NostrRelayRouting = stub
         let relayList = RelayListMetadata(read: [readRelay], write: [writeRelay])
         let dmRelayList = DirectMessageRelayList(relays: [inboxRelay])
-        let note = try await signer.sign(.textNote("gossip"))
+        let note = try signer.sign(.textNote("gossip"))
 
         let relayListEvent = try await routing.publishRelayList(relayList)
         let dmRelayListEvent = try await routing.publishDirectMessageRelayList(dmRelayList)
