@@ -31,7 +31,7 @@ struct RequestResponseSessionTests {
 
     /// Starts `session`, resolving each incoming event's request — keyed by its `e` tag — with the
     /// event's content, the way an owner resolves a request once it has decoded the response.
-    private func start(_ session: Session) async throws {
+    private func start(_ session: Session, onEnded: @escaping Session.EndHandler = {}) async throws {
         try await session.ensureStarted(subscriptionID: Self.subscriptionID, filters: [Filter(kinds: [1])]) {
             [weak session] event in
             guard let session, let key = event.firstTagValue(named: "e") else { return }
@@ -39,6 +39,8 @@ struct RequestResponseSessionTests {
                 state.append(event.content)
                 return .resolved(state)
             }
+        } onEnded: {
+            await onEnded()
         }
     }
 
@@ -338,6 +340,46 @@ struct RequestResponseSessionTests {
         #expect(try await pending.value == ["a-done"])
     }
 
+    /// Owners finish the streams they feed from the handler when told the session has ended, so
+    /// a consumer iterating one is not left suspended on a connection that is gone.
+    @Test("the owner is told once when the event stream ends")
+    func ownerIsToldWhenEventStreamEnds() async throws {
+        let transport = FakeTransport()
+        let session = makeSession(transport)
+        let ends = EndCounter()
+        try await start(session) { await ends.record() }
+
+        await transport.endEvents()
+        try await pollUntil { await ends.count == 1 }
+
+        // Restarting and disconnecting reports nothing more: the owner asked for that teardown.
+        try await start(session) { await ends.record() }
+        await session.disconnect()
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(await ends.count == 1)
+    }
+
+    /// The owner finishes its streams on its own actor, after the session has already cleared its
+    /// started state. A restart in that window must wait, or a stream the owner opens on the new
+    /// session would be finished by the late notice about the old one.
+    @Test("a restart waits until the owner has handled the previous session's end")
+    func restartWaitsForEndHandler() async throws {
+        let transport = FakeTransport()
+        let session = makeSession(transport)
+        let ends = EndCounter()
+        try await start(session) {
+            try? await Task.sleep(for: .milliseconds(50))
+            await ends.record()
+        }
+
+        await transport.endEvents()
+        try await pollUntil { await !session.isStarted }
+        try await start(session)
+
+        #expect(await ends.count == 1)
+        #expect(await transport.connectCount == 2)
+    }
+
     private func pollUntil(_ condition: @Sendable () async -> Bool) async throws {
         for _ in 0..<400 {
             if await condition() { return }
@@ -391,6 +433,15 @@ struct RequestResponseSessionTests {
         try await transport.waitForSend(key, count: sent + 1)
         await transport.deliver(self.response(for: key, content: "\(key)-done"))
         return try await response
+    }
+}
+
+/// Counts the end notices a session sends its owner.
+private actor EndCounter {
+    private(set) var count = 0
+
+    func record() {
+        count += 1
     }
 }
 

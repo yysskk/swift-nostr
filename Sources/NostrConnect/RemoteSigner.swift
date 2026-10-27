@@ -243,10 +243,7 @@ public actor RemoteSigner {
         // Fail a pending awaitConnection() waiter, if any.
         failConnection(with: .notConnected)
 
-        for stream in authChallengeStreams.values {
-            stream.finish()
-        }
-        authChallengeStreams.removeAll()
+        finishAuthChallengeStreams()
         // Every in-flight request is failed below, so no deadline is still owed an answer. Left
         // behind, these accumulate one entry per request that ended any way other than the signer
         // eventually replying — an abandoned `auth_url` prompt, a timeout, a teardown.
@@ -262,6 +259,9 @@ public actor RemoteSigner {
             filters: [responseFilter]
         ) { [weak self] event in
             await self?.handle(event: event)
+        } onEnded: { [weak self] in
+            // The relays' streams ended: no challenge can arrive on this session any more.
+            await self?.finishAuthChallengeStreams()
         }
     }
 
@@ -271,8 +271,10 @@ public actor RemoteSigner {
     /// (typically in a browser); the originating request stays pending until the signer answers it
     /// or the ``Config/authChallengeTimeout`` elapses.
     ///
-    /// Multiple concurrent streams are supported; each ends when its task is cancelled or the
-    /// session is disconnected.
+    /// Multiple concurrent streams are supported; each finishes when its task is cancelled or the
+    /// session ends — on ``disconnect()``, or when the relays' streams end because automatic
+    /// reconnection gave up. Call this again for a fresh stream: it receives the challenges of the
+    /// next request, which reconnects.
     public func authChallenges() -> AsyncStream<RemoteSignerAuthChallenge> {
         let id = UUID()
         let (stream, continuation) = AsyncStream<RemoteSignerAuthChallenge>.makeStream()
@@ -285,6 +287,14 @@ public actor RemoteSigner {
 
     private func removeAuthChallengeStream(_ id: UUID) {
         authChallengeStreams[id] = nil
+    }
+
+    /// Ends every open auth-challenge stream, so a consumer's `for await` loop exits.
+    private func finishAuthChallengeStreams() {
+        for stream in authChallengeStreams.values {
+            stream.finish()
+        }
+        authChallengeStreams.removeAll()
     }
 
     // MARK: - Requests

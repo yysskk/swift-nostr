@@ -60,4 +60,72 @@ struct WalletConnectNotificationTests {
         #expect(info.negotiatedEncryption == .nip44)
         #expect(await connection.info?.methods.contains(.getBalance) == true)
     }
+
+    // MARK: - Stream lifetime
+
+    /// The merged event stream ends when every relay's has — automatic reconnection gave up, or the
+    /// connections went away. No notification can arrive after that, so a stream left open would
+    /// keep its consumer's `for await` loop suspended forever, with nothing saying why.
+    @Test("notification streams finish when the relays' event stream ends", .timeLimit(.minutes(1)))
+    func notificationStreamsFinishWhenEventStreamEnds() async throws {
+        let transport = FakeWalletConnectTransport()
+        let connection = WalletConnection(
+            uri: try NWCFixtures.uri(wallet: KeyPair(), client: KeyPair()), transport: transport)
+        let first = try await connection.notifications()
+        let second = try await connection.notifications()
+        let drained = Task {
+            var received = 0
+            for await _ in first { received += 1 }
+            return received
+        }
+
+        await transport.endEvents()
+
+        #expect(await drained.value == 0)
+        var iterator = second.makeAsyncIterator()
+        #expect(await iterator.next() == nil)
+    }
+
+    @Test("notifications() after the event stream ended reconnects and returns a live stream", .timeLimit(.minutes(1)))
+    func notificationsAfterEventStreamEndedReconnects() async throws {
+        let wallet = try KeyPair()
+        let client = try KeyPair()
+        let transport = FakeWalletConnectTransport()
+        let connection = WalletConnection(
+            uri: try NWCFixtures.uri(wallet: wallet, client: client), transport: transport)
+        let ended = try await connection.notifications()
+        await transport.endEvents()
+        for await _ in ended {}
+
+        var iterator = try await connection.notifications().makeAsyncIterator()
+        #expect(await transport.connectCount == 2)
+
+        await transport.emit(
+            try NWCFixtures.notification(
+                notificationJSON: #"{"notification_type":"payment_received","notification":{"amount":1000}}"#,
+                kind: .walletConnectNotification, client: client, wallet: wallet, scheme: .nip44))
+        #expect(await iterator.next()?.type == "payment_received")
+    }
+
+    @Test("disconnect finishes notification streams, and one opened afterwards stays live", .timeLimit(.minutes(1)))
+    func disconnectFinishesNotificationStreams() async throws {
+        let wallet = try KeyPair()
+        let client = try KeyPair()
+        let transport = FakeWalletConnectTransport()
+        let connection = WalletConnection(
+            uri: try NWCFixtures.uri(wallet: wallet, client: client), transport: transport)
+        let old = try await connection.notifications()
+        await connection.disconnect()
+        for await _ in old {}
+
+        var iterator = try await connection.notifications().makeAsyncIterator()
+        // Give the disconnected session's reader every chance to wake and finish the new stream.
+        try await Task.sleep(for: .milliseconds(200))
+
+        await transport.emit(
+            try NWCFixtures.notification(
+                notificationJSON: #"{"notification_type":"payment_sent","notification":{"amount":2000}}"#,
+                kind: .walletConnectNotification, client: client, wallet: wallet, scheme: .nip44))
+        #expect(await iterator.next()?.type == "payment_sent")
+    }
 }

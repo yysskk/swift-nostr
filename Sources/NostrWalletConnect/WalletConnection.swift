@@ -90,10 +90,7 @@ public actor WalletConnection {
         pendingInfo?.finish(throwing: WalletConnectError.notConnected)
         pendingInfo = nil
 
-        for stream in notificationStreams.values {
-            stream.finish()
-        }
-        notificationStreams.removeAll()
+        finishNotificationStreams()
 
         await session.disconnect()
     }
@@ -106,6 +103,9 @@ public actor WalletConnection {
             filters: [responseFilter]
         ) { [weak self] event in
             await self?.handle(event)
+        } onEnded: { [weak self] in
+            // The relays' streams ended: no notification can arrive on this connection any more.
+            await self?.finishNotificationStreams()
         }
     }
 
@@ -168,6 +168,10 @@ public actor WalletConnection {
     ///
     /// Starts the connection if it isn't already, so a caller can subscribe to notifications without
     /// first issuing a command or calling ``connect()``.
+    ///
+    /// The stream finishes when the connection ends — on ``disconnect()``, or when the relays'
+    /// streams end because automatic reconnection gave up. Call this again for a fresh stream: it
+    /// reconnects first.
     public func notifications() async throws -> AsyncStream<WalletConnectNotification> {
         try await ensureStarted()
         let id = UUID()
@@ -181,6 +185,14 @@ public actor WalletConnection {
 
     private func removeNotificationStream(_ id: UUID) {
         notificationStreams[id] = nil
+    }
+
+    /// Ends every open notification stream, so a consumer's `for await` loop exits.
+    private func finishNotificationStreams() {
+        for stream in notificationStreams.values {
+            stream.finish()
+        }
+        notificationStreams.removeAll()
     }
 
     // MARK: - Sending

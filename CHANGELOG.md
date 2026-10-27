@@ -710,6 +710,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `addTagQuery(.publicKey, …)` was stored apart from `eventReferences` and `publicKeyReferences`,
   so a filter holding both wrote two values to the same `#e` or `#p` key, and decoding never
   restored the generic query. Each tag query now has a single value, encoded once.
+- **Notification and auth-challenge streams finish when the relays' streams end**: once automatic
+  reconnection gave up, `WalletConnection` and `RemoteSigner` failed their in-flight requests but
+  left every `notifications()` and `authChallenges()` stream open, so a `for await` over one never
+  ended. They now finish, as they do on `disconnect()`; call either method again for a fresh stream,
+  which the next request (or `notifications()` itself) reconnects to serve.
 
 ## [0.8.0] - 2026-10-25
 
