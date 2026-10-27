@@ -11,7 +11,7 @@ struct DirectMessageRelayDiscoveryTests {
     /// A signed-in client backed by one connected mock relay that acks publishes.
     private func makeClient() async throws -> (NostrClient, MockWebSocketSession) {
         let (client, socket) = try await ConnectedClientFixture.make()
-        try await client.identity.setPrivateKey(String(repeating: "1", count: 64))
+        try await client.identity.setSigner(EventSigner(privateKey: PrivateKey(hex: String(repeating: "1", count: 64))))
         return (client, socket)
     }
 

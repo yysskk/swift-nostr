@@ -16,7 +16,7 @@ struct DirectMessageRoutingTests {
     func connectOwnInbox() async throws {
         let (client, socket) = try await ConnectedClientFixture.make(
             relayURL: inboxURL, gossipPolicy: .requirePresent)
-        try await client.identity.setPrivateKey(String(repeating: "1", count: 64))
+        try await client.identity.setSigner(EventSigner(privateKey: PrivateKey(hex: String(repeating: "1", count: 64))))
 
         // Advertise (and cache) the user's own DM inbox relays; only
         // inbox.example.com is present in the pool.
@@ -88,7 +88,7 @@ struct DirectMessageRoutingTests {
     @Test("messages.send on an empty pool throws emptyPool")
     func sendOnEmptyPoolThrows() async throws {
         let client = NostrClient()
-        try await client.identity.setPrivateKey(String(repeating: "1", count: 64))
+        try await client.identity.setSigner(EventSigner(privateKey: PrivateKey(hex: String(repeating: "1", count: 64))))
         let recipient = KeyPair()
 
         // Empty pool, no cached lists: the recipient copy's pool fallback finds nothing.
@@ -100,7 +100,7 @@ struct DirectMessageRoutingTests {
     @Test("messages.send falls back to the pool when no DM relay list is known")
     func sendFallsBackToPool() async throws {
         let (client, socket) = try await ConnectedClientFixture.make()
-        try await client.identity.setPrivateKey(String(repeating: "1", count: 64))
+        try await client.identity.setSigner(EventSigner(privateKey: PrivateKey(hex: String(repeating: "1", count: 64))))
         let recipient = KeyPair()
         let sender = await client.identity.publicKey!
         // Confirmed-absent DM relay lists: both copies fall back to the pool's relay

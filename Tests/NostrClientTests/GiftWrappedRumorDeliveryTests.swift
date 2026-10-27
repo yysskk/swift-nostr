@@ -23,7 +23,7 @@ struct GiftWrappedRumorDeliveryTests {
     @Test("a custom-kind rumor reaches the recipient and the self-copy via the pool fallback")
     func deliversCustomKindRumor() async throws {
         let (client, socket) = try await ConnectedClientFixture.make()
-        try await client.identity.setPrivateKey(senderKey)
+        try await client.identity.setSigner(EventSigner(privateKey: PrivateKey(hex: senderKey)))
         let sender = try KeyPair(privateKey: PrivateKey(hex: senderKey))
         let recipient = KeyPair()
         await client.dmRelayListStore.markNoList(for: recipient.publicKey)
@@ -70,7 +70,7 @@ struct GiftWrappedRumorDeliveryTests {
         try await pool.addRelay(poolURL).connect()
         try await pool.addRelay(inboxURL).connect()
         let client = NostrClient(relayPool: pool, gossipPolicy: .requirePresent)
-        try await client.identity.setPrivateKey(senderKey)
+        try await client.identity.setSigner(EventSigner(privateKey: PrivateKey(hex: senderKey)))
         let sender = try KeyPair(privateKey: PrivateKey(hex: senderKey))
         let recipient = KeyPair()
         await client.dmRelayListStore.store(
@@ -97,7 +97,7 @@ struct GiftWrappedRumorDeliveryTests {
     @Test("an expiration is set on both gift wraps")
     func expirationOnBothWraps() async throws {
         let (client, socket) = try await ConnectedClientFixture.make()
-        try await client.identity.setPrivateKey(senderKey)
+        try await client.identity.setSigner(EventSigner(privateKey: PrivateKey(hex: senderKey)))
         let sender = try KeyPair(privateKey: PrivateKey(hex: senderKey))
         let recipient = KeyPair()
         await client.dmRelayListStore.markNoList(for: recipient.publicKey)
@@ -120,7 +120,7 @@ struct GiftWrappedRumorDeliveryTests {
     @Test("the rumor is authored under the signer's key at the template's creation time")
     func rumorIsAuthoredUnderSignerKey() async throws {
         let (client, socket) = try await ConnectedClientFixture.make()
-        try await client.identity.setPrivateKey(senderKey)
+        try await client.identity.setSigner(EventSigner(privateKey: PrivateKey(hex: senderKey)))
         let sender = try KeyPair(privateKey: PrivateKey(hex: senderKey))
         let recipient = KeyPair()
         await client.dmRelayListStore.markNoList(for: recipient.publicKey)
@@ -145,7 +145,7 @@ struct GiftWrappedRumorDeliveryTests {
     @Test("an empty pool throws emptyPool")
     func emptyPoolThrows() async throws {
         let client = NostrClient()
-        try await client.identity.setPrivateKey(senderKey)
+        try await client.identity.setSigner(EventSigner(privateKey: PrivateKey(hex: senderKey)))
         let recipient = KeyPair()
 
         await #expect(throws: RelayPool.Error.emptyPool) {

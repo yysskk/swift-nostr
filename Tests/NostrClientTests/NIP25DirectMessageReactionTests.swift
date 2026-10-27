@@ -165,7 +165,7 @@ struct NIP25DirectMessageReactionTests {
     @Test("messages.react targets the message author and falls back to the pool")
     func reactRoutingFallsBackToPool() async throws {
         let (client, socket) = try await ConnectedClientFixture.make()
-        try await client.identity.setPrivateKey(String(repeating: "1", count: 64))
+        try await client.identity.setSigner(EventSigner(privateKey: PrivateKey(hex: String(repeating: "1", count: 64))))
         let author = KeyPair()
 
         let myPublicKey = try #require(await client.identity.publicKey)

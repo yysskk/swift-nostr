@@ -9,7 +9,7 @@ NostrClient implements NIP-17 private direct messages using NIP-44 encryption an
 ### Sending
 
 ```swift
-try await client.identity.setNsec("nsec1...")
+try await client.identity.setSigner(EventSigner(nsec: "nsec1..."))
 
 let recipient = try PublicKey(npub: "npub1...")
 let result = try await client.messages.send(
@@ -373,7 +373,7 @@ re-requested after authentication succeeds:
 
 ```swift
 let client = NostrClient()
-try await client.identity.setNsec("nsec1...")  // automatic from here on
+try await client.identity.setSigner(EventSigner(nsec: "nsec1..."))  // automatic from here on
 ```
 
 Automatic authentication reveals the signer's public key to any relay that asks. Switch to
@@ -445,11 +445,11 @@ Through ``NostrClient``, each relay's rejection is the error in its
 
 ## Remote Signing (NIP-46)
 
-``NostrIdentityAPI/setSigner(_:)-(NostrSigning)`` accepts any `NostrSigning` — a local
+``NostrIdentityAPI/setSigner(_:)`` accepts any `NostrSigning` — a local
 ``EventSigner`` or a remote NIP-46 signer (a `RemoteSigner` from the `NostrConnect`
 library), so the private key can live in a separate "bunker" the app never touches. The signer's
 public key is resolved once and cached, so ``NostrIdentityAPI/publicKey`` stays a single actor
-hop.
+hop. ``NostrIdentityAPI/removeSigner()`` clears it again, for example on sign-out.
 
 Every feature runs through the signer, so a remote one is a drop-in for a local key: the generic
 ``NostrIdentityAPI/sign(_:)`` and

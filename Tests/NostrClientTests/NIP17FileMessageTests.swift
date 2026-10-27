@@ -167,7 +167,7 @@ struct NIP17FileMessageTests {
     func clientSendFileRoundTrip() async throws {
         let (client, socket) = try await ConnectedClientFixture.make()
         let senderKey = KeyPair()
-        try await client.identity.setPrivateKey(senderKey.privateKey.hex)
+        try await client.identity.setSigner(EventSigner(keyPair: senderKey))
         let recipient = KeyPair()
         let encrypted = EncryptedFile.encrypt(Data("x".utf8))
         let url = try #require(URL(string: "https://files.example.com/1"))

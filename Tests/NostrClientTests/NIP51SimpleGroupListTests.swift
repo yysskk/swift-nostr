@@ -362,7 +362,7 @@ struct NIP51SimpleGroupListClientTests {
         try await firstConnection.connect()
         let secondConnection = await client.relays.pool.addRelay(secondRelayURL)
         try await secondConnection.connect()
-        await client.identity.setSigner(EventSigner(keyPair: KeyPair()))
+        try await client.identity.setSigner(EventSigner(keyPair: KeyPair()))
 
         let typed = SimpleGroupList(
             publicEntries: [GroupListEntry(groupID: groupID, relayURL: groupRelay, name: "Cooking")],
@@ -434,7 +434,7 @@ struct NIP51SimpleGroupListClientTests {
         let (client, socket) = makeClient()
         try await client.relays.connect(to: [firstRelayURL])
         let signer = EventSigner(keyPair: KeyPair())
-        await client.identity.setSigner(signer)
+        try await client.identity.setSigner(signer)
         let typed = SimpleGroupList(
             publicEntries: [GroupListEntry(groupID: groupID, relayURL: groupRelay)],
             privateEntries: [GroupListEntry(groupID: "5ec4e7", relayURL: RelayURL("wss://hidden.example.com")!)],

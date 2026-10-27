@@ -126,7 +126,7 @@ struct ExtendingTheClientTests {
     func capabilityHelperOnClient() async throws {
         let (client, socket) = try await ConnectedClientFixture.make(relayURL: relayURL)
         let signer = EventSigner(keyPair: KeyPair())
-        await client.identity.setSigner(signer)
+        try await client.identity.setSigner(signer)
         let expiration = Timestamp.now.advanced(by: .seconds(3600))
 
         let published = try await PublishAckSupport.acknowledgingPublishes(on: socket) {
@@ -169,7 +169,7 @@ struct ExtendingTheClientTests {
     func namespaceSignsThroughClient() async throws {
         let client = NostrClient()
         let signer = EventSigner(keyPair: KeyPair())
-        await client.identity.setSigner(signer)
+        try await client.identity.setSigner(signer)
         let recipient = KeyPair().publicKey
 
         let request = try await client.zaps.signRequest(
@@ -187,7 +187,7 @@ struct ExtendingTheClientTests {
     func namespaceFetchesThroughClient() async throws {
         let (client, socket) = try await ConnectedClientFixture.make(relayURL: relayURL)
         let signer = EventSigner(keyPair: KeyPair())
-        await client.identity.setSigner(signer)
+        try await client.identity.setSigner(signer)
         let receipt = try makeReceipt(paying: signer.publicKey, amountMillisats: 21_000)
 
         let task = Task { try await client.zaps.received(limit: 10) }
@@ -212,7 +212,7 @@ struct ExtendingTheClientTests {
         let receipt = try makeReceipt(paying: signer.publicKey, amountMillisats: 5_000)
         let events = RecordingEventCapabilities(signer: signer, cannedEvents: [receipt])
         let identity = RecordingIdentityCapabilities()
-        await identity.setSigner(signer)
+        try await identity.setSigner(signer)
         let zaps = ZapsAPI(events: events, identity: identity)
 
         let receipts = try await zaps.received()
@@ -229,7 +229,7 @@ struct ExtendingTheClientTests {
     func namespaceWithMinimalStubAndClientIdentity() async throws {
         let client = NostrClient()
         let signer = EventSigner(keyPair: KeyPair())
-        await client.identity.setSigner(signer)
+        try await client.identity.setSigner(signer)
         let receipt = try makeReceipt(paying: signer.publicKey, amountMillisats: 21_000)
         let events = CannedEvents([receipt])
         let zaps = ZapsAPI(events: events, identity: client.identity)

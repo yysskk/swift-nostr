@@ -3,16 +3,8 @@ import NostrClient
 import NostrCore
 
 /// A stand-in for ``NostrIdentityAPI`` that implements only the ``NostrIdentityProviding``
-/// primitives: it records which signer overload installed which signer, so the protocol extension
-/// can be exercised without a client.
+/// requirements, so a composed namespace can be exercised without a client.
 actor RecordingIdentityCapabilities: NostrIdentityProviding {
-    /// One signer installation, by the overload that received it.
-    enum Installation: Sendable {
-        case local(EventSigner)
-        case any(any NostrSigning)
-    }
-
-    private(set) var installations: [Installation] = []
     private(set) var authenticatedRelays: [RelayURL] = []
     private var signer: (any NostrSigning)?
     private var cachedPublicKey: PublicKey?
@@ -20,16 +12,14 @@ actor RecordingIdentityCapabilities: NostrIdentityProviding {
 
     // MARK: - NostrIdentityProviding
 
-    func setSigner(_ signer: EventSigner) async {
-        installations.append(.local(signer))
-        self.signer = signer
-        cachedPublicKey = signer.publicKey
-    }
-
-    func setSigner(_ signer: any NostrSigning) async throws {
-        installations.append(.any(signer))
+    func setSigner(_ signer: some NostrSigning) async throws {
         cachedPublicKey = try await signer.publicKey
         self.signer = signer
+    }
+
+    func removeSigner() async {
+        signer = nil
+        cachedPublicKey = nil
     }
 
     var publicKey: PublicKey? {

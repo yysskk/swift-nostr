@@ -210,7 +210,7 @@ struct MessagingCapabilityTests {
     @Test("client.messages.open returns the message, reaction, or file a gift wrap carries")
     func clientOpenClassifiesEachPayload() async throws {
         let client = NostrClient()
-        try await client.identity.setPrivateKey(bob.privateKey.hex)
+        try await client.identity.setSigner(EventSigner(keyPair: bob))
         let message = try await fromAlice.createMessageWithSelfCopy(content: "hi", to: bob.publicKey)
         let reaction = try await fromAlice.createReactionWithSelfCopy(
             reaction: "🤙", to: message.rumor.id, author: alice.publicKey, recipientPublicKey: bob.publicKey)
@@ -234,7 +234,7 @@ struct MessagingCapabilityTests {
     @Test("client.messages.open throws unexpectedKind for a rumor that is not a message, reaction, or file")
     func clientOpenRejectsOtherKinds() async throws {
         let client = NostrClient()
-        try await client.identity.setPrivateKey(bob.privateKey.hex)
+        try await client.identity.setSigner(EventSigner(keyPair: bob))
         let giftWrap = try await GiftWrap.wrap(
             .textNote("not a DM"), signer: EventSigner(keyPair: alice), to: bob.publicKey)
 

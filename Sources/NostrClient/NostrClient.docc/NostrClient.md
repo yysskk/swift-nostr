@@ -17,7 +17,7 @@ The lower-level primitives it builds on — the event model, keys and signing, N
 import NostrClient
 
 let client = NostrClient()
-try await client.identity.setNsec("nsec1...")
+try await client.identity.setSigner(EventSigner(nsec: "nsec1..."))
 try await client.relays.connect(to: [
     RelayURL(string: "wss://relay.example.com"),
     RelayURL(string: "wss://relay2.example.com"),
