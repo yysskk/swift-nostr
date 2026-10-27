@@ -60,7 +60,7 @@ public struct NostrConnectURI: Sendable, Hashable {
         name: String? = nil,
         url: URL? = nil,
         image: URL? = nil
-    ) throws {
+    ) throws(RemoteSignerError) {
         guard !relays.isEmpty else {
             throw RemoteSignerError.invalidURI(reason: "at least one relay is required")
         }
@@ -92,7 +92,7 @@ public struct NostrConnectURI: Sendable, Hashable {
         name: String? = nil,
         url: URL? = nil,
         image: URL? = nil
-    ) throws -> NostrConnectURI {
+    ) throws(RemoteSignerError) -> NostrConnectURI {
         try NostrConnectURI(
             clientPublicKey: clientKeyPair.publicKey,
             relays: relays,
@@ -110,7 +110,7 @@ public struct NostrConnectURI: Sendable, Hashable {
     /// - Throws: ``RemoteSignerError/invalidURI(reason:)`` if the string is malformed or missing
     ///   required fields, including a host that is not a canonical lowercase hex public key or a
     ///   `relay` value that is not a valid relay URL.
-    public init(string: String) throws {
+    public init(string: String) throws(RemoteSignerError) {
         guard let components = URLComponents(string: string),
             components.scheme?.lowercased() == Self.scheme
         else {

@@ -1,4 +1,5 @@
 import Foundation
+public import NostrCore
 
 /// Errors raised by the NostrWalletConnect module.
 public enum WalletConnectError: Error, LocalizedError, Sendable, Equatable {
@@ -19,6 +20,13 @@ public enum WalletConnectError: Error, LocalizedError, Sendable, Equatable {
 
     /// A pending operation was superseded by a newer one (e.g. a concurrent `fetchInfo()`).
     case superseded
+
+    /// The task awaiting the wallet was cancelled. A request cancelled after it was sent may still
+    /// be carried out by the wallet.
+    case cancelled
+
+    /// The relay transport failed to connect, subscribe, or send.
+    case transportFailed(RelayConnection.Error)
 
     /// The wallet response carried neither a `result` nor an `error`.
     case missingResult
@@ -46,6 +54,10 @@ public enum WalletConnectError: Error, LocalizedError, Sendable, Equatable {
             return "The wallet did not respond in time"
         case .superseded:
             return "The operation was superseded by a newer one"
+        case .cancelled:
+            return "The wallet operation was cancelled"
+        case .transportFailed(let error):
+            return "The wallet relay transport failed: \(error.errorDescription ?? "\(error)")"
         case .missingResult:
             return "The wallet response contained neither a result nor an error"
         case .unexpectedResultType(let expected, let received):

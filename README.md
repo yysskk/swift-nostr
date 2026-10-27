@@ -230,7 +230,7 @@ The `NostrConnect` library delegates signing to a remote signer that holds the u
 import NostrConnect
 
 // Start a session from the signer's bunker:// token.
-let signer = try RemoteSigner(bunker: try BunkerURI(string: "bunker://..."))
+let signer = RemoteSigner(bunker: try BunkerURI(string: "bunker://..."))
 
 // Prove the user's key and sign an event remotely — the signed event is verified locally.
 let userPublicKey = try await signer.userPublicKey()

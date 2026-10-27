@@ -31,7 +31,7 @@ extension RemoteSigner {
         clientKeyPair: KeyPair,
         transport: (any RelayTransport)? = nil,
         config: Config = Config()
-    ) throws {
+    ) throws(RemoteSignerError) {
         guard clientKeyPair.publicKey == invitation.clientPublicKey else {
             throw RemoteSignerError.invalidURI(reason: "client keypair does not match the invitation public key")
         }
@@ -59,9 +59,11 @@ extension RemoteSigner {
     ///   ``Config/requestTimeout``, ``RemoteSignerError/connectionInProgress`` if another
     ///   ``awaitConnection()`` wait is already running on this session,
     ///   ``RemoteSignerError/notConnected`` if the session ends first — on ``disconnect()``, or when
-    ///   the relays' streams end — or a transport error.
+    ///   the relays' streams end — ``RemoteSignerError/cancelled`` if the calling task is cancelled,
+    ///   or ``RemoteSignerError/transportFailed(_:)`` if the relay cannot be connected to or
+    ///   subscribed on.
     @discardableResult
-    public func awaitConnection() async throws -> PublicKey {
+    public func awaitConnection() async throws(RemoteSignerError) -> PublicKey {
         try await discoverSigner()
     }
 }

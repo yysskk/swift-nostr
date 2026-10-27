@@ -10,8 +10,8 @@ extension RemoteSigner {
     /// round-trip.
     /// - Returns: The user's public key, parsed from the signer's hex reply.
     /// - Throws: ``RemoteSignerError/responseValidationFailed`` if the signer replies with anything
-    ///   but a canonical hex public key.
-    public func userPublicKey() async throws -> PublicKey {
+    ///   but a canonical hex public key, or what ``send(_:params:)`` throws.
+    public func userPublicKey() async throws(RemoteSignerError) -> PublicKey {
         if let cached = userPublicKeyIfCached { return cached }
         guard let publicKey = PublicKey(try await send(.getPublicKey)) else {
             throw RemoteSignerError.responseValidationFailed
@@ -29,10 +29,11 @@ extension RemoteSigner {
     ///   (from ``userPublicKey()``); the returned event is rejected unless the signer authored it
     ///   under that key.
     /// - Returns: The signed ``Event``.
-    /// - Throws: ``RemoteSignerError/responseValidationFailed`` if the returned event fails to
-    ///   verify or does not match the request — including when `event` is keyed to another public
-    ///   key, since the signer signs under the user's.
-    public func sign(_ event: UnsignedEvent) async throws -> Event {
+    /// - Throws: ``RemoteSignerError/responseDecodingFailed`` if the reply is not an event,
+    ///   ``RemoteSignerError/responseValidationFailed`` if the returned event fails to verify or does
+    ///   not match the request — including when `event` is keyed to another public key, since the
+    ///   signer signs under the user's — or what ``send(_:params:)`` throws.
+    public func sign(_ event: UnsignedEvent) async throws(RemoteSignerError) -> Event {
         let requestJSON = try encodeUnsignedEvent(event)
         let result = try await send(.signEvent, params: [requestJSON])
 
@@ -56,8 +57,9 @@ extension RemoteSigner {
     }
 
     /// Liveness check (`ping`); the signer replies with `pong`.
-    /// - Throws: ``RemoteSignerError/responseValidationFailed`` if the reply is not `pong`.
-    public func ping() async throws {
+    /// - Throws: ``RemoteSignerError/responseValidationFailed`` if the reply is not `pong`, or what
+    ///   ``send(_:params:)`` throws.
+    public func ping() async throws(RemoteSignerError) {
         let result = try await send(.ping)
         guard result == "pong" else {
             throw RemoteSignerError.responseValidationFailed
@@ -70,7 +72,10 @@ extension RemoteSigner {
     ///   - plaintext: The message to encrypt.
     ///   - recipientPublicKey: The recipient's public key.
     /// - Returns: The NIP-44 ciphertext.
-    public func nip44Encrypt(_ plaintext: String, to recipientPublicKey: PublicKey) async throws -> String {
+    /// - Throws: What ``send(_:params:)`` throws.
+    public func nip44Encrypt(
+        _ plaintext: String, to recipientPublicKey: PublicKey
+    ) async throws(RemoteSignerError) -> String {
         try await send(.nip44Encrypt, params: [recipientPublicKey.hex, plaintext])
     }
 
@@ -80,7 +85,10 @@ extension RemoteSigner {
     ///   - ciphertext: The NIP-44 ciphertext to decrypt.
     ///   - senderPublicKey: The sender's public key.
     /// - Returns: The decrypted plaintext.
-    public func nip44Decrypt(_ ciphertext: String, from senderPublicKey: PublicKey) async throws -> String {
+    /// - Throws: What ``send(_:params:)`` throws.
+    public func nip44Decrypt(
+        _ ciphertext: String, from senderPublicKey: PublicKey
+    ) async throws(RemoteSignerError) -> String {
         try await send(.nip44Decrypt, params: [senderPublicKey.hex, ciphertext])
     }
 
@@ -90,7 +98,10 @@ extension RemoteSigner {
     ///   - plaintext: The message to encrypt.
     ///   - thirdPartyPublicKey: The recipient's public key.
     /// - Returns: The NIP-04 ciphertext.
-    public func nip04Encrypt(_ plaintext: String, to thirdPartyPublicKey: PublicKey) async throws -> String {
+    /// - Throws: What ``send(_:params:)`` throws.
+    public func nip04Encrypt(
+        _ plaintext: String, to thirdPartyPublicKey: PublicKey
+    ) async throws(RemoteSignerError) -> String {
         try await send(.nip04Encrypt, params: [thirdPartyPublicKey.hex, plaintext])
     }
 
@@ -100,15 +111,18 @@ extension RemoteSigner {
     ///   - ciphertext: The NIP-04 ciphertext to decrypt.
     ///   - thirdPartyPublicKey: The sender's public key.
     /// - Returns: The decrypted plaintext.
-    public func nip04Decrypt(_ ciphertext: String, from thirdPartyPublicKey: PublicKey) async throws -> String {
+    /// - Throws: What ``send(_:params:)`` throws.
+    public func nip04Decrypt(
+        _ ciphertext: String, from thirdPartyPublicKey: PublicKey
+    ) async throws(RemoteSignerError) -> String {
         try await send(.nip04Decrypt, params: [thirdPartyPublicKey.hex, ciphertext])
     }
 
     /// Asks the signer for its preferred relays (`switch_relays`).
     /// - Returns: The signer's preferred relays, or `nil` when it keeps the current set.
     /// - Throws: ``RemoteSignerError/responseDecodingFailed`` if the reply is neither a JSON array
-    ///   of relay URLs nor `null`.
-    public func switchRelays() async throws -> [RelayURL]? {
+    ///   of relay URLs nor `null`, or what ``send(_:params:)`` throws.
+    public func switchRelays() async throws(RemoteSignerError) -> [RelayURL]? {
         let result = try await send(.switchRelays)
         let trimmed = result.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed != "null" else { return nil }
@@ -127,7 +141,7 @@ extension RemoteSigner {
     }
 
     /// JSON-stringifies an unsigned event as `{kind, content, tags, created_at}` for `sign_event`.
-    private func encodeUnsignedEvent(_ event: UnsignedEvent) throws -> String {
+    private func encodeUnsignedEvent(_ event: UnsignedEvent) throws(RemoteSignerError) -> String {
         let object: [String: Any] = [
             "kind": event.kind.rawValue,
             "content": event.content,

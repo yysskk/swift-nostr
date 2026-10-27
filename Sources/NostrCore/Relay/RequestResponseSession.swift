@@ -1,7 +1,22 @@
 import Foundation
 
-/// A failure in the session machinery itself, distinct from the protocol errors an owner supplies.
+/// A failure in the session machinery itself, which the owner maps into its own error type so callers
+/// never see this one.
 package enum RequestResponseSessionError: Error, Equatable, Sendable {
+    /// No response arrived before the request's timeout elapsed.
+    case timedOut
+
+    /// The session was torn down — by ``RequestResponseSession/disconnect()``, or because the
+    /// transport's event stream ended — while the request was waiting.
+    case notConnected
+
+    /// The task waiting for the response was cancelled. A request cancelled before it was sent is not
+    /// sent at all; one cancelled afterwards may still be acted on by the peer.
+    case cancelled
+
+    /// The transport failed to connect, subscribe, or send.
+    case transportFailed(RelayConnection.Error)
+
     /// A request was made under a key that already identifies one in flight.
     ///
     /// Correlation keys are expected to be unique — NIP-46 uses 16 random bytes, NIP-47 an event id
@@ -34,8 +49,11 @@ package enum RequestResponseSessionError: Error, Equatable, Sendable {
 ///
 /// - Note: `Sendable` payloads only: `Key` correlates a response to its request, `State` is
 ///   whatever the owner needs to interpret that response (the method a request used, the scheme it
-///   was encrypted with, the parts collected so far), and `Response` is what the caller awaits.
-package actor RequestResponseSession<Key: Hashable & Sendable, State: Sendable, Response: Sendable> {
+///   was encrypted with, the parts collected so far), `Response` is what the caller awaits, and
+///   `Failure` is the owner's error type, the only one the session throws.
+package actor RequestResponseSession<
+    Key: Hashable & Sendable, State: Sendable, Response: Sendable, Failure: Error
+> {
     /// Receives every event the transport delivers, in arrival order.
     package typealias EventHandler = @Sendable (Event) async -> Void
 
@@ -47,10 +65,9 @@ package actor RequestResponseSession<Key: Hashable & Sendable, State: Sendable, 
     package typealias PartialResult = @Sendable (State) -> Response
 
     private let transport: any RelayTransport
-    private let timedOut: any Error
-    private let notConnected: any Error
+    private let mapError: @Sendable (RequestResponseSessionError) -> Failure
 
-    private var startTask: Task<Void, any Error>?
+    private var startTask: Task<Result<Void, RelayConnection.Error>, Never>?
     private var readerTask: Task<Void, Never>?
     /// The owner's ``EndHandler`` running for a session whose event stream ended.
     ///
@@ -74,14 +91,14 @@ package actor RequestResponseSession<Key: Hashable & Sendable, State: Sendable, 
     /// Creates a session over `transport`.
     /// - Parameters:
     ///   - transport: The relay transport to drive.
-    ///   - timedOut: The error a request fails with when its timeout elapses.
-    ///   - notConnected: The error in-flight requests fail with when ``disconnect()`` tears the
-    ///     session down. Both are supplied by the owner so callers keep seeing their module's error
-    ///     type rather than a shared one.
-    package init(transport: any RelayTransport, timedOut: any Error, notConnected: any Error) {
+    ///   - mapError: Converts each failure of the session's own into the owner's error type, so
+    ///     callers keep seeing their module's error type rather than a shared one.
+    package init(
+        transport: any RelayTransport,
+        mapError: @escaping @Sendable (RequestResponseSessionError) -> Failure
+    ) {
         self.transport = transport
-        self.timedOut = timedOut
-        self.notConnected = notConnected
+        self.mapError = mapError
     }
 
     /// Whether the session has been started and not since disconnected.
@@ -102,12 +119,14 @@ package actor RequestResponseSession<Key: Hashable & Sendable, State: Sendable, 
     /// When the transport's event stream ends — automatic reconnection gave up, or the connections
     /// went away — the session fails its in-flight requests, calls `onEnded`, and the next call here
     /// starts it again. `onEnded` is not called for ``disconnect()``, whose caller already knows.
+    /// - Throws: ``RequestResponseSessionError/transportFailed(_:)``, mapped, when the transport cannot
+    ///   connect or subscribe.
     package func ensureStarted(
         subscriptionID: String,
         filters: [Filter],
         handler: @escaping EventHandler,
         onEnded: @escaping EndHandler
-    ) async throws {
+    ) async throws(Failure) {
         // Let the owner finish the previous session's streams first. Re-checked after each wait,
         // since another session may have started and ended while this call was suspended.
         while let endNotification {
@@ -117,7 +136,9 @@ package actor RequestResponseSession<Key: Hashable & Sendable, State: Sendable, 
             }
         }
         if let startTask {
-            try await startTask.value
+            if case .failure(let error) = await startTask.value {
+                throw mapError(.transportFailed(error))
+            }
             return
         }
         // Claimed here rather than inside `performStart`: that runs in a task that must first hop
@@ -127,19 +148,22 @@ package actor RequestResponseSession<Key: Hashable & Sendable, State: Sendable, 
         sessionGeneration &+= 1
         let generation = sessionGeneration
 
-        let task = Task { [weak self] in
-            guard let self else { return }
-            try await self.performStart(
-                subscriptionID: subscriptionID, filters: filters, handler: handler, onEnded: onEnded,
-                generation: generation)
+        let task = Task { [weak self] () -> Result<Void, RelayConnection.Error> in
+            guard let self else { return .success(()) }
+            do throws(RelayConnection.Error) {
+                try await self.performStart(
+                    subscriptionID: subscriptionID, filters: filters, handler: handler, onEnded: onEnded,
+                    generation: generation)
+                return .success(())
+            } catch {
+                return .failure(error)
+            }
         }
         startTask = task
-        do {
-            try await task.value
-        } catch {
+        if case .failure(let error) = await task.value {
             // Clear on failure so a later attempt can retry the setup.
             startTask = nil
-            throw error
+            throw mapError(.transportFailed(error))
         }
     }
 
@@ -149,7 +173,7 @@ package actor RequestResponseSession<Key: Hashable & Sendable, State: Sendable, 
         handler: @escaping EventHandler,
         onEnded: @escaping EndHandler,
         generation: UInt64
-    ) async throws {
+    ) async throws(RelayConnection.Error) {
         try await transport.connect()
         // Subscribe before sending anything so a response delivered during the subscribe
         // round-trip is not missed.
@@ -182,7 +206,8 @@ package actor RequestResponseSession<Key: Hashable & Sendable, State: Sendable, 
 
         for request in pending.values {
             request.timeoutTask?.cancel()
-            request.continuation.finish(throwing: notConnected)
+            request.continuation.yield(.failure(mapError(.notConnected)))
+            request.continuation.finish()
         }
         pending.removeAll()
 
@@ -191,8 +216,14 @@ package actor RequestResponseSession<Key: Hashable & Sendable, State: Sendable, 
     }
 
     /// Opens an additional subscription, or replaces one under an id already in use.
-    package func subscribe(id: String, filters: [Filter]) async throws {
-        try await transport.subscribe(id: id, filters: filters)
+    /// - Throws: ``RequestResponseSessionError/transportFailed(_:)``, mapped, when the transport
+    ///   cannot subscribe.
+    package func subscribe(id: String, filters: [Filter]) async throws(Failure) {
+        do throws(RelayConnection.Error) {
+            try await transport.subscribe(id: id, filters: filters)
+        } catch {
+            throw mapError(.transportFailed(error))
+        }
     }
 
     /// Closes the subscription with `id`.
@@ -200,7 +231,7 @@ package actor RequestResponseSession<Key: Hashable & Sendable, State: Sendable, 
         await transport.unsubscribe(id: id)
     }
 
-    /// Stops reading, fails every in-flight request with the session's `notConnected` error, and
+    /// Stops reading, fails every in-flight request with ``RequestResponseSessionError/notConnected``, and
     /// disconnects the transport. A later ``ensureStarted(subscriptionID:filters:handler:onEnded:)``
     /// starts the session again.
     ///
@@ -215,7 +246,8 @@ package actor RequestResponseSession<Key: Hashable & Sendable, State: Sendable, 
 
         for request in pending.values {
             request.timeoutTask?.cancel()
-            request.continuation.finish(throwing: notConnected)
+            request.continuation.yield(.failure(mapError(.notConnected)))
+            request.continuation.finish()
         }
         pending.removeAll()
 
@@ -239,9 +271,11 @@ package actor RequestResponseSession<Key: Hashable & Sendable, State: Sendable, 
     ///     that did arrive.
     /// - Returns: The response the owner resolved the request with, as
     ///   ``RequestResolution/resolved(_:)``.
-    /// - Throws: The session's `timedOut` error if no response arrives in time, the error the owner
-    ///   failed the request with through ``RequestResolution/failed(_:)``, a transport error from the
-    ///   send, or
+    /// - Throws: The error the owner failed the request with through ``RequestResolution/failed(_:)``,
+    ///   or, mapped: ``RequestResponseSessionError/timedOut`` if no response arrives in time,
+    ///   ``RequestResponseSessionError/notConnected`` if the session ends first,
+    ///   ``RequestResponseSessionError/cancelled`` if the calling task is cancelled,
+    ///   ``RequestResponseSessionError/transportFailed(_:)`` if the send fails, or
     ///   ``RequestResponseSessionError/duplicateRequestKey`` when `key` is already in flight.
     package func perform(
         _ event: Event,
@@ -249,17 +283,22 @@ package actor RequestResponseSession<Key: Hashable & Sendable, State: Sendable, 
         state: State,
         timeout: Duration,
         partialResult: PartialResult? = nil
-    ) async throws -> Response {
+    ) async throws(Failure) -> Response {
         // Overwriting an entry would drop the first request's continuation without resolving it and
         // leave its timeout running: that caller would stay suspended forever — its own cleanup
         // never runs, because it never returns — while the orphaned timeout resolved this request
         // on the first one's schedule. The newcomer is refused instead, since it has not sent
         // anything yet and the request already in flight may be about to be answered.
         guard pending[key] == nil else {
-            throw RequestResponseSessionError.duplicateRequestKey
+            throw mapError(.duplicateRequestKey)
+        }
+        // Once sent, a request may be acted on whether or not anyone still waits for the answer, so
+        // a caller that has already gone away sends nothing.
+        guard !Task.isCancelled else {
+            throw mapError(.cancelled)
         }
 
-        let (stream, continuation) = AsyncThrowingStream<Response, any Error>.makeStream()
+        let (stream, continuation) = AsyncStream<Result<Response, Failure>>.makeStream()
         // Scheduling the timeout as part of the registration is safe: its task cannot re-enter the
         // actor until this call suspends, by which point the entry it looks for exists.
         pending[key] = PendingRequest(
@@ -269,12 +308,18 @@ package actor RequestResponseSession<Key: Hashable & Sendable, State: Sendable, 
             partialResult: partialResult)
         defer { discard(key) }
 
-        try await transport.send(event)
-
-        for try await response in stream {
-            return response
+        do throws(RelayConnection.Error) {
+            try await transport.send(event)
+        } catch {
+            throw mapError(.transportFailed(error))
         }
-        throw timedOut
+
+        // Every resolution yields a result, so the stream ends without one only when the waiting
+        // task is cancelled.
+        for await result in stream {
+            return try result.get()
+        }
+        throw mapError(.cancelled)
     }
 
     /// Folds a decoded response into the in-flight request under `key`.
@@ -291,7 +336,7 @@ package actor RequestResponseSession<Key: Hashable & Sendable, State: Sendable, 
     @discardableResult
     package func withPendingRequest(
         _ key: Key,
-        _ body: @Sendable (inout State) -> RequestResolution<Response>
+        _ body: @Sendable (inout State) -> RequestResolution<Response, Failure>
     ) -> State? {
         guard var request = pending[key] else { return nil }
 
@@ -305,12 +350,13 @@ package actor RequestResponseSession<Key: Hashable & Sendable, State: Sendable, 
         case .resolved(let response):
             pending.removeValue(forKey: key)
             request.timeoutTask?.cancel()
-            request.continuation.yield(response)
+            request.continuation.yield(.success(response))
             request.continuation.finish()
         case .failed(let error):
             pending.removeValue(forKey: key)
             request.timeoutTask?.cancel()
-            request.continuation.finish(throwing: error)
+            request.continuation.yield(.failure(error))
+            request.continuation.finish()
         }
         return request.state
     }
@@ -327,11 +373,11 @@ package actor RequestResponseSession<Key: Hashable & Sendable, State: Sendable, 
     private func timeOut(_ key: Key) {
         guard let request = pending.removeValue(forKey: key) else { return }
         if let partialResult = request.partialResult {
-            request.continuation.yield(partialResult(request.state))
-            request.continuation.finish()
+            request.continuation.yield(.success(partialResult(request.state)))
         } else {
-            request.continuation.finish(throwing: timedOut)
+            request.continuation.yield(.failure(mapError(.timedOut)))
         }
+        request.continuation.finish()
     }
 
     /// Deregisters the request under `key` and cancels its timeout without resolving its waiter —
@@ -345,7 +391,7 @@ package actor RequestResponseSession<Key: Hashable & Sendable, State: Sendable, 
     private struct PendingRequest {
         /// The owner's per-request state, read back by its handler when a response arrives.
         var state: State
-        let continuation: AsyncThrowingStream<Response, any Error>.Continuation
+        let continuation: AsyncStream<Result<Response, Failure>>.Continuation
         /// The task that resolves the request on timeout; replaced when the handler returns
         /// ``RequestResolution/pendingFor(_:)``, and cancelled once the request resolves.
         var timeoutTask: Task<Void, Never>?
@@ -356,7 +402,7 @@ package actor RequestResponseSession<Key: Hashable & Sendable, State: Sendable, 
 
 /// What a decoded response means for the request it belongs to — the verdict
 /// ``RequestResponseSession/withPendingRequest(_:_:)`` acts on.
-package enum RequestResolution<Response: Sendable>: Sendable {
+package enum RequestResolution<Response: Sendable, Failure: Error>: Sendable {
     /// Keep the request pending, retaining whatever the handler wrote to its state: NIP-47
     /// collecting one part of a `multi_pay_*` reply that is still incomplete.
     case pending
@@ -369,5 +415,5 @@ package enum RequestResolution<Response: Sendable>: Sendable {
     case resolved(Response)
 
     /// Fail the waiter with this error.
-    case failed(any Error)
+    case failed(Failure)
 }

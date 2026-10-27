@@ -34,7 +34,7 @@ public struct BunkerURI: Sendable, Hashable {
     ///   - relays: The relays the remote signer listens on (must contain at least one).
     ///   - secret: An optional one-time connection secret.
     /// - Throws: ``RemoteSignerError/invalidURI(reason:)`` if the relay list is empty.
-    public init(remoteSignerPublicKey: PublicKey, relays: [RelayURL], secret: String? = nil) throws {
+    public init(remoteSignerPublicKey: PublicKey, relays: [RelayURL], secret: String? = nil) throws(RemoteSignerError) {
         guard !relays.isEmpty else {
             throw RemoteSignerError.invalidURI(reason: "at least one relay is required")
         }
@@ -50,7 +50,7 @@ public struct BunkerURI: Sendable, Hashable {
     /// - Throws: ``RemoteSignerError/invalidURI(reason:)`` if the string is malformed or missing
     ///   required fields, including a host that is not a canonical lowercase hex public key or a
     ///   `relay` value that is not a valid relay URL.
-    public init(string: String) throws {
+    public init(string: String) throws(RemoteSignerError) {
         guard let components = URLComponents(string: string),
             components.scheme?.lowercased() == Self.scheme
         else {

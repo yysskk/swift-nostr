@@ -1782,18 +1782,18 @@ import NostrConnect
 // keypair (pass a persisted one to resume an authorized session); transport defaults to a
 // RelayConnectionTransport over the token's relays.
 let bunker = try BunkerURI(string: "bunker://<remote-signer-public-key>?relay=wss://...&secret=...")
-let signer = try RemoteSigner(bunker: bunker)
+let signer = RemoteSigner(bunker: bunker)
 
 // Session behavior.
 let config = RemoteSigner.Config(
     requestTimeout: .seconds(30),         // wait for a response before failing
     authChallengeTimeout: .seconds(300))  // a request may stay pending after an auth_url challenge
-let tuned = try RemoteSigner(bunker: bunker, config: config)
+let tuned = RemoteSigner(bunker: bunker, config: config)
 
 // Ask the signer to grant operations up front (sent as NIP-46 `perms` in the connect request), so
 // each one does not draw its own auth_url challenge. Empty by default, which omits them. A
 // nostrconnect:// session instead carries its permissions in the invitation URI.
-let authorized = try RemoteSigner(
+let authorized = RemoteSigner(
     bunker: bunker,
     requesting: [.signEvent(kind: .textNote), .nip44Encrypt, .nip44Decrypt])
 
@@ -1868,7 +1868,7 @@ for await challenge in await signer.authChallenges() {
 - `RemoteSignerAuthChallenge` — `url`, `method`, `requestID`
 - `RelayTransport` / `RelayConnectionTransport` (`NostrCore`) — the relay seam; inject a fake for
   tests, or the default transport with a `webSocketFactory:` for a platform-native socket
-- `RemoteSignerError` — `invalidURI(reason:)`, `notConnected`, `connectionInProgress`, `requestEncodingFailed`, `responseDecodingFailed`, `timedOut`, `connectionRejected(message:)`, `signerError(message:)`, `responseValidationFailed`
+- `RemoteSignerError` — `invalidURI(reason:)`, `notConnected`, `connectionInProgress`, `requestEncodingFailed`, `responseDecodingFailed`, `timedOut`, `cancelled`, `transportFailed(RelayConnection.Error)`, `connectionRejected(message:)`, `signerError(message:)`, `responseValidationFailed`; every `RemoteSigner` and URI method is `throws(RemoteSignerError)`
 
 ## Errors
 

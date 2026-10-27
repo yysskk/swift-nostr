@@ -34,7 +34,7 @@ and create a ``RemoteSigner``:
 import NostrConnect
 
 let bunker = try BunkerURI(string: "bunker://...")
-let signer = try RemoteSigner(bunker: bunker)
+let signer = RemoteSigner(bunker: bunker)
 ```
 
 The token's host is the signer's public key, held as a `PublicKey` in
@@ -49,7 +49,7 @@ surface connection errors up front.
 To resume a previously authorized session, persist the client keypair and pass it back in:
 
 ```swift
-let signer = try RemoteSigner(bunker: bunker, clientKeyPair: savedClientKeyPair)
+let signer = RemoteSigner(bunker: bunker, clientKeyPair: savedClientKeyPair)
 ```
 
 To have the signer grant operations up front rather than challenging the user for each, list them
@@ -57,7 +57,7 @@ as ``RemoteSignerPermission`` values. They are sent in the `connect` request; re
 default) leaves them out:
 
 ```swift
-let signer = try RemoteSigner(
+let signer = RemoteSigner(
     bunker: bunker,
     requesting: [.signEvent(kind: .textNote), .nip44Encrypt, .nip44Decrypt])
 ```
@@ -178,11 +178,13 @@ the request is ``RemoteSignerError/responseValidationFailed``:
 do {
     let signed = try await signer.sign(.textNote("Signed by my bunker"))
     print(signed.id)
-} catch let RemoteSignerError.signerError(message) {
+} catch .signerError(let message) {
     print("The signer refused: \(message)")
-} catch RemoteSignerError.responseValidationFailed {
+} catch .responseValidationFailed {
     print("The returned event did not match the request")
-} catch RemoteSignerError.timedOut {
+} catch .timedOut {
     print("The signer did not respond in time")
+} catch {
+    print(error.localizedDescription)  // any other RemoteSignerError
 }
 ```

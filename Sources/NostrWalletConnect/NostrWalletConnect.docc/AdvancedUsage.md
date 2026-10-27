@@ -287,24 +287,29 @@ The set of codes is open-ended, so a code NIP-47 does not define is preserved ve
 ```swift
 do {
     _ = try await connection.payInvoice("lnbc...")
-} catch let WalletConnectError.walletError(code, message) {
+} catch .walletError(let code, let message) {
     switch code {
     case .insufficientBalance: print("insufficient balance: \(message)")
     case .quotaExceeded:       print("quota exceeded: \(message)")
     case .restricted, .unauthorized: print("not permitted: \(message)")
     default:                   print("\(code.rawValue): \(message)")
     }
-} catch WalletConnectError.timedOut {
+} catch .timedOut {
     print("no response within the configured timeout")
-} catch WalletConnectError.notConnected {
-    print("the connection was torn down")
+} catch .transportFailed(let error) {
+    print("the relay failed: \(error)")
+} catch {
+    print(error)  // any other WalletConnectError
 }
 ```
 
 The other cases — ``WalletConnectError/invalidURI(reason:)``,
 ``WalletConnectError/requestEncodingFailed``, ``WalletConnectError/responseDecodingFailed``,
-``WalletConnectError/missingResult``, and ``WalletConnectError/superseded`` — cover URI parsing,
-encryption/encoding failures, malformed responses, and a `fetchInfo()` superseded by a newer call.
+``WalletConnectError/missingResult``, ``WalletConnectError/superseded``,
+``WalletConnectError/notConnected``, and ``WalletConnectError/cancelled`` — cover URI parsing,
+encryption/encoding failures, malformed responses, a `fetchInfo()` superseded by a newer call, a
+connection torn down while waiting, and a cancelled task. A request cancelled after it was sent may
+still be carried out by the wallet.
 
 ## Event Kinds
 

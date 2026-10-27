@@ -13,12 +13,18 @@ actor FakeRemoteSignerTransport: RelayTransport {
     private(set) var sentEvents: [Event] = []
     private(set) var subscriptions: [String: [Filter]] = [:]
     private var continuation: AsyncStream<Event>.Continuation?
+    private var nextConnectError: RelayConnection.Error?
+    private var nextSendError: RelayConnection.Error?
 
     init() {}
 
     func connect() async throws(RelayConnection.Error) {
-        isConnected = true
         connectCount += 1
+        if let error = nextConnectError {
+            nextConnectError = nil
+            throw error
+        }
+        isConnected = true
     }
 
     func subscribe(id: String, filters: [Filter]) async throws(RelayConnection.Error) {
@@ -30,6 +36,10 @@ actor FakeRemoteSignerTransport: RelayTransport {
     }
 
     func send(_ event: Event) async throws(RelayConnection.Error) {
+        if let error = nextSendError {
+            nextSendError = nil
+            throw error
+        }
         sentEvents.append(event)
     }
 
@@ -59,6 +69,16 @@ actor FakeRemoteSignerTransport: RelayTransport {
     func endEvents() {
         continuation?.finish()
         continuation = nil
+    }
+
+    /// Fails the next `connect()` with `error`, once.
+    func failNextConnect(with error: RelayConnection.Error) {
+        nextConnectError = error
+    }
+
+    /// Fails the next `send(_:)` with `error`, once.
+    func failNextSend(with error: RelayConnection.Error) {
+        nextSendError = error
     }
 
     /// The most recently sent event, if any.

@@ -706,6 +706,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `throws(RelayPool.Error)`; `NostrRelayRouting.connectDirectMessageInboxRelays()` is
   `throws(NostrClient.Error)`; and `RelayTransport`'s `connect()`, `subscribe(id:filters:)`, and
   `send(_:)` are `throws(RelayConnection.Error)`.
+- **NostrWalletConnect and NostrConnect use typed throws** (breaking): `WalletConnection` and
+  `WalletConnectURI` are `throws(WalletConnectError)`, and `RemoteSigner`, `BunkerURI`, and
+  `NostrConnectURI` are `throws(RemoteSignerError)`, so a `catch .timedOut` needs no cast.
+  Relay failures that used to escape as `RelayConnection.Error` are wrapped in the new
+  `transportFailed(_:)` case of each. A cancelled task now fails a command, `fetchInfo()`, or
+  `awaitConnection()` at once with the new `cancelled` case instead of `timedOut`, and a command
+  from an already-cancelled task is not sent; `awaitConnection()` previously ignored cancellation.
+  `RemoteSigner(bunker:)` no longer throws. `payZap(...)` stays untyped: it also throws
+  `LNURLPayResponse.InvoiceError`.
 
 ### Fixed
 
