@@ -63,7 +63,7 @@ public struct DirectMessagePayloadSequence: AsyncSequence, Sendable {
     }
 
     /// The underlying subscription, yielding the gift wraps (kind 1059) still sealed; open each
-    /// event with ``NostrMessaging/parsePayload(_:)``.
+    /// event with ``NostrMessaging/open(_:)``.
     public var giftWraps: SubscriptionSequence {
         base
     }
@@ -79,7 +79,7 @@ public struct DirectMessagePayloadSequence: AsyncSequence, Sendable {
         public mutating func next() async throws -> DirectMessagePayload? {
             while let item = await base.next() {
                 guard case .event(_, let event) = item else { continue }
-                if let payload = try await parser.parsePayloadIfReadable(event) {
+                if let payload = try await parser.openIfReadable(event) {
                     return payload
                 }
             }

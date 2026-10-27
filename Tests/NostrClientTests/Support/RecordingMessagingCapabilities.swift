@@ -3,7 +3,8 @@ import NostrClient
 import NostrCore
 
 /// A stand-in for ``NostrMessagesAPI`` that implements only the ``NostrMessaging`` primitives: it
-/// records every call, gift-wraps each send for real without publishing it, opens gift wraps with a
+/// records every call, gift-wraps each send for real without publishing it (reporting it accepted
+/// by ``relayURL``), opens gift wraps with a
 /// ``DirectMessageParser`` bound to its signer, and answers each subscription with a finished
 /// sequence of canned gift wraps, so the protocol extension can be exercised without a relay pool.
 actor RecordingMessagingCapabilities: NostrMessaging {
@@ -22,7 +23,6 @@ actor RecordingMessagingCapabilities: NostrMessaging {
     let cannedGiftWraps: [Event]
 
     private(set) var sends: [Send] = []
-    private(set) var parsedGiftWraps: [Event] = []
     private(set) var subscribeLimits: [Int] = []
 
     init(signer: EventSigner, relayURL: RelayURL, cannedGiftWraps: [Event] = []) {
@@ -44,18 +44,22 @@ actor RecordingMessagingCapabilities: NostrMessaging {
                 template: template, recipientPublicKey: recipientPublicKey, expiration: expiration, strategy: strategy
             ))
         let rumor = UnsignedEvent(template, publicKey: signer.publicKey).asRumor()
-        return SendDirectMessageResult(
+        let message = GiftWrappedMessage(
             rumor: rumor,
             recipientGiftWrap: try await GiftWrap.wrap(
-                event: rumor, signer: signer, recipientPublicKey: recipientPublicKey, expiration: expiration),
+                template, signer: signer, to: recipientPublicKey, expiration: expiration),
             selfGiftWrap: try await GiftWrap.wrap(
-                event: rumor, signer: signer, recipientPublicKey: signer.publicKey, expiration: expiration)
+                template, signer: signer, to: signer.publicKey, expiration: expiration)
+        )
+        return SendDirectMessageResult(
+            message: message,
+            recipientPublishResult: PublishResult(statuses: [relayURL: .accepted]),
+            selfCopyPublishResult: PublishResult(statuses: [relayURL: .accepted])
         )
     }
 
-    func parsePayload(_ giftWrap: Event) async throws -> DirectMessagePayload {
-        parsedGiftWraps.append(giftWrap)
-        return try await DirectMessageParser(signer: signer).parsePayload(giftWrap)
+    func open(_ giftWrap: Event) async throws -> DirectMessagePayload {
+        try await DirectMessageParser(signer: signer).open(giftWrap)
     }
 
     func subscribe(limit: Int) async throws -> DirectMessagePayloadSequence {

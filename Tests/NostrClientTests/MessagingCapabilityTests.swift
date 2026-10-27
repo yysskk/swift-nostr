@@ -7,8 +7,8 @@ import Testing
 
 /// The ``NostrMessaging`` conveniences are written once, in a protocol extension over the
 /// primitives. Driving them through a stub that implements only the primitives shows what each one
-/// builds and forwards — template, recipient, expiration, strategy, limit, and the defaults — and
-/// which payload each parse helper accepts, without a relay pool.
+/// builds and forwards — template, recipient, expiration, strategy, limit, and the defaults —
+/// without a relay pool.
 @Suite("Messaging Capability Tests")
 struct MessagingCapabilityTests {
     private let relayURL = RelayURL("wss://relay.example.com")!
@@ -42,16 +42,6 @@ struct MessagingCapabilityTests {
         return try #require(sends.first)
     }
 
-    /// The NIP-44 error `operation` throws, so two failures to open a gift wrap can be compared.
-    private func thrownError<T>(by operation: () async throws -> T) async -> SealedMessage.Error? {
-        do {
-            _ = try await operation()
-            return nil
-        } catch {
-            return error as? SealedMessage.Error
-        }
-    }
-
     // MARK: - Send primitive's short forms
 
     @Test("sendGiftWrapped forwards the template, recipient, and expiration, none by default, and no strategy")
@@ -69,8 +59,8 @@ struct MessagingCapabilityTests {
         #expect(recorded.map(\.recipientPublicKey) == [alice.publicKey, alice.publicKey])
         #expect(recorded.map(\.expiration) == [nil, expiry])
         #expect(recorded.map(\.strategy) == [nil, nil])
-        #expect(result.rumor.publicKey == bob.publicKey)
-        #expect(result.rumor.kind == Event.Kind(rawValue: 30_999))
+        #expect(result.message.rumor.publicKey == bob.publicKey)
+        #expect(result.message.rumor.kind == Event.Kind(rawValue: 30_999))
     }
 
     // MARK: - Send conveniences
@@ -89,7 +79,7 @@ struct MessagingCapabilityTests {
         #expect(recorded.recipientPublicKey == alice.publicKey)
         #expect(recorded.expiration == nil)
         #expect(recorded.strategy == nil)
-        #expect(result.rumor.kind == .privateDirectMessage)
+        #expect(result.message.rumor.kind == .privateDirectMessage)
     }
 
     @Test("send carries the subject and reply tags and forwards expiration and strategy")
@@ -207,67 +197,44 @@ struct MessagingCapabilityTests {
         #expect(recorded.strategy == .firstAck)
     }
 
-    // MARK: - Parse conveniences
+    // MARK: - Opening
 
-    @Test("each parse helper unwraps its own payload through parsePayload")
-    func parseHelpersUnwrapTheirCase() async throws {
-        let stub = makeStub()
-        let messaging: any NostrMessaging = stub
+    @Test("client.messages.open returns the message, reaction, or file a gift wrap carries")
+    func clientOpenClassifiesEachPayload() async throws {
+        let client = NostrClient()
+        try await client.identity.setPrivateKey(bob.privateKey.hex)
         let message = try await fromAlice.createMessageWithSelfCopy(content: "hi", to: bob.publicKey)
         let reaction = try await fromAlice.createReactionWithSelfCopy(
-            reaction: "🤙", to: .fixture("message"), author: bob.publicKey, recipientPublicKey: bob.publicKey)
+            reaction: "🤙", to: message.rumor.id, author: alice.publicKey, recipientPublicKey: bob.publicKey)
         let file = try await fromAlice.createFileMessageWithSelfCopy(
             url: URL(string: "https://files.example.com/blob")!, mimeType: "image/jpeg",
             encryption: try encryptedFile(),
             to: bob.publicKey)
 
-        let parsedMessage = try await messaging.parse(message.recipientGiftWrap)
-        let parsedReaction = try await messaging.parseReaction(reaction.recipientGiftWrap)
-        let parsedFile = try await messaging.parseFile(file.recipientGiftWrap)
+        let openedMessage = try #require(await client.messages.open(message.recipientGiftWrap).message)
+        let openedReaction = try #require(await client.messages.open(reaction.recipientGiftWrap).reaction)
+        let openedFile = try #require(await client.messages.open(file.recipientGiftWrap).file)
 
-        #expect(parsedMessage.content == "hi")
-        #expect(parsedMessage.senderPublicKey == alice.publicKey)
-        #expect(parsedReaction.content == "🤙")
-        #expect(parsedReaction.messageID == .fixture("message"))
-        #expect(parsedFile.url == URL(string: "https://files.example.com/blob"))
-        #expect(
-            await stub.parsedGiftWraps.map(\.id) == [
-                message.recipientGiftWrap.id, reaction.recipientGiftWrap.id, file.recipientGiftWrap.id,
-            ])
+        #expect(openedMessage.rumorID == message.rumor.id)
+        #expect(openedMessage.content == "hi")
+        #expect(openedMessage.senderPublicKey == alice.publicKey)
+        #expect(openedReaction.rumorID == reaction.rumor.id)
+        #expect(openedReaction.content == "🤙")
+        #expect(openedReaction.messageID == message.rumor.id)
+        #expect(openedFile.rumorID == file.rumor.id)
+        #expect(openedFile.url == URL(string: "https://files.example.com/blob"))
     }
 
-    @Test("a parse helper handed another payload throws unexpectedKind with the payload's kind")
-    func parseHelpersRejectOtherPayloads() async throws {
-        let messaging: any NostrMessaging = makeStub()
-        let message = try await fromAlice.createMessageWithSelfCopy(content: "hi", to: bob.publicKey)
-        let reaction = try await fromAlice.createReactionWithSelfCopy(
-            to: .fixture("message"), author: bob.publicKey, recipientPublicKey: bob.publicKey)
+    @Test("client.messages.open throws unexpectedKind for a rumor that is not a message, reaction, or file")
+    func clientOpenRejectsOtherKinds() async throws {
+        let client = NostrClient()
+        try await client.identity.setPrivateKey(bob.privateKey.hex)
+        let giftWrap = try await GiftWrap.wrap(
+            .textNote("not a DM"), signer: EventSigner(keyPair: alice), to: bob.publicKey)
 
-        await #expect(throws: DirectMessagePayload.Error.unexpectedKind(.reaction)) {
-            try await messaging.parse(reaction.recipientGiftWrap)
+        await #expect(throws: DirectMessagePayload.Error.unexpectedKind(.textNote)) {
+            try await client.messages.open(giftWrap)
         }
-        await #expect(throws: DirectMessagePayload.Error.unexpectedKind(.privateDirectMessage)) {
-            try await messaging.parseReaction(message.recipientGiftWrap)
-        }
-        await #expect(throws: DirectMessagePayload.Error.unexpectedKind(.privateDirectMessage)) {
-            try await messaging.parseFile(message.recipientGiftWrap)
-        }
-    }
-
-    @Test("a gift wrap that does not open throws what the dedicated parser throws")
-    func parseHelpersPassUnwrapFailuresThrough() async throws {
-        let messaging: any NostrMessaging = makeStub()
-        let carol = KeyPair()
-        // Sealed to Carol, so Bob's decryption fails.
-        let foreign = try await fromAlice.createMessageWithSelfCopy(content: "hi", to: carol.publicKey)
-        let parser = DirectMessageParser(signer: EventSigner(keyPair: bob))
-
-        let expected = await thrownError { try await parser.parse(foreign.recipientGiftWrap) }
-
-        #expect(expected != nil)
-        #expect(await thrownError { try await messaging.parse(foreign.recipientGiftWrap) } == expected)
-        #expect(await thrownError { try await messaging.parseReaction(foreign.recipientGiftWrap) } == expected)
-        #expect(await thrownError { try await messaging.parseFile(foreign.recipientGiftWrap) } == expected)
     }
 
     // MARK: - Receiving

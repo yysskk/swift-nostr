@@ -28,14 +28,14 @@ public struct DirectMessageBuilder: Sendable {
     ///   - replyTo: Optional id of the event to reply to
     ///   - expiration: Optional NIP-40 expiration for a disappearing message. Applied to both
     ///     gift wraps so the recipient and self copies expire together.
-    /// - Returns: The shared rumor and both gift wraps
+    /// - Returns: The shared rumor and both gift wraps.
     public func createMessageWithSelfCopy(
         content: String,
         to recipientPublicKey: PublicKey,
         subject: String? = nil,
         replyTo: EventID? = nil,
         expiration: Timestamp? = nil
-    ) async throws -> SendDirectMessageResult {
+    ) async throws -> GiftWrappedMessage {
         try await wrapWithSelfCopy(
             .directMessage(content, to: recipientPublicKey, subject: subject, replyTo: replyTo),
             to: recipientPublicKey,
@@ -46,8 +46,9 @@ public struct DirectMessageBuilder: Sendable {
     /// Creates a gift-wrapped NIP-25 reaction to a direct message, plus the sender's self-copy.
     ///
     /// The reaction is an unsigned kind-7 rumor referencing the target message's rumor id and
-    /// author, built by ``EventTemplate/directMessageReaction(to:author:content:)``. Like a message it is wrapped twice — for the recipient and for the sender — so it
-    /// stays private and sender-anonymous, and both wraps carry the identical rumor.
+    /// author, built by ``EventTemplate/directMessageReaction(to:author:content:)``. Like a message
+    /// it is wrapped twice — for the recipient and for the sender — so it stays private and
+    /// sender-anonymous, and both wraps carry the identical rumor.
     /// - Parameters:
     ///   - reaction: The reaction content. NIP-25 uses "+" for a like, "-" for a dislike, or an
     ///     emoji such as "🤙".
@@ -62,7 +63,7 @@ public struct DirectMessageBuilder: Sendable {
         author: PublicKey,
         recipientPublicKey: PublicKey,
         expiration: Timestamp? = nil
-    ) async throws -> SendDirectMessageResult {
+    ) async throws -> GiftWrappedMessage {
         try await wrapWithSelfCopy(
             .directMessageReaction(to: messageID, author: author, content: reaction),
             to: recipientPublicKey,
@@ -96,7 +97,7 @@ public struct DirectMessageBuilder: Sendable {
         blurhash: String? = nil,
         to recipientPublicKey: PublicKey,
         expiration: Timestamp? = nil
-    ) async throws -> SendDirectMessageResult {
+    ) async throws -> GiftWrappedMessage {
         try await wrapWithSelfCopy(
             .fileMessage(
                 url: url, mimeType: mimeType, encryption: encryption, size: size, dimensions: dimensions,
@@ -138,7 +139,7 @@ public struct DirectMessageBuilder: Sendable {
         return try await withThrowingTaskGroup(of: (offset: Int, wrap: Event).self) { group in
             for (offset, addressee) in addressees.enumerated() {
                 group.addTask {
-                    (offset, try await GiftWrap.wrap(event: rumor, signer: signer, recipientPublicKey: addressee))
+                    (offset, try await GiftWrap.wrap(rumor: rumor, signer: signer, to: addressee, expiration: nil))
                 }
             }
             var wraps: [(offset: Int, wrap: Event)] = []
@@ -158,7 +159,7 @@ public struct DirectMessageBuilder: Sendable {
         _ template: EventTemplate,
         to recipientPublicKey: PublicKey,
         expiration: Timestamp?
-    ) async throws -> SendDirectMessageResult {
+    ) async throws -> GiftWrappedMessage {
         try await wrapWithSelfCopy(
             template, senderPublicKey: try await signer.publicKey, to: recipientPublicKey, expiration: expiration)
     }
@@ -180,22 +181,14 @@ public struct DirectMessageBuilder: Sendable {
         senderPublicKey: PublicKey,
         to recipientPublicKey: PublicKey,
         expiration: Timestamp?
-    ) async throws -> SendDirectMessageResult {
+    ) async throws -> GiftWrappedMessage {
         let rumor = UnsignedEvent(template, publicKey: senderPublicKey).asRumor()
         async let recipientGiftWrap = GiftWrap.wrap(
-            event: rumor,
-            signer: signer,
-            recipientPublicKey: recipientPublicKey,
-            expiration: expiration
-        )
+            rumor: rumor, signer: signer, to: recipientPublicKey, expiration: expiration)
         async let selfGiftWrap = GiftWrap.wrap(
-            event: rumor,
-            signer: signer,
-            recipientPublicKey: senderPublicKey,
-            expiration: expiration
-        )
+            rumor: rumor, signer: signer, to: senderPublicKey, expiration: expiration)
 
-        return SendDirectMessageResult(
+        return GiftWrappedMessage(
             rumor: rumor,
             recipientGiftWrap: try await recipientGiftWrap,
             selfGiftWrap: try await selfGiftWrap

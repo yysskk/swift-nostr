@@ -8,13 +8,13 @@ extension NostrMessaging {
     /// delivered like a NIP-17 direct message, waiting for the pool config's
     /// ``RelayPoolConfig/defaultPublishStrategy``.
     ///
-    /// Use it for private payloads other than kinds 14, 15, and 7. To build the gift wraps without
-    /// publishing, use ``GiftWrap/wrap(event:signer:recipientPublicKey:expiration:)``.
+    /// Use it for private payloads other than kinds 14, 15, and 7. To build a gift wrap without
+    /// publishing, use ``GiftWrap/wrap(_:signer:to:expiration:)``.
     /// - Parameters:
     ///   - template: The rumor's kind, tags, content, and creation time.
     ///   - recipientPublicKey: The recipient's public key.
     ///   - expiration: A NIP-40 expiration set on both gift wraps, if any.
-    /// - Returns: The shared rumor, both gift wraps, and the per-relay publish outcomes.
+    /// - Returns: The published ``GiftWrappedMessage`` and the per-relay publish outcomes.
     /// - Throws: The errors of ``NostrMessaging/sendGiftWrapped(_:to:expiration:strategy:)``.
     @discardableResult
     public func sendGiftWrapped(
@@ -58,8 +58,8 @@ extension NostrMessaging {
     ///   - strategy: How many relay acknowledgments to wait for on the recipient gift wrap before
     ///     returning (default: the pool config's ``RelayPoolConfig/defaultPublishStrategy``). The
     ///     best-effort self-copy always uses the pool default so it never blocks the send.
-    /// - Returns: The shared rumor, both gift wraps, and the per-relay publish outcomes. The rumor's
-    ///   `id` is the key for matching the message when it echoes back from a relay.
+    /// - Returns: The published ``GiftWrappedMessage`` and the per-relay publish outcomes. Its
+    ///   `message.rumor.id` is the key for matching the message when it echoes back from a relay.
     @discardableResult
     public func send(
         _ content: String,
@@ -88,7 +88,7 @@ extension NostrMessaging {
     ///   - expiration: A NIP-40 expiration applied to both gift wraps.
     ///   - strategy: How many relay acknowledgments to wait for on the recipient gift wrap before
     ///     returning (default: the pool config's ``RelayPoolConfig/defaultPublishStrategy``).
-    /// - Returns: The shared rumor, both gift wraps, and the per-relay publish outcomes.
+    /// - Returns: The published ``GiftWrappedMessage`` and the per-relay publish outcomes.
     @discardableResult
     public func react(
         to message: DirectMessage,
@@ -122,7 +122,7 @@ extension NostrMessaging {
     ///   - expiration: A NIP-40 expiration applied to both gift wraps.
     ///   - strategy: How many relay acknowledgments to wait for on the recipient gift wrap before
     ///     returning (default: the pool config's ``RelayPoolConfig/defaultPublishStrategy``).
-    /// - Returns: The shared rumor, both gift wraps, and the per-relay publish outcomes.
+    /// - Returns: The published ``GiftWrappedMessage`` and the per-relay publish outcomes.
     @discardableResult
     public func sendFile(
         url: URL,
@@ -143,44 +143,5 @@ extension NostrMessaging {
             expiration: expiration,
             strategy: strategy
         )
-    }
-
-    /// Unwraps a received gift wrap as a direct message (kind 14).
-    /// - Parameter giftWrap: The gift-wrapped event.
-    /// - Returns: The message.
-    /// - Throws: ``DirectMessagePayload/Error/unexpectedKind(_:)`` when the gift wrap carries another
-    ///   payload, or the errors of ``NostrMessaging/parsePayload(_:)``.
-    public func parse(_ giftWrap: Event) async throws -> DirectMessage {
-        let payload = try await parsePayload(giftWrap)
-        guard case .message(let message) = payload else {
-            throw DirectMessagePayload.Error.unexpectedKind(payload.kind)
-        }
-        return message
-    }
-
-    /// Unwraps a received gift wrap as a NIP-25 reaction to a direct message (kind 7).
-    /// - Parameter giftWrap: The gift-wrapped event.
-    /// - Returns: The reaction.
-    /// - Throws: ``DirectMessagePayload/Error/unexpectedKind(_:)`` when the gift wrap carries another
-    ///   payload, or the errors of ``NostrMessaging/parsePayload(_:)``.
-    public func parseReaction(_ giftWrap: Event) async throws -> DirectMessageReaction {
-        let payload = try await parsePayload(giftWrap)
-        guard case .reaction(let reaction) = payload else {
-            throw DirectMessagePayload.Error.unexpectedKind(payload.kind)
-        }
-        return reaction
-    }
-
-    /// Unwraps a received gift wrap as a NIP-17 file message (kind 15).
-    /// - Parameter giftWrap: The gift-wrapped event.
-    /// - Returns: The file message.
-    /// - Throws: ``DirectMessagePayload/Error/unexpectedKind(_:)`` when the gift wrap carries another
-    ///   payload, or the errors of ``NostrMessaging/parsePayload(_:)``.
-    public func parseFile(_ giftWrap: Event) async throws -> DirectMessageFile {
-        let payload = try await parsePayload(giftWrap)
-        guard case .file(let file) = payload else {
-            throw DirectMessagePayload.Error.unexpectedKind(payload.kind)
-        }
-        return file
     }
 }

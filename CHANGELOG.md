@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **The NIP-17 direct-message API is simplified** (breaking):
+  - One way to read a gift wrap: `NostrMessaging.parsePayload(_:)` → `open(_:)`, which returns the
+    `DirectMessagePayload` to switch on. The `client.messages` conveniences `parse(_:)`,
+    `parseReaction(_:)`, and `parseFile(_:)` are removed, and `DirectMessageParser`'s `parse(_:)`,
+    `parseReaction(_:)`, `parseFileMessage(_:)`, and `parsePayload(_:)` collapse into `open(_:)`.
+    `DirectMessagePayload.Error.unexpectedKind` now means only a rumor that is not kind 14, 7, or 15.
+  - Built and sent results are separate types. `DirectMessageBuilder`'s
+    `createMessageWithSelfCopy`, `createReactionWithSelfCopy`, and `createFileMessageWithSelfCopy`
+    return the new `GiftWrappedMessage` (`rumor`, `recipientGiftWrap`, `selfGiftWrap`) instead of a
+    `SendDirectMessageResult` without publish results. `SendDirectMessageResult` is now `message:
+    GiftWrappedMessage`, `recipientPublishResult: PublishResult` (no longer optional), and
+    `selfCopyPublishResult: PublishResult?` (nil when the best-effort self-copy failed):
+    `result.rumor` → `result.message.rumor`, and likewise for both gift wraps.
+  - `GiftWrap.wrap(event:signer:recipientPublicKey:expiration:)` →
+    `wrap(_:signer:to:expiration:)`, which takes an `EventTemplate` and authors the rumor under the
+    signer's public key. The old form took the rumor's author from the event while the seal was
+    signed by `signer`, so an event authored by any other key produced a gift wrap that `unwrap`
+    rejected with `authorMismatch`; that mistake can no longer be expressed. A template carries its
+    `createdAt`, so wrapping it once per addressee yields one rumor id.
+
 ### Fixed
 
 - **Cancelling a send no longer drops the relay connection**: `RelayConnection.send(_:)` raced the

@@ -9,8 +9,8 @@ import NostrCore
 /// ``NostrMessaging/send(_:to:subject:replyTo:expiration:strategy:)``,
 /// ``NostrMessaging/react(to:reaction:expiration:strategy:)``, and
 /// ``NostrMessaging/sendFile(url:mimeType:encryption:size:dimensions:blurhash:to:expiration:strategy:)``
-/// gift-wrap a template through ``sendGiftWrapped(_:to:expiration:strategy:)``; and the parse
-/// helpers unwrap through ``parsePayload(_:)``. ``subscribe(limit:)`` delivers every payload, with
+/// gift-wrap a template through ``sendGiftWrapped(_:to:expiration:strategy:)``; ``open(_:)`` unwraps
+/// a received gift wrap. ``subscribe(limit:)`` delivers every payload, with
 /// ``DirectMessagePayloadSequence/messages`` and ``DirectMessagePayloadSequence/giftWraps`` as views.
 ///
 /// Every send is routed by the addressee's NIP-17 DM relay list (kind 10050) via
@@ -31,18 +31,18 @@ public struct NostrMessagesAPI: NostrMessaging {
         expiration: Timestamp?,
         strategy: PublishStrategy?
     ) async throws -> SendDirectMessageResult {
-        let result = try await client.withSigner { signer, publicKey in
+        let message = try await client.withSigner { signer, publicKey in
             try await DirectMessageBuilder(signer: signer).wrapWithSelfCopy(
                 template, senderPublicKey: publicKey, to: recipientPublicKey, expiration: expiration)
         }
 
-        return try await deliver(result, to: recipientPublicKey, strategy: strategy)
+        return try await deliver(message, to: recipientPublicKey, strategy: strategy)
     }
 
     /// Unwraps a received gift wrap into the message, reaction, or file message it carries.
-    public func parsePayload(_ giftWrap: Event) async throws -> DirectMessagePayload {
+    public func open(_ giftWrap: Event) async throws -> DirectMessagePayload {
         try await client.withSigner { signer, _ in
-            try await DirectMessageParser(signer: signer).parsePayload(giftWrap)
+            try await DirectMessageParser(signer: signer).open(giftWrap)
         }
     }
 
@@ -56,8 +56,8 @@ public struct NostrMessagesAPI: NostrMessaging {
 
     // MARK: - Private
 
-    /// Routes a built result's gift wraps to the recipient's and sender's kind-10050 DM relays and
-    /// publishes them, returning the result enriched with per-relay outcomes.
+    /// Routes a built message's gift wraps to the recipient's and sender's kind-10050 DM relays and
+    /// publishes them, returning the message with its per-relay outcomes.
     ///
     /// A nil target means the addressee advertised no DM relay list (or none could be connected), so
     /// the copy falls back to the full pool rather than being dropped; the recipient copy's fallback
@@ -65,26 +65,24 @@ public struct NostrMessagesAPI: NostrMessaging {
     /// addressees are resolved in parallel — each may trigger an independent relay-list fetch — and
     /// the best-effort self-copy never blocks or fails the primary send.
     private func deliver(
-        _ result: SendDirectMessageResult,
+        _ message: GiftWrappedMessage,
         to recipientPublicKey: PublicKey,
         strategy: PublishStrategy?
     ) async throws -> SendDirectMessageResult {
         async let recipientTargetsTask = inboxTargets(for: recipientPublicKey)
         // The rumor is authored under the sender's key, so it names the self-copy's addressee.
-        async let senderTargetsTask = inboxTargets(for: result.rumor.publicKey)
+        async let senderTargetsTask = inboxTargets(for: message.rumor.publicKey)
         let recipientTargets = await recipientTargetsTask
         let senderTargets = await senderTargetsTask
 
-        async let selfCopyDelivery = publishBestEffort(result.selfGiftWrap, toURLs: senderTargets)
+        async let selfCopyDelivery = publishBestEffort(message.selfGiftWrap, toURLs: senderTargets)
         let recipientResult = try await client.pool.publish(
-            result.recipientGiftWrap, to: recipientTargets, strategy: strategy
+            message.recipientGiftWrap, to: recipientTargets, strategy: strategy
         )
         let selfCopyResult = await selfCopyDelivery
 
         return SendDirectMessageResult(
-            rumor: result.rumor,
-            recipientGiftWrap: result.recipientGiftWrap,
-            selfGiftWrap: result.selfGiftWrap,
+            message: message,
             recipientPublishResult: recipientResult,
             selfCopyPublishResult: selfCopyResult
         )

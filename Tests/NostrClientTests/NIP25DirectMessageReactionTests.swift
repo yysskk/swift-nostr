@@ -44,8 +44,8 @@ struct NIP25DirectMessageReactionTests {
             reaction: "+", to: messageID, author: recipient.publicKey,
             recipientPublicKey: recipient.publicKey)
 
-        let reaction = try await DirectMessageParser(signer: EventSigner(keyPair: recipient)).parseReaction(
-            result.recipientGiftWrap)
+        let reaction = try #require(await DirectMessageParser(signer: EventSigner(keyPair: recipient)).open(
+            result.recipientGiftWrap).reaction)
         #expect(reaction.content == "+")
         #expect(reaction.messageID == messageID)
         #expect(reaction.messageAuthorPublicKey == recipient.publicKey)
@@ -53,23 +53,23 @@ struct NIP25DirectMessageReactionTests {
 
         // The self-copy decrypts with the sender's own key and carries the identical reaction,
         // guarding against a wrong-key regression when wrapping the self-copy.
-        let selfCopy = try await DirectMessageParser(signer: EventSigner(keyPair: sender)).parseReaction(
-            result.selfGiftWrap)
+        let selfCopy = try #require(await DirectMessageParser(signer: EventSigner(keyPair: sender)).open(
+            result.selfGiftWrap).reaction)
         #expect(selfCopy.rumorID == reaction.rumorID)
         #expect(selfCopy.content == "+")
         #expect(selfCopy.messageID == messageID)
         #expect(selfCopy.senderPublicKey == sender.publicKey)
     }
 
-    @Test("parsePayload classifies messages and reactions")
-    func parsePayloadDispatch() async throws {
+    @Test("open classifies messages and reactions")
+    func openDispatch() async throws {
         let sender = KeyPair()
         let recipient = KeyPair()
         let builder = DirectMessageBuilder(signer: EventSigner(keyPair: sender))
         let parser = DirectMessageParser(signer: EventSigner(keyPair: recipient))
 
         let message = try await builder.createMessageWithSelfCopy(content: "hi", to: recipient.publicKey)
-        guard case .message(let parsedMessage) = try await parser.parsePayload(message.recipientGiftWrap) else {
+        guard case .message(let parsedMessage) = try await parser.open(message.recipientGiftWrap) else {
             Issue.record("expected a message payload")
             return
         }
@@ -78,31 +78,12 @@ struct NIP25DirectMessageReactionTests {
         let reaction = try await builder.createReactionWithSelfCopy(
             reaction: "❤️", to: parsedMessage.rumorID, author: sender.publicKey,
             recipientPublicKey: recipient.publicKey)
-        guard case .reaction(let parsedReaction) = try await parser.parsePayload(reaction.recipientGiftWrap) else {
+        guard case .reaction(let parsedReaction) = try await parser.open(reaction.recipientGiftWrap) else {
             Issue.record("expected a reaction payload")
             return
         }
         #expect(parsedReaction.content == "❤️")
         #expect(parsedReaction.messageID == parsedMessage.rumorID)
-    }
-
-    @Test("parse and parseReaction reject the wrong inner kind")
-    func crossParsingRejected() async throws {
-        let sender = KeyPair()
-        let recipient = KeyPair()
-        let builder = DirectMessageBuilder(signer: EventSigner(keyPair: sender))
-        let parser = DirectMessageParser(signer: EventSigner(keyPair: recipient))
-
-        let message = try await builder.createMessageWithSelfCopy(content: "hi", to: recipient.publicKey)
-        let reaction = try await builder.createReactionWithSelfCopy(
-            reaction: "+", to: messageID, author: sender.publicKey, recipientPublicKey: recipient.publicKey)
-
-        await #expect(throws: DirectMessagePayload.Error.unexpectedKind(.reaction)) {
-            try await parser.parse(reaction.recipientGiftWrap)
-        }
-        await #expect(throws: DirectMessagePayload.Error.unexpectedKind(.privateDirectMessage)) {
-            try await parser.parseReaction(message.recipientGiftWrap)
-        }
     }
 
     @Test("a reaction without an e tag is rejected")
@@ -111,16 +92,16 @@ struct NIP25DirectMessageReactionTests {
         let recipient = KeyPair()
 
         // Hand-built kind-7 rumor with no "e" tag — not a valid reaction.
-        let rumor = UnsignedEvent(
-            publicKey: sender.publicKey, kind: .reaction,
+        let template = EventTemplate(
+            kind: .reaction,
             tags: [.publicKey(sender.publicKey)], content: "+"
-        ).asRumor()
+        )
         let giftWrap = try await GiftWrap.wrap(
-            event: rumor, signer: EventSigner(keyPair: sender), recipientPublicKey: recipient.publicKey)
+            template, signer: EventSigner(keyPair: sender), to: recipient.publicKey)
 
         let parser = DirectMessageParser(signer: EventSigner(keyPair: recipient))
         await #expect(throws: DirectMessagePayload.Error.missingReactionTarget) {
-            try await parser.parseReaction(giftWrap)
+            try await parser.open(giftWrap)
         }
     }
 
@@ -130,15 +111,15 @@ struct NIP25DirectMessageReactionTests {
         let recipient = KeyPair()
 
         // Hand-built kind-7 rumor with an "e" tag but no "p" tag — author is unknown.
-        let rumor = UnsignedEvent(
-            publicKey: sender.publicKey, kind: .reaction,
+        let template = EventTemplate(
+            kind: .reaction,
             tags: [.event(messageID)], content: "+"
-        ).asRumor()
+        )
         let giftWrap = try await GiftWrap.wrap(
-            event: rumor, signer: EventSigner(keyPair: sender), recipientPublicKey: recipient.publicKey)
+            template, signer: EventSigner(keyPair: sender), to: recipient.publicKey)
 
         await #expect(throws: DirectMessagePayload.Error.missingReactionTarget) {
-            try await DirectMessageParser(signer: EventSigner(keyPair: recipient)).parseReaction(giftWrap)
+            try await DirectMessageParser(signer: EventSigner(keyPair: recipient)).open(giftWrap)
         }
     }
 
@@ -152,14 +133,14 @@ struct NIP25DirectMessageReactionTests {
         let sender = KeyPair()
         let recipient = KeyPair()
 
-        let rumor = UnsignedEvent(
-            publicKey: sender.publicKey, kind: .reaction, tags: tags, content: "+"
-        ).asRumor()
+        let template = EventTemplate(
+            kind: .reaction, tags: tags, content: "+"
+        )
         let giftWrap = try await GiftWrap.wrap(
-            event: rumor, signer: EventSigner(keyPair: sender), recipientPublicKey: recipient.publicKey)
+            template, signer: EventSigner(keyPair: sender), to: recipient.publicKey)
 
         await #expect(throws: DirectMessagePayload.Error.missingReactionTarget) {
-            try await DirectMessageParser(signer: EventSigner(keyPair: recipient)).parseReaction(giftWrap)
+            try await DirectMessageParser(signer: EventSigner(keyPair: recipient)).open(giftWrap)
         }
     }
 
@@ -175,8 +156,8 @@ struct NIP25DirectMessageReactionTests {
             recipientPublicKey: recipient.publicKey, expiration: expiry)
 
         #expect(result.recipientGiftWrap.expiration == expiry)
-        let parsed = try await DirectMessageParser(signer: EventSigner(keyPair: recipient)).parseReaction(
-            result.recipientGiftWrap)
+        let parsed = try #require(await DirectMessageParser(signer: EventSigner(keyPair: recipient)).open(
+            result.recipientGiftWrap).reaction)
         #expect(parsed.expiresAt == expiry)
     }
 
@@ -199,9 +180,9 @@ struct NIP25DirectMessageReactionTests {
         let result = try await PublishAckSupport.acknowledgingPublishes(2, on: socket) {
             try await client.messages.react(to: message, reaction: "+")
         }
-        #expect(result.rumor.kind == .reaction)
-        #expect(result.rumor.referencedEventIDs == [messageID])
-        #expect(result.recipientPublishResult?.acceptedRelays == [ConnectedClientFixture.defaultRelayURL])
+        #expect(result.message.rumor.kind == .reaction)
+        #expect(result.message.rumor.referencedEventIDs == [messageID])
+        #expect(result.recipientPublishResult.acceptedRelays == [ConnectedClientFixture.defaultRelayURL])
         await client.relays.disconnect()
     }
 }

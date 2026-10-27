@@ -56,7 +56,7 @@ public struct DirectMessageSequence: AsyncSequence, Sendable {
         public mutating func next() async throws -> DirectMessage? {
             while let item = await base.next() {
                 guard case .event(_, let event) = item else { continue }
-                if let message = try await parser.parseIfReadable(event) {
+                if let message = try await parser.openMessageIfReadable(event) {
                     return message
                 }
             }
