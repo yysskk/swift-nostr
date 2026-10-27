@@ -1,5 +1,6 @@
 import Foundation
 import NostrCore
+import NostrTestSupport
 import Testing
 
 @testable import NostrClient
@@ -70,33 +71,48 @@ struct NIP17FileMessageTests {
         }
     }
 
-    // MARK: - Build
+    // MARK: - FileAttachment
 
-    @Test("a built file message carries the NIP-17 file tags")
-    func fileMessageTags() async throws {
-        let sender = KeyPair()
-        let recipient = KeyPair()
+    @Test("an attachment built from an EncryptedFile takes its key, nonce, and both hashes")
+    func attachmentFromEncryptedFile() throws {
         let encrypted = EncryptedFile.encrypt(Data("x".utf8))
+        let url = try #require(URL(string: "https://files.example.com/1"))
 
-        let builder = DirectMessageBuilder(signer: EventSigner(keyPair: sender))
-        let result = try await builder.createFileMessageWithSelfCopy(
-            url: URL(string: "https://files.example.com/1")!, mimeType: "image/png", encryption: encrypted,
-            size: 123, dimensions: "640x480", blurhash: "LKO2", to: recipient.publicKey)
+        let attachment = FileAttachment(
+            url: url, mimeType: "image/png", encryption: encrypted, size: 123, dimensions: "640x480",
+            blurhash: "LKO2")
 
-        let rumor = result.rumor
-        #expect(rumor.kind == .fileMessage)
-        #expect(rumor.content == "https://files.example.com/1")
-        #expect(rumor.signature == nil)  // NIP-17 rumors are never signed
-        #expect(rumor.referencedPublicKeys == [recipient.publicKey])
-        #expect(rumor.firstTagValue(named: "file-type") == "image/png")
-        #expect(rumor.firstTagValue(named: "encryption-algorithm") == "aes-gcm")
-        #expect(rumor.firstTagValue(named: "decryption-key") == encrypted.key.base64EncodedString())
-        #expect(rumor.firstTagValue(named: "decryption-nonce") == encrypted.nonce.base64EncodedString())
-        #expect(rumor.firstTagValue(named: "x") == encrypted.encryptedSHA256)
-        #expect(rumor.firstTagValue(named: "ox") == encrypted.originalSHA256)
-        #expect(rumor.firstTagValue(named: "size") == "123")
-        #expect(rumor.firstTagValue(named: "dim") == "640x480")
-        #expect(rumor.firstTagValue(named: "blurhash") == "LKO2")
+        #expect(attachment.url == url)
+        #expect(attachment.mimeType == "image/png")
+        #expect(attachment.decryptionKey == encrypted.key)
+        #expect(attachment.decryptionNonce == encrypted.nonce)
+        #expect(attachment.encryptedSHA256 == encrypted.encryptedSHA256)
+        #expect(attachment.originalSHA256 == encrypted.originalSHA256)
+        #expect(attachment.size == 123)
+        #expect(attachment.dimensions == "640x480")
+        #expect(attachment.blurhash == "LKO2")
+    }
+
+    @Test("an attachment decrypts the uploaded ciphertext back to the original")
+    func attachmentDecrypts() throws {
+        let original = Data("hello, this is a secret file".utf8)
+        let encrypted = EncryptedFile.encrypt(original)
+        let url = try #require(URL(string: "https://files.example.com/1"))
+        let attachment = FileAttachment(url: url, mimeType: "text/plain", encryption: encrypted)
+
+        #expect(try attachment.decrypt(encrypted.ciphertext) == original)
+    }
+
+    @Test("an attachment with the wrong key fails authentication")
+    func attachmentWrongKeyFails() throws {
+        let encrypted = EncryptedFile.encrypt(Data("secret".utf8))
+        let url = try #require(URL(string: "https://files.example.com/1"))
+        var attachment = FileAttachment(url: url, mimeType: "text/plain", encryption: encrypted)
+        attachment.decryptionKey = Data(repeating: 0, count: 32)
+
+        #expect(throws: EncryptedFile.Error.authenticationFailed) {
+            _ = try attachment.decrypt(encrypted.ciphertext)
+        }
     }
 
     // MARK: - Round trip
@@ -107,37 +123,71 @@ struct NIP17FileMessageTests {
         let recipient = KeyPair()
         let original = Data("hello, this is a secret file".utf8)
         let encrypted = EncryptedFile.encrypt(original)
-        let url = URL(string: "https://files.example.com/abc")!
+        let url = try #require(URL(string: "https://files.example.com/abc"))
+        let attachment = FileAttachment(
+            url: url, mimeType: "text/plain", encryption: encrypted, size: encrypted.ciphertext.count,
+            dimensions: "640x480", blurhash: "LKO2")
 
         let builder = DirectMessageBuilder(signer: EventSigner(keyPair: sender))
-        let result = try await builder.createFileMessageWithSelfCopy(
-            url: url, mimeType: "text/plain", encryption: encrypted,
-            size: encrypted.ciphertext.count, to: recipient.publicKey)
+        let result = try await builder.createFileMessageWithSelfCopy(attachment, to: recipient.publicKey)
 
         let recipientParser = DirectMessageParser(signer: EventSigner(keyPair: recipient))
-
         let file = try #require(await recipientParser.open(result.recipientGiftWrap).file)
-        #expect(file.url == url)
-        #expect(file.mimeType == "text/plain")
+        #expect(file.attachment == attachment)
         #expect(file.senderPublicKey == sender.publicKey)
-        #expect(file.encryptedSHA256 == encrypted.encryptedSHA256)
-        #expect(file.originalSHA256 == encrypted.originalSHA256)
-        #expect(file.size == encrypted.ciphertext.count)
-
-        // The parsed key/nonce decrypt the (separately transmitted) blob back to the original.
-        let decrypted = try EncryptedFile.decrypt(
-            encrypted.ciphertext, key: file.decryptionKey, nonce: file.decryptionNonce)
-        #expect(decrypted == original)
+        #expect(file.recipientPublicKey == recipient.publicKey)
+        // The parsed key and nonce decrypt the (separately transmitted) blob back to the original.
+        #expect(try file.attachment.decrypt(encrypted.ciphertext) == original)
 
         // The self-copy decrypts with the sender's own key and yields the same file, guarding
         // against a wrong-key regression when wrapping the self-copy.
         let senderParser = DirectMessageParser(signer: EventSigner(keyPair: sender))
         let selfFile = try #require(await senderParser.open(result.selfGiftWrap).file)
         #expect(selfFile.rumorID == file.rumorID)
-        #expect(selfFile.url == url)
-        let selfDecrypted = try EncryptedFile.decrypt(
-            encrypted.ciphertext, key: selfFile.decryptionKey, nonce: selfFile.decryptionNonce)
-        #expect(selfDecrypted == original)
+        #expect(selfFile.attachment == attachment)
+    }
+
+    @Test("a hand-built file message without the optional tags opens with them nil")
+    func fileWithoutOptionalTags() async throws {
+        let sender = KeyPair()
+        let recipient = KeyPair()
+        let key = Data(repeating: 1, count: 32)
+        let nonce = Data(repeating: 2, count: 12)
+
+        let giftWrap = try await Self.wrapFileRumor(
+            sender: sender, recipient: recipient, url: "https://files.example.com/1", key: key, nonce: nonce)
+
+        let parser = DirectMessageParser(signer: EventSigner(keyPair: recipient))
+        let file = try #require(await parser.open(giftWrap).file)
+        let url = try #require(URL(string: "https://files.example.com/1"))
+        #expect(file.attachment == FileAttachment(url: url, decryptionKey: key, decryptionNonce: nonce))
+    }
+
+    @Test("messages.sendFile delivers an attachment that opens equal to the one sent")
+    func clientSendFileRoundTrip() async throws {
+        let (client, socket) = try await ConnectedClientFixture.make()
+        let senderKey = KeyPair()
+        try await client.identity.setPrivateKey(senderKey.privateKey.hex)
+        let recipient = KeyPair()
+        let encrypted = EncryptedFile.encrypt(Data("x".utf8))
+        let url = try #require(URL(string: "https://files.example.com/1"))
+        let attachment = FileAttachment(url: url, mimeType: "image/png", encryption: encrypted, size: 42)
+
+        // Confirmed-absent DM relay lists: both copies fall back to the pool's relay without a
+        // discovery fetch.
+        await client.dmRelayListStore.markNoList(for: recipient.publicKey)
+        await client.dmRelayListStore.markNoList(for: senderKey.publicKey)
+
+        let result = try await PublishAckSupport.acknowledgingPublishes(2, on: socket) {
+            try await client.messages.sendFile(attachment, to: recipient.publicKey)
+        }
+        await client.relays.disconnect()
+
+        let recipientParser = DirectMessageParser(signer: EventSigner(keyPair: recipient))
+        let file = try #require(await recipientParser.open(result.message.recipientGiftWrap).file)
+        #expect(file.attachment == attachment)
+        let selfFile = try #require(await client.messages.open(result.message.selfGiftWrap).file)
+        #expect(selfFile.attachment == attachment)
     }
 
     @Test("open classifies a file message")
@@ -145,20 +195,18 @@ struct NIP17FileMessageTests {
         let sender = KeyPair()
         let recipient = KeyPair()
         let encrypted = EncryptedFile.encrypt(Data("x".utf8))
+        let url = try #require(URL(string: "https://files.example.com/1"))
+        let attachment = FileAttachment(url: url, mimeType: "image/png", encryption: encrypted)
 
         let builder = DirectMessageBuilder(signer: EventSigner(keyPair: sender))
-        let result = try await builder.createFileMessageWithSelfCopy(
-            url: URL(string: "https://files.example.com/1")!, mimeType: "image/png", encryption: encrypted,
-            to: recipient.publicKey)
+        let result = try await builder.createFileMessageWithSelfCopy(attachment, to: recipient.publicKey)
 
-        guard
-            case .file(let file) = try await DirectMessageParser(signer: EventSigner(keyPair: recipient))
-                .open(result.recipientGiftWrap)
-        else {
+        let parser = DirectMessageParser(signer: EventSigner(keyPair: recipient))
+        guard case .file(let file) = try await parser.open(result.recipientGiftWrap) else {
             Issue.record("expected a file payload")
             return
         }
-        #expect(file.url == URL(string: "https://files.example.com/1"))
+        #expect(file.attachment.url == url)
     }
 
     @Test("a file message without a decryption key is rejected")
@@ -251,10 +299,12 @@ struct NIP17FileMessageTests {
         let encrypted = EncryptedFile.encrypt(Data("x".utf8))
         let expiry = Timestamp(rawValue: 1_700_000_000)
 
+        let url = try #require(URL(string: "https://example.com/u"))
+        let attachment = FileAttachment(url: url, mimeType: "image/png", encryption: encrypted)
+
         let builder = DirectMessageBuilder(signer: EventSigner(keyPair: sender))
         let result = try await builder.createFileMessageWithSelfCopy(
-            url: URL(string: "https://example.com/u")!, mimeType: "image/png", encryption: encrypted,
-            to: recipient.publicKey, expiration: expiry)
+            attachment, to: recipient.publicKey, expiration: expiry)
 
         #expect(result.recipientGiftWrap.expiration == expiry)
         let recipientParser = DirectMessageParser(signer: EventSigner(keyPair: recipient))

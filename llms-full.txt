@@ -409,7 +409,7 @@ for await giftWrap in giftWraps.events {
 switch try await client.messages.open(giftWrapEvent) {
 case .message(let dm): print(dm.content)
 case .reaction(let reaction): print(reaction.content)
-case .file(let file): print(file.url)
+case .file(let file): print(file.attachment.url)
 }
 ```
 
@@ -616,7 +616,7 @@ EventTemplate.relayListMetadata(RelayListMetadata(read: [inbox], write: [outbox]
 EventTemplate.directMessageRelayList(DirectMessageRelayList(relays: [inbox]))      // kind 10050, relay tags (NIP-17)
 EventTemplate.directMessage("hi", to: bob, subject: nil, replyTo: nil)  // kind 14 rumor: p, subject, e reply-marker tags (NIP-17)
 EventTemplate.directMessageReaction(to: message.rumorID, author: alice, content: "+")  // kind 7 rumor: e, p, k 14 (NIP-25)
-EventTemplate.fileMessage(url: url, mimeType: "image/jpeg", encryption: encrypted, to: bob)  // kind 15 rumor (NIP-17)
+EventTemplate.fileMessage(FileAttachment(url: url, mimeType: "image/jpeg", encryption: encrypted), to: bob)  // kind 15 (NIP-17)
 EventTemplate.report(author, type: .impersonation, reason: "")  // kind 1984, type on the p tag (NIP-56)
 EventTemplate.report(event, type: .illegal, reason: "")      // type on the e tag + bare p tag for the author
 EventTemplate.longFormContent(article, draft: false)         // kind 30023 / 30024 draft; stamps a nil publishedAt (NIP-23)
@@ -1189,7 +1189,9 @@ NIP-17 Private Direct Message (struct: Sendable, Identifiable, Hashable).
 
 `DirectMessageReaction` has `rumorID`, `senderPublicKey`, `messageID: EventID`, and
 `messageAuthorPublicKey: PublicKey`; `DirectMessageFile` has `rumorID`, `senderPublicKey`,
-`recipientPublicKey`, and `url: URL`; both also have `createdAt: Timestamp` and `expiresAt: Timestamp?`. A reaction whose `e` or `p` tag is missing or malformed fails to parse.
+`recipientPublicKey`, and `attachment: FileAttachment` (`url`, `mimeType`, `decryptionKey`, `decryptionNonce`,
+`encryptedSHA256`, `originalSHA256`, `size`, `dimensions`, `blurhash`; `decrypt(_:)` opens the downloaded
+blob); both also have `createdAt: Timestamp` and `expiresAt: Timestamp?`. A reaction whose `e` or `p` tag is missing or malformed fails to parse.
 
 ## DirectMessageBuilder
 

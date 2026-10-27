@@ -119,6 +119,7 @@ add NIP helpers and namespaces of your own; see <doc:ExtendingTheClient>.
 - ``DirectMessage``
 - ``DirectMessageReaction``
 - ``DirectMessageFile``
+- ``FileAttachment``
 - ``DirectMessagePayload``
 - ``DirectMessageSequence``
 - ``DirectMessagePayloadSequence``

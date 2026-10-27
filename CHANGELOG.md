@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`FileAttachment` describes a NIP-17 kind-15 file**: the URL, MIME type, decryption key and
+  nonce, `x`/`ox` hashes, size, dimensions, and blurhash in one value that a file message both sends
+  and receives. `init(url:mimeType:encryption:size:dimensions:blurhash:)` fills the key, nonce, and
+  hashes from an `EncryptedFile`, and `decrypt(_:)` opens the downloaded blob with the attachment's
+  key and nonce.
+
 ### Changed
 
 - **The NIP-17 direct-message API is simplified** (breaking):
@@ -28,6 +36,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     signed by `signer`, so an event authored by any other key produced a gift wrap that `unwrap`
     rejected with `authorMismatch`; that mistake can no longer be expressed. A template carries its
     `createdAt`, so wrapping it once per addressee yields one rumor id.
+- **File messages take a `FileAttachment`** (breaking): the six loose file parameters collapse into
+  one value on every sending entry point, and the receiving side carries the same value.
+  - `EventTemplate.fileMessage(url:mimeType:encryption:size:dimensions:blurhash:to:)` →
+    `fileMessage(_:to:)`. An attachment built from an `EncryptedFile` emits the same tags in the same
+    order; `file-type`, `x`, `ox`, `size`, `dim`, and `blurhash` are omitted when nil.
+  - `NostrMessaging.sendFile(url:mimeType:encryption:size:dimensions:blurhash:to:expiration:strategy:)`
+    → `sendFile(_:to:expiration:strategy:)`.
+  - `DirectMessageBuilder`'s
+    `createFileMessageWithSelfCopy(url:mimeType:encryption:size:dimensions:blurhash:to:expiration:)` →
+    `createFileMessageWithSelfCopy(_:to:expiration:)`.
+  - `DirectMessageFile`'s `url`, `mimeType`, `decryptionKey`, `decryptionNonce`, `encryptedSHA256`,
+    `originalSHA256`, `size`, `dimensions`, and `blurhash` move into `attachment: FileAttachment`
+    (`file.url` → `file.attachment.url`), and its initializer takes `attachment:` in their place.
+    `EncryptedFile.decrypt(blob, key: file.decryptionKey, nonce: file.decryptionNonce)` →
+    `file.attachment.decrypt(blob)`.
 
 ### Fixed
 

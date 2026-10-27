@@ -73,35 +73,22 @@ public struct DirectMessageBuilder: Sendable {
 
     /// Creates a gift-wrapped NIP-17 kind-15 file message, plus the sender's self-copy.
     ///
-    /// The file must already be encrypted (see ``EncryptedFile/encrypt(_:)``) and uploaded; pass
-    /// the resulting URL and ``EncryptedFile``. The message carries the URL as its content and the
-    /// key, nonce, and hashes as tags — built by
-    /// ``EventTemplate/fileMessage(url:mimeType:encryption:size:dimensions:blurhash:to:)`` — wrapped
-    /// exactly like a text message so it stays private.
+    /// The file must already be encrypted (see ``EncryptedFile/encrypt(_:)``) and uploaded; describe
+    /// it with a ``FileAttachment``. The message carries the URL as its content and the key, nonce,
+    /// and hashes as tags — built by ``EventTemplate/fileMessage(_:to:)`` — wrapped exactly like a
+    /// text message so it stays private.
     /// - Parameters:
-    ///   - url: The URL of the uploaded encrypted file.
-    ///   - mimeType: The file's MIME type before encryption (the `file-type` tag).
-    ///   - encryption: The encryption result whose key, nonce, and hashes describe the file.
-    ///   - size: Optional size of the encrypted file in bytes (the `size` tag).
-    ///   - dimensions: Optional pixel dimensions as "<width>x<height>" (the `dim` tag).
-    ///   - blurhash: Optional blurhash placeholder (the `blurhash` tag).
+    ///   - attachment: The uploaded encrypted file.
     ///   - recipientPublicKey: The recipient's public key.
     ///   - expiration: Optional NIP-40 expiration applied to both gift wraps.
     /// - Returns: The shared rumor and both gift wraps.
     public func createFileMessageWithSelfCopy(
-        url: URL,
-        mimeType: String,
-        encryption: EncryptedFile,
-        size: Int? = nil,
-        dimensions: String? = nil,
-        blurhash: String? = nil,
+        _ attachment: FileAttachment,
         to recipientPublicKey: PublicKey,
         expiration: Timestamp? = nil
     ) async throws -> GiftWrappedMessage {
         try await wrapWithSelfCopy(
-            .fileMessage(
-                url: url, mimeType: mimeType, encryption: encryption, size: size, dimensions: dimensions,
-                blurhash: blurhash, to: recipientPublicKey),
+            .fileMessage(attachment, to: recipientPublicKey),
             to: recipientPublicKey,
             expiration: expiration
         )

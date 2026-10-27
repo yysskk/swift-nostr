@@ -66,7 +66,7 @@ for await giftWrap in giftWraps.events {
 switch try await client.messages.open(giftWrapEvent) {
 case .message(let dm): print("Message: \(dm.content)")
 case .reaction(let reaction): print("Reaction: \(reaction.content)")
-case .file(let file): print("File: \(file.url)")
+case .file(let file): print("File: \(file.attachment.url)")
 }
 ```
 
@@ -83,23 +83,22 @@ try await client.messages.react(to: message, reaction: "🤙")
 
 A file message carries an *encrypted* file's URL together with the keys needed to decrypt it. Encrypt
 the bytes with ``EncryptedFile/encrypt(_:)``, upload the ciphertext to any host (Blossom, NIP-96, …),
-then send the URL and keys with
-``NostrMessaging/sendFile(url:mimeType:encryption:size:dimensions:blurhash:to:expiration:strategy:)``:
+then describe the upload as a ``FileAttachment`` and send it with
+``NostrMessaging/sendFile(_:to:expiration:strategy:)``:
 
 ```swift
 let encrypted = EncryptedFile.encrypt(imageData)
 let url = try await upload(encrypted.ciphertext)  // your transport
-try await client.messages.sendFile(
-    url: url, mimeType: "image/jpeg", encryption: encrypted, to: recipient
-)
+let attachment = FileAttachment(url: url, mimeType: "image/jpeg", encryption: encrypted)
+try await client.messages.sendFile(attachment, to: recipient)
 ```
 
-On receipt, download the ciphertext and decrypt it with the file's keys using
-``EncryptedFile/decrypt(_:key:nonce:)``:
+On receipt, download the ciphertext and decrypt it with the attachment's keys using
+``FileAttachment/decrypt(_:)``:
 
 ```swift
-let blob = try await download(file.url)  // your transport
-let data = try EncryptedFile.decrypt(blob, key: file.decryptionKey, nonce: file.decryptionNonce)
+let blob = try await download(file.attachment.url)  // your transport
+let data = try file.attachment.decrypt(blob)
 ```
 
 ### Gift-Wrapped Rumors of Any Kind
@@ -150,9 +149,9 @@ for try await payload in try await client.messages.subscribe() {
     case .reaction(let reaction):
         print("\(reaction.senderPublicKey) reacted \(reaction.content) to \(reaction.messageID)")
     case .file(let file):
-        let blob = try await download(file.url)  // your transport
-        let data = try EncryptedFile.decrypt(blob, key: file.decryptionKey, nonce: file.decryptionNonce)
-        print("received \(file.mimeType ?? "file"), \(data.count) bytes")
+        let blob = try await download(file.attachment.url)  // your transport
+        let data = try file.attachment.decrypt(blob)
+        print("received \(file.attachment.mimeType ?? "file"), \(data.count) bytes")
     }
 }
 ```
