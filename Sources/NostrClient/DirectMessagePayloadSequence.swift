@@ -12,7 +12,7 @@ import NostrCore
 ///     switch payload {
 ///     case .message(let message): print("\(message.senderPublicKey): \(message.content)")
 ///     case .reaction(let reaction): print("\(reaction.senderPublicKey) reacted \(reaction.content)")
-///     case .file(let file): print("\(file.senderPublicKey) sent \(file.url)")
+///     case .file(let file): print("\(file.senderPublicKey) sent \(file.attachment.url)")
 ///     }
 /// }
 /// ```

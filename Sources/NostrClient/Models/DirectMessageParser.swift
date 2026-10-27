@@ -180,10 +180,7 @@ public struct DirectMessageParser: Sendable {
 
         let recipientPublicKey = try await addressee(of: rumor)
 
-        return DirectMessageFile(
-            rumorID: rumor.id,
-            senderPublicKey: unwrapped.senderPublicKey,
-            recipientPublicKey: recipientPublicKey,
+        let attachment = FileAttachment(
             url: url,
             mimeType: rumor.firstTagValue(named: "file-type"),
             decryptionKey: key,
@@ -192,7 +189,14 @@ public struct DirectMessageParser: Sendable {
             originalSHA256: rumor.firstTagValue(named: "ox"),
             size: rumor.firstTagValue(named: "size").flatMap(Int.init),
             dimensions: rumor.firstTagValue(named: "dim"),
-            blurhash: rumor.firstTagValue(named: "blurhash"),
+            blurhash: rumor.firstTagValue(named: "blurhash")
+        )
+
+        return DirectMessageFile(
+            rumorID: rumor.id,
+            senderPublicKey: unwrapped.senderPublicKey,
+            recipientPublicKey: recipientPublicKey,
+            attachment: attachment,
             createdAt: rumor.createdAt,
             expiresAt: giftWrap.expiration
         )

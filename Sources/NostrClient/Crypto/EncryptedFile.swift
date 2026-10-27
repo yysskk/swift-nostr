@@ -13,11 +13,11 @@ import NostrCore
 /// ```swift
 /// let encrypted = EncryptedFile.encrypt(imageData)
 /// let url = try await upload(encrypted.ciphertext)            // your host, out of scope here
-/// try await client.messages.sendFile(
-///     url: url, mimeType: "image/jpeg", encryption: encrypted, to: publicKey)
+/// let attachment = FileAttachment(url: url, mimeType: "image/jpeg", encryption: encrypted)
+/// try await client.messages.sendFile(attachment, to: publicKey)
 ///
-/// // On the receiving side, after downloading the blob at `file.url`:
-/// let decrypted = try EncryptedFile.decrypt(blob, key: file.decryptionKey, nonce: file.decryptionNonce)
+/// // On the receiving side, after downloading the blob at `file.attachment.url`:
+/// let decrypted = try file.attachment.decrypt(blob)
 /// ```
 ///
 /// https://github.com/nostr-protocol/nips/blob/master/17.md

@@ -105,19 +105,14 @@ extension NostrMessaging {
     }
 
     /// Sends a NIP-17 file message (kind 15), gift-wrapped and routed like a text message and built
-    /// by ``EventTemplate/fileMessage(url:mimeType:encryption:size:dimensions:blurhash:to:)``.
+    /// by ``EventTemplate/fileMessage(_:to:)``.
     ///
     /// Encrypt the file with ``EncryptedFile/encrypt(_:)`` and upload the resulting
-    /// ``EncryptedFile/ciphertext`` to your host first, then pass the URL and the `EncryptedFile`
-    /// here. The message carries the URL plus the key, nonce, and hashes the recipient needs to
-    /// download and decrypt it.
+    /// ``EncryptedFile/ciphertext`` to your host first, then describe it with
+    /// ``FileAttachment/init(url:mimeType:encryption:size:dimensions:blurhash:)``. The message
+    /// carries the URL plus the key, nonce, and hashes the recipient needs to download and decrypt it.
     /// - Parameters:
-    ///   - url: The URL of the uploaded encrypted file.
-    ///   - mimeType: The file's MIME type before encryption (e.g. "image/jpeg").
-    ///   - encryption: The encryption result from ``EncryptedFile/encrypt(_:)``.
-    ///   - size: The encrypted file's size in bytes.
-    ///   - dimensions: Pixel dimensions as "<width>x<height>".
-    ///   - blurhash: A blurhash placeholder for progressive display.
+    ///   - attachment: The uploaded encrypted file.
     ///   - recipientPublicKey: The recipient's public key.
     ///   - expiration: A NIP-40 expiration applied to both gift wraps.
     ///   - strategy: How many relay acknowledgments to wait for on the recipient gift wrap before
@@ -125,20 +120,13 @@ extension NostrMessaging {
     /// - Returns: The published ``GiftWrappedMessage`` and the per-relay publish outcomes.
     @discardableResult
     public func sendFile(
-        url: URL,
-        mimeType: String,
-        encryption: EncryptedFile,
-        size: Int? = nil,
-        dimensions: String? = nil,
-        blurhash: String? = nil,
+        _ attachment: FileAttachment,
         to recipientPublicKey: PublicKey,
         expiration: Timestamp? = nil,
         strategy: PublishStrategy? = nil
     ) async throws -> SendDirectMessageResult {
         try await sendGiftWrapped(
-            .fileMessage(
-                url: url, mimeType: mimeType, encryption: encryption, size: size, dimensions: dimensions,
-                blurhash: blurhash, to: recipientPublicKey),
+            .fileMessage(attachment, to: recipientPublicKey),
             to: recipientPublicKey,
             expiration: expiration,
             strategy: strategy

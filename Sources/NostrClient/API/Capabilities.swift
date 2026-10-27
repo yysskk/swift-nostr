@@ -322,7 +322,7 @@ public protocol NostrRelayRouting: Sendable {
 /// The requirements are the primitives — gift-wrapping a template, unwrapping a gift wrap, and the
 /// gift-wrap stream; ``send(_:to:subject:replyTo:expiration:strategy:)``,
 /// ``react(to:reaction:expiration:strategy:)``,
-/// ``sendFile(url:mimeType:encryption:size:dimensions:blurhash:to:expiration:strategy:)``,
+/// ``sendFile(_:to:expiration:strategy:)``,
 /// and the short forms of the primitives are provided by an extension built on them.
 public protocol NostrMessaging: Sendable {
     /// Authors `template` as an unsigned rumor under the configured signer's public key and sends it

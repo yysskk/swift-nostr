@@ -194,41 +194,48 @@ struct EventTemplateClientTests {
                 .content == "🤙")
     }
 
-    @Test("fileMessage is kind 15 with the URL as content and the file's keys and hashes as tags")
+    @Test("fileMessage is kind 15 with the URL as content and every attachment field as a tag, in order")
     func fileMessage() throws {
         let file = EncryptedFile.encrypt(Data("file bytes".utf8))
+        let url = try #require(URL(string: "https://files.example.com/blob"))
+        let attachment = FileAttachment(
+            url: url, mimeType: "image/png", encryption: file, size: 1024, dimensions: "640x480",
+            blurhash: "LEHV6nWB2yk8")
 
-        let template = EventTemplate.fileMessage(
-            url: URL(string: "https://files.example.com/blob")!, mimeType: "image/jpeg", encryption: file,
-            to: .fixture("bob"))
+        let template = EventTemplate.fileMessage(attachment, to: .fixture("bob"))
 
         #expect(template.kind == .fileMessage)
         #expect(template.content == "https://files.example.com/blob")
         #expect(
             template.tags.map(\.rawArray) == [
                 ["p", PublicKey.fixture("bob").hex],
-                ["file-type", "image/jpeg"],
+                ["file-type", "image/png"],
                 ["encryption-algorithm", "aes-gcm"],
                 ["decryption-key", file.key.base64EncodedString()],
                 ["decryption-nonce", file.nonce.base64EncodedString()],
                 ["x", file.encryptedSHA256],
                 ["ox", file.originalSHA256],
-            ])
-    }
-
-    @Test("fileMessage appends size, dimensions, and blurhash in that order")
-    func fileMessageOptionalTags() throws {
-        let template = EventTemplate.fileMessage(
-            url: URL(string: "https://files.example.com/blob")!, mimeType: "image/png",
-            encryption: EncryptedFile.encrypt(Data("file bytes".utf8)), size: 1024, dimensions: "640x480",
-            blurhash: "LEHV6nWB2yk8", to: .fixture("bob"))
-
-        #expect(template.tags.count == 10)
-        #expect(
-            template.tags.suffix(3).map(\.rawArray) == [
                 ["size", "1024"],
                 ["dim", "640x480"],
                 ["blurhash", "LEHV6nWB2yk8"],
+            ])
+    }
+
+    @Test("fileMessage omits the optional tags an attachment leaves nil")
+    func fileMessageOmitsNilTags() throws {
+        let url = try #require(URL(string: "https://files.example.com/blob"))
+        let key = Data(repeating: 1, count: 32)
+        let nonce = Data(repeating: 2, count: 12)
+        let attachment = FileAttachment(url: url, decryptionKey: key, decryptionNonce: nonce)
+
+        let template = EventTemplate.fileMessage(attachment, to: .fixture("bob"))
+
+        #expect(
+            template.tags.map(\.rawArray) == [
+                ["p", PublicKey.fixture("bob").hex],
+                ["encryption-algorithm", "aes-gcm"],
+                ["decryption-key", key.base64EncodedString()],
+                ["decryption-nonce", nonce.base64EncodedString()],
             ])
     }
 
@@ -237,12 +244,12 @@ struct EventTemplateClientTests {
         let alice = KeyPair()
         let builder = DirectMessageBuilder(signer: EventSigner(keyPair: alice))
         let file = EncryptedFile.encrypt(Data("file bytes".utf8))
+        let url = try #require(URL(string: "https://files.example.com/blob"))
+        let attachment = FileAttachment(url: url, mimeType: "image/jpeg", encryption: file)
         let expected: [EventTemplate] = [
             .directMessage("hi", to: .fixture("bob"), subject: "s", replyTo: .fixture("parent")),
             .directMessageReaction(to: .fixture("message"), author: .fixture("bob"), content: "-"),
-            .fileMessage(
-                url: URL(string: "https://files.example.com/blob")!, mimeType: "image/jpeg", encryption: file,
-                to: .fixture("bob")),
+            .fileMessage(attachment, to: .fixture("bob")),
         ]
 
         let rumors = [
@@ -252,10 +259,7 @@ struct EventTemplateClientTests {
             try await builder.createReactionWithSelfCopy(
                 reaction: "-", to: .fixture("message"), author: .fixture("bob"), recipientPublicKey: .fixture("bob")
             ).rumor,
-            try await builder.createFileMessageWithSelfCopy(
-                url: URL(string: "https://files.example.com/blob")!, mimeType: "image/jpeg", encryption: file,
-                to: .fixture("bob")
-            ).rumor,
+            try await builder.createFileMessageWithSelfCopy(attachment, to: .fixture("bob")).rumor,
         ]
 
         #expect(rumors.map(\.kind) == expected.map(\.kind))

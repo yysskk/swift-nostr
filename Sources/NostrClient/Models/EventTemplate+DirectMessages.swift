@@ -48,46 +48,38 @@ extension EventTemplate {
         )
     }
 
-    /// A NIP-17 file message (kind 15) to `recipientPublicKey`: the URL of a file encrypted with
-    /// ``EncryptedFile/encrypt(_:)`` as the content, and the MIME type, key, nonce, and hashes as
-    /// tags. Like a message, it is gift-wrapped and never signed.
+    /// A NIP-17 file message (kind 15) to `recipientPublicKey`: the attachment's URL as the content,
+    /// and its MIME type, key, nonce, hashes, and metadata as tags. Like a message, it is
+    /// gift-wrapped and never signed. Optional tags are omitted when the attachment leaves them nil.
     /// https://github.com/nostr-protocol/nips/blob/master/17.md
     /// - Parameters:
-    ///   - url: The URL of the uploaded encrypted file.
-    ///   - mimeType: The file's MIME type before encryption (the `file-type` tag).
-    ///   - encryption: The encryption result whose key, nonce, and hashes describe the file.
-    ///   - size: The encrypted file's size in bytes (the `size` tag).
-    ///   - dimensions: Pixel dimensions as "<width>x<height>" (the `dim` tag).
-    ///   - blurhash: A blurhash placeholder (the `blurhash` tag).
+    ///   - attachment: The uploaded encrypted file, typically built with
+    ///     ``FileAttachment/init(url:mimeType:encryption:size:dimensions:blurhash:)``.
     ///   - recipientPublicKey: The recipient, named by the `p` tag.
     /// - Returns: The template for the file message.
-    public static func fileMessage(
-        url: URL,
-        mimeType: String,
-        encryption: EncryptedFile,
-        size: Int? = nil,
-        dimensions: String? = nil,
-        blurhash: String? = nil,
-        to recipientPublicKey: PublicKey
-    ) -> EventTemplate {
-        var tags: [Tag] = [
-            .publicKey(recipientPublicKey),
-            Tag(name: "file-type", values: [mimeType]),
-            Tag(name: "encryption-algorithm", values: ["aes-gcm"]),
-            Tag(name: "decryption-key", values: [encryption.key.base64EncodedString()]),
-            Tag(name: "decryption-nonce", values: [encryption.nonce.base64EncodedString()]),
-            Tag(name: "x", values: [encryption.encryptedSHA256]),
-            Tag(name: "ox", values: [encryption.originalSHA256]),
-        ]
-        if let size {
+    public static func fileMessage(_ attachment: FileAttachment, to recipientPublicKey: PublicKey) -> EventTemplate {
+        var tags: [Tag] = [.publicKey(recipientPublicKey)]
+        if let mimeType = attachment.mimeType {
+            tags.append(Tag(name: "file-type", values: [mimeType]))
+        }
+        tags.append(Tag(name: "encryption-algorithm", values: ["aes-gcm"]))
+        tags.append(Tag(name: "decryption-key", values: [attachment.decryptionKey.base64EncodedString()]))
+        tags.append(Tag(name: "decryption-nonce", values: [attachment.decryptionNonce.base64EncodedString()]))
+        if let encryptedSHA256 = attachment.encryptedSHA256 {
+            tags.append(Tag(name: "x", values: [encryptedSHA256]))
+        }
+        if let originalSHA256 = attachment.originalSHA256 {
+            tags.append(Tag(name: "ox", values: [originalSHA256]))
+        }
+        if let size = attachment.size {
             tags.append(Tag(name: "size", values: [String(size)]))
         }
-        if let dimensions {
+        if let dimensions = attachment.dimensions {
             tags.append(Tag(name: "dim", values: [dimensions]))
         }
-        if let blurhash {
+        if let blurhash = attachment.blurhash {
             tags.append(Tag(name: "blurhash", values: [blurhash]))
         }
-        return EventTemplate(kind: .fileMessage, tags: tags, content: url.absoluteString)
+        return EventTemplate(kind: .fileMessage, tags: tags, content: attachment.url.absoluteString)
     }
 }

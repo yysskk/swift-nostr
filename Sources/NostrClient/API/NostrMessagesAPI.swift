@@ -8,7 +8,7 @@ import NostrCore
 /// inherits every convenience from the protocol's extension:
 /// ``NostrMessaging/send(_:to:subject:replyTo:expiration:strategy:)``,
 /// ``NostrMessaging/react(to:reaction:expiration:strategy:)``, and
-/// ``NostrMessaging/sendFile(url:mimeType:encryption:size:dimensions:blurhash:to:expiration:strategy:)``
+/// ``NostrMessaging/sendFile(_:to:expiration:strategy:)``
 /// gift-wrap a template through ``sendGiftWrapped(_:to:expiration:strategy:)``; ``open(_:)`` unwraps
 /// a received gift wrap. ``subscribe(limit:)`` delivers every payload, with
 /// ``DirectMessagePayloadSequence/messages`` and ``DirectMessagePayloadSequence/giftWraps`` as views.
