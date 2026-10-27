@@ -40,6 +40,12 @@ public struct EventID: Sendable, Hashable {
         self.hex = data.hexEncodedString()
     }
 
+    /// Creates an event id from bytes the caller guarantees are 32 long, such as a SHA-256 digest.
+    init(validatedData data: Data) {
+        precondition(data.count == 32, "An event id is 32 bytes")
+        self.hex = data.hexEncodedString()
+    }
+
     /// Creates an event id from a NIP-19 `note` bech32 string.
     /// - Throws: ``EventID/Error/invalidBech32(_:)`` if `note` is not valid bech32,
     ///   ``EventID/Error/unexpectedPrefix(_:)`` if it carries a prefix other than `note`, or

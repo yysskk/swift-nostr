@@ -54,7 +54,7 @@ struct NIP51ListTests {
 
     @Test("list(_:encryptingWith:) carries the kind and public items, and only encrypted private items")
     func listTemplateLayout() async throws {
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
         let publicItems: [Event.Tag] = [.event(EventID.fixture("public-note-id")), .hashtag("nostr")]
         let list = NostrList(kind: .bookmarkList, publicItems: publicItems, privateItems: [.word("secret")])
 
@@ -72,7 +72,7 @@ struct NIP51ListTests {
         arguments: [false, true]
     )
     func signOpenRoundTrip(remote: Bool) async throws {
-        let keyPair = try KeyPair()
+        let keyPair = KeyPair()
         let signer: any NostrSigning = remote ? StubRemoteSigner(keyPair: keyPair) : EventSigner(keyPair: keyPair)
         let publicItems: [Event.Tag] = [.event(EventID.fixture("public-note-id")), .hashtag("nostr")]
         let privateItems: [Event.Tag] = [.event(EventID.fixture("private-note-id")), .word("secret-word")]
@@ -97,7 +97,7 @@ struct NIP51ListTests {
         #expect(template.content == "")
 
         // Reading empty content back needs no decryption either.
-        let event = try EventSigner(keyPair: try KeyPair()).sign(template)
+        let event = EventSigner(keyPair: KeyPair()).sign(template)
         let opened = try await NostrList(event: event, decryptingWith: FailingSigner())
         #expect(opened.privateItems.isEmpty)
         #expect(opened.publicItems == [.word("spam")])
@@ -105,7 +105,7 @@ struct NIP51ListTests {
 
     @Test("Non-empty private items produce a base64 payload without the plaintext")
     func encryptedContentHidesPlaintext() async throws {
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
         // Use distinctive multi-character strings: their appearance in the base64 payload would
         // signal a leak, while being long enough not to collide with random nonce/ciphertext bytes.
         let list = NostrList(
@@ -135,8 +135,8 @@ struct NIP51ListTests {
 
     @Test("A different signer cannot decrypt the list")
     func differentSignerCannotOpen() async throws {
-        let author = EventSigner(keyPair: try KeyPair())
-        let other = EventSigner(keyPair: try KeyPair())
+        let author = EventSigner(keyPair: KeyPair())
+        let other = EventSigner(keyPair: KeyPair())
         let list = NostrList(kind: .muteList, privateItems: [.word("secret-word")])
 
         let event = try await sign(list, with: author)
@@ -147,9 +147,9 @@ struct NIP51ListTests {
 
     @Test("Content that decrypts to something other than a tag array throws malformedPrivateItems")
     func nonTagArrayContentThrows() async throws {
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
         let content = try signer.nip44Encrypt(#"{"not":"a tag array"}"#, to: signer.publicKey)
-        let event = try signer.sign(EventTemplate(kind: .muteList, content: content))
+        let event = signer.sign(EventTemplate(kind: .muteList, content: content))
 
         await #expect(throws: NostrList.Error.malformedPrivateItems) {
             try await NostrList(event: event, decryptingWith: signer)
@@ -158,7 +158,7 @@ struct NIP51ListTests {
 
     @Test("A signer error while decrypting propagates")
     func decryptionFailurePropagates() async throws {
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
         let event = try await sign(NostrList(kind: .muteList, privateItems: [.word("secret-word")]), with: signer)
 
         await #expect(throws: RelayConnection.Error.timedOut) {
@@ -170,7 +170,7 @@ struct NIP51ListTests {
 
     @Test("Unusual public tags survive a read-modify-write cycle")
     func losslessPublicItems() async throws {
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
         let unusual = Event.Tag(name: "client", values: ["x"])
         let list = NostrList(kind: .bookmarkList, publicItems: [.hashtag("nostr"), unusual])
 
@@ -184,7 +184,7 @@ struct NIP51ListTests {
 
     @Test("NostrList(event:) exposes only public items")
     func eventInitPublicOnly() async throws {
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
         let list = NostrList(
             kind: .bookmarkList,
             publicItems: [.hashtag("nostr")],

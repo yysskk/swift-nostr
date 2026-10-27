@@ -11,8 +11,8 @@ struct RemoteSignerCommandsTests {
     private let signer: KeyPair
 
     init() throws {
-        self.client = try KeyPair()
-        self.signer = try KeyPair()
+        self.client = KeyPair()
+        self.signer = KeyPair()
     }
 
     /// A connected ``RemoteSigner`` with its fake transport, ready for command tests.
@@ -146,7 +146,7 @@ struct RemoteSignerCommandsTests {
         // A hostile signer returns a self-consistent event with matching kind/content/tags/created_at
         // but authored under a *different* key. verify() alone would accept it, so the public key check
         // must reject it.
-        let attacker = try KeyPair()
+        let attacker = KeyPair()
         let forged = UnsignedEvent(
             publicKey: attacker.publicKey, createdAt: Timestamp(rawValue: 1000), kind: .textNote, content: "requested")
         let json = try RemoteSignerFixtures.signedEventJSON(forged, signer: attacker)
@@ -161,7 +161,7 @@ struct RemoteSignerCommandsTests {
     func signRejectsForeignRequestKey() async throws {
         let (remote, transport) = try await connected()
         let unsigned = UnsignedEvent(
-            publicKey: try KeyPair().publicKey, createdAt: Timestamp(rawValue: 1000), kind: .textNote,
+            publicKey: KeyPair().publicKey, createdAt: Timestamp(rawValue: 1000), kind: .textNote,
             content: "requested")
 
         let signed = Task { try await remote.sign(unsigned) }
@@ -232,7 +232,7 @@ struct RemoteSignerCommandsTests {
     @Test("nip44Encrypt sends third-party public key then plaintext and returns the ciphertext")
     func nip44EncryptRoundTrip() async throws {
         let (remote, transport) = try await connected()
-        let third = try KeyPair().publicKey
+        let third = KeyPair().publicKey
 
         let ciphertext = Task { try await remote.nip44Encrypt("secret message", to: third) }
         let request = try await nextRequest(transport)
@@ -248,7 +248,7 @@ struct RemoteSignerCommandsTests {
     @Test("nip44Decrypt sends third-party public key then ciphertext and returns the plaintext")
     func nip44DecryptRoundTrip() async throws {
         let (remote, transport) = try await connected()
-        let third = try KeyPair().publicKey
+        let third = KeyPair().publicKey
 
         let plaintext = Task { try await remote.nip44Decrypt("cipher==", from: third) }
         let request = try await nextRequest(transport)
@@ -264,7 +264,7 @@ struct RemoteSignerCommandsTests {
     @Test("nip04Encrypt sends third-party public key then plaintext")
     func nip04EncryptRoundTrip() async throws {
         let (remote, transport) = try await connected()
-        let third = try KeyPair().publicKey
+        let third = KeyPair().publicKey
 
         let ciphertext = Task { try await remote.nip04Encrypt("hi", to: third) }
         let request = try await nextRequest(transport)
@@ -280,7 +280,7 @@ struct RemoteSignerCommandsTests {
     @Test("nip04Decrypt sends third-party public key then ciphertext and returns the plaintext")
     func nip04DecryptRoundTrip() async throws {
         let (remote, transport) = try await connected()
-        let third = try KeyPair().publicKey
+        let third = KeyPair().publicKey
 
         let plaintext = Task { try await remote.nip04Decrypt("ct?iv=iv", from: third) }
         let request = try await nextRequest(transport)

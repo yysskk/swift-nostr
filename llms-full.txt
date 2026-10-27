@@ -550,7 +550,7 @@ EventTemplate(kind: .textNote, tags: [.hashtag("nostr")], content: "gm")  // cre
 EventTemplate.textNote("Hello", tags: [])                    // kind 1
 EventTemplate.reply(to: parent, content: "Agreed", relayURL: relay)  // kind 1, NIP-10 root/reply e tags + p tag
 EventTemplate.reaction(to: event, content: "🤙")              // kind 7, e + p tags; content defaults to "+"
-try EventTemplate.repost(of: event, relayURL: relay)         // kind 6, event JSON as content; RelayURL? hint
+EventTemplate.repost(of: event, relayURL: relay)         // kind 6, event JSON as content; RelayURL? hint
 EventTemplate.deletion(of: [event.id], reason: "mistake")    // kind 5, one e tag per id (NIP-09)
 EventTemplate.clientAuthentication(relayURL: relay, challenge: "challenge")  // kind 22242 (NIP-42)
 try EventTemplate.zapRequest(                                // kind 9734 (NIP-57); throws ZapRequestError.missingRelays for no relays
@@ -562,7 +562,7 @@ EventTemplate.groupJoinRequest(groupID: "abcdef")           // NIP-29 group fact
 var note = EventTemplate.textNote("expiring")
 note.tags.append(.expiration(.now.advanced(by: .seconds(3600))))
 note.createdAt = Timestamp(rawValue: 1_700_000_000)
-let event = try signer.sign(note)                            // EventSigner: synchronous
+let event = signer.sign(note)                            // EventSigner: synchronous
 let remote = try await bunker.sign(.textNote("gm"))         // any NostrSigning: async
 let unsigned = UnsignedEvent(note, publicKey: pk)            // the template under an explicit key
 ```
@@ -600,7 +600,7 @@ let unsigned = UnsignedEvent(
     tags: [.hashtag("test")],
     content: "Hello"
 )
-let serialized = try unsigned.serializedForHashing()  // NIP-01 serialization
+let serialized = unsigned.serializedForHashing()  // NIP-01 serialization
 ```
 
 ## Filter
@@ -713,7 +713,7 @@ Messages sent to relay (NIP-01) (enum: Sendable).
 - `.count(subscriptionID: String, filters: [Filter])` -- event count request (NIP-45)
 
 ```swift
-let json = try clientMessage.serialize()  // JSON array string
+let json = clientMessage.serialize()  // JSON array string
 ```
 
 ## EventCount
@@ -784,7 +784,7 @@ Nostr keypair (struct: Sendable).
 ### Initialization
 
 ```swift
-let random = try KeyPair()                           // random keypair
+let random = KeyPair()                           // random keypair
 let fromHex = try KeyPair(privateKeyHex: "hex...")    // from hex
 let fromNsec = try KeyPair(nsec: "nsec1...")          // from bech32 nsec
 let fromMnemonic = try KeyPair(                       // from BIP-39 (NIP-06)
@@ -795,9 +795,10 @@ let fromMnemonic = try KeyPair(                       // from BIP-39 (NIP-06)
 let (mnemonic, kp) = try KeyPair.generate(wordCount: 12)  // random mnemonic
 ```
 
-The hex, data, and nsec initializers throw `KeyPair.Error`: `invalidHex` (not 64 hex digits),
-`invalidLength(Int)` (not 32 bytes), `invalidBech32(Bech32.Error)` or `unexpectedPrefix(String)` for an
-nsec, and `invalidPrivateKey` for bytes that are not a valid secp256k1 scalar.
+The hex, data, nsec, and mnemonic initializers and `generate` throw `KeyPair.Error`: `invalidHex` (not 64
+hex digits), `invalidLength(Int)` (not 32 bytes), `invalidBech32(Bech32.Error)` or `unexpectedPrefix(String)`
+for an nsec, `invalidMnemonic(Mnemonic.Error)` for a bad phrase or word count, and `invalidPrivateKey` for
+bytes that are not a valid secp256k1 scalar.
 
 ## PublicKey / EventID / Signature
 
@@ -865,7 +866,7 @@ NIP-49 password-encrypted private key (`ncryptsec1...`), protected with scrypt a
 
 ### Encrypt and Decrypt
 
-Passwords are NFKC-normalized before key derivation. scrypt allocates 2^logN KiB, and the cost byte is chosen by whoever wrote the payload, so both sides are bounded: `encrypt` writes and `decrypt` spends at most `maximumLogN`, defaulting to `EncryptedPrivateKey.defaultMaximumLogN` (18, 256 MiB; NIP-49 permits up to 22). A cost outside the bound throws `EncryptedPrivateKey.Error.unsupportedScryptCost` before any derivation. Raise the bound only to write or open a deliberately costlier key; a parsed payload's `logN` is readable first. A wrong password throws `EncryptedPrivateKey.Error.decryptionFailed`, and a string that is not a well-formed payload throws `malformedPayload`.
+Passwords are NFKC-normalized before key derivation. scrypt allocates 2^logN KiB, and the cost byte is chosen by whoever wrote the payload, so both sides are bounded: `encrypt` writes and `decrypt` spends at most `maximumLogN`, defaulting to `EncryptedPrivateKey.defaultMaximumLogN` (18, 256 MiB; NIP-49 permits up to 22). A cost outside the bound throws `EncryptedPrivateKey.Error.unsupportedScryptCost` before any derivation. Raise the bound only to write or open a deliberately costlier key; a parsed payload's `logN` is readable first. A wrong password throws `EncryptedPrivateKey.Error.decryptionFailed`, and a string that is not a well-formed payload throws `malformedPayload`; `KeyPair(ncryptsec:password:)` throws `invalidPrivateKey` for a decrypted key that is not a valid secp256k1 scalar.
 
 ```swift
 // Encrypt raw private-key bytes.
@@ -911,13 +912,13 @@ let signer = try EventSigner(nsec: "nsec1...")
 ### Signing Methods
 
 ```swift
-// Synchronous, without await even in async code.
-let note = try signer.sign(.textNote("Hello"))     // any EventTemplate (see EventTemplate)
+// Synchronous, without await even in async code; signing a template cannot fail.
+let note = signer.sign(.textNote("Hello"))     // any EventTemplate (see EventTemplate)
 let signed = try signer.sign(unsignedEvent)        // a pre-keyed UnsignedEvent
-let meta = try signer.sign(.metadata(UserMetadata(name: "Alice")))
-let contacts = try signer.sign(.contactList([Contact(publicKey: alice)]))
+let meta = signer.sign(.metadata(UserMetadata(name: "Alice")))
+let contacts = signer.sign(.contactList([Contact(publicKey: alice)]))
 let pow = try await signer.sign(.textNote("Hello"), proofOfWork: 20)  // mine to 20 leading zero bits, then sign (NIP-13)
-let report = try signer.sign(.report(author, type: .impersonation))  // kind 1984, NIP-56
+let report = signer.sign(.report(author, type: .impersonation))  // kind 1984, NIP-56
 ```
 
 ### NIP-44 Encryption
@@ -1300,7 +1301,7 @@ let naddr = try article.naddr(author: publicKey, relays: [try RelayURL(string: "
 let byCoord = try await client.events.fetchLongFormContent(naddr: naddr)
 
 // Sign without publishing
-let event = try signer.sign(.longFormContent(article, draft: false))
+let event = signer.sign(.longFormContent(article, draft: false))
 ```
 
 ## Groups (NIP-29)
@@ -1466,11 +1467,11 @@ The reason category of a NIP-56 report, kind 1984 (enum: String, Sendable, Hasha
 
 ```swift
 // Report a public key: the type rides on the "p" tag.
-let report = try signer.sign(.report(author, type: .impersonation, reason: ""))   // PublicKey
+let report = signer.sign(.report(author, type: .impersonation, reason: ""))   // PublicKey
 try await client.events.publishReport(publicKey: author, type: .impersonation)
 
 // Report an event: the type rides on the "e" tag, plus a bare "p" tag naming the author.
-let eventReport = try signer.sign(.report(note, type: .illegal, reason: "against the law"))
+let eventReport = signer.sign(.report(note, type: .illegal, reason: "against the law"))
 try await client.events.publishReport(event: note, type: .spam, reason: "unsolicited")
 ```
 
@@ -1543,7 +1544,7 @@ let raw = ots.rawData               // Data?
 // Attach to a template before signing; replaces any existing ots tag, nil removes it
 var note = EventTemplate.textNote("timestamped")
 note.openTimestamps = ots
-let signed = try signer.sign(note)
+let signed = signer.sign(note)
 
 // Event extensions
 let ots = event.openTimestamps                  // OpenTimestamps?

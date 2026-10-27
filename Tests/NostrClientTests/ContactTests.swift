@@ -201,7 +201,7 @@ struct ContactListEventTests {
 
     @Test("Sign contact list event")
     func contactListEvent() throws {
-        let keyPair = try KeyPair()
+        let keyPair = KeyPair()
         let signer = EventSigner(keyPair: keyPair)
 
         let contacts = [
@@ -210,7 +210,7 @@ struct ContactListEventTests {
             Contact(publicKey: publicKey3),
         ]
 
-        let event = try signer.sign(.contactList(contacts))
+        let event = signer.sign(.contactList(contacts))
 
         #expect(event.kind == 3)
         #expect(event.content == "")
@@ -223,11 +223,11 @@ struct ContactListEventTests {
 
     @Test("Contacts without a relay or petname become bare p tags")
     func contactListFromPublicKeys() throws {
-        let keyPair = try KeyPair()
+        let keyPair = KeyPair()
         let signer = EventSigner(keyPair: keyPair)
 
         let publicKeys = [publicKey1, publicKey2, publicKey3]
-        let event = try signer.sign(.contactList(publicKeys.map { Contact(publicKey: $0) }))
+        let event = signer.sign(.contactList(publicKeys.map { Contact(publicKey: $0) }))
 
         #expect(event.kind == 3)
         #expect(event.tags.count == 3)
@@ -238,7 +238,7 @@ struct ContactListEventTests {
 
     @Test("Extract contacts from event")
     func extractContactsFromEvent() throws {
-        let keyPair = try KeyPair()
+        let keyPair = KeyPair()
         let signer = EventSigner(keyPair: keyPair)
 
         let contacts = [
@@ -246,7 +246,7 @@ struct ContactListEventTests {
             Contact(publicKey: publicKey2),
         ]
 
-        let event = try signer.sign(.contactList(contacts))
+        let event = signer.sign(.contactList(contacts))
 
         let extractedContacts = event.contacts
         #expect(extractedContacts != nil)
@@ -260,7 +260,7 @@ struct ContactListEventTests {
 
     @Test("Extract contacts skips p tags whose public key is not canonical hex")
     func extractContactsSkipsMalformedPublicKeys() throws {
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
         let event = try signer.sign(
             UnsignedEvent(
                 publicKey: signer.publicKey,
@@ -279,11 +279,11 @@ struct ContactListEventTests {
 
     @Test("isContactList property")
     func isContactListProperty() throws {
-        let keyPair = try KeyPair()
+        let keyPair = KeyPair()
         let signer = EventSigner(keyPair: keyPair)
 
-        let contactEvent = try signer.sign(.contactList([Contact(publicKey: publicKey1)]))
-        let textNote = try signer.sign(.textNote("Hello"))
+        let contactEvent = signer.sign(.contactList([Contact(publicKey: publicKey1)]))
+        let textNote = signer.sign(.textNote("Hello"))
 
         #expect(contactEvent.isContactList == true)
         #expect(textNote.isContactList == false)
@@ -291,10 +291,10 @@ struct ContactListEventTests {
 
     @Test("contacts property returns nil for non-contact event")
     func contactsPropertyReturnsNilForNonContactEvent() throws {
-        let keyPair = try KeyPair()
+        let keyPair = KeyPair()
         let signer = EventSigner(keyPair: keyPair)
 
-        let textNote = try signer.sign(.textNote("Hello"))
+        let textNote = signer.sign(.textNote("Hello"))
         #expect(textNote.contacts == nil)
     }
 }

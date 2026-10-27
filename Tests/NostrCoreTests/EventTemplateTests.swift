@@ -8,7 +8,7 @@ struct EventTemplateTests {
     private let relayURL = RelayURL("wss://relay.example.com")!
 
     private func note(_ content: String = "gm") throws -> Event {
-        try EventSigner(keyPair: try KeyPair()).sign(.textNote(content))
+        EventSigner(keyPair: KeyPair()).sign(.textNote(content))
     }
 
     // MARK: - Template and UnsignedEvent
@@ -44,14 +44,14 @@ struct EventTemplateTests {
 
     @Test("a template's fields can be edited before it is signed")
     func editBeforeSigning() throws {
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
         let expiry = Timestamp(rawValue: 1_700_003_600)
 
         var template = EventTemplate.textNote("draft")
         template.content = "final"
         template.tags.append(.expiration(expiry))
         template.createdAt = Timestamp(rawValue: 1_700_000_000)
-        let event = try signer.sign(template)
+        let event = signer.sign(template)
 
         #expect(event.content == "final")
         #expect(event.tags == [["expiration", "1700003600"]])
@@ -78,7 +78,7 @@ struct EventTemplateTests {
 
     /// A note carrying `tags`, to be replied to.
     private func parent(tags: [[String]]) throws -> Event {
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
         return try signer.sign(
             UnsignedEvent(
                 publicKey: signer.publicKey, createdAt: Timestamp(rawValue: 1_700_000_000), kind: .textNote,
@@ -189,7 +189,7 @@ struct EventTemplateTests {
     func repost() throws {
         let note = try note()
 
-        let template = try EventTemplate.repost(of: note, relayURL: relayURL)
+        let template = EventTemplate.repost(of: note, relayURL: relayURL)
 
         #expect(template.kind == .repost)
         #expect(
@@ -203,7 +203,7 @@ struct EventTemplateTests {
     func repostWithoutRelayURL() throws {
         let note = try note()
 
-        let template = try EventTemplate.repost(of: note)
+        let template = EventTemplate.repost(of: note)
 
         #expect(template.tags.map(\.rawArray) == [["e", note.id.hex], ["p", note.publicKey.hex]])
     }

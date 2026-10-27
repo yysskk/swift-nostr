@@ -33,8 +33,8 @@ struct NIP44VectorTests {
     )
     func conversationKey(_ vector: NIP44Vectors.ConversationKeyVector) throws {
         let derived = try SealedMessage.conversationKeyHex(
-            privateKeyHex: vector.sec1,
-            publicKeyHex: vector.pub2
+            keyPair: KeyPair(privateKeyHex: vector.sec1),
+            publicKey: PublicKey(hex: vector.pub2)
         )
 
         #expect(derived == vector.conversationKey)
@@ -78,11 +78,11 @@ struct NIP44VectorTests {
         arguments: NIP44Vectors.valid.encryptDecrypt
     )
     func encryptDecryptConversationKey(_ vector: NIP44Vectors.EncryptDecryptVector) throws {
-        let pub1 = try KeyPair(privateKeyHex: vector.sec1).publicKey.hex
-        let pub2 = try KeyPair(privateKeyHex: vector.sec2).publicKey.hex
+        let keyPair1 = try KeyPair(privateKeyHex: vector.sec1)
+        let keyPair2 = try KeyPair(privateKeyHex: vector.sec2)
 
-        let fromSender = try SealedMessage.conversationKeyHex(privateKeyHex: vector.sec1, publicKeyHex: pub2)
-        let fromRecipient = try SealedMessage.conversationKeyHex(privateKeyHex: vector.sec2, publicKeyHex: pub1)
+        let fromSender = try SealedMessage.conversationKeyHex(keyPair: keyPair1, publicKey: keyPair2.publicKey)
+        let fromRecipient = try SealedMessage.conversationKeyHex(keyPair: keyPair2, publicKey: keyPair1.publicKey)
 
         #expect(fromSender == vector.conversationKey)
         #expect(fromRecipient == vector.conversationKey)
@@ -174,15 +174,21 @@ struct NIP44VectorTests {
 
     // MARK: - Invalid vectors
 
-    /// Out-of-range secret keys and public keys that are not on the curve must be rejected. The
-    /// errors come from P256K and are untyped, so only the fact of throwing is asserted.
+    /// Out-of-range secret keys and public keys that are not on the curve must be rejected: the
+    /// former by ``KeyPair``, the latter by the derivation itself.
     @Test(
         "Invalid conversation-key inputs are rejected",
         arguments: NIP44Vectors.invalid.getConversationKey
     )
-    func invalidConversationKey(_ vector: NIP44Vectors.InvalidConversationKeyVector) {
-        #expect(throws: (any Error).self) {
-            _ = try SealedMessage.conversationKeyHex(privateKeyHex: vector.sec1, publicKeyHex: vector.pub2)
+    func invalidConversationKey(_ vector: NIP44Vectors.InvalidConversationKeyVector) throws {
+        let publicKey = try PublicKey(hex: vector.pub2)
+        do throws(KeyPair.Error) {
+            let keyPair = try KeyPair(privateKeyHex: vector.sec1)
+            #expect(throws: SealedMessage.Error.invalidPublicKey) {
+                _ = try SealedMessage.conversationKeyHex(keyPair: keyPair, publicKey: publicKey)
+            }
+        } catch {
+            #expect(error == .invalidPrivateKey)
         }
     }
 

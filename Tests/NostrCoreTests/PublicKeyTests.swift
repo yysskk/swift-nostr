@@ -150,7 +150,7 @@ struct PublicKeyTests {
 
     @Test("equal keys hash equally")
     func hashing() throws {
-        let keys: Set<PublicKey> = [try PublicKey(hex: hex), try PublicKey(npub: npub), try KeyPair().publicKey]
+        let keys: Set<PublicKey> = [try PublicKey(hex: hex), try PublicKey(npub: npub), KeyPair().publicKey]
 
         #expect(keys.count == 2)
     }

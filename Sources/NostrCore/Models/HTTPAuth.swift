@@ -52,10 +52,9 @@ public enum HTTPAuth {
     /// - Returns: The header value, e.g. `"Nostr eyJpZCI6…"`.
     /// - Throws: ``HTTPAuth/AuthorizationError/invalidEventKind(_:)`` when `event` is not
     ///   kind 27235.
-    public static func authorizationHeaderValue(for event: Event) throws -> String {
-        guard event.kind == .httpAuth else { throw AuthorizationError.invalidEventKind(event.kind) }
-        let json = try JSONEncoder().encode(event)
-        return "\(scheme) \(json.base64EncodedString())"
+    public static func authorizationHeaderValue(for event: Event) throws(AuthorizationError) -> String {
+        guard event.kind == .httpAuth else { throw .invalidEventKind(event.kind) }
+        return "\(scheme) \(event.jsonData.base64EncodedString())"
     }
 
     /// Why a request could not be given a NIP-98 `Authorization` header.

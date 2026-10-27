@@ -7,7 +7,7 @@ import Testing
 struct NostrSigningTests {
     @Test("EventSigner used as any NostrSigning exposes the keypair public key")
     func publicKeyThroughProtocol() async throws {
-        let keyPair = try KeyPair()
+        let keyPair = KeyPair()
         let signer: any NostrSigning = EventSigner(keyPair: keyPair)
 
         #expect(try await signer.publicKey == keyPair.publicKey)
@@ -15,7 +15,7 @@ struct NostrSigningTests {
 
     @Test("signing through any NostrSigning produces a verifiable event")
     func signThroughProtocol() async throws {
-        let keyPair = try KeyPair()
+        let keyPair = KeyPair()
         let signer: any NostrSigning = EventSigner(keyPair: keyPair)
         let unsigned = UnsignedEvent(publicKey: keyPair.publicKey, kind: .textNote, content: "hello")
 
@@ -29,7 +29,7 @@ struct NostrSigningTests {
 
     @Test("sign(_:) signs a template under the signer's public key through any NostrSigning")
     func signTemplateThroughProtocol() async throws {
-        let keyPair = try KeyPair()
+        let keyPair = KeyPair()
         let signer: any NostrSigning = EventSigner(keyPair: keyPair)
         var template = EventTemplate.textNote("hello", tags: [.hashtag("nostr")])
         template.createdAt = Timestamp(rawValue: 1_700_000_000)
@@ -46,10 +46,10 @@ struct NostrSigningTests {
 
     @Test("an EventSigner signs a template synchronously in async code, without await")
     func eventSignerSignsTemplateWithoutAwaitInAsyncCode() async throws {
-        let keyPair = try KeyPair()
+        let keyPair = KeyPair()
         let signer = EventSigner(keyPair: keyPair)
 
-        let event = try signer.sign(EventTemplate.textNote("gm"))
+        let event = signer.sign(EventTemplate.textNote("gm"))
 
         #expect(event.publicKey == keyPair.publicKey)
         #expect(event.content == "gm")
@@ -58,7 +58,7 @@ struct NostrSigningTests {
 
     @Test("sign(_:) resolves the public key of a signer that is not an EventSigner")
     func signTemplateThroughRemoteSigner() async throws {
-        let keyPair = try KeyPair()
+        let keyPair = KeyPair()
         let signer = StubRemoteSigner(keyPair: keyPair)
 
         let event = try await signer.sign(.textNote("hello"))
@@ -70,7 +70,7 @@ struct NostrSigningTests {
 
     @Test("a zap request is signed by a signer that is not an EventSigner (NIP-57)")
     func zapRequestThroughRemoteSigner() async throws {
-        let keyPair = try KeyPair()
+        let keyPair = KeyPair()
         let signer = StubRemoteSigner(keyPair: keyPair)
         let relay = RelayURL("wss://relay.example.com")!
 
@@ -85,8 +85,8 @@ struct NostrSigningTests {
 
     @Test("NIP-44 encrypt then decrypt round-trips through any NostrSigning")
     func nip44RoundTripThroughProtocol() async throws {
-        let alice = try KeyPair()
-        let bob = try KeyPair()
+        let alice = KeyPair()
+        let bob = KeyPair()
         let aliceSigner: any NostrSigning = EventSigner(keyPair: alice)
         let bobSigner: any NostrSigning = EventSigner(keyPair: bob)
 
@@ -98,8 +98,8 @@ struct NostrSigningTests {
 
     @Test("EventSigner NIP-44 helpers round-trip directly between two keypairs")
     func eventSignerNIP44RoundTrip() throws {
-        let alice = try KeyPair()
-        let bob = try KeyPair()
+        let alice = KeyPair()
+        let bob = KeyPair()
         let aliceSigner = EventSigner(keyPair: alice)
         let bobSigner = EventSigner(keyPair: bob)
 

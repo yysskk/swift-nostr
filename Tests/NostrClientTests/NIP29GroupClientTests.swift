@@ -120,7 +120,7 @@ struct NIP29GroupClientTests {
         try await groupConnection.connect()
         let otherConnection = await client.relays.pool.addRelay(otherRelayURL)
         try await otherConnection.connect()
-        await client.identity.setSigner(EventSigner(keyPair: try KeyPair()))
+        await client.identity.setSigner(EventSigner(keyPair: KeyPair()))
 
         let group = GroupReference(relayURL: groupRelayURL, id: groupID, inviteCode: "welcome")
         let joinTask = Task { try await client.groups.join(group, reason: "please let me in") }
@@ -141,7 +141,7 @@ struct NIP29GroupClientTests {
     @Test("an explicit invite code overrides the reference's code")
     func joinGroupInviteCodeOverride() async throws {
         let (client, socket) = makeClient()
-        await client.identity.setSigner(EventSigner(keyPair: try KeyPair()))
+        await client.identity.setSigner(EventSigner(keyPair: KeyPair()))
         try await client.relays.connect(to: [groupRelayURL])
 
         let group = GroupReference(relayURL: groupRelayURL, id: groupID, inviteCode: "stale")
@@ -156,7 +156,7 @@ struct NIP29GroupClientTests {
     @Test("groups.leave publishes a kind-9022 event with the h tag")
     func leaveGroupPublishesLeaveRequest() async throws {
         let (client, socket) = makeClient()
-        await client.identity.setSigner(EventSigner(keyPair: try KeyPair()))
+        await client.identity.setSigner(EventSigner(keyPair: KeyPair()))
         try await client.relays.connect(to: [groupRelayURL])
 
         let group = GroupReference(relayURL: groupRelayURL, id: groupID)
@@ -174,7 +174,7 @@ struct NIP29GroupClientTests {
     @Test("groups.publishMessage defaults to kind 9 with h first and previous last")
     func publishGroupMessageLayout() async throws {
         let (client, socket) = makeClient()
-        await client.identity.setSigner(EventSigner(keyPair: try KeyPair()))
+        await client.identity.setSigner(EventSigner(keyPair: KeyPair()))
         try await client.relays.connect(to: [groupRelayURL])
 
         let group = GroupReference(relayURL: groupRelayURL, id: groupID)
@@ -198,9 +198,9 @@ struct NIP29GroupClientTests {
     @Test("groups.publishModeration putUser publishes kind 9000 with the roled p tag")
     func publishGroupModerationPutUser() async throws {
         let (client, socket) = makeClient()
-        await client.identity.setSigner(EventSigner(keyPair: try KeyPair()))
+        await client.identity.setSigner(EventSigner(keyPair: KeyPair()))
         try await client.relays.connect(to: [groupRelayURL])
-        let member = try KeyPair().publicKey
+        let member = KeyPair().publicKey
 
         let group = GroupReference(relayURL: groupRelayURL, id: groupID)
         let moderationTask = Task {
@@ -222,7 +222,7 @@ struct NIP29GroupClientTests {
     @Test("a group relay missing from the pool is added and connected automatically")
     func ensureGroupRelayAddsAndConnects() async throws {
         let (client, socket) = makeClient()
-        await client.identity.setSigner(EventSigner(keyPair: try KeyPair()))
+        await client.identity.setSigner(EventSigner(keyPair: KeyPair()))
         #expect(await client.relays.pool.relay(for: groupRelayURL) == nil)
 
         let group = GroupReference(relayURL: groupRelayURL, id: groupID)
@@ -240,7 +240,7 @@ struct NIP29GroupClientTests {
     @Test("groups.join signs through a remote NostrSigning signer")
     func joinGroupWithRemoteSigner() async throws {
         let (client, socket) = makeClient()
-        let keyPair = try KeyPair()
+        let keyPair = KeyPair()
         try await client.identity.setSigner(StubRemoteSigner(keyPair: keyPair) as any NostrSigning)
 
         let group = GroupReference(relayURL: groupRelayURL, id: groupID, inviteCode: "welcome")
@@ -279,7 +279,7 @@ struct NIP29GroupClientTests {
     func fetchGroupMetadataNewestWins() async throws {
         let (client, socket) = makeClient()
         try await client.relays.connect(to: [groupRelayURL])
-        let relaySigner = EventSigner(keyPair: try KeyPair())
+        let relaySigner = EventSigner(keyPair: KeyPair())
         let stale = try stateEvent(
             kind: .groupMetadata, fieldTags: [Event.Tag(name: "name", values: ["Old"])],
             createdAt: Timestamp(rawValue: 1_700_000_000), signer: relaySigner)
@@ -303,8 +303,8 @@ struct NIP29GroupClientTests {
 
     @Test("with the relay public key known, an impostor's newer metadata is dropped")
     func fetchGroupMetadataDropsImpostor() async throws {
-        let relaySigner = EventSigner(keyPair: try KeyPair())
-        let impostorSigner = EventSigner(keyPair: try KeyPair())
+        let relaySigner = EventSigner(keyPair: KeyPair())
+        let impostorSigner = EventSigner(keyPair: KeyPair())
         let genuine = try stateEvent(
             kind: .groupMetadata, fieldTags: [Event.Tag(name: "name", values: ["Genuine"])],
             createdAt: Timestamp(rawValue: 1_700_000_000), signer: relaySigner)
@@ -338,8 +338,8 @@ struct NIP29GroupClientTests {
     func fetchGroupMetadataWithoutValidationTrustsTheRelay() async throws {
         let (client, socket) = makeClient()
         try await client.relays.connect(to: [groupRelayURL])
-        let relaySigner = EventSigner(keyPair: try KeyPair())
-        let impostorSigner = EventSigner(keyPair: try KeyPair())
+        let relaySigner = EventSigner(keyPair: KeyPair())
+        let impostorSigner = EventSigner(keyPair: KeyPair())
         let genuine = try stateEvent(
             kind: .groupMetadata, fieldTags: [Event.Tag(name: "name", values: ["Genuine"])],
             createdAt: Timestamp(rawValue: 1_700_000_000), signer: relaySigner)
@@ -360,8 +360,8 @@ struct NIP29GroupClientTests {
     func fetchGroupStateSnapshot() async throws {
         let (client, socket) = makeClient()
         try await client.relays.connect(to: [groupRelayURL])
-        let relaySigner = EventSigner(keyPair: try KeyPair())
-        let admin = try KeyPair().publicKey
+        let relaySigner = EventSigner(keyPair: KeyPair())
+        let admin = KeyPair().publicKey
         let metadata = try stateEvent(
             kind: .groupMetadata, fieldTags: [Event.Tag(name: "name", values: ["Pizza Lovers"])],
             createdAt: Timestamp(rawValue: 1_700_000_000), signer: relaySigner)

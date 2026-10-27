@@ -89,11 +89,11 @@ struct DirectMessageRelayListTests {
 
     @Test("Signing a list with duplicates round-trips through the event")
     func signedListRoundTripsWithDuplicates() throws {
-        let keyPair = try KeyPair()
+        let keyPair = KeyPair()
         let signer = EventSigner(keyPair: keyPair)
 
         let list = DirectMessageRelayList(relays: [RelayURL("wss://a.example.com")!, RelayURL("wss://a.example.com/")!])
-        let event = try signer.sign(.directMessageRelayList(list))
+        let event = signer.sign(.directMessageRelayList(list))
         // The signed event's tags and the re-parsed list agree — no dangling duplicate tags.
         #expect(event.tags == [["relay", "wss://a.example.com"]])
         #expect(event.directMessageRelayList?.relays == [RelayURL("wss://a.example.com")!])
@@ -120,14 +120,14 @@ struct DirectMessageRelayListTests {
 
     @Test("Sign DM relay list event")
     func signEvent() throws {
-        let keyPair = try KeyPair()
+        let keyPair = KeyPair()
         let signer = EventSigner(keyPair: keyPair)
 
         let list = DirectMessageRelayList(relays: [
             RelayURL("wss://inbox.example.com")!,
             RelayURL("wss://dm.example.com")!,
         ])
-        let event = try signer.sign(.directMessageRelayList(list))
+        let event = signer.sign(.directMessageRelayList(list))
 
         #expect(event.kind == 10050)
         #expect(event.content == "")
@@ -137,10 +137,10 @@ struct DirectMessageRelayListTests {
 
     @Test("Sign DM relay list from relay URLs")
     func signFromRelays() throws {
-        let keyPair = try KeyPair()
+        let keyPair = KeyPair()
         let signer = EventSigner(keyPair: keyPair)
 
-        let event = try signer.sign(
+        let event = signer.sign(
             .directMessageRelayList(DirectMessageRelayList(relays: [RelayURL("wss://inbox.example.com")!])))
 
         #expect(event.kind == 10050)
@@ -149,11 +149,11 @@ struct DirectMessageRelayListTests {
 
     @Test("Extract DM relay list from event")
     func extractFromEvent() throws {
-        let keyPair = try KeyPair()
+        let keyPair = KeyPair()
         let signer = EventSigner(keyPair: keyPair)
 
         let list = DirectMessageRelayList(relays: [RelayURL("wss://a.example.com")!, RelayURL("wss://b.example.com")!])
-        let event = try signer.sign(.directMessageRelayList(list))
+        let event = signer.sign(.directMessageRelayList(list))
 
         let extracted = event.directMessageRelayList
         #expect(extracted?.relays == [RelayURL("wss://a.example.com")!, RelayURL("wss://b.example.com")!])
@@ -161,22 +161,22 @@ struct DirectMessageRelayListTests {
 
     @Test("directMessageRelayList returns nil for non-10050 event")
     func nilForOtherKind() throws {
-        let keyPair = try KeyPair()
+        let keyPair = KeyPair()
         let signer = EventSigner(keyPair: keyPair)
 
-        let textNote = try signer.sign(.textNote("Hello"))
+        let textNote = signer.sign(.textNote("Hello"))
         #expect(textNote.directMessageRelayList == nil)
         #expect(textNote.isDirectMessageRelayList == false)
     }
 
     @Test("isDirectMessageRelayList property")
     func isDirectMessageRelayListProperty() throws {
-        let keyPair = try KeyPair()
+        let keyPair = KeyPair()
         let signer = EventSigner(keyPair: keyPair)
 
-        let dmRelayEvent = try signer.sign(
+        let dmRelayEvent = signer.sign(
             .directMessageRelayList(DirectMessageRelayList(relays: [RelayURL("wss://a.example.com")!])))
-        let textNote = try signer.sign(.textNote("Hello"))
+        let textNote = signer.sign(.textNote("Hello"))
 
         #expect(dmRelayEvent.isDirectMessageRelayList == true)
         #expect(textNote.isDirectMessageRelayList == false)

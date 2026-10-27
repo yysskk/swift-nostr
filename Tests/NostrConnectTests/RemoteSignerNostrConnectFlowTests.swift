@@ -11,8 +11,8 @@ struct RemoteSignerNostrConnectFlowTests {
     private let signer: KeyPair
 
     init() throws {
-        self.client = try KeyPair()
-        self.signer = try KeyPair()
+        self.client = KeyPair()
+        self.signer = KeyPair()
     }
 
     private func makeInvitation() throws -> NostrConnectURI {
@@ -34,7 +34,7 @@ struct RemoteSignerNostrConnectFlowTests {
     @Test("init throws invalidURI when the keypair does not match the invitation public key")
     func initRejectsMismatchedKeyPair() async throws {
         let invitation = try makeInvitation()
-        let otherKeyPair = try KeyPair()
+        let otherKeyPair = KeyPair()
 
         #expect(throws: RemoteSignerError.invalidURI(reason: "client keypair does not match the invitation public key"))
         {
@@ -107,7 +107,7 @@ struct RemoteSignerNostrConnectFlowTests {
         try await waitForSubscription(transport)
 
         // A spoofer answers with a result that is not the secret; the client must keep waiting.
-        let spoofer = try KeyPair()
+        let spoofer = KeyPair()
         try await transport.deliver(
             RemoteSignerFixtures.response(
                 requestID: "spoof", result: "not-the-secret", client: client, signer: spoofer))

@@ -17,7 +17,7 @@ struct RoutingCapabilityTests {
     private let signer: EventSigner
 
     init() throws {
-        signer = EventSigner(keyPair: try KeyPair())
+        signer = EventSigner(keyPair: KeyPair())
     }
 
     // MARK: - Short forms of the primitives
@@ -54,7 +54,7 @@ struct RoutingCapabilityTests {
         let routing: any NostrRelayRouting = stub
         let relayList = RelayListMetadata(read: [readRelay], write: [writeRelay])
         let dmRelayList = DirectMessageRelayList(relays: [inboxRelay])
-        let note = try signer.sign(.textNote("gossip"))
+        let note = signer.sign(.textNote("gossip"))
 
         let relayListEvent = try await routing.publishRelayList(relayList)
         let dmRelayListEvent = try await routing.publishDirectMessageRelayList(dmRelayList)

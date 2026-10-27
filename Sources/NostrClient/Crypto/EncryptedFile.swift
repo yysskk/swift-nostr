@@ -11,7 +11,7 @@ import NostrCore
 /// **not** embedded in the uploaded blob.
 ///
 /// ```swift
-/// let encrypted = try EncryptedFile.encrypt(imageData)
+/// let encrypted = EncryptedFile.encrypt(imageData)
 /// let url = try await upload(encrypted.ciphertext)            // your host, out of scope here
 /// try await client.messages.sendFile(
 ///     url: url, mimeType: "image/jpeg", encryption: encrypted, to: publicKey)
@@ -57,10 +57,18 @@ public struct EncryptedFile: Sendable, Hashable {
     /// Encrypts `data` with a freshly generated AES-256-GCM key and 96-bit nonce.
     /// - Parameter data: The plaintext file contents.
     /// - Returns: The encrypted blob plus the key, nonce, and hashes needed for the message.
-    public static func encrypt(_ data: Data) throws -> EncryptedFile {
+    /// - Precondition: `data` is under the 64 GiB a single AES-GCM message can hold.
+    public static func encrypt(_ data: Data) -> EncryptedFile {
         let key = SymmetricKey(size: .bits256)
         let nonce = AES.GCM.Nonce()
-        let sealedBox = try AES.GCM.seal(data, using: key, nonce: nonce)
+        // AES-GCM rejects only a key of the wrong size, a nonce of the wrong length, or a message
+        // past its length limit, and the first two are fixed here.
+        let sealedBox: AES.GCM.SealedBox
+        do {
+            sealedBox = try AES.GCM.seal(data, using: key, nonce: nonce)
+        } catch {
+            preconditionFailure("AES-GCM rejected a 256-bit key and a 12-byte nonce: \(error)")
+        }
 
         // Upload the ciphertext with its tag appended; the nonce travels in the message tag.
         let blob = sealedBox.ciphertext + sealedBox.tag

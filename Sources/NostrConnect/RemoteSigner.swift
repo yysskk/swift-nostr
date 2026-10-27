@@ -124,7 +124,7 @@ public actor RemoteSigner {
         transport: (any RelayTransport)? = nil,
         config: Config = Config()
     ) throws {
-        let keyPair = try clientKeyPair ?? KeyPair()
+        let keyPair = clientKeyPair ?? KeyPair()
         self.clientKeyPair = keyPair
         self.signer = EventSigner(keyPair: keyPair)
         self.clientPublicKey = keyPair.publicKey

@@ -13,8 +13,8 @@ struct MultiPayMatchingTests {
     private func makeConnection(timeout: Duration = .seconds(2)) throws -> (
         connection: WalletConnection, transport: FakeWalletConnectTransport, client: KeyPair, wallet: KeyPair
     ) {
-        let wallet = try KeyPair()
-        let client = try KeyPair()
+        let wallet = KeyPair()
+        let client = KeyPair()
         let transport = FakeWalletConnectTransport()
         let connection = WalletConnection(
             uri: try NWCFixtures.uri(wallet: wallet, client: client),

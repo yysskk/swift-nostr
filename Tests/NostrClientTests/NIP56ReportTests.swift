@@ -18,10 +18,10 @@ struct NIP56ReportTests {
 
     @Test("report(_:type:reason:) of a public key produces a kind-1984 event with the type on the p tag")
     func signPublicKeyReport() throws {
-        let signer = EventSigner(keyPair: try KeyPair())
-        let target = try KeyPair()
+        let signer = EventSigner(keyPair: KeyPair())
+        let target = KeyPair()
 
-        let event = try signer.sign(.report(target.publicKey, type: .nudity, reason: "explicit content"))
+        let event = signer.sign(.report(target.publicKey, type: .nudity, reason: "explicit content"))
 
         #expect(event.kind == .report)
         #expect(event.content == "explicit content")
@@ -31,10 +31,10 @@ struct NIP56ReportTests {
 
     @Test("report(_:type:reason:) of a public key supports impersonation, the spec's canonical example")
     func signImpersonationReport() throws {
-        let signer = EventSigner(keyPair: try KeyPair())
-        let target = try KeyPair()
+        let signer = EventSigner(keyPair: KeyPair())
+        let target = KeyPair()
 
-        let event = try signer.sign(.report(target.publicKey, type: .impersonation))
+        let event = signer.sign(.report(target.publicKey, type: .impersonation))
 
         #expect(event.kind == .report)
         #expect(event.content.isEmpty)
@@ -44,11 +44,11 @@ struct NIP56ReportTests {
 
     @Test("report(_:type:reason:) of an event tags the event with a type and names the author with a bare p tag")
     func signEventReport() throws {
-        let author = EventSigner(keyPair: try KeyPair())
-        let note = try author.sign(.textNote("offending note"))
+        let author = EventSigner(keyPair: KeyPair())
+        let note = author.sign(.textNote("offending note"))
 
-        let reporter = EventSigner(keyPair: try KeyPair())
-        let event = try reporter.sign(.report(note, type: .illegal, reason: "against the law"))
+        let reporter = EventSigner(keyPair: KeyPair())
+        let event = reporter.sign(.report(note, type: .illegal, reason: "against the law"))
 
         #expect(event.kind == .report)
         #expect(event.content == "against the law")
@@ -61,11 +61,11 @@ struct NIP56ReportTests {
 
     @Test("report(_:type:reason:) of an event keeps the author p tag even when the reason is empty")
     func signEventReportWithoutReason() throws {
-        let author = EventSigner(keyPair: try KeyPair())
-        let note = try author.sign(.textNote("offending note"))
+        let author = EventSigner(keyPair: KeyPair())
+        let note = author.sign(.textNote("offending note"))
 
-        let reporter = EventSigner(keyPair: try KeyPair())
-        let event = try reporter.sign(.report(note, type: .spam))
+        let reporter = EventSigner(keyPair: KeyPair())
+        let event = reporter.sign(.report(note, type: .spam))
 
         #expect(event.content.isEmpty)
         #expect(event.tags.contains(["e", note.id.hex, "spam"]))

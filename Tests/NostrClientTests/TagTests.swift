@@ -238,13 +238,13 @@ struct TagTests {
             rawTags: [["e", id1.hex, "", "reply"], ["p", pk2.hex]],
             content: "hi"
         )
-        #expect(try viaTags.serializedForHashing() == viaRaw.serializedForHashing())
+        #expect(viaTags.serializedForHashing() == viaRaw.serializedForHashing())
     }
 
     @Test("signed events carry typed tags and verify")
     func signedEventsCarryTypedTags() throws {
-        let signer = EventSigner(keyPair: try KeyPair())
-        let event = try signer.sign(.textNote("hi", tags: [.hashtag("nostr")]))
+        let signer = EventSigner(keyPair: KeyPair())
+        let event = signer.sign(.textNote("hi", tags: [.hashtag("nostr")]))
         #expect(event.tags == [["t", "nostr"]])
         #expect(try event.verify())
     }

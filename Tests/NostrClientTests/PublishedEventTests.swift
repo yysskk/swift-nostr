@@ -143,7 +143,7 @@ struct PublishedEventTests {
     @Test("messages.send reports both publish outcomes")
     func sendDirectMessageReportsPublishOutcomes() async throws {
         let (client, socket) = try await makeClient()
-        let recipient = try KeyPair()
+        let recipient = KeyPair()
         let sender = await client.identity.publicKey!
         // Confirmed-absent DM relay lists: both copies fall back to the pool's relay
         // without a discovery fetch.
@@ -162,8 +162,8 @@ struct PublishedEventTests {
 
     @Test("SendDirectMessageResult publish results default to nil")
     func sendDirectMessageResultDefaultsToNilPublishResults() async throws {
-        let alice = try KeyPair()
-        let bob = try KeyPair()
+        let alice = KeyPair()
+        let bob = KeyPair()
         let builder = DirectMessageBuilder(signer: EventSigner(keyPair: alice))
         let result = try await builder.createMessageWithSelfCopy(content: "hi", to: bob.publicKey)
 
@@ -205,8 +205,8 @@ struct PublishedEventTests {
     @Test("messages.parse without a signer throws signerNotSet")
     func parseDirectMessageWithoutSignerThrowsSignerNotSet() async throws {
         let client = NostrClient()
-        let alice = try KeyPair()
-        let bob = try KeyPair()
+        let alice = KeyPair()
+        let bob = KeyPair()
         let giftWrap = try await DirectMessageBuilder(signer: EventSigner(keyPair: alice))
             .createMessageWithSelfCopy(content: "hi", to: bob.publicKey)
             .recipientGiftWrap

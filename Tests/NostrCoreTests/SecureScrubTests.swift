@@ -51,8 +51,8 @@ struct SecureScrubTests {
 
     @Test("NIP-44 still round-trips after scrubbing its derived keys")
     func nip44RoundTripsAfterScrub() throws {
-        let alice = try KeyPair()
-        let bob = try KeyPair()
+        let alice = KeyPair()
+        let bob = KeyPair()
 
         let sealed = try SealedMessage.seal("hello there", for: bob.publicKey, using: alice)
         #expect(try sealed.open(from: alice.publicKey, using: bob) == "hello there")
@@ -69,13 +69,11 @@ struct SecureScrubTests {
 
     @Test("a conversation key is the same across repeated derivations")
     func conversationKeyIsStable() throws {
-        let alice = try KeyPair()
-        let bob = try KeyPair()
+        let alice = KeyPair()
+        let bob = KeyPair()
 
-        let first = try SealedMessage.conversationKeyHex(
-            privateKeyHex: alice.privateKeyHex, publicKeyHex: bob.publicKey.hex)
-        let second = try SealedMessage.conversationKeyHex(
-            privateKeyHex: alice.privateKeyHex, publicKeyHex: bob.publicKey.hex)
+        let first = try SealedMessage.conversationKeyHex(keyPair: alice, publicKey: bob.publicKey)
+        let second = try SealedMessage.conversationKeyHex(keyPair: alice, publicKey: bob.publicKey)
 
         // Scrubbing the ECDH shared point must not disturb the key derived from it.
         #expect(first == second)

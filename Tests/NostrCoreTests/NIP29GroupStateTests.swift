@@ -32,7 +32,7 @@ struct NIP29GroupStateTests {
 
     @Test("metadata with every field set round-trips through its wire tags")
     func metadataRoundTrip() throws {
-        let relay = EventSigner(keyPair: try KeyPair())
+        let relay = EventSigner(keyPair: KeyPair())
         let metadata = Groups.Metadata(
             groupID: "abcdef",
             name: "Pizza Lovers",
@@ -57,7 +57,7 @@ struct NIP29GroupStateTests {
 
     @Test("a metadata event with only a d tag parses to the defaults")
     func metadataDefaults() throws {
-        let relay = EventSigner(keyPair: try KeyPair())
+        let relay = EventSigner(keyPair: KeyPair())
         let event = try stateEvent(kind: .groupMetadata, tags: [.identifier("abcdef")], signer: relay)
 
         let parsed = try Groups.Metadata(event: event)
@@ -80,7 +80,7 @@ struct NIP29GroupStateTests {
 
     @Test("explicit public and open tags parse to false flags and are consumed")
     func metadataExplicitPublicOpen() throws {
-        let relay = EventSigner(keyPair: try KeyPair())
+        let relay = EventSigner(keyPair: KeyPair())
         let event = try stateEvent(
             kind: .groupMetadata,
             tags: [.identifier("abcdef"), Event.Tag(name: "public"), Event.Tag(name: "open")],
@@ -116,7 +116,7 @@ struct NIP29GroupStateTests {
 
     @Test("supported_kinds distinguishes absent from empty and drops junk values")
     func metadataSupportedKinds() throws {
-        let relay = EventSigner(keyPair: try KeyPair())
+        let relay = EventSigner(keyPair: KeyPair())
 
         let absent = try stateEvent(kind: .groupMetadata, tags: [.identifier("abcdef")], signer: relay)
         #expect(try Groups.Metadata(event: absent).supportedKinds == nil)
@@ -138,7 +138,7 @@ struct NIP29GroupStateTests {
 
     @Test("unknown tags round-trip through additionalTags in order")
     func metadataUnknownTags() throws {
-        let relay = EventSigner(keyPair: try KeyPair())
+        let relay = EventSigner(keyPair: KeyPair())
         let event = try stateEvent(
             kind: .groupMetadata,
             tags: [
@@ -203,7 +203,7 @@ struct NIP29GroupStateTests {
 
     @Test("an admin list with multi-role and role-less admins round-trips")
     func adminListRoundTrip() throws {
-        let relay = EventSigner(keyPair: try KeyPair())
+        let relay = EventSigner(keyPair: KeyPair())
         let ceo = PublicKey.fixture("ceo")
         let greeter = PublicKey.fixture("greeter")
         let list = Groups.AdminList(
@@ -224,7 +224,7 @@ struct NIP29GroupStateTests {
 
     @Test("a member list round-trips with order preserved")
     func memberListRoundTrip() throws {
-        let relay = EventSigner(keyPair: try KeyPair())
+        let relay = EventSigner(keyPair: KeyPair())
         let members = [PublicKey.fixture("first"), PublicKey.fixture("second")]
         let list = Groups.MemberList(groupID: "abcdef", members: members)
 
@@ -236,7 +236,7 @@ struct NIP29GroupStateTests {
 
     @Test("a role list round-trips with and without descriptions")
     func roleListRoundTrip() throws {
-        let relay = EventSigner(keyPair: try KeyPair())
+        let relay = EventSigner(keyPair: KeyPair())
         let list = Groups.RoleList(
             groupID: "abcdef",
             roles: [
@@ -255,7 +255,7 @@ struct NIP29GroupStateTests {
 
     @Test("a pin list preserves the exact order of interleaved e and a items")
     func pinListRoundTrip() throws {
-        let relay = EventSigner(keyPair: try KeyPair())
+        let relay = EventSigner(keyPair: KeyPair())
         let first = EventID.fixture("first")
         let second = EventID.fixture("second")
         let address = "39000:\(String(repeating: "b", count: 64)):abcdef"
@@ -278,7 +278,7 @@ struct NIP29GroupStateTests {
     /// or id is dropped while the well-formed entries around it are kept.
     @Test("admin, member, and pin lists skip entries whose key or id is malformed")
     func listsSkipMalformedEntries() throws {
-        let relay = EventSigner(keyPair: try KeyPair())
+        let relay = EventSigner(keyPair: KeyPair())
         let member = PublicKey.fixture("member")
         let pinned = EventID.fixture("pinned")
         let malformed = ["not-a-key", member.hex.uppercased(), String(member.hex.dropLast())]
@@ -305,7 +305,7 @@ struct NIP29GroupStateTests {
 
     @Test("every parser rejects an event of the wrong kind with the expected payloads")
     func wrongKind() throws {
-        let relay = EventSigner(keyPair: try KeyPair())
+        let relay = EventSigner(keyPair: KeyPair())
         let note = try stateEvent(kind: .textNote, tags: [.identifier("abcdef")], signer: relay)
 
         for (kind, parse) in stateParsers {
@@ -317,7 +317,7 @@ struct NIP29GroupStateTests {
 
     @Test("every parser rejects a missing d tag and an empty d value")
     func missingGroupID() throws {
-        let relay = EventSigner(keyPair: try KeyPair())
+        let relay = EventSigner(keyPair: KeyPair())
 
         for (kind, parse) in stateParsers {
             let missing = try stateEvent(kind: kind, tags: [], signer: relay)
@@ -330,8 +330,8 @@ struct NIP29GroupStateTests {
 
     @Test("parse failures are thrown as the concrete ValidationError")
     func typedValidationError() throws {
-        let relay = EventSigner(keyPair: try KeyPair())
-        let impostor = EventSigner(keyPair: try KeyPair())
+        let relay = EventSigner(keyPair: KeyPair())
+        let impostor = EventSigner(keyPair: KeyPair())
         let forged = try stateEvent(kind: .groupMetadata, tags: [.identifier("abcdef")], signer: impostor)
 
         do {
@@ -344,8 +344,8 @@ struct NIP29GroupStateTests {
 
     @Test("every parser pins the author when a relay public key is given")
     func relayPublicKeyCheck() throws {
-        let relay = EventSigner(keyPair: try KeyPair())
-        let impostor = EventSigner(keyPair: try KeyPair())
+        let relay = EventSigner(keyPair: KeyPair())
+        let impostor = EventSigner(keyPair: KeyPair())
 
         for (kind, parse) in stateParsers {
             let forged = try stateEvent(kind: kind, tags: [.identifier("abcdef")], signer: impostor)

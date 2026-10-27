@@ -7,7 +7,7 @@ struct KeyPairTests {
 
     @Test("Generate random keypair")
     func generateRandomKeypair() throws {
-        let keyPair = try KeyPair()
+        let keyPair = KeyPair()
 
         #expect(keyPair.privateKey.count == 32)
         #expect(keyPair.publicKey.data.count == 32)
@@ -26,7 +26,7 @@ struct KeyPairTests {
 
     @Test("Bech32 encoding nsec")
     func bech32Nsec() throws {
-        let keyPair = try KeyPair()
+        let keyPair = KeyPair()
         let nsec = keyPair.nsec
 
         #expect(nsec.hasPrefix("nsec1"))
@@ -38,7 +38,7 @@ struct KeyPairTests {
 
     @Test("Bech32 encoding npub")
     func bech32Npub() throws {
-        let keyPair = try KeyPair()
+        let keyPair = KeyPair()
         let npub = keyPair.publicKey.npub
 
         #expect(npub.hasPrefix("npub1"))
@@ -75,7 +75,7 @@ struct KeyPairTests {
 
     @Test("A malformed nsec is rejected with the reason")
     func invalidNsec() throws {
-        let keyPair = try KeyPair()
+        let keyPair = KeyPair()
         let corrupted = String(keyPair.nsec.dropLast()) + (keyPair.nsec.hasSuffix("q") ? "p" : "q")
         let short = try Bech32.encode(hrp: "nsec", data: Data(repeating: 1, count: 31))
 
@@ -92,9 +92,9 @@ struct KeyPairTests {
 
     @Test("Keypairs for the same identity are equal")
     func equalityForSameIdentity() throws {
-        let keyPair = try KeyPair()
+        let keyPair = KeyPair()
         let same = try KeyPair(privateKey: keyPair.privateKey)
-        let other = try KeyPair()
+        let other = KeyPair()
 
         #expect(keyPair == same)
         #expect(keyPair != other)
@@ -102,9 +102,9 @@ struct KeyPairTests {
 
     @Test("Keypairs hash by identity and work in a Set")
     func hashingByIdentity() throws {
-        let keyPair = try KeyPair()
+        let keyPair = KeyPair()
         let same = try KeyPair(privateKey: keyPair.privateKey)
-        let other = try KeyPair()
+        let other = KeyPair()
 
         let identities: Set<KeyPair> = [keyPair, same, other]
         #expect(identities.count == 2)

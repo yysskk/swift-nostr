@@ -72,7 +72,7 @@ struct FetchVerificationTests {
         let unsigned = UnsignedEvent(
             publicKey: publicKey, createdAt: createdAt, kind: kind, rawTags: tags, content: content)
         return Event(
-            id: try unsigned.computedID,
+            id: unsigned.computedID,
             publicKey: publicKey,
             createdAt: createdAt,
             kind: kind,
@@ -90,7 +90,7 @@ struct FetchVerificationTests {
     @Test("a forged DM relay list cannot displace the real one")
     func forgedDirectMessageRelayListIsIgnored() async throws {
         let (client, socket) = try await makeClient()
-        let victim = EventSigner(keyPair: try KeyPair())
+        let victim = EventSigner(keyPair: KeyPair())
 
         let real = try signed(
             victim, kind: .directMessageRelayList, createdAt: Timestamp(rawValue: 1_700_000_000),
@@ -111,8 +111,8 @@ struct FetchVerificationTests {
     @Test("a DM relay list attributed to another author is ignored")
     func directMessageRelayListFromAnotherAuthorIsIgnored() async throws {
         let (client, socket) = try await makeClient()
-        let victim = EventSigner(keyPair: try KeyPair())
-        let stranger = EventSigner(keyPair: try KeyPair())
+        let victim = EventSigner(keyPair: KeyPair())
+        let stranger = EventSigner(keyPair: KeyPair())
 
         // Genuinely signed — but by somebody else.
         let strangersList = try signed(
@@ -132,7 +132,7 @@ struct FetchVerificationTests {
     @Test("a forged NIP-65 relay list cannot displace the real one")
     func forgedRelayListIsIgnored() async throws {
         let (client, socket) = try await makeClient()
-        let victim = EventSigner(keyPair: try KeyPair())
+        let victim = EventSigner(keyPair: KeyPair())
 
         let real = try signed(
             victim, kind: .relayListMetadata, createdAt: Timestamp(rawValue: 1_700_000_000),
@@ -154,7 +154,7 @@ struct FetchVerificationTests {
     @Test("metadata is the newest verified profile, not the first to arrive")
     func metadataPicksNewestVerified() async throws {
         let (client, socket) = try await makeClient()
-        let victim = EventSigner(keyPair: try KeyPair())
+        let victim = EventSigner(keyPair: KeyPair())
 
         let forgery = try forged(
             claiming: victim.publicKey, kind: .setMetadata, createdAt: Timestamp(rawValue: 2_000_000_000),
@@ -180,7 +180,7 @@ struct FetchVerificationTests {
     @Test("fetchEvent rejects an event that is not the one requested")
     func fetchEventRejectsSubstitute() async throws {
         let (client, socket) = try await makeClient()
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
         let substitute = try signed(
             signer, kind: .textNote, createdAt: Timestamp(rawValue: 1_700_000_000), content: "not it")
         let requestedID = try EventID(hex: String(repeating: "cd", count: 32))
@@ -196,7 +196,7 @@ struct FetchVerificationTests {
     @Test("fetchEvent returns the requested event when the relay sends it")
     func fetchEventReturnsRequested() async throws {
         let (client, socket) = try await makeClient()
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
         let wanted = try signed(
             signer, kind: .textNote, createdAt: Timestamp(rawValue: 1_700_000_000), content: "the one")
 
@@ -214,7 +214,7 @@ struct FetchVerificationTests {
     /// same way rather than by which relay answered first.
     @Test("a created_at tie is broken by the lowest id")
     func tieIsBrokenByLowestID() throws {
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
         var candidates: [Event] = []
         for index in 0..<6 {
             candidates.append(
@@ -234,7 +234,7 @@ struct FetchVerificationTests {
 
     @Test("an addressable selection matches the d identifier")
     func addressableSelectionMatchesIdentifier() throws {
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
         let wanted = try signed(
             signer, kind: .longFormContent, createdAt: Timestamp(rawValue: 1_700_000_000), tags: [["d", "wanted"]])
         let other = try signed(

@@ -17,8 +17,8 @@ struct WalletConnectEncryptionTests {
 
     @Test("round-trips through the cipher for each scheme", arguments: [WalletConnectEncryption.nip44, .nip04])
     func roundTrip(scheme: WalletConnectEncryption) throws {
-        let client = try KeyPair()
-        let wallet = try KeyPair()
+        let client = KeyPair()
+        let wallet = KeyPair()
         let cipher = WalletConnectCipher(scheme)
         let message = #"{"method":"get_balance","params":{}}"#
 
@@ -30,8 +30,8 @@ struct WalletConnectEncryptionTests {
 
     @Test("a NIP-04 payload is shaped differently from a NIP-44 payload")
     func payloadShapes() throws {
-        let client = try KeyPair()
-        let wallet = try KeyPair()
+        let client = KeyPair()
+        let wallet = KeyPair()
 
         let nip04 = try WalletConnectCipher(.nip04).encrypt("hi", recipientPublicKey: wallet.publicKey, sender: client)
         let nip44 = try WalletConnectCipher(.nip44).encrypt("hi", recipientPublicKey: wallet.publicKey, sender: client)
@@ -42,8 +42,8 @@ struct WalletConnectEncryptionTests {
 
     @Test("decrypting with the wrong scheme fails")
     func crossSchemeFails() throws {
-        let client = try KeyPair()
-        let wallet = try KeyPair()
+        let client = KeyPair()
+        let wallet = KeyPair()
 
         let nip04Payload = try WalletConnectCipher(.nip04)
             .encrypt("hi", recipientPublicKey: wallet.publicKey, sender: client)
@@ -63,7 +63,7 @@ struct WalletConnectEncryptionTests {
         arguments: [WalletConnectEncryption.nip44, .nip04]
     )
     func offCurvePublicKey(scheme: WalletConnectEncryption) throws {
-        let client = try KeyPair()
+        let client = KeyPair()
         // Well-formed hex, but no secp256k1 point has this x coordinate (it exceeds the field size).
         let offCurve = try PublicKey(hex: String(repeating: "ff", count: 32))
         #expect(throws: (any Error).self) {

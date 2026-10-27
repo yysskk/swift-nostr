@@ -66,7 +66,7 @@ public enum ProofOfWork {
                 content: event.content
             )
             // `Self.` disambiguates from the `difficulty` parameter that shadows the method here.
-            if Self.difficulty(of: try candidate.computedID) >= difficulty {
+            if Self.difficulty(of: candidate.computedID) >= difficulty {
                 return candidate
             }
 

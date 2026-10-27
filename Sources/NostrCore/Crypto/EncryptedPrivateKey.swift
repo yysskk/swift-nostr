@@ -95,29 +95,30 @@ public struct EncryptedPrivateKey: Sendable, Hashable {
     ///   - maximumLogN: The largest cost this call will write, defaulting to
     ///     ``defaultMaximumLogN``. NIP-49 permits up to 22.
     /// - Returns: The resulting ``EncryptedPrivateKey``.
-    /// - Throws: ``KeyPair/Error/invalidLength(_:)`` if `privateKey` is not 32 bytes, or
-    ///   ``EncryptedPrivateKey/Error/unsupportedScryptCost(_:)`` if `logN` exceeds `maximumLogN`, or `maximumLogN`
-    ///   exceeds the `22` NIP-49 defines.
+    /// - Throws: ``EncryptedPrivateKey/Error/invalidPrivateKeyLength(_:)`` if `privateKey` is not
+    ///   32 bytes; ``EncryptedPrivateKey/Error/unsupportedScryptCost(_:)`` if `logN` exceeds
+    ///   `maximumLogN`, or `maximumLogN` exceeds the `22` NIP-49 defines; or
+    ///   ``EncryptedPrivateKey/Error/keyDerivationFailed`` if scrypt cannot run.
     public static func encrypt(
         privateKey: Data,
         password: String,
         logN: UInt8 = 16,
         keySecurity: KeySecurity = .unknown,
         maximumLogN: UInt8 = defaultMaximumLogN
-    ) throws -> EncryptedPrivateKey {
+    ) throws(EncryptedPrivateKey.Error) -> EncryptedPrivateKey {
         guard privateKey.count == 32 else {
-            throw KeyPair.Error.invalidLength(privateKey.count)
+            throw .invalidPrivateKeyLength(privateKey.count)
         }
         // The whole range, as on the reading side: a `maximumLogN` of 0 clears an upper-bound-only
         // guard and then makes the `1...maximumLogN` below an invalid range, trapping on the very
         // input this bound exists to check.
         guard 1...specMaximumLogN ~= maximumLogN else {
-            throw Error.unsupportedScryptCost(maximumLogN)
+            throw .unsupportedScryptCost(maximumLogN)
         }
         // Bounded by the same default the reader applies, so this library never writes a payload it
         // would then refuse to open — a round trip that failed inside one module.
         guard 1...maximumLogN ~= logN else {
-            throw Error.unsupportedScryptCost(logN)
+            throw .unsupportedScryptCost(logN)
         }
 
         let salt = SecureRandom.generateBytes(count: saltByteCount)
@@ -157,13 +158,16 @@ public struct EncryptedPrivateKey: Sendable, Hashable {
     /// - Returns: The decrypted 32-byte private key.
     /// - Throws: ``EncryptedPrivateKey/Error/unsupportedScryptCost(_:)`` if the recorded cost is
     ///   outside `1...maximumLogN`, or if `maximumLogN` itself exceeds the `22` NIP-49 defines;
+    ///   ``EncryptedPrivateKey/Error/keyDerivationFailed`` if scrypt cannot run; or
     ///   ``EncryptedPrivateKey/Error/decryptionFailed`` if authentication fails (almost always a wrong password).
-    public func decrypt(password: String, maximumLogN: UInt8 = defaultMaximumLogN) throws -> Data {
+    public func decrypt(
+        password: String, maximumLogN: UInt8 = defaultMaximumLogN
+    ) throws(EncryptedPrivateKey.Error) -> Data {
         // The whole range, not just the ceiling: a `maximumLogN` of 0 would clear an upper-bound-only
         // guard and then make the `1...maximumLogN` below an invalid range, trapping on exactly the
         // caller-supplied input this bound exists to make safe.
         guard 1...Self.specMaximumLogN ~= maximumLogN else {
-            throw Error.unsupportedScryptCost(maximumLogN)
+            throw .unsupportedScryptCost(maximumLogN)
         }
 
         let payload = try Self.decodePayload(ncryptsec)
@@ -173,7 +177,7 @@ public struct EncryptedPrivateKey: Sendable, Hashable {
         // asks for is committed the moment scrypt starts.
         let logN = payload[base + 1]
         guard 1...maximumLogN ~= logN else {
-            throw Error.unsupportedScryptCost(logN)
+            throw .unsupportedScryptCost(logN)
         }
 
         let salt = Data(payload[(base + 2)..<(base + 18)])
@@ -191,7 +195,7 @@ public struct EncryptedPrivateKey: Sendable, Hashable {
                 authenticating: associatedData
             )
         } catch {
-            throw Error.decryptionFailed
+            throw .decryptionFailed
         }
     }
 
@@ -216,17 +220,25 @@ public struct EncryptedPrivateKey: Sendable, Hashable {
     }
 
     /// Derives the 32-byte symmetric key with scrypt over the NFKC-normalized password.
-    private static func deriveSymmetricKey(password: String, salt: Data, logN: UInt8) throws -> Data {
+    private static func deriveSymmetricKey(
+        password: String, salt: Data, logN: UInt8
+    ) throws(EncryptedPrivateKey.Error) -> Data {
         let normalizedPassword = Data(password.precomposedStringWithCompatibilityMapping.utf8)
-        let derivedKey = try KDF.Scrypt.deriveKey(
-            from: normalizedPassword,
-            salt: salt,
-            outputByteCount: symmetricKeyByteCount,
-            rounds: 1 << Int(logN),
-            blockSize: scryptBlockSize,
-            parallelism: scryptParallelism
-        )
-        return derivedKey.withUnsafeBytes { Data($0) }
+        // The parameters are fixed or range-checked, so scrypt fails only when it cannot allocate
+        // the 2^logN KiB it needs.
+        do {
+            return try KDF.Scrypt.deriveKey(
+                from: normalizedPassword,
+                salt: salt,
+                outputByteCount: symmetricKeyByteCount,
+                rounds: 1 << Int(logN),
+                blockSize: scryptBlockSize,
+                parallelism: scryptParallelism
+            )
+            .withUnsafeBytes { Data($0) }
+        } catch {
+            throw .keyDerivationFailed
+        }
     }
 }
 
@@ -239,8 +251,16 @@ extension EncryptedPrivateKey {
         /// The scrypt cost exponent is outside the accepted range (payload: the offending `logN`
         /// or `maximumLogN`).
         case unsupportedScryptCost(UInt8)
+        /// The private key to encrypt is not 32 bytes (payload: its byte count).
+        case invalidPrivateKeyLength(Int)
+        /// scrypt could not derive the symmetric key, typically because the memory its cost asks
+        /// for could not be allocated.
+        case keyDerivationFailed
         /// The key did not authenticate — almost always a wrong password.
         case decryptionFailed
+        /// The decrypted key is not a valid secp256k1 private key: zero, or not below the curve
+        /// order.
+        case invalidPrivateKey
 
         public var errorDescription: String? {
             switch self {
@@ -248,8 +268,14 @@ extension EncryptedPrivateKey {
                 return "The ncryptsec payload is malformed or has an unsupported version"
             case .unsupportedScryptCost(let logN):
                 return "The ncryptsec declares an unsupported scrypt cost: \(logN)"
+            case .invalidPrivateKeyLength(let count):
+                return "A private key must be 32 bytes, got \(count)"
+            case .keyDerivationFailed:
+                return "scrypt could not derive the ncryptsec key"
             case .decryptionFailed:
                 return "The ncryptsec could not be decrypted — the password is likely wrong"
+            case .invalidPrivateKey:
+                return "The ncryptsec holds an invalid private key"
             }
         }
     }
@@ -267,13 +293,13 @@ extension KeyPair {
     ///     ``EncryptedPrivateKey/defaultMaximumLogN``.
     /// - Returns: The resulting ``EncryptedPrivateKey``.
     /// - Throws: ``EncryptedPrivateKey/Error/unsupportedScryptCost(_:)`` if `logN` exceeds
-    ///   `maximumLogN`.
+    ///   `maximumLogN`, or ``EncryptedPrivateKey/Error/keyDerivationFailed`` if scrypt cannot run.
     public func encryptedPrivateKey(
         password: String,
         logN: UInt8 = 16,
         keySecurity: EncryptedPrivateKey.KeySecurity = .unknown,
         maximumLogN: UInt8 = EncryptedPrivateKey.defaultMaximumLogN
-    ) throws -> EncryptedPrivateKey {
+    ) throws(EncryptedPrivateKey.Error) -> EncryptedPrivateKey {
         try EncryptedPrivateKey.encrypt(
             privateKey: privateKey,
             password: password,
@@ -291,15 +317,22 @@ extension KeyPair {
     ///     ``EncryptedPrivateKey/defaultMaximumLogN``.
     /// - Throws: ``EncryptedPrivateKey/Error/malformedPayload`` if the payload is malformed,
     ///   ``EncryptedPrivateKey/Error/unsupportedScryptCost(_:)`` if the recorded cost exceeds
-    ///   `maximumLogN`, ``EncryptedPrivateKey/Error/decryptionFailed`` if the password is wrong, or
-    ///   ``KeyPair/Error/invalidPrivateKey`` if the decrypted bytes are not a valid secp256k1 scalar.
+    ///   `maximumLogN`, ``EncryptedPrivateKey/Error/keyDerivationFailed`` if scrypt cannot run,
+    ///   ``EncryptedPrivateKey/Error/decryptionFailed`` if the password is wrong, or
+    ///   ``EncryptedPrivateKey/Error/invalidPrivateKey`` if the decrypted bytes are not a valid
+    ///   secp256k1 scalar.
     public init(
         ncryptsec: String,
         password: String,
         maximumLogN: UInt8 = EncryptedPrivateKey.defaultMaximumLogN
-    ) throws {
+    ) throws(EncryptedPrivateKey.Error) {
         let privateKey = try EncryptedPrivateKey(ncryptsec: ncryptsec)
             .decrypt(password: password, maximumLogN: maximumLogN)
-        try self.init(privateKey: privateKey)
+        // Decryption authenticated the payload and so yields 32 bytes; only their value can be
+        // wrong.
+        guard let keyPair = try? KeyPair(privateKey: privateKey) else {
+            throw .invalidPrivateKey
+        }
+        self = keyPair
     }
 }

@@ -33,6 +33,13 @@ public struct Signature: Sendable, Hashable {
         }
         self.hex = data.hexEncodedString()
     }
+
+    /// Creates a signature from bytes the caller guarantees are 64 long, such as a fresh Schnorr
+    /// signature.
+    init(validatedData data: Data) {
+        precondition(data.count == 64, "A signature is 64 bytes")
+        self.hex = data.hexEncodedString()
+    }
 }
 
 extension Signature: CustomStringConvertible, LosslessStringConvertible {

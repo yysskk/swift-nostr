@@ -25,7 +25,7 @@ struct GiftWrappedRumorDeliveryTests {
         let (client, socket) = try await ConnectedClientFixture.make()
         try await client.identity.setPrivateKey(senderKey)
         let sender = try KeyPair(privateKeyHex: senderKey)
-        let recipient = try KeyPair()
+        let recipient = KeyPair()
         await client.dmRelayListStore.markNoList(for: recipient.publicKey)
         await client.dmRelayListStore.markNoList(for: sender.publicKey)
         let template = makeTemplate(recipient: recipient.publicKey)
@@ -36,7 +36,7 @@ struct GiftWrappedRumorDeliveryTests {
 
         #expect(result.rumor.kind == customKind)
         #expect(result.rumor.signature == nil)
-        #expect(result.rumor.id == (try UnsignedEvent(template, publicKey: sender.publicKey).computedID))
+        #expect(result.rumor.id == UnsignedEvent(template, publicKey: sender.publicKey).computedID)
 
         let received = try await GiftWrap.unwrap(
             giftWrap: result.recipientGiftWrap, recipient: EventSigner(keyPair: recipient))
@@ -72,7 +72,7 @@ struct GiftWrappedRumorDeliveryTests {
         let client = NostrClient(relayPool: pool, gossipPolicy: .requirePresent)
         try await client.identity.setPrivateKey(senderKey)
         let sender = try KeyPair(privateKeyHex: senderKey)
-        let recipient = try KeyPair()
+        let recipient = KeyPair()
         await client.dmRelayListStore.store(
             DirectMessageRelayList(relays: [inboxURL]), createdAt: Timestamp(rawValue: 1), for: recipient.publicKey)
         // The sender advertised no list, so the self-copy falls back to the whole pool.
@@ -99,7 +99,7 @@ struct GiftWrappedRumorDeliveryTests {
         let (client, socket) = try await ConnectedClientFixture.make()
         try await client.identity.setPrivateKey(senderKey)
         let sender = try KeyPair(privateKeyHex: senderKey)
-        let recipient = try KeyPair()
+        let recipient = KeyPair()
         await client.dmRelayListStore.markNoList(for: recipient.publicKey)
         await client.dmRelayListStore.markNoList(for: sender.publicKey)
         let expiry = Timestamp(rawValue: 2_000_000_000)
@@ -122,7 +122,7 @@ struct GiftWrappedRumorDeliveryTests {
         let (client, socket) = try await ConnectedClientFixture.make()
         try await client.identity.setPrivateKey(senderKey)
         let sender = try KeyPair(privateKeyHex: senderKey)
-        let recipient = try KeyPair()
+        let recipient = KeyPair()
         await client.dmRelayListStore.markNoList(for: recipient.publicKey)
         await client.dmRelayListStore.markNoList(for: sender.publicKey)
         let createdAt = Timestamp(rawValue: 1_700_000_000)
@@ -146,7 +146,7 @@ struct GiftWrappedRumorDeliveryTests {
     func emptyPoolThrows() async throws {
         let client = NostrClient()
         try await client.identity.setPrivateKey(senderKey)
-        let recipient = try KeyPair()
+        let recipient = KeyPair()
 
         await #expect(throws: RelayPool.Error.emptyPool) {
             try await client.messages.sendGiftWrapped(
@@ -157,7 +157,7 @@ struct GiftWrappedRumorDeliveryTests {
     @Test("without a signer it throws signerNotSet")
     func noSignerThrows() async throws {
         let client = NostrClient()
-        let recipient = try KeyPair()
+        let recipient = KeyPair()
 
         await #expect(throws: NostrClient.Error.signerNotSet) {
             try await client.messages.sendGiftWrapped(

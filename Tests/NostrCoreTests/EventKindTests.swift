@@ -99,7 +99,7 @@ struct EventKindTests {
 
     @Test("signed events round-trip with struct kinds")
     func signedEventsRoundTrip() throws {
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
         let unsigned = UnsignedEvent(
             publicKey: signer.publicKey,
             kind: Event.Kind(rawValue: 31337),

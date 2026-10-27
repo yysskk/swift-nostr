@@ -31,7 +31,7 @@ struct NIP42AuthRetryTests {
 
     private func makeResponder(signer: EventSigner) -> RelayConnection.AuthenticationResponder {
         { relayURL, challenge in
-            try? signer.sign(.clientAuthentication(relayURL: relayURL, challenge: challenge))
+            signer.sign(.clientAuthentication(relayURL: relayURL, challenge: challenge))
         }
     }
 
@@ -48,11 +48,11 @@ struct NIP42AuthRetryTests {
     @Test("publish retries once after the automatic authentication succeeds")
     func publishRetriesAfterAuthentication() async throws {
         let (connection, mock) = makeConnection()
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
         await connection.setAuthenticationResponder(makeResponder(signer: signer))
         try await connection.connect()
 
-        let note = try signer.sign(.textNote("gm"))
+        let note = signer.sign(.textNote("gm"))
         let publishTask = Task { try await connection.publish(note) }
 
         // First attempt is rejected; the relay sends the challenge alongside.
@@ -77,8 +77,8 @@ struct NIP42AuthRetryTests {
         let (connection, mock) = makeConnection()
         try await connection.connect()
 
-        let signer = EventSigner(keyPair: try KeyPair())
-        let note = try signer.sign(.textNote("gm"))
+        let signer = EventSigner(keyPair: KeyPair())
+        let note = signer.sign(.textNote("gm"))
         let publishTask = Task { try await connection.publish(note) }
 
         try await NIP42TestSupport.pollUntil { self.eventFrames(in: mock).count == 1 }
@@ -96,11 +96,11 @@ struct NIP42AuthRetryTests {
     @Test("publish surfaces the authentication failure when the AUTH is rejected")
     func publishSurfacesRejectedAuthentication() async throws {
         let (connection, mock) = makeConnection()
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
         await connection.setAuthenticationResponder(makeResponder(signer: signer))
         try await connection.connect()
 
-        let note = try signer.sign(.textNote("gm"))
+        let note = signer.sign(.textNote("gm"))
         let publishTask = Task { try await connection.publish(note) }
 
         try await NIP42TestSupport.pollUntil { self.eventFrames(in: mock).count == 1 }
@@ -130,11 +130,11 @@ struct NIP42AuthRetryTests {
     @Test("publish falls back to the original rejection when no authentication concludes")
     func publishTimesOutWaitingForAuthentication() async throws {
         let (connection, mock) = makeConnection(publishAckTimeout: .seconds(2))
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
         await connection.setAuthenticationResponder(makeResponder(signer: signer))
         try await connection.connect()
 
-        let note = try signer.sign(.textNote("gm"))
+        let note = signer.sign(.textNote("gm"))
         let publishTask = Task { try await connection.publish(note) }
 
         // The relay rejects but never sends a challenge, so the responder
@@ -154,11 +154,11 @@ struct NIP42AuthRetryTests {
     @Test("non-auth rejections keep failing without a retry")
     func publishDoesNotRetryOtherRejections() async throws {
         let (connection, mock) = makeConnection()
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
         await connection.setAuthenticationResponder(makeResponder(signer: signer))
         try await connection.connect()
 
-        let note = try signer.sign(.textNote("gm"))
+        let note = signer.sign(.textNote("gm"))
         let publishTask = Task { try await connection.publish(note) }
 
         try await NIP42TestSupport.pollUntil { self.eventFrames(in: mock).count == 1 }
@@ -178,13 +178,13 @@ struct NIP42AuthRetryTests {
     @Test("reinstalling a responder while an answer is in flight sends no second AUTH")
     func responderReinstallDoesNotDoubleAnswer() async throws {
         let (connection, mock) = makeConnection()
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
         let slowResponder: RelayConnection.AuthenticationResponder = { relayURL, challenge in
             // Slow enough that the reinstall below happens while this answer
             // is still being produced — before authenticate(with:) registers
             // its pending entry.
             try? await Task.sleep(for: .milliseconds(100))
-            return try? signer.sign(.clientAuthentication(relayURL: relayURL, challenge: challenge))
+            return signer.sign(.clientAuthentication(relayURL: relayURL, challenge: challenge))
         }
         await connection.setAuthenticationResponder(slowResponder)
         try await connection.connect()
@@ -210,7 +210,7 @@ struct NIP42AuthRetryTests {
     @Test("a subscription closed with auth-required is re-requested after authentication")
     func subscriptionReRequestedAfterAuthentication() async throws {
         let (connection, mock) = makeConnection()
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
         await connection.setAuthenticationResponder(makeResponder(signer: signer))
         try await connection.connect()
 
@@ -230,7 +230,7 @@ struct NIP42AuthRetryTests {
     @Test("a subscription closed for other reasons is not re-requested")
     func subscriptionClosedForOtherReasonsStaysClosed() async throws {
         let (connection, mock) = makeConnection()
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
         await connection.setAuthenticationResponder(makeResponder(signer: signer))
         try await connection.connect()
 
@@ -248,7 +248,7 @@ struct NIP42AuthRetryTests {
     @Test("a subscription unsubscribed while awaiting auth is not re-requested")
     func unsubscribedSubscriptionIsNotReRequested() async throws {
         let (connection, mock) = makeConnection()
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
         await connection.setAuthenticationResponder(makeResponder(signer: signer))
         try await connection.connect()
 

@@ -85,8 +85,8 @@ struct SubscriptionTeardownTests {
         let (client, socket) = try await makeClient()
         let pool = await client.pool
 
-        let signer = EventSigner(keyPair: try KeyPair())
-        let stored = try signer.sign(.textNote("stored"))
+        let signer = EventSigner(keyPair: KeyPair())
+        let stored = signer.sign(.textNote("stored"))
         let storedJSON = String(decoding: try JSONEncoder().encode(stored), as: UTF8.self)
 
         let firstSeen = MessageCounts()

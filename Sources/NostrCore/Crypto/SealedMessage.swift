@@ -273,21 +273,18 @@ public struct SealedMessage: Sendable {
 
     // MARK: - Internal Methods
 
-    /// Derives the NIP-44 conversation key from hex-encoded keys and returns it as hex.
+    /// Derives the NIP-44 conversation key between `keyPair` and `publicKey` and returns it as hex.
     ///
     /// Internal and intended for tests that check the derivation against the official
     /// `get_conversation_key` vectors.
     /// - Parameters:
-    ///   - privateKeyHex: The caller's private key (hex string).
-    ///   - publicKeyHex: The peer's x-only public key (hex string).
+    ///   - keyPair: The caller's key pair.
+    ///   - publicKey: The peer's x-only public key.
     /// - Returns: The 32-byte conversation key as a hex string.
-    /// - Throws: ``KeyPair/Error`` or ``PublicKey/Error`` for a key that does not parse, or
-    ///   ``SealedMessage/Error/invalidPublicKey`` if the public key is not a point on secp256k1.
-    static func conversationKeyHex(privateKeyHex: String, publicKeyHex: String) throws -> String {
-        let keyPair = try KeyPair(privateKeyHex: privateKeyHex)
-        let publicKey = try PublicKey(hex: publicKeyHex)
-        let conversationKey = try Self.conversationKey(privateKey: keyPair.privateKey, publicKey: publicKey.data)
-        return conversationKey.hexEncodedString()
+    /// - Throws: ``SealedMessage/Error/invalidPublicKey`` if `publicKey` is not a point on
+    ///   secp256k1.
+    static func conversationKeyHex(keyPair: KeyPair, publicKey: PublicKey) throws(SealedMessage.Error) -> String {
+        try Self.conversationKey(privateKey: keyPair.privateKey, publicKey: publicKey.data).hexEncodedString()
     }
 
     /// Computes the conversation key using ECDH + HKDF.

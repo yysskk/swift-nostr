@@ -100,6 +100,16 @@ public struct Event: Codable, Identifiable, Hashable, Sendable {
         try container.encode(content, forKey: .content)
         try container.encodeIfPresent(signature, forKey: .signature)
     }
+
+    /// The event encoded as NIP-01 JSON by `JSONEncoder`.
+    var jsonData: Data {
+        // Every field is a string, an integer, or an array of strings, all of which encode.
+        do {
+            return try JSONEncoder().encode(self)
+        } catch {
+            preconditionFailure("An event did not encode as JSON: \(error)")
+        }
+    }
 }
 
 // MARK: - Event Kind
@@ -339,18 +349,36 @@ public struct UnsignedEvent: Sendable {
         self.content = content
     }
 
-    /// Serializes the event for hashing according to NIP-01
-    public func serializedForHashing() throws -> Data {
-        let serializable: [Any] = [
-            0,
-            publicKey.hex,
-            createdAt.rawValue,
-            kind.rawValue,
-            tags,
-            content,
-        ]
-        return try JSONSerialization.data(
-            withJSONObject: serializable, options: [.sortedKeys, .withoutEscapingSlashes])
+    /// Serializes the event for hashing according to NIP-01: the compact JSON array
+    /// `[0,pubkey,created_at,kind,tags,content]` in UTF-8.
+    public func serializedForHashing() -> Data {
+        var json = #"[0,""# + publicKey.hex + #"",\#(createdAt.rawValue),\#(kind.rawValue),["#
+        json += tags.map { "[" + $0.map(Self.jsonString).joined(separator: ",") + "]" }.joined(separator: ",")
+        json += "]," + Self.jsonString(content) + "]"
+        return Data(json.utf8)
+    }
+
+    /// `string` as a JSON string literal, escaped the way NIP-01 ids are computed: the
+    /// two-character escapes for `"`, `\`, and the five control characters that have one,
+    /// `\u00XX` with lowercase hex for every other control character, and everything else verbatim.
+    private static func jsonString(_ string: String) -> String {
+        var literal = "\""
+        for scalar in string.unicodeScalars {
+            switch scalar {
+            case "\"": literal += #"\""#
+            case "\\": literal += #"\\"#
+            case "\n": literal += #"\n"#
+            case "\r": literal += #"\r"#
+            case "\t": literal += #"\t"#
+            case "\u{08}": literal += #"\b"#
+            case "\u{0C}": literal += #"\f"#
+            case "\u{00}"..."\u{1F}":
+                let hex = String(scalar.value, radix: 16)
+                literal += #"\u00"# + (hex.count == 1 ? "0" + hex : hex)
+            default: literal.unicodeScalars.append(scalar)
+            }
+        }
+        return literal + "\""
     }
 
     /// The NIP-01 event id: the SHA-256 of ``serializedForHashing()``.
@@ -359,9 +387,7 @@ public struct UnsignedEvent: Sendable {
     /// unsigned form; signing, rumor construction, and proof-of-work mining all
     /// go through it.
     public var computedID: EventID {
-        get throws {
-            try EventID(data: Data(SHA256.hash(data: serializedForHashing())))
-        }
+        EventID(validatedData: Data(SHA256.hash(data: serializedForHashing())))
     }
 
     /// Returns this event as an unsigned rumor (NIP-59): the event id is computed
@@ -370,9 +396,9 @@ public struct UnsignedEvent: Sendable {
     /// NIP-17 requires that kind-14 rumors are never signed — a leaked signed rumor
     /// would be cryptographic proof of authorship and destroy deniability.
     /// https://github.com/nostr-protocol/nips/blob/master/59.md
-    public func asRumor() throws -> Event {
+    public func asRumor() -> Event {
         Event(
-            id: try computedID,
+            id: computedID,
             publicKey: publicKey,
             createdAt: createdAt,
             kind: kind,

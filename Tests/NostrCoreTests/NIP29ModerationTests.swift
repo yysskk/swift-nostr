@@ -51,7 +51,7 @@ struct NIP29ModerationTemplateTests {
         var template = EventTemplate.groupModeration(.deleteGroup, groupID: "abcdef")
         template.createdAt = createdAt
 
-        let signed = try EventSigner(keyPair: try KeyPair()).sign(template)
+        let signed = EventSigner(keyPair: KeyPair()).sign(template)
 
         #expect(signed.createdAt == createdAt)
         #expect(try signed.verify())
@@ -167,7 +167,7 @@ struct NIP29ModerationTemplateTests {
 
     @Test("a moderation event signed by a remote signer verifies and keeps the template layout")
     func signedModeration() async throws {
-        let signer = StubRemoteSigner(keyPair: try KeyPair())
+        let signer = StubRemoteSigner(keyPair: KeyPair())
         var template = EventTemplate.groupModeration(.removeUser(publicKey: target), groupID: "abcdef", reason: "spam")
         template.createdAt = createdAt
 
@@ -196,7 +196,7 @@ struct NIP29ModerationParsingTests {
     ) throws -> Event {
         var template = EventTemplate.groupModeration(action, groupID: groupID, previous: previous, reason: reason)
         template.createdAt = createdAt
-        return try EventSigner(keyPair: try KeyPair()).sign(template)
+        return EventSigner(keyPair: KeyPair()).sign(template)
     }
 
     @Test("a put-user event round-trips with roles, reason, and previous references")

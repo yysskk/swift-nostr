@@ -15,10 +15,15 @@ public struct KeyPair: Sendable {
     }
 
     /// Creates a new random keypair
-    public init() throws {
-        let secpPrivateKey = try P256K.Schnorr.PrivateKey()
-        self.privateKey = Data(secpPrivateKey.dataRepresentation)
-        self.publicKey = PublicKey(validatedData: Data(secpPrivateKey.xonly.bytes))
+    public init() {
+        // Random bytes miss the valid scalar range (zero, or not below the curve order) with
+        // probability under 2^-127; draw again rather than report it.
+        while true {
+            if let keyPair = try? KeyPair(privateKey: SecureRandom.generateBytes(count: 32)) {
+                self = keyPair
+                return
+            }
+        }
     }
 
     /// Creates a keypair from an existing private key
@@ -87,10 +92,15 @@ public struct KeyPair: Sendable {
     ///   - mnemonicPhrase: The BIP-39 mnemonic phrase as a space-separated string
     ///   - passphrase: Optional passphrase for additional security
     ///   - account: The account index (default 0)
-    /// - Throws: A ``Mnemonic/Error`` if the phrase is not a valid mnemonic, or
+    /// - Throws: ``KeyPair/Error/invalidMnemonic(_:)`` if the phrase is not a valid mnemonic, or
     ///   ``KeyPair/Error/invalidPrivateKey`` if derivation produces an invalid scalar.
-    public init(mnemonicPhrase: String, passphrase: String = "", account: UInt32 = 0) throws {
-        let mnemonic = try Mnemonic(phrase: mnemonicPhrase)
+    public init(mnemonicPhrase: String, passphrase: String = "", account: UInt32 = 0) throws(KeyPair.Error) {
+        let mnemonic: Mnemonic
+        do throws(Mnemonic.Error) {
+            mnemonic = try Mnemonic(phrase: mnemonicPhrase)
+        } catch {
+            throw .invalidMnemonic(error)
+        }
         try self.init(mnemonic: mnemonic, passphrase: passphrase, account: account)
     }
 
@@ -99,12 +109,18 @@ public struct KeyPair: Sendable {
     ///   - wordCount: Number of words in the mnemonic (12, 15, 18, 21, or 24)
     ///   - passphrase: Optional passphrase for additional security
     /// - Returns: A tuple containing the generated mnemonic and keypair
-    /// - Throws: ``Mnemonic/Error/invalidWordCount(_:)`` for an unsupported `wordCount`, or
-    ///   ``KeyPair/Error/invalidPrivateKey`` if derivation produces an invalid scalar.
+    /// - Throws: ``KeyPair/Error/invalidMnemonic(_:)`` wrapping ``Mnemonic/Error/invalidWordCount(_:)``
+    ///   for an unsupported `wordCount`, or ``KeyPair/Error/invalidPrivateKey`` if derivation
+    ///   produces an invalid scalar.
     public static func generate(
         wordCount: Int = 12, passphrase: String = ""
-    ) throws -> (mnemonic: Mnemonic, keyPair: KeyPair) {
-        let mnemonic = try Mnemonic.generate(wordCount: wordCount)
+    ) throws(KeyPair.Error) -> (mnemonic: Mnemonic, keyPair: KeyPair) {
+        let mnemonic: Mnemonic
+        do throws(Mnemonic.Error) {
+            mnemonic = try Mnemonic.generate(wordCount: wordCount)
+        } catch {
+            throw .invalidMnemonic(error)
+        }
         let keyPair = try KeyPair(mnemonic: mnemonic, passphrase: passphrase)
         return (mnemonic, keyPair)
     }
@@ -128,6 +144,8 @@ extension KeyPair {
         case unexpectedPrefix(String)
         /// The 32 bytes are not a valid secp256k1 private key: zero, or not below the curve order.
         case invalidPrivateKey
+        /// The NIP-06 mnemonic is not valid BIP-39 (payload: why).
+        case invalidMnemonic(Mnemonic.Error)
 
         public var errorDescription: String? {
             switch self {
@@ -141,6 +159,8 @@ extension KeyPair {
                 return "Expected an nsec, got bech32 prefix \(prefix)"
             case .invalidPrivateKey:
                 return "Invalid private key"
+            case .invalidMnemonic(let error):
+                return "Invalid mnemonic: \(error.errorDescription ?? "invalid BIP-39 phrase")"
             }
         }
     }

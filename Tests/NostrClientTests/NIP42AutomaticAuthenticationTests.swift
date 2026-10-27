@@ -113,9 +113,9 @@ struct NIP42AutomaticAuthenticationTests {
     @Test("a responder answers AUTH challenges automatically")
     func responderAnswersChallenge() async throws {
         let (connection, mock) = makeConnection()
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
         await connection.setAuthenticationResponder { relayURL, challenge in
-            try? signer.sign(.clientAuthentication(relayURL: relayURL, challenge: challenge))
+            signer.sign(.clientAuthentication(relayURL: relayURL, challenge: challenge))
         }
         try await connection.connect()
 
@@ -152,9 +152,9 @@ struct NIP42AutomaticAuthenticationTests {
         mock.deliver(.string(#"["AUTH","challengestringhere"]"#))
         try await pollUntil { await connection.authenticationChallenge != nil }
 
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
         await connection.setAuthenticationResponder { relayURL, challenge in
-            try? signer.sign(.clientAuthentication(relayURL: relayURL, challenge: challenge))
+            signer.sign(.clientAuthentication(relayURL: relayURL, challenge: challenge))
         }
 
         let sent = try await acknowledgeAuth(on: connection, mock: mock)
@@ -165,9 +165,9 @@ struct NIP42AutomaticAuthenticationTests {
     @Test("clearing the responder stops automatic answers")
     func clearedResponderDoesNotAnswer() async throws {
         let (connection, mock) = makeConnection()
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
         await connection.setAuthenticationResponder { relayURL, challenge in
-            try? signer.sign(.clientAuthentication(relayURL: relayURL, challenge: challenge))
+            signer.sign(.clientAuthentication(relayURL: relayURL, challenge: challenge))
         }
         await connection.setAuthenticationResponder(nil)
         try await connection.connect()
@@ -183,9 +183,9 @@ struct NIP42AutomaticAuthenticationTests {
     @Test("a rejected automatic authentication is recorded on lastAuthenticationError")
     func responderFailureRecorded() async throws {
         let (connection, mock) = makeConnection()
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
         await connection.setAuthenticationResponder { relayURL, challenge in
-            try? signer.sign(.clientAuthentication(relayURL: relayURL, challenge: challenge))
+            signer.sign(.clientAuthentication(relayURL: relayURL, challenge: challenge))
         }
         try await connection.connect()
 
@@ -213,9 +213,9 @@ struct NIP42AutomaticAuthenticationTests {
                 autoReconnect: false
             )
         )
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
         await connection.setAuthenticationResponder { relayURL, challenge in
-            try? signer.sign(.clientAuthentication(relayURL: relayURL, challenge: challenge))
+            signer.sign(.clientAuthentication(relayURL: relayURL, challenge: challenge))
         }
         try await connection.connect()
 
@@ -231,9 +231,9 @@ struct NIP42AutomaticAuthenticationTests {
     @Test("a later successful authentication clears lastAuthenticationError")
     func responderFailureClearedOnSuccess() async throws {
         let (connection, mock) = makeConnection()
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
         await connection.setAuthenticationResponder { relayURL, challenge in
-            try? signer.sign(.clientAuthentication(relayURL: relayURL, challenge: challenge))
+            signer.sign(.clientAuthentication(relayURL: relayURL, challenge: challenge))
         }
         try await connection.connect()
 
@@ -254,9 +254,9 @@ struct NIP42AutomaticAuthenticationTests {
     @Test("disconnect clears lastAuthenticationError")
     func disconnectClearsAuthenticationError() async throws {
         let (connection, mock) = makeConnection()
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
         await connection.setAuthenticationResponder { relayURL, challenge in
-            try? signer.sign(.clientAuthentication(relayURL: relayURL, challenge: challenge))
+            signer.sign(.clientAuthentication(relayURL: relayURL, challenge: challenge))
         }
         try await connection.connect()
 
@@ -271,9 +271,9 @@ struct NIP42AutomaticAuthenticationTests {
     @Test("disconnecting mid-authentication does not resurrect a stale error")
     func disconnectDuringAuthenticationLeavesNoError() async throws {
         let (connection, mock) = makeConnection()
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
         await connection.setAuthenticationResponder { relayURL, challenge in
-            try? signer.sign(.clientAuthentication(relayURL: relayURL, challenge: challenge))
+            signer.sign(.clientAuthentication(relayURL: relayURL, challenge: challenge))
         }
         try await connection.connect()
 
@@ -318,14 +318,14 @@ struct NIP42AutomaticAuthenticationTests {
             config: RelayPoolConfig(defaultRelayConfig: noReconnectConfig),
             webSocketFactory: MockWebSocketSessionFactory(makeSession: { mocks[counter.next()] })
         )
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
 
         let urlA = RelayURL("wss://relay-a.example.com")!
         let urlB = RelayURL("wss://relay-b.example.com")!
 
         let connectionA = await pool.addRelay(urlA)
         await pool.setAuthenticationResponder { relayURL, challenge in
-            try? signer.sign(.clientAuthentication(relayURL: relayURL, challenge: challenge))
+            signer.sign(.clientAuthentication(relayURL: relayURL, challenge: challenge))
         }
         let connectionB = await pool.addRelay(urlB)
         // Connect sequentially so the factory pairs mockA with relay A and
@@ -358,7 +358,7 @@ struct NIP42AutomaticAuthenticationTests {
     @Test("with a signer set, the client answers challenges automatically by default")
     func clientAutomaticByDefault() async throws {
         let (client, mock) = makeClient()
-        let keyPair = try KeyPair()
+        let keyPair = KeyPair()
         await client.identity.setSigner(EventSigner(keyPair: keyPair))
         try await client.relays.connect(to: [relayURL])
 
@@ -375,7 +375,7 @@ struct NIP42AutomaticAuthenticationTests {
     @Test("a signer set before relays are added still answers their challenges")
     func clientSignerBeforeRelays() async throws {
         let (client, mock) = makeClient()
-        await client.identity.setSigner(EventSigner(keyPair: try KeyPair()))
+        await client.identity.setSigner(EventSigner(keyPair: KeyPair()))
         try await client.relays.connect(to: [relayURL])
 
         mock.deliver(.string(#"["AUTH","early-signer"]"#))
@@ -389,7 +389,7 @@ struct NIP42AutomaticAuthenticationTests {
     @Test("manual mode does not answer challenges until authenticate is called")
     func clientManualMode() async throws {
         let (client, mock) = makeClient()
-        await client.identity.setSigner(EventSigner(keyPair: try KeyPair()))
+        await client.identity.setSigner(EventSigner(keyPair: KeyPair()))
         await client.identity.setAuthenticationMode(.manual)
         try await client.relays.connect(to: [relayURL])
 
@@ -414,7 +414,7 @@ struct NIP42AutomaticAuthenticationTests {
     @Test("switching back to automatic answers a pending challenge")
     func clientSwitchToAutomaticAnswersPendingChallenge() async throws {
         let (client, mock) = makeClient()
-        await client.identity.setSigner(EventSigner(keyPair: try KeyPair()))
+        await client.identity.setSigner(EventSigner(keyPair: KeyPair()))
         await client.identity.setAuthenticationMode(.manual)
         try await client.relays.connect(to: [relayURL])
 
@@ -431,7 +431,7 @@ struct NIP42AutomaticAuthenticationTests {
     @Test("authenticate(relayURL:) requires the relay to be in the pool")
     func clientAuthenticateUnknownRelay() async throws {
         let (client, _) = makeClient()
-        await client.identity.setSigner(EventSigner(keyPair: try KeyPair()))
+        await client.identity.setSigner(EventSigner(keyPair: KeyPair()))
 
         await #expect(throws: RelayPool.Error.noMatchingRelays([RelayURL("wss://unknown.example.com")!])) {
             try await client.identity.authenticate(relayURL: RelayURL("wss://Unknown.Example.com/")!)
@@ -441,7 +441,7 @@ struct NIP42AutomaticAuthenticationTests {
     @Test("authenticate(relayURL:) requires a challenge")
     func clientAuthenticateWithoutChallenge() async throws {
         let (client, _) = makeClient()
-        await client.identity.setSigner(EventSigner(keyPair: try KeyPair()))
+        await client.identity.setSigner(EventSigner(keyPair: KeyPair()))
         try await client.relays.connect(to: [relayURL])
 
         await #expect(throws: RelayConnection.Error.missingAuthenticationChallenge) {

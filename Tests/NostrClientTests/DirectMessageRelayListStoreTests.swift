@@ -139,10 +139,10 @@ struct DirectMessageRelayListStoreTests {
     @Test("Ingest a kind 10050 event")
     func ingestEvent() async throws {
         let store = makeStore()
-        let keyPair = try KeyPair()
+        let keyPair = KeyPair()
         let signer = EventSigner(keyPair: keyPair)
 
-        let event = try signer.sign(
+        let event = signer.sign(
             .directMessageRelayList(DirectMessageRelayList(relays: [RelayURL("wss://inbox.example.com")!])))
         let ingested = await store.ingest(event)
         #expect(ingested != nil)
@@ -154,10 +154,10 @@ struct DirectMessageRelayListStoreTests {
     @Test("Ingest ignores a non-10050 event")
     func ingestIgnoresOtherKind() async throws {
         let store = makeStore()
-        let keyPair = try KeyPair()
+        let keyPair = KeyPair()
         let signer = EventSigner(keyPair: keyPair)
 
-        let textNote = try signer.sign(.textNote("Hello"))
+        let textNote = signer.sign(.textNote("Hello"))
         let ingested = await store.ingest(textNote)
         #expect(ingested == nil)
     }

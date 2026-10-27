@@ -32,7 +32,7 @@ struct NostrClientTargetedPublishTests {
     }
 
     private func makeEvent() throws -> Event {
-        try EventSigner(keyPair: try KeyPair()).sign(.textNote("targeted"))
+        EventSigner(keyPair: KeyPair()).sign(.textNote("targeted"))
     }
 
     // MARK: - Targeting
@@ -109,7 +109,7 @@ struct NostrClientTargetedPublishTests {
     @Test("a template published to chosen relays is signed by the client's signer and reaches only those relays")
     func templatePublishReachesOnlyTargetedRelays() async throws {
         let (client, sockets) = try await makeClient(relayURLs: [urlA, urlB, urlC])
-        let keyPair = try KeyPair()
+        let keyPair = KeyPair()
         try await client.identity.setPrivateKey(keyPair.privateKeyHex)
 
         let task = Task {
@@ -134,7 +134,7 @@ struct NostrClientTargetedPublishTests {
     @Test("a template published to an empty target list throws instead of broadcasting")
     func templatePublishToEmptyTargetsThrows() async throws {
         let (client, sockets) = try await makeClient(relayURLs: [urlA, urlB])
-        try await client.identity.setPrivateKey(try KeyPair().privateKeyHex)
+        try await client.identity.setPrivateKey(KeyPair().privateKeyHex)
 
         await #expect(throws: RelayPool.Error.noMatchingRelays([])) {
             try await client.events.publish(.textNote("nowhere"), to: [])

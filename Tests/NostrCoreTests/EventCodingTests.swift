@@ -5,7 +5,7 @@ import Testing
 @Suite("Event Coding Tests")
 struct EventCodingTests {
     private func signedNote() throws -> Event {
-        try EventSigner(keyPair: try KeyPair()).sign(.textNote("gm"))
+        EventSigner(keyPair: KeyPair()).sign(.textNote("gm"))
     }
 
     private func jsonObject(_ event: Event) throws -> [String: Any] {
@@ -48,7 +48,7 @@ struct EventCodingTests {
 
     @Test("an unsigned rumor encodes without a sig key and decodes back as unsigned")
     func rumorOmitsSig() throws {
-        let rumor = try UnsignedEvent(publicKey: try KeyPair().publicKey, kind: .privateDirectMessage, content: "hi")
+        let rumor = UnsignedEvent(publicKey: KeyPair().publicKey, kind: .privateDirectMessage, content: "hi")
             .asRumor()
         let object = try jsonObject(rumor)
 
@@ -63,7 +63,7 @@ struct EventCodingTests {
 
     @Test("an empty sig decodes as an unsigned rumor")
     func emptySigDecodesAsRumor() throws {
-        let rumor = try UnsignedEvent(publicKey: try KeyPair().publicKey, kind: .textNote, content: "hi").asRumor()
+        let rumor = UnsignedEvent(publicKey: KeyPair().publicKey, kind: .textNote, content: "hi").asRumor()
         var object = try jsonObject(rumor)
         object["sig"] = ""
 
@@ -109,10 +109,10 @@ struct EventCodingTests {
 
     @Test("a signed event's id is the id its unsigned form computes")
     func idMatchesComputedID() throws {
-        let unsigned = UnsignedEvent(publicKey: try KeyPair().publicKey, kind: .textNote, content: "gm")
-        let rumor = try unsigned.asRumor()
+        let unsigned = UnsignedEvent(publicKey: KeyPair().publicKey, kind: .textNote, content: "gm")
+        let rumor = unsigned.asRumor()
 
-        #expect(rumor.id == (try unsigned.computedID))
+        #expect(rumor.id == unsigned.computedID)
         #expect(rumor.publicKey == unsigned.publicKey)
     }
 }

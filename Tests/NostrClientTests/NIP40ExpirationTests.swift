@@ -23,16 +23,16 @@ struct NIP40ExpirationTests {
 
     @Test("Event.expiration reads a valid expiration tag")
     func eventExpiration() throws {
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
         let expiry = Timestamp(rawValue: 1_700_000_000)
-        let event = try signer.sign(.textNote("gm", tags: [.expiration(expiry)]))
+        let event = signer.sign(.textNote("gm", tags: [.expiration(expiry)]))
         #expect(event.expiration == expiry)
     }
 
     @Test("Event.expiration is nil without an expiration tag")
     func eventExpirationAbsent() throws {
-        let signer = EventSigner(keyPair: try KeyPair())
-        let event = try signer.sign(.textNote("gm"))
+        let signer = EventSigner(keyPair: KeyPair())
+        let event = signer.sign(.textNote("gm"))
         #expect(event.expiration == nil)
     }
 
@@ -47,8 +47,8 @@ struct NIP40ExpirationTests {
 
     @Test("isExpired compares against the given time, expiring at the boundary")
     func isExpired() throws {
-        let signer = EventSigner(keyPair: try KeyPair())
-        let event = try signer.sign(.textNote("gm", tags: [.expiration(Timestamp(rawValue: 1000))]))
+        let signer = EventSigner(keyPair: KeyPair())
+        let event = signer.sign(.textNote("gm", tags: [.expiration(Timestamp(rawValue: 1000))]))
         #expect(event.isExpired(asOf: Timestamp(rawValue: 1001)))
         #expect(event.isExpired(asOf: Timestamp(rawValue: 1000)))
         #expect(!event.isExpired(asOf: Timestamp(rawValue: 999)))
@@ -56,8 +56,8 @@ struct NIP40ExpirationTests {
 
     @Test("an event without an expiration tag never expires")
     func noExpirationNeverExpires() throws {
-        let signer = EventSigner(keyPair: try KeyPair())
-        let event = try signer.sign(.textNote("gm"))
+        let signer = EventSigner(keyPair: KeyPair())
+        let event = signer.sign(.textNote("gm"))
         #expect(!event.isExpired(asOf: Timestamp(rawValue: 9_999_999_999)))
     }
 
@@ -65,8 +65,8 @@ struct NIP40ExpirationTests {
 
     @Test("a disappearing DM carries the expiration on the gift wrap, not the rumor")
     func dmGiftWrapCarriesExpiration() async throws {
-        let sender = try KeyPair()
-        let recipient = try KeyPair()
+        let sender = KeyPair()
+        let recipient = KeyPair()
         let expiry = Timestamp(rawValue: 1_700_000_000)
 
         let builder = DirectMessageBuilder(signer: EventSigner(keyPair: sender))
@@ -82,8 +82,8 @@ struct NIP40ExpirationTests {
 
     @Test("a received disappearing DM exposes its expiration")
     func parsedDMExposesExpiration() async throws {
-        let sender = try KeyPair()
-        let recipient = try KeyPair()
+        let sender = KeyPair()
+        let recipient = KeyPair()
         let expiry = Timestamp(rawValue: 1_700_000_000)
 
         let builder = DirectMessageBuilder(signer: EventSigner(keyPair: sender))
@@ -98,8 +98,8 @@ struct NIP40ExpirationTests {
 
     @Test("a received DM keeps the rumor's created_at and an expiration beyond Date's range exactly")
     func parsedDMKeepsTimestampsExactly() async throws {
-        let sender = try KeyPair()
-        let recipient = try KeyPair()
+        let sender = KeyPair()
+        let recipient = KeyPair()
         let expiry = Timestamp(rawValue: .max)
 
         let builder = DirectMessageBuilder(signer: EventSigner(keyPair: sender))
@@ -116,8 +116,8 @@ struct NIP40ExpirationTests {
 
     @Test("a normal DM has no expiration")
     func normalDMHasNoExpiration() async throws {
-        let sender = try KeyPair()
-        let recipient = try KeyPair()
+        let sender = KeyPair()
+        let recipient = KeyPair()
 
         let builder = DirectMessageBuilder(signer: EventSigner(keyPair: sender))
         let result = try await builder.createMessageWithSelfCopy(content: "hi", to: recipient.publicKey)

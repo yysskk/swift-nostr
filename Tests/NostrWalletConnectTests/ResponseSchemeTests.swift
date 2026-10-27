@@ -16,8 +16,8 @@ struct ResponseSchemeTests {
     ) throws -> (
         connection: WalletConnection, transport: FakeWalletConnectTransport, client: KeyPair, wallet: KeyPair
     ) {
-        let wallet = try KeyPair()
-        let client = try KeyPair()
+        let wallet = KeyPair()
+        let client = KeyPair()
         let transport = FakeWalletConnectTransport()
         let connection = WalletConnection(
             uri: try NWCFixtures.uri(wallet: wallet, client: client),
@@ -124,7 +124,7 @@ struct ResponseSchemeTests {
     @Test("a response from another public key is ignored")
     func responseFromAnotherPublicKeyIsIgnored() async throws {
         let (connection, transport, client, _) = try makeConnection(timeout: .milliseconds(300))
-        let impostor = try KeyPair()
+        let impostor = KeyPair()
 
         let payment = Task { try await connection.payInvoice("lnbc1") }
 

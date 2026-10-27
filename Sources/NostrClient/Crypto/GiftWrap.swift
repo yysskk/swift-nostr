@@ -54,7 +54,7 @@ public struct GiftWrap: Sendable {
         let sealJSON = try encodeSeal(seal)
 
         // 3. Create gift wrap (encrypt seal with an ephemeral key, which hides the sender)
-        let ephemeralSigner = EventSigner(keyPair: try KeyPair())
+        let ephemeralSigner = EventSigner(keyPair: KeyPair())
 
         var wrapTags: [Tag] = [.publicKey(recipientPublicKey)]
         if let expiration {
@@ -169,7 +169,7 @@ public struct GiftWrap: Sendable {
             content: rumor.content
         )
 
-        guard rumor.id == (try unsigned.computedID) else {
+        guard rumor.id == unsigned.computedID else {
             throw Error.invalidRumorID
         }
 

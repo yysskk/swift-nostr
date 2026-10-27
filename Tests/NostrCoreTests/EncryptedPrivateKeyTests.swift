@@ -83,7 +83,7 @@ struct EncryptedPrivateKeyTests {
 
     @Test("KeyPair round trip preserves the public key")
     func keyPairRoundTripPreservesPublicKey() throws {
-        let keyPair = try KeyPair()
+        let keyPair = KeyPair()
 
         let encrypted = try keyPair.encryptedPrivateKey(password: "hunter2")
         let recovered = try KeyPair(ncryptsec: encrypted.ncryptsec, password: "hunter2")
@@ -147,8 +147,19 @@ struct EncryptedPrivateKeyTests {
 
     @Test("Encrypting rejects a key that is not 32 bytes")
     func encryptRejectsWrongKeyLength() {
-        #expect(throws: KeyPair.Error.invalidLength(31)) {
+        #expect(throws: EncryptedPrivateKey.Error.invalidPrivateKeyLength(31)) {
             try EncryptedPrivateKey.encrypt(privateKey: Data(repeating: 0, count: 31), password: "x")
+        }
+    }
+
+    @Test("A keypair is not created from an ncryptsec holding an invalid scalar")
+    func keyPairRejectsInvalidScalar() throws {
+        // NIP-49 round-trips any 32 bytes, including zero, which is not a valid secp256k1 key.
+        let encrypted = try EncryptedPrivateKey.encrypt(privateKey: Data(repeating: 0, count: 32), password: "x")
+
+        #expect(try encrypted.decrypt(password: "x") == Data(repeating: 0, count: 32))
+        #expect(throws: EncryptedPrivateKey.Error.invalidPrivateKey) {
+            _ = try KeyPair(ncryptsec: encrypted.ncryptsec, password: "x")
         }
     }
 
@@ -167,7 +178,7 @@ struct EncryptedPrivateKeyTests {
     @Test("Parsing rejects a non-ncryptsec prefix")
     func rejectsWrongPrefix() throws {
         // A valid nsec bech32 string carries the wrong HRP.
-        let nsec = try KeyPair().nsec
+        let nsec = KeyPair().nsec
 
         #expect(throws: EncryptedPrivateKey.Error.malformedPayload) {
             try EncryptedPrivateKey(ncryptsec: nsec)

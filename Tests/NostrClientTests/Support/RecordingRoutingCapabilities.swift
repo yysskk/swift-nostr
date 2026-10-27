@@ -72,7 +72,7 @@ actor RecordingRoutingCapabilities: NostrRelayRouting {
     func publishRelayList(_ relayList: RelayListMetadata, strategy: PublishStrategy?) async throws -> PublishedEvent {
         relayListPublishes.append(RelayListPublish(relayList: relayList, strategy: strategy))
         return PublishedEvent(
-            event: try signer.sign(.relayListMetadata(relayList)), result: PublishResult(statuses: [:]))
+            event: signer.sign(.relayListMetadata(relayList)), result: PublishResult(statuses: [:]))
     }
 
     func subscribeOutbox(authors: [PublicKey], kinds: [Event.Kind], limit: Int?) async throws -> SubscriptionSequence {
@@ -105,7 +105,7 @@ actor RecordingRoutingCapabilities: NostrRelayRouting {
     ) async throws -> PublishedEvent {
         directMessageRelayListPublishes.append(DirectMessageRelayListPublish(relayList: relayList, strategy: strategy))
         return PublishedEvent(
-            event: try signer.sign(.directMessageRelayList(relayList)), result: PublishResult(statuses: [:]))
+            event: signer.sign(.directMessageRelayList(relayList)), result: PublishResult(statuses: [:]))
     }
 
     func connectDirectMessageInboxRelays() async throws -> Set<RelayURL> {

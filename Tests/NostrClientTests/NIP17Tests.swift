@@ -11,8 +11,8 @@ struct NIP17Tests {
 
     @Test("NIP-44 seal and open message")
     func nip44SealOpen() throws {
-        let alice = try KeyPair()
-        let bob = try KeyPair()
+        let alice = KeyPair()
+        let bob = KeyPair()
 
         let originalMessage = "Hello, Bob! This is a private message."
 
@@ -30,8 +30,8 @@ struct NIP17Tests {
 
     @Test("NIP-44 sender can open own message")
     func nip44SenderOpen() throws {
-        let alice = try KeyPair()
-        let bob = try KeyPair()
+        let alice = KeyPair()
+        let bob = KeyPair()
 
         let originalMessage = "Hello, Bob!"
 
@@ -45,8 +45,8 @@ struct NIP17Tests {
 
     @Test("NIP-44 with special characters")
     func nip44SpecialCharacters() throws {
-        let alice = try KeyPair()
-        let bob = try KeyPair()
+        let alice = KeyPair()
+        let bob = KeyPair()
 
         let originalMessage = "Hello! 🎉 Special: <>&\"'日本語中文한국어"
 
@@ -58,8 +58,8 @@ struct NIP17Tests {
 
     @Test("NIP-44 with long message")
     func nip44LongMessage() throws {
-        let alice = try KeyPair()
-        let bob = try KeyPair()
+        let alice = KeyPair()
+        let bob = KeyPair()
 
         let originalMessage = String(repeating: "A", count: 10000)
 
@@ -71,8 +71,8 @@ struct NIP17Tests {
 
     @Test("NIP-44 version check")
     func nip44VersionCheck() throws {
-        let alice = try KeyPair()
-        let bob = try KeyPair()
+        let alice = KeyPair()
+        let bob = KeyPair()
 
         let sealed = try SealedMessage.seal("test", for: bob.publicKey, using: alice)
         let payload = Data(base64Encoded: sealed.payload)!
@@ -85,12 +85,12 @@ struct NIP17Tests {
 
     @Test("Gift wrap and unwrap")
     func giftWrapUnwrap() async throws {
-        let alice = try KeyPair()
-        let bob = try KeyPair()
+        let alice = KeyPair()
+        let bob = KeyPair()
 
         // Create a simple event
         let signer = EventSigner(keyPair: alice)
-        let originalEvent = try signer.sign(.textNote("Secret message"))
+        let originalEvent = signer.sign(.textNote("Secret message"))
 
         // Alice wraps the event for Bob
         let wrapped = try await GiftWrap.wrap(
@@ -115,11 +115,11 @@ struct NIP17Tests {
 
     @Test("Gift wrap uses ephemeral key")
     func giftWrapEphemeralKey() async throws {
-        let alice = try KeyPair()
-        let bob = try KeyPair()
+        let alice = KeyPair()
+        let bob = KeyPair()
 
         let signer = EventSigner(keyPair: alice)
-        let event = try signer.sign(.textNote("Test"))
+        let event = signer.sign(.textNote("Test"))
 
         let wrapped = try await GiftWrap.wrap(
             event: event,
@@ -135,8 +135,8 @@ struct NIP17Tests {
 
     @Test("Create and parse direct message")
     func directMessageRoundTrip() async throws {
-        let alice = try KeyPair()
-        let bob = try KeyPair()
+        let alice = KeyPair()
+        let bob = KeyPair()
 
         let builder = DirectMessageBuilder(signer: EventSigner(keyPair: alice))
         let giftWrap = try await builder.createMessageWithSelfCopy(
@@ -159,8 +159,8 @@ struct NIP17Tests {
 
     @Test("Direct message with reply")
     func directMessageReply() async throws {
-        let alice = try KeyPair()
-        let bob = try KeyPair()
+        let alice = KeyPair()
+        let bob = KeyPair()
 
         let builder = DirectMessageBuilder(signer: EventSigner(keyPair: alice))
 
@@ -190,9 +190,9 @@ struct NIP17Tests {
 
     @Test("Group message creates multiple gift wraps")
     func groupMessage() async throws {
-        let alice = try KeyPair()
-        let bob = try KeyPair()
-        let charlie = try KeyPair()
+        let alice = KeyPair()
+        let bob = KeyPair()
+        let charlie = KeyPair()
 
         let builder = DirectMessageBuilder(signer: EventSigner(keyPair: alice))
         let giftWraps = try await builder.createGroupMessage(
@@ -224,8 +224,8 @@ struct NIP17Tests {
 
     @Test("Self-copy shares one unsigned rumor across both gift wraps")
     func selfCopySharesRumor() async throws {
-        let alice = try KeyPair()
-        let bob = try KeyPair()
+        let alice = KeyPair()
+        let bob = KeyPair()
 
         let builder = DirectMessageBuilder(signer: EventSigner(keyPair: alice))
         let result = try await builder.createMessageWithSelfCopy(
@@ -258,9 +258,9 @@ struct NIP17Tests {
 
     @Test("A message whose p tag is not a canonical hex key is rejected")
     func messageWithMalformedRecipientRejected() async throws {
-        let alice = try KeyPair()
-        let bob = try KeyPair()
-        let rumor = try UnsignedEvent(
+        let alice = KeyPair()
+        let bob = KeyPair()
+        let rumor = UnsignedEvent(
             publicKey: alice.publicKey, kind: .privateDirectMessage,
             rawTags: [["p", bob.publicKey.hex.uppercased()]], content: "hi"
         ).asRumor()
@@ -274,9 +274,9 @@ struct NIP17Tests {
 
     @Test("A reply marker whose event id is not canonical hex leaves replyTo nil")
     func messageWithMalformedReplyMarker() async throws {
-        let alice = try KeyPair()
-        let bob = try KeyPair()
-        let rumor = try UnsignedEvent(
+        let alice = KeyPair()
+        let bob = KeyPair()
+        let rumor = UnsignedEvent(
             publicKey: alice.publicKey, kind: .privateDirectMessage,
             rawTags: [["p", bob.publicKey.hex], ["e", "not-an-id", "", "reply"]], content: "hi"
         ).asRumor()
@@ -292,8 +292,8 @@ struct NIP17Tests {
 
     @Test("Self-copy parses identically for sender and recipient")
     func selfCopyParsesOnBothSides() async throws {
-        let alice = try KeyPair()
-        let bob = try KeyPair()
+        let alice = KeyPair()
+        let bob = KeyPair()
 
         let builder = DirectMessageBuilder(signer: EventSigner(keyPair: alice))
         let result = try await builder.createMessageWithSelfCopy(
@@ -319,7 +319,7 @@ struct NIP17Tests {
 
     @Test("Rumor id matches the id the signing path would produce")
     func rumorIDMatchesSignedID() throws {
-        let alice = try KeyPair()
+        let alice = KeyPair()
 
         let unsigned = UnsignedEvent(
             publicKey: alice.publicKey,
@@ -329,7 +329,7 @@ struct NIP17Tests {
             content: "id derivation check"
         )
 
-        let rumor = try unsigned.asRumor()
+        let rumor = unsigned.asRumor()
         let signed = try EventSigner(keyPair: alice).sign(unsigned)
 
         // The id derives from the serialized content only, never the signature
@@ -340,8 +340,8 @@ struct NIP17Tests {
 
     @Test("Group message rumor is unsigned")
     func groupMessageRumorIsUnsigned() async throws {
-        let alice = try KeyPair()
-        let bob = try KeyPair()
+        let alice = KeyPair()
+        let bob = KeyPair()
 
         let builder = DirectMessageBuilder(signer: EventSigner(keyPair: alice))
         let giftWraps = try await builder.createGroupMessage(
@@ -355,8 +355,8 @@ struct NIP17Tests {
 
     @Test("DirectMessage properties")
     func directMessageProperties() async throws {
-        let alice = try KeyPair()
-        let bob = try KeyPair()
+        let alice = KeyPair()
+        let bob = KeyPair()
 
         let builder = DirectMessageBuilder(signer: EventSigner(keyPair: alice))
         let giftWrap = try await builder.createMessageWithSelfCopy(
@@ -374,12 +374,12 @@ struct NIP17Tests {
 
     @Test("Invalid gift wrap kind throws error")
     func invalidGiftWrapKind() async throws {
-        let alice = try KeyPair()
-        let bob = try KeyPair()
+        let alice = KeyPair()
+        let bob = KeyPair()
 
         // Create a regular text note (not a gift wrap)
         let signer = EventSigner(keyPair: alice)
-        let textNote = try signer.sign(.textNote("Not a gift wrap"))
+        let textNote = signer.sign(.textNote("Not a gift wrap"))
 
         let parser = DirectMessageParser(signer: EventSigner(keyPair: bob))
 
@@ -390,9 +390,9 @@ struct NIP17Tests {
 
     @Test("parsePayload rejects a rumor that is not a message, reaction, or file")
     func parsePayloadRejectsOtherKinds() async throws {
-        let alice = try KeyPair()
-        let bob = try KeyPair()
-        let rumor = try UnsignedEvent(publicKey: alice.publicKey, kind: .textNote, content: "hi").asRumor()
+        let alice = KeyPair()
+        let bob = KeyPair()
+        let rumor = UnsignedEvent(publicKey: alice.publicKey, kind: .textNote, content: "hi").asRumor()
         let giftWrap = try await GiftWrap.wrap(
             event: rumor, signer: EventSigner(keyPair: alice), recipientPublicKey: bob.publicKey)
 

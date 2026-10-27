@@ -18,9 +18,9 @@ struct ZapPaymentTests {
 
     @Test("payZap fetches the invoice and pays it, returning the preimage")
     func payZapCompletes() async throws {
-        let wallet = try KeyPair()
-        let client = try KeyPair()
-        let zapSigner = EventSigner(keyPair: try KeyPair())
+        let wallet = KeyPair()
+        let client = KeyPair()
+        let zapSigner = EventSigner(keyPair: KeyPair())
         let transport = FakeWalletConnectTransport()
         let connection = WalletConnection(
             uri: try NWCFixtures.uri(wallet: wallet, client: client),
@@ -58,9 +58,9 @@ struct ZapPaymentTests {
 
     @Test("payZap propagates a wallet payment error after fetching the invoice")
     func payZapPropagatesWalletError() async throws {
-        let wallet = try KeyPair()
-        let client = try KeyPair()
-        let zapSigner = EventSigner(keyPair: try KeyPair())
+        let wallet = KeyPair()
+        let client = KeyPair()
+        let zapSigner = EventSigner(keyPair: KeyPair())
         let transport = FakeWalletConnectTransport()
         let connection = WalletConnection(
             uri: try NWCFixtures.uri(wallet: wallet, client: client),
@@ -98,9 +98,9 @@ struct ZapPaymentTests {
 
     @Test("payZap rejects an out-of-range amount before sending any wallet request")
     func payZapRejectsOutOfRange() async throws {
-        let wallet = try KeyPair()
-        let client = try KeyPair()
-        let zapSigner = EventSigner(keyPair: try KeyPair())
+        let wallet = KeyPair()
+        let client = KeyPair()
+        let zapSigner = EventSigner(keyPair: KeyPair())
         let transport = FakeWalletConnectTransport()
         let connection = WalletConnection(
             uri: try NWCFixtures.uri(wallet: wallet, client: client), transport: transport)

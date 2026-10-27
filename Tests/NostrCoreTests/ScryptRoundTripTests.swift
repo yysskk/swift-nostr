@@ -50,7 +50,7 @@ struct ScryptRoundTripTests {
                 privateKey: privateKey, password: password, logN: 14, maximumLogN: 0)
         }
 
-        let keyPair = try KeyPair()
+        let keyPair = KeyPair()
         #expect(throws: EncryptedPrivateKey.Error.unsupportedScryptCost(0)) {
             _ = try keyPair.encryptedPrivateKey(password: password, logN: 14, maximumLogN: 0)
         }
@@ -72,7 +72,7 @@ struct ScryptRoundTripTests {
 
     @Test("the KeyPair convenience carries the same cap")
     func keyPairConvenienceRoundTrips() throws {
-        let keyPair = try KeyPair()
+        let keyPair = KeyPair()
         let encrypted = try keyPair.encryptedPrivateKey(password: password, logN: 14)
 
         #expect(try KeyPair(ncryptsec: encrypted.ncryptsec, password: password).privateKeyHex == keyPair.privateKeyHex)

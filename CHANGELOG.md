@@ -142,6 +142,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `InternetIdentifier.verify(_:)`, `verify(_:expectedPublicKey:)`, `lookupPublicKey(_:)`,
   `lookupRelays(_:)`, and `String.verifyAsInternetIdentifier()` /
   `verifyAsInternetIdentifier(expectedPublicKey:)` are `async throws(InternetIdentifier.VerificationError)`.
+- **APIs that cannot fail no longer throw, and more APIs use typed throws** (breaking): `KeyPair()`,
+  `UnsignedEvent.serializedForHashing()`, `computedID`, and `asRumor()`, `EventSigner.sign(_:)` for an
+  `EventTemplate`, `ClientMessage.serialize()`, `EventTemplate.repost(of:relayURL:)`, and
+  `EncryptedFile.encrypt(_:)` no longer throw, so callers drop `try`. `EventSigner.sign(_:)` for an
+  `UnsignedEvent` is `throws(EventSigner.Error)` and `HTTPAuth.authorizationHeaderValue(for:)` is
+  `throws(HTTPAuth.AuthorizationError)`. `KeyPair(mnemonicPhrase:passphrase:account:)` and
+  `KeyPair.generate(wordCount:passphrase:)` are `throws(KeyPair.Error)`, wrapping a bad phrase or word
+  count in the new `KeyPair.Error.invalidMnemonic(Mnemonic.Error)`. `EncryptedPrivateKey.encrypt`,
+  `decrypt(password:maximumLogN:)`, `KeyPair.encryptedPrivateKey(password:logN:keySecurity:maximumLogN:)`,
+  and `KeyPair(ncryptsec:password:maximumLogN:)` are `throws(EncryptedPrivateKey.Error)`, which gains
+  `invalidPrivateKeyLength(Int)`, `keyDerivationFailed`, and `invalidPrivateKey` (for a decrypted key
+  that is not a valid secp256k1 scalar). `serializedForHashing()` writes the NIP-01 serialization
+  itself instead of through `JSONSerialization`, with the same bytes on every platform.
 - **Bech32, key, mnemonic, and NIP-49 failures have their own error types** (breaking): each
   domain throws a nested `Error` with typed throws, so callers can branch on why parsing failed.
   `Bech32.encode/decode/decodeToWords` throw `Bech32.Error` (`invalidHumanReadablePart`, `mixedCase`,
@@ -157,7 +170,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `invalidMnemonicWord` (`unknownWord`), and `invalidMnemonicChecksum` (`invalidChecksum`).
   `EncryptedPrivateKey.Error` replaces `invalidNcryptsec` (`malformedPayload`), `unsupportedScryptCost`,
   and NIP-49's `decryptionFailed`; encrypting a key that is not 32 bytes throws
-  `KeyPair.Error.invalidLength`. `LNURL.decode(_:)` throws `LNURL.Error` (`invalidBech32`,
+  `EncryptedPrivateKey.Error.invalidPrivateKeyLength(Int)`. `LNURL.decode(_:)` throws `LNURL.Error` (`invalidBech32`,
   `unexpectedPrefix`, `invalidURL`). `KeyPair.nsec` and `LNURL.encode(_:)` no longer throw.
   Secure random bytes come from `SystemRandomNumberGenerator` on every platform, so
   `NostrError.randomGenerationFailed` is gone with the other replaced cases.

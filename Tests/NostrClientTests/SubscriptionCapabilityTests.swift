@@ -14,7 +14,7 @@ struct SubscriptionCapabilityTests {
     private let relayB = RelayURL("wss://b.example.com")!
 
     private func note(_ content: String) throws -> Event {
-        try EventSigner(keyPair: try KeyPair()).sign(.textNote(content))
+        EventSigner(keyPair: KeyPair()).sign(.textNote(content))
     }
 
     /// The one subscribe the stub recorded.

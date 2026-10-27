@@ -63,9 +63,9 @@ struct DirectMessageSequenceTests {
 
     @Test("yields parsed messages and skips unparseable items")
     func yieldsParsedMessagesAndSkipsUnparseable() async throws {
-        let alice = try KeyPair()
-        let bob = try KeyPair()
-        let carol = try KeyPair()
+        let alice = KeyPair()
+        let bob = KeyPair()
+        let carol = KeyPair()
 
         // A message addressed to Bob, one addressed to Carol (undecryptable by
         // Bob), a plain text note, and a notice — only Bob's DM should emerge.
@@ -73,7 +73,7 @@ struct DirectMessageSequenceTests {
             .createMessageWithSelfCopy(content: "hi bob", to: bob.publicKey, subject: "greetings")
         let toCarol = try await DirectMessageBuilder(signer: EventSigner(keyPair: alice))
             .createMessageWithSelfCopy(content: "hi carol", to: carol.publicKey)
-        let plainNote = try EventSigner(keyPair: alice).sign(.textNote("public note"))
+        let plainNote = EventSigner(keyPair: alice).sign(.textNote("public note"))
 
         let sequence = makeSequence(
             items: [
@@ -101,8 +101,8 @@ struct DirectMessageSequenceTests {
 
     @Test("a signer that cannot attempt the read throws instead of dropping the message")
     func signerFailureThrowsRatherThanSkipping() async throws {
-        let alice = try KeyPair()
-        let bob = try KeyPair()
+        let alice = KeyPair()
+        let bob = KeyPair()
 
         // A message genuinely addressed to Bob. Bob's signer is unreachable, so the failure says
         // nothing about the event — treating it like a foreign wrap would consume the message from
@@ -124,8 +124,8 @@ struct DirectMessageSequenceTests {
 
     @Test("payloads surface a signer failure the same way")
     func payloadSignerFailureThrows() async throws {
-        let alice = try KeyPair()
-        let bob = try KeyPair()
+        let alice = KeyPair()
+        let bob = KeyPair()
 
         let toBob = try await DirectMessageBuilder(signer: EventSigner(keyPair: alice))
             .createMessageWithSelfCopy(content: "hi bob", to: bob.publicKey)
@@ -148,9 +148,9 @@ struct DirectMessageSequenceTests {
 
     @Test("a gift wrap sealed to someone else is skipped, and later messages still arrive")
     func foreignGiftWrapSkippedWithoutEndingTheStream() async throws {
-        let alice = try KeyPair()
-        let bob = try KeyPair()
-        let carol = try KeyPair()
+        let alice = KeyPair()
+        let bob = KeyPair()
+        let carol = KeyPair()
 
         let toCarol = try await DirectMessageBuilder(signer: EventSigner(keyPair: alice))
             .createMessageWithSelfCopy(content: "hi carol", to: carol.publicKey)
@@ -177,7 +177,7 @@ struct DirectMessageSequenceTests {
 
     @Test("exposes id, expectedRelays, and close")
     func exposesMetadata() async throws {
-        let bob = try KeyPair()
+        let bob = KeyPair()
         let sequence = makeSequence(items: [], recipient: bob)
         #expect(sequence.id == "sub_test")
         #expect(sequence.expectedRelays == [relayURL])

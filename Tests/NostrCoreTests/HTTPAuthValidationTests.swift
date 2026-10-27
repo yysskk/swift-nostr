@@ -14,10 +14,10 @@ struct HTTPAuthValidationTests {
         payload: Data? = nil,
         createdAt: Timestamp = Timestamp(rawValue: 1_700_000_000)
     ) throws -> (header: String, now: Timestamp, signer: EventSigner) {
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
         var template = EventTemplate.httpAuthorization(url: url, method: method, payload: payload)
         template.createdAt = createdAt
-        let header = try HTTPAuth.authorizationHeaderValue(for: try signer.sign(template))
+        let header = try HTTPAuth.authorizationHeaderValue(for: signer.sign(template))
         return (header, createdAt, signer)
     }
 
@@ -181,7 +181,7 @@ struct HTTPAuthValidationTests {
 
     @Test("an event of the wrong kind is rejected")
     func wrongKind() throws {
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
         let note = try signer.sign(
             UnsignedEvent(publicKey: signer.publicKey, kind: .textNote, content: ""))
 

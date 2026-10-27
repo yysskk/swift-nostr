@@ -20,7 +20,7 @@ If you need the higher-level client (relay pool, gossip routing, direct messages
 ```swift
 import NostrCore
 
-let keyPair = try KeyPair()                  // new random keypair
+let keyPair = KeyPair()                  // new random keypair
 print(keyPair.publicKey.npub, keyPair.nsec)
 
 let imported = try KeyPair(nsec: "nsec1...")
@@ -54,12 +54,12 @@ An ``EventTemplate`` holds what you decide about an event — its kind, tags, co
 ```swift
 let signer = EventSigner(keyPair: keyPair)
 
-let note = try signer.sign(.textNote("Hello, Nostr!"))
-let reaction = try signer.sign(.reaction(to: note, content: "🤙"))
-let reply = try signer.sign(.reply(to: note, content: "gm to you too"))  // NIP-10 threading
+let note = signer.sign(.textNote("Hello, Nostr!"))
+let reaction = signer.sign(.reaction(to: note, content: "🤙"))
+let reply = signer.sign(.reply(to: note, content: "gm to you too"))  // NIP-10 threading
 
 // Or build any event yourself. Tags that reference an event or a key take the typed value.
-let custom = try signer.sign(
+let custom = signer.sign(
     EventTemplate(
         kind: .textNote,
         tags: [.event(note.id, marker: .reply), .publicKey(note.publicKey)],
@@ -75,7 +75,7 @@ A template's properties are mutable, so a factory's result can be adjusted befor
 ```swift
 var expiring = EventTemplate.textNote("gone in an hour")
 expiring.tags.append(.expiration(.now.advanced(by: .seconds(3600))))
-let event = try signer.sign(expiring)
+let event = signer.sign(expiring)
 ```
 
 Templates work with any ``NostrSigning``, including a remote NIP-46 signer, through ``NostrSigning/sign(_:)-(EventTemplate)``; ``NostrSigning/sign(_:proofOfWork:)`` mines one to a NIP-13 difficulty before signing it:

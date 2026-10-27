@@ -29,7 +29,7 @@ Or add via Xcode: File > Add Package Dependencies > Enter the repository URL.
 import NostrClient
 
 // Generate a random keypair
-let keyPair = try KeyPair()
+let keyPair = KeyPair()
 print("npub: \(keyPair.publicKey.npub)")
 print("nsec: \(keyPair.nsec)")
 

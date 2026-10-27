@@ -20,7 +20,7 @@ struct EventCapabilityTests {
         cannedCount: Int = 0
     ) throws -> RecordingEventCapabilities {
         RecordingEventCapabilities(
-            signer: EventSigner(keyPair: try KeyPair()),
+            signer: EventSigner(keyPair: KeyPair()),
             pooledRelays: pooledRelays,
             cannedEvents: cannedEvents,
             cannedCount: cannedCount,
@@ -29,7 +29,7 @@ struct EventCapabilityTests {
     }
 
     private func note(_ content: String = "parent") throws -> Event {
-        try EventSigner(keyPair: try KeyPair()).sign(.textNote(content))
+        EventSigner(keyPair: KeyPair()).sign(.textNote(content))
     }
 
     /// `event` with its content altered but its id and signature kept — a copy that no longer verifies.
@@ -358,8 +358,8 @@ struct EventCapabilityTests {
 
     @Test("fetchMetadata keeps the newest profile the named key signed")
     func fetchMetadataSelectsTheNewestOwnProfile() async throws {
-        let author = EventSigner(keyPair: try KeyPair())
-        let stranger = EventSigner(keyPair: try KeyPair())
+        let author = EventSigner(keyPair: KeyPair())
+        let stranger = EventSigner(keyPair: KeyPair())
         var older = try EventTemplate.metadata(UserMetadata(name: "Old"))
         older.createdAt = Timestamp(rawValue: 1_700_000_000)
         var newer = try EventTemplate.metadata(UserMetadata(name: "New"))
@@ -367,7 +367,7 @@ struct EventCapabilityTests {
         var impostor = try EventTemplate.metadata(UserMetadata(name: "Impostor"))
         impostor.createdAt = Timestamp(rawValue: 1_800_000_000)
         let stub = try makeStub(cannedEvents: [
-            try author.sign(older), try stranger.sign(impostor), try author.sign(newer),
+            author.sign(older), stranger.sign(impostor), author.sign(newer),
         ])
 
         let metadata = try await stub.fetchMetadata(publicKey: author.publicKey)
@@ -381,9 +381,9 @@ struct EventCapabilityTests {
 
     @Test("fetchLongFormContent by author and identifier filters on both and keeps the matching article")
     func fetchLongFormContentByAuthor() async throws {
-        let author = EventSigner(keyPair: try KeyPair())
-        let wanted = try author.sign(.longFormContent(LongFormContent(identifier: "essay", title: "Wanted")))
-        let otherIdentifier = try author.sign(
+        let author = EventSigner(keyPair: KeyPair())
+        let wanted = author.sign(.longFormContent(LongFormContent(identifier: "essay", title: "Wanted")))
+        let otherIdentifier = author.sign(
             .longFormContent(LongFormContent(identifier: "other", title: "Other")))
         let stub = try makeStub(cannedEvents: [otherIdentifier, wanted])
 
@@ -401,9 +401,9 @@ struct EventCapabilityTests {
 
     @Test("fetchLongFormContent(naddr:) queries the coordinate's relay hints when the pool has one")
     func fetchByNAddrUsesPooledHints() async throws {
-        let author = EventSigner(keyPair: try KeyPair())
+        let author = EventSigner(keyPair: KeyPair())
         let article = LongFormContent(identifier: "essay", title: "Hinted")
-        let stored = try author.sign(.longFormContent(article))
+        let stored = author.sign(.longFormContent(article))
         let stub = try makeStub(pooledRelays: [relayA], cannedEvents: [stored])
         let naddr = try article.naddr(author: author.publicKey, relays: [relayA, relayB])
 
@@ -421,9 +421,9 @@ struct EventCapabilityTests {
 
     @Test("fetchLongFormContent(naddr:) falls back to the whole pool when no hint is in it")
     func fetchByNAddrFallsBackWhenNoHintIsPooled() async throws {
-        let author = EventSigner(keyPair: try KeyPair())
+        let author = EventSigner(keyPair: KeyPair())
         let article = LongFormContent(identifier: "essay", title: "Fallback")
-        let stored = try author.sign(.longFormContent(article))
+        let stored = author.sign(.longFormContent(article))
         let stub = try makeStub(pooledRelays: [relayA], cannedEvents: [stored])
         let naddr = try article.naddr(author: author.publicKey, relays: [relayB])
 
@@ -438,12 +438,12 @@ struct EventCapabilityTests {
 
     @Test("fetchLongFormContent(naddr:) without hints queries the whole pool")
     func fetchByNAddrWithoutHintsBroadcasts() async throws {
-        let author = EventSigner(keyPair: try KeyPair())
+        let author = EventSigner(keyPair: KeyPair())
         let article = LongFormContent(identifier: "essay", title: "Unhinted")
         // A draft under the same identifier is another kind, so the coordinate does not select it.
-        let draft = try author.sign(
+        let draft = author.sign(
             .longFormContent(LongFormContent(identifier: "essay", title: "Draft"), draft: true))
-        let stub = try makeStub(cannedEvents: [draft, try author.sign(.longFormContent(article))])
+        let stub = try makeStub(cannedEvents: [draft, author.sign(.longFormContent(article))])
         let naddr = try article.naddr(author: author.publicKey)
 
         let fetched = try await stub.fetchLongFormContent(naddr: naddr)

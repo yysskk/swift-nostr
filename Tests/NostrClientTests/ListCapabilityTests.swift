@@ -15,7 +15,7 @@ struct ListCapabilityTests {
     private let other = PublicKey.fixture("other")
 
     init() throws {
-        signer = EventSigner(keyPair: try KeyPair())
+        signer = EventSigner(keyPair: KeyPair())
     }
 
     private func makeStub(cannedSet: NostrListSet? = nil) -> RecordingListCapabilities {

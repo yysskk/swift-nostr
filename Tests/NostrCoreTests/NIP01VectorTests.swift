@@ -314,10 +314,10 @@ struct NIP01VectorTests {
             content: vector.content
         )
 
-        let serialized = try unsigned.serializedForHashing()
+        let serialized = unsigned.serializedForHashing()
 
         #expect(String(decoding: serialized, as: UTF8.self) == vector.expectedSerialization)
-        #expect(try unsigned.computedID.hex == vector.expectedID)
+        #expect(unsigned.computedID.hex == vector.expectedID)
     }
 
     /// Non-ASCII text is emitted as raw UTF-8, never as `\uXXXX` escapes, and surrogate
@@ -352,8 +352,8 @@ struct NIP01VectorTests {
                 + "9cace8aa9e225d5d2c2268c3a96c6c6f2077c3b6726c6420e697a5e69cace8aa9e20f09f9a8020636166c3a9225d"
         )!
 
-        #expect(try unsigned.serializedForHashing() == expectedSerialization)
-        #expect(try unsigned.computedID.hex == "273f93418df624cc93bc4d241e7c0b979797af75a38988ad38bb4d8ba199352b")
+        #expect(unsigned.serializedForHashing() == expectedSerialization)
+        #expect(unsigned.computedID.hex == "273f93418df624cc93bc4d241e7c0b979797af75a38988ad38bb4d8ba199352b")
     }
 
     /// NIP-01's text mandates only the seven two-character escapes and says every other
@@ -373,13 +373,38 @@ struct NIP01VectorTests {
             content: "ctrl:\u{01}\u{1B}!"
         )
 
-        let serialized = try unsigned.serializedForHashing()
+        let serialized = unsigned.serializedForHashing()
         let expectedSerialization =
             #"[0,"79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798","#
             + #"1700000000,1,[],"ctrl:\u0001\u001b!"]"#
 
         #expect(String(decoding: serialized, as: UTF8.self) == expectedSerialization)
-        #expect(try unsigned.computedID.hex == "25afcde11dc0bae511ce9811b35c7d5a59066aa0df373ffdd059849885583440")
+        #expect(unsigned.computedID.hex == "25afcde11dc0bae511ce9811b35c7d5a59066aa0df373ffdd059849885583440")
+    }
+
+    /// Only C0 controls are escaped: DEL (U+007F) and the line and paragraph separators
+    /// (U+2028, U+2029) are written verbatim, as `JSON.stringify`, Python's `json`, and
+    /// `serde_json` all do. The separators are given as escapes so this file stays readable.
+    @Test("del and unicode line separators serialize verbatim")
+    func delAndLineSeparatorsSerializeVerbatim() throws {
+        let unsigned = UnsignedEvent(
+            publicKey: try PublicKey(hex: Self.publicKey1),
+            createdAt: Self.timestamp,
+            kind: 1,
+            rawTags: [["t", "a\u{2028}b"]],
+            content: "del:\u{7F} ls:\u{2028} ps:\u{2029} /"
+        )
+
+        // [0,"79be…1798",1700000000,1,[["t","a<U+2028>b"]],"del:<DEL> ls:<U+2028> ps:<U+2029> /"]
+        let expectedSerialization = Data(
+            hexString:
+                "5b302c2237396265363637656639646362626163353561303632393563653837306230373032396266636462326463"
+                + "653238643935396632383135623136663831373938222c313730303030303030302c312c5b5b2274222c2261e280a8"
+                + "62225d5d2c2264656c3a7f206c733ae280a82070733ae280a9202f225d"
+        )!
+
+        #expect(unsigned.serializedForHashing() == expectedSerialization)
+        #expect(unsigned.computedID.hex == "1bdc7147214573b23e3742f56e8c24904dceb19263ac8acb53d3c12cccef6418")
     }
 
     /// Cross-implementation signature check. These signatures cannot be reproduced by signing
@@ -412,7 +437,7 @@ struct NIP01VectorTests {
             content: tamperedContent
         )
 
-        #expect(try tamperedUnsigned.computedID.hex != vector.id)
+        #expect(tamperedUnsigned.computedID.hex != vector.id)
         #expect(throws: Event.VerificationError.idMismatch) {
             try vector.event(content: tamperedContent).verify()
         }
