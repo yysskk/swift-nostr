@@ -211,6 +211,34 @@ struct RelayConnectionTransportTests {
         await transport.disconnect()
     }
 
+    @Test("send reconnects relays that dropped, with auto-reconnect off")
+    func sendReconnectsDroppedRelays() async throws {
+        let dispenser = SocketDispenser()
+        let transport = makeTransport(dispenser: dispenser)
+        try await transport.connect()
+
+        // Both relay streams ending finishes the merged stream, which marks both drops as handled.
+        let stream = await transport.events()
+        let finished = Flag()
+        Task {
+            for await _ in stream {}
+            finished.set()
+        }
+        for index in Self.relayURLs.indices {
+            try #require(dispenser.socket(at: index)).deliver(error: URLError(.networkConnectionLost))
+        }
+        try await pollUntil { finished.isSet }
+
+        try await transport.send(Self.event(id: Self.eventID))
+
+        #expect(dispenser.count == Self.relayURLs.count * 2)
+        for index in Self.relayURLs.indices {
+            let mock = try #require(dispenser.socket(at: Self.relayURLs.count + index))
+            #expect(Self.sentFrame("EVENT", in: mock) != nil)
+        }
+        await transport.disconnect()
+    }
+
     @Test("events from both relays surface on the one merged stream")
     func eventsFromEveryRelayMerge() async throws {
         let dispenser = SocketDispenser()

@@ -32,11 +32,95 @@ struct RelayConnectionTests {
         }
     }
 
-    private func makeConnection() -> (RelayConnection, MockWebSocketSession) {
+    /// Counts the sockets a connection's factory hands out, i.e. its connection attempts.
+    private final class SocketCount: @unchecked Sendable {
+        private let lock = NSLock()
+        private var count = 0
+
+        func increment() {
+            lock.withLock { count += 1 }
+        }
+
+        var value: Int {
+            lock.withLock { count }
+        }
+    }
+
+    /// A socket whose REQ sends suspend until the test releases them, one at a time, so a test can
+    /// act while a subscribe is mid-send. Every other frame goes straight to the wrapped mock.
+    private final class GatedRequestSocket: WebSocketSession, @unchecked Sendable {
+        let mock = MockWebSocketSession()
+        private let lock = NSLock()
+        private var held: [(text: String, continuation: CheckedContinuation<Void, any Swift.Error>)] = []
+
+        func resume() { mock.resume() }
+
+        func cancel(with closeCode: WebSocketCloseCode, reason: Data?) {
+            mock.cancel(with: closeCode, reason: reason)
+        }
+
+        func send(_ message: WebSocketMessage) async throws {
+            guard case .string(let text) = message, text.hasPrefix(#"["REQ""#) else {
+                try await mock.send(message)
+                return
+            }
+            try await withCheckedThrowingContinuation { continuation in
+                lock.withLock { held.append((text, continuation)) }
+            }
+            try await mock.send(message)
+        }
+
+        func receive() async throws -> WebSocketMessage {
+            try await mock.receive()
+        }
+
+        func sendPing(pongReceiveHandler: @escaping @Sendable ((any Swift.Error)?) -> Void) {
+            mock.sendPing(pongReceiveHandler: pongReceiveHandler)
+        }
+
+        /// How many REQ sends are suspended.
+        var heldCount: Int {
+            lock.withLock { held.count }
+        }
+
+        /// Completes the held REQ send at `index`, failing it with `error` when one is given.
+        func release(at index: Int = 0, error: (any Swift.Error)? = nil) {
+            let continuation = lock.withLock { held.remove(at: index).continuation }
+            if let error {
+                continuation.resume(throwing: error)
+            } else {
+                continuation.resume()
+            }
+        }
+    }
+
+    private func makeGatedConnection() -> (RelayConnection, GatedRequestSocket) {
+        let socket = GatedRequestSocket()
+        let connection = RelayConnection(
+            url: RelayURL("wss://relay.example.com")!,
+            webSocketFactory: GatedRequestSocketFactory(socket: socket),
+            config: RelayConnectionConfig(
+                connectionTimeout: .seconds(1), pingInterval: .seconds(60), autoReconnect: false)
+        )
+        return (connection, socket)
+    }
+
+    private struct GatedRequestSocketFactory: WebSocketSessionFactory {
+        let socket: GatedRequestSocket
+
+        func makeWebSocket(with request: URLRequest) -> any WebSocketSession {
+            socket
+        }
+    }
+
+    private func makeConnection(socketCount: SocketCount = SocketCount()) -> (RelayConnection, MockWebSocketSession) {
         let mock = MockWebSocketSession()
         let connection = RelayConnection(
             url: RelayURL("wss://relay.example.com")!,
-            webSocketFactory: MockWebSocketSessionFactory(makeSession: { mock }),
+            webSocketFactory: MockWebSocketSessionFactory(makeSession: {
+                socketCount.increment()
+                return mock
+            }),
             // No auto-reconnect and a long ping interval keep the test's background
             // tasks inert; the connection is torn down explicitly at the end.
             config: RelayConnectionConfig(
@@ -46,9 +130,9 @@ struct RelayConnectionTests {
     }
 
     /// Spins until `condition` holds, bounded so a logic error fails fast instead of hanging.
-    private func pollUntil(_ condition: @Sendable () -> Bool) async throws {
+    private func pollUntil(_ condition: @Sendable () async -> Bool) async throws {
         for _ in 0..<200 {
-            if condition() { return }
+            if await condition() { return }
             try await Task.sleep(for: .milliseconds(5))
         }
         throw RelayConnection.Error.timedOut
@@ -146,11 +230,145 @@ struct RelayConnectionTests {
         try await connection.connect()
         try await connection.subscribe(subscriptionID: Self.subscriptionID, filters: [Filter(kinds: [.textNote])])
 
-        try await connection.unsubscribe(subscriptionID: Self.subscriptionID)
+        await connection.unsubscribe(subscriptionID: Self.subscriptionID)
 
         let frame = try #require(Self.sentFrame("CLOSE", in: mock))
         #expect(frame.count == 2)
         #expect(frame[1] as? String == Self.subscriptionID)
+        await connection.disconnect()
+    }
+
+    @Test("send on a disconnected connection throws notConnected without connecting")
+    func sendWhileDisconnectedDoesNotConnect() async throws {
+        let socketCount = SocketCount()
+        let (connection, mock) = makeConnection(socketCount: socketCount)
+
+        await #expect(throws: RelayConnection.Error.notConnected) {
+            try await connection.send(.close(subscriptionID: Self.subscriptionID))
+        }
+
+        #expect(socketCount.value == 0)
+        #expect(mock.sentTextFrames.isEmpty)
+        #expect(await connection.state == .disconnected)
+    }
+
+    @Test("subscribe on a disconnected connection connects first")
+    func subscribeWhileDisconnectedConnects() async throws {
+        let socketCount = SocketCount()
+        let (connection, mock) = makeConnection(socketCount: socketCount)
+
+        try await connection.subscribe(subscriptionID: Self.subscriptionID, filters: [Filter(kinds: [.textNote])])
+
+        #expect(socketCount.value == 1)
+        #expect(await connection.state == .connected)
+        #expect(Self.sentFrame("REQ", in: mock) != nil)
+        await connection.disconnect()
+    }
+
+    @Test("unsubscribe on a never-connected connection does not connect")
+    func unsubscribeWhileDisconnectedDoesNotConnect() async throws {
+        let socketCount = SocketCount()
+        let (connection, mock) = makeConnection(socketCount: socketCount)
+
+        await connection.unsubscribe(subscriptionID: Self.subscriptionID)
+
+        #expect(socketCount.value == 0)
+        #expect(mock.sentTextFrames.isEmpty)
+        #expect(await connection.state == .disconnected)
+    }
+
+    @Test("unsubscribe after a drop forgets the subscription without reconnecting")
+    func unsubscribeAfterDropForgetsSubscriptionWithoutReconnecting() async throws {
+        let socketCount = SocketCount()
+        let (connection, mock) = makeConnection(socketCount: socketCount)
+        try await connection.subscribe(subscriptionID: Self.subscriptionID, filters: [Filter(kinds: [.textNote])])
+
+        mock.deliver(error: URLError(.networkConnectionLost))
+        try await pollUntil {
+            if case .failed = await connection.state { return true }
+            return false
+        }
+        #expect(await connection.hasSubscription(Self.subscriptionID))
+
+        await connection.unsubscribe(subscriptionID: Self.subscriptionID)
+
+        #expect(socketCount.value == 1)
+        #expect(Self.sentFrame("CLOSE", in: mock) == nil)
+        #expect(await !connection.hasSubscription(Self.subscriptionID))
+        await connection.disconnect()
+    }
+
+    @Test("unsubscribe sends no CLOSE for a subscription the connection does not hold")
+    func unsubscribeUnknownSubscriptionSendsNothing() async throws {
+        let (connection, mock) = makeConnection()
+        try await connection.connect()
+
+        await connection.unsubscribe(subscriptionID: Self.subscriptionID)
+
+        #expect(Self.sentFrame("CLOSE", in: mock) == nil)
+        await connection.disconnect()
+    }
+
+    @Test("unsubscribe while the REQ is still being sent forgets the subscription and CLOSEs it")
+    func unsubscribeDuringInFlightRequest() async throws {
+        let (connection, socket) = makeGatedConnection()
+        try await connection.connect()
+
+        let subscribing = Task {
+            try await connection.subscribe(subscriptionID: Self.subscriptionID, filters: [Filter(kinds: [.textNote])])
+        }
+        try await pollUntil { socket.heldCount == 1 }
+
+        await connection.unsubscribe(subscriptionID: Self.subscriptionID)
+        #expect(Self.sentFrame("CLOSE", in: socket.mock) != nil)
+
+        socket.release()
+        try await subscribing.value
+
+        // The completed REQ does not bring back the subscription it raced with.
+        #expect(await !connection.hasSubscription(Self.subscriptionID))
+        await connection.disconnect()
+    }
+
+    @Test("a failed REQ forgets its subscription")
+    func failedRequestForgetsSubscription() async throws {
+        let (connection, socket) = makeGatedConnection()
+        try await connection.connect()
+
+        let subscribing = Task {
+            try await connection.subscribe(subscriptionID: Self.subscriptionID, filters: [Filter(kinds: [.textNote])])
+        }
+        try await pollUntil { socket.heldCount == 1 }
+        #expect(await connection.hasSubscription(Self.subscriptionID))
+
+        socket.release(error: URLError(.networkConnectionLost))
+        await #expect(throws: RelayConnection.Error.notConnected) { try await subscribing.value }
+
+        #expect(await !connection.hasSubscription(Self.subscriptionID))
+        await connection.disconnect()
+    }
+
+    @Test("a failed REQ leaves a newer subscribe on the same id registered")
+    func failedRequestKeepsNewerSubscription() async throws {
+        let (connection, socket) = makeGatedConnection()
+        try await connection.connect()
+
+        let first = Task {
+            try await connection.subscribe(subscriptionID: Self.subscriptionID, filters: [Filter(kinds: [.textNote])])
+        }
+        try await pollUntil { socket.heldCount == 1 }
+        await connection.unsubscribe(subscriptionID: Self.subscriptionID)
+        let second = Task {
+            try await connection.subscribe(subscriptionID: Self.subscriptionID, filters: [Filter(kinds: [.reaction])])
+        }
+        try await pollUntil { socket.heldCount == 2 }
+
+        socket.release(at: 1)
+        try await second.value
+        socket.release(error: URLError(.networkConnectionLost))
+        await #expect(throws: RelayConnection.Error.notConnected) { try await first.value }
+
+        #expect(await connection.hasSubscription(Self.subscriptionID))
         await connection.disconnect()
     }
 
