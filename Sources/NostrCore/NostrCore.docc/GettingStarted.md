@@ -106,7 +106,7 @@ try await request.setNostrAuthorization(signer: signer)  // any NostrSigning
 Without a `URLRequest`, sign ``EventTemplate/httpAuthorization(url:method:payload:)`` and encode the event with ``HTTPAuth/authorizationHeaderValue(for:)``:
 
 ```swift
-let event = try await signer.sign(.httpAuthorization(url: uploadURL, method: "POST", payload: body))
+let event = signer.sign(.httpAuthorization(url: uploadURL, method: "POST", payload: body))
 let header = try HTTPAuth.authorizationHeaderValue(for: event)
 ```
 
@@ -129,9 +129,9 @@ do {
 NIP-29 relay-based groups live on a single relay, and everything a user sends carries the group id in an "h" tag. Ask to join with ``EventTemplate/groupJoinRequest(groupID:inviteCode:reason:)`` (kind 9021, with an invite code for closed groups), then post content of any kind with ``EventTemplate/groupContent(groupID:kind:content:tags:previous:)`` — here a NIP-C7 chat message — with "previous" timeline references that ``Groups`` samples from recently seen group events:
 
 ```swift
-let join = try await signer.sign(.groupJoinRequest(groupID: "abcdef", inviteCode: "A7fjq2"))
+let join = signer.sign(.groupJoinRequest(groupID: "abcdef", inviteCode: "A7fjq2"))
 
-let message = try await signer.sign(
+let message = signer.sign(
     .groupContent(
         groupID: "abcdef",
         kind: .chatMessage,

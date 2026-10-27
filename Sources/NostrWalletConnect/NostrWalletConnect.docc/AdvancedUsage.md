@@ -306,11 +306,12 @@ do {
 
 The other cases — ``WalletConnectError/invalidURI(reason:)``,
 ``WalletConnectError/requestEncodingFailed``, ``WalletConnectError/responseDecodingFailed``,
-``WalletConnectError/missingResult``, ``WalletConnectError/superseded``,
-``WalletConnectError/notConnected``, and ``WalletConnectError/cancelled`` — cover URI parsing,
-encryption/encoding failures, malformed responses, a `fetchInfo()` superseded by a newer call, a
-connection torn down while waiting, and a cancelled task. A request cancelled after it was sent may
-still be carried out by the wallet.
+``WalletConnectError/missingResult``, ``WalletConnectError/unsupportedEncryption(_:)``,
+``WalletConnectError/superseded``, ``WalletConnectError/notConnected``, and
+``WalletConnectError/cancelled`` — cover URI parsing, encryption/encoding failures, malformed
+responses, a response encrypted with a scheme this package does not implement, a `fetchInfo()`
+superseded by a newer call, a connection torn down while waiting, and a cancelled task. A request
+cancelled after it was sent may still be carried out by the wallet.
 
 ## Event Kinds
 

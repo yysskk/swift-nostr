@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-10-27
+
+A typing release. Raw strings and integers give way to value types — `PublicKey`, `EventID`,
+`Signature`, `PrivateKey`, `RelayURL`, `Timestamp`, `EventCoordinate`, `SubscriptionID`, and
+`Tag.Name`, with `Duration` for every period — and `NostrError` is replaced by an error type per
+domain, thrown with typed throws. Events are built as `EventTemplate`s that any signer, local or
+remote, can sign; the client's capability protocols require only their primitives; and the
+subscription and relay-routing API is reshaped around pool-owned subscription ids, one
+`subscribe(...)` per live stream, and a `RelayRoute` that folds in NIP-65 outbox routing. NIP-46
+and NIP-47 method types are open, so a method this package does not model can still be sent.
+Upgrading from 0.8.0 requires source changes throughout; see **Changed**.
+
 ### Added
 
 - **`PrivateKey` is a typed secret key**: 32 bytes validated as a secp256k1 scalar — non-zero and
@@ -20,8 +32,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   anything else — uppercase, the wrong length, non-hex, or a bech32 string with another prefix —
   with `PublicKey.Error`, `EventID.Error`, or `Signature.Error`; the failable `init?(_:)` returns
   nil, and decoding fails with `DecodingError.dataCorrupted`. `PublicKey.npub` and `EventID.note`
-  give the NIP-19 forms and no longer throw. `EventID` is `Comparable` in byte order, the order
-  NIP-01 breaks `created_at` ties by.
+  give the NIP-19 forms. `EventID` is `Comparable` in byte order, the order NIP-01 breaks
+  `created_at` ties by.
 - **`RelayURL` is a typed relay URL**: a `ws` or `wss` URL held in canonical form — lowercased
   scheme and host, root trailing slash and default port removed, path case and a non-root trailing
   slash kept — so every spelling of a relay is the same value, and equality and hashing follow it.
@@ -66,8 +78,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `groupContent(groupID:kind:content:tags:previous:)`, and `groupModeration(_:groupID:previous:reason:)`,
   and the NIP-98 `httpAuthorization(url:method:payload:)`.
   `NostrSigning.sign(_:)` signs a template as the signer's public key, so it works with a local
-  `EventSigner` and a remote `RemoteSigner` alike, and `EventSigner.sign(_:)` does the same
-  synchronously. `UnsignedEvent(_:publicKey:)` builds the unsigned event from a template.
+  `EventSigner` and a remote `RemoteSigner` alike; `EventSigner.sign(_:)` does the same
+  synchronously and cannot fail. `UnsignedEvent(_:publicKey:)` builds the unsigned event from a
+  template.
 - **NostrClient's models build `EventTemplate`s**: `metadata(_:)`, `contactList(_:)`,
   `relayListMetadata(_:)`, `directMessageRelayList(_:)`, `report(_:type:reason:)` for a public key or
   an event, and `longFormContent(_:draft:)`. NIP-51 lists and sets come from
@@ -125,29 +138,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Operations take a `RelayRoute` instead of an optional relay set, and the outbox methods are
+- **Operations take a `RelayRoute` instead of an optional relay list, and the outbox methods are
   removed** (breaking): nil no longer means the whole pool, and each operation has one short form,
   whose `route` defaults to `.pool`. To pass a `strategy` or `timeout`, spell out the primitive with
   `route: .pool`.
-  - `events.publish(_:to:strategy:)` (template and signed event) → `publish(_:route:strategy:)`;
-    the short forms `publish(_:strategy:)` and `publish(_:to:strategy:)` → `publish(_:route:)`.
-  - `events.fetch(filters:from:timeout:)` → `fetch(filters:route:timeout:)`; `fetch(filters:timeout:)`
-    and `fetch(filters:from:timeout:)` with a non-optional set → `fetch(filters:route:)`.
-  - `events.countEvents(matching:from:timeout:)` → `countEvents(matching:route:timeout:)`;
-    `countEvents(matching:timeout:)` and its targeted short form → `countEvents(matching:route:)`.
-  - `subscriptions.subscribe(filters:to:bufferingPolicy:)` → `subscribe(filters:route:bufferingPolicy:)`;
-    `subscribe(filters:bufferingPolicy:)` and its targeted short form → `subscribe(filters:route:)`,
-    which buffers without bound.
-  - `routing.subscribeOutbox(authors:kinds:limit:)` and its short forms are removed:
+  - `events.publish(_:to:strategy:)` → `publish(_:route:strategy:)`, for a signed event and for an
+    `EventTemplate`, with the short form `publish(_:route:)`.
+  - `events.fetch(filters:to:timeout:)` → `fetch(filters:route:timeout:)`, with the short form
+    `fetch(filters:route:)`.
+  - `events.count(filters:to:timeout:)` → `countEvents(matching:route:timeout:)`, with the short
+    form `countEvents(matching:route:)`.
+  - `subscriptions.subscribe(filters:to:bufferingPolicy:)` → `subscribe(filters:route:bufferingPolicy:)`,
+    with the short form `subscribe(filters:route:)`, which buffers without bound.
+  - `routing.subscribeOutbox(authors:kinds:limit:)` is removed:
     `subscriptions.subscribe(filters: [Filter(authors:kinds:limit:)], route: .outbox)`.
-  - `routing.publishGossip(_:strategy:)` and `publishGossip(_:)` are removed:
-    `events.publish(_:route: .outbox)` or `publish(_:route:strategy:)`.
-
+  - `routing.publishGossip(_:strategy:)` is removed: `events.publish(_:route: .outbox)` or
+    `publish(_:route:strategy:)`.
 - **Every live stream opens with `subscribe`, and each primitive has one short form** (breaking):
   a namespace's stream-opening method is `subscribe(...)`, with arguments naming what to receive.
-  - `client.subscriptions`: `events(filters:)` and `events(filters:to:)` are removed; read
-    `subscribe(filters:).events`. The feeds `userTimeline(publicKey:limit:)`, `globalFeed(limit:)`,
-    `mentions(publicKey:limit:)`, and `metadata(publicKeys:)` are removed in favor of the `Filter`
+  - `client.subscriptions`: `events(filters:to:bufferingPolicy:)` is removed; read
+    `subscribe(filters:).events`. The feeds `userTimeline(pubkey:limit:)`, `globalFeed(limit:)`,
+    `mentions(pubkey:limit:)`, and `metadata(pubkeys:)` are removed in favor of the `Filter`
     presets: `subscribe(filters: [.globalFeed(limit: 50)])`.
   - `client.messages`: the `NostrMessaging` requirement `payloads(limit:)` is `subscribe(limit:)`,
     still returning a `DirectMessagePayloadSequence`, and `payloads()` is `subscribe()`. The
@@ -170,7 +181,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     `fetchSimpleGroupList(for:)`, `fetchMetadata(for:authorPublicKey:)`,
     `fetchState(for:authorPublicKey:)`, and `sendGiftWrapped(_:to:expiration:)`, each defaulting its
     optional arguments to nil.
-
 - **`KeyPair` holds a `PrivateKey`** (breaking): `privateKey` is a `PrivateKey` instead of `Data`,
   and `KeyPair(privateKey:)` takes one and no longer throws. `KeyPair(privateKey: Data)`,
   `KeyPair(privateKeyHex:)`, `privateKeyHex`, and `nsec` are removed in favor of `PrivateKey(data:)`,
@@ -179,26 +189,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `KeyDerivation.deriveNostrKey(seed:account:)` returns a `PrivateKey`, and
   `WalletConnectURI.secret` is a `PrivateKey`, so
   `WalletConnectURI(walletPublicKey:relays:secret:lud16:)` throws only for an empty relay list.
-- **`Event.verify()` throws for every failure** (breaking): it returns `Void` and throws the new
-  `Event.VerificationError.invalidSignature` for a signature that does not verify, instead of
-  returning `false`. `Event.isValid` is the same check as a `Bool`, for when the reason does not
-  matter.
+- **`Event.verify()` throws for every failure** (breaking): it returns `Void` instead of `Bool` and
+  is `throws(Event.VerificationError)` — `idMismatch` (was `NostrError.invalidEventId`),
+  `missingSignature` for an unsigned rumor, and `invalidSignature` for a signature that does not
+  verify, which used to return `false`. `Event.isValid` is the same check as a `Bool`, for when the
+  reason does not matter.
 - **Subscription ids are `SubscriptionID`s, and the pool generates them** (breaking): the
   associated values of `ClientMessage.request`, `close`, and `count` and of `RelayMessage.event`,
-  `endOfStoredEvents`, `closed`, and `count`, `RelayConnection.hasSubscription(_:)` and
+  `endOfStoredEvents`, `closed`, and `count` are `subscriptionID: SubscriptionID` (were
+  `subscriptionId: String`), and `RelayConnection.hasSubscription(_:)` and
   `activeSubscriptions()`, and `SubscriptionSequence.id` (with `Events.id`,
   `DirectMessageSequence.id`, and `DirectMessagePayloadSequence.id`) are `SubscriptionID`s instead
   of `String`s. Where the method already names the subscription, the id is labeled `id:`:
-  `RelayConnection.subscribe(subscriptionID:filters:)` and `unsubscribe(subscriptionID:)` are
+  `RelayConnection.subscribe(subscriptionId:filters:)` and `unsubscribe(subscriptionId:)` are
   `subscribe(id:filters:)` and `unsubscribe(id:)`, matching `RelayTransport`, and
-  `RelayPool.unsubscribe(subscriptionID:)`, `NostrSubscriptionsAPI.unsubscribe(subscriptionID:)`,
+  `RelayPool.unsubscribe(subscriptionId:)`, `NostrSubscriptionsAPI.unsubscribe(subscriptionId:)`,
   and the `NostrSubscribing` requirement are `unsubscribe(id:)`.
-  `RelayPool.subscribe(subscriptionID:filters:to:handler:)`, which took a caller-chosen id that could
+  `RelayPool.subscribe(subscriptionId:filters:to:handler:)`, which took a caller-chosen id that could
   collide with the client's own, is `subscribe(filters:to:bufferingPolicy:)`: the pool names the
   subscription and returns it as a `SubscriptionSequence`, as `client.subscriptions.subscribe` does.
-  With ids never reused, `RelayPool.Error.subscriptionSuperseded` is removed. `RelayPool` gains
-  `unsubscribeAll()`, and `disconnectAll()` now closes every subscription and ends its sequence
-  before disconnecting. The wire format is unchanged.
+  `RelayPool` gains `unsubscribeAll()`, and `disconnectAll()` now closes every subscription and ends
+  its sequence before disconnecting. The wire format is unchanged.
 - **`RelayConnection.send(_:)` no longer connects** (breaking): like `publish(_:)`, it throws
   `RelayConnection.Error.notConnected` when the connection is not established instead of spending
   up to `connectionTimeout` on a reconnect; call `connect()` first. `subscribe(id:filters:)`
@@ -231,17 +242,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `ExpressibleByStringLiteral`, so `Tag(name: "x")` and `tags(named: "x")` still compile. Constants
   are named after the typed constructor that emits them (`.event` for "e", `.publicKey` for "p",
   `.hashtag` for "t", `.identifier` for "d", `.inviteCode` for "code", `.simpleGroup` for "group",
-  and so on). `Event.tags(named:)`, `Event.firstTagValue(named:)`, `Filter.addTagQuery(_:values:)`,
-  `Filter.tagQuery(_:)`, and `Groups.ValidationError.missingTag(name:kind:)` take a `Tag.Name`;
-  the filter methods still ignore a leading `#`. Passing a `String` variable now needs
-  `Tag.Name(rawValue:)`.
+  and so on). `Event.tags(named:)`, `Event.firstTagValue(named:)`, the `Filter[tag:]` subscript, and
+  `Groups.ValidationError.missingTag(name:kind:)` take a `Tag.Name`. Passing a `String` variable now
+  needs `Tag.Name(rawValue:)`.
 - **`Event.tags` and `UnsignedEvent.tags` are `[Tag]`** (breaking), like `EventTemplate.tags`.
   A tag keeps the exact string array it was built or decoded from, so the JSON encoding and the
   NIP-01 id are unchanged and any tag a relay sends still decodes and verifies. An empty array is
   a tag too (an empty `name`, no `values`): decoding one no longer fails, `Event.tags` and
   private list items keep it, and `Tag(rawArray:)` is no longer failable. `Tag.raw(_:)`,
   `Tag`'s array-literal conformance, `Event.structuredTags` (read `tags`), and
-  `UnsignedEvent.init(publicKey:createdAt:kind:rawTags:content:)` (pass `tags:`) are removed.
+  `UnsignedEvent.init(pubkey:createdAt:kind:rawTags:content:)` (pass `tags:`) are removed.
 - **APIs that throw a single error type use typed throws** (breaking): callers now get the
   concrete error type without casting, so `catch .invalidBase64` or `error == .publicKeyMismatch`
   works directly. `HTTPAuth.validate(authorization:url:method:payload:tolerance:now:)` and
@@ -252,48 +262,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `lookupRelays(_:)`, and `String.verifyAsInternetIdentifier()` /
   `verifyAsInternetIdentifier(expectedPublicKey:)` are `async throws(InternetIdentifier.VerificationError)`.
 - **APIs that cannot fail no longer throw, and more APIs use typed throws** (breaking): `KeyPair()`,
-  `UnsignedEvent.serializedForHashing()`, `computedID`, and `asRumor()`, `EventSigner.sign(_:)` for an
-  `EventTemplate`, `ClientMessage.serialize()`, `EventTemplate.repost(of:relayURL:)`, and
-  `EncryptedFile.encrypt(_:)` no longer throw, so callers drop `try`. `EventSigner.sign(_:)` for an
-  `UnsignedEvent` is `throws(EventSigner.Error)` and `HTTPAuth.authorizationHeaderValue(for:)` is
+  `UnsignedEvent.serializedForHashing()`, `computedID`, and `asRumor()`, `ClientMessage.serialize()`,
+  and `EncryptedFile.encrypt(_:)` no longer throw, so callers drop `try`. `EventSigner.sign(_:)` for
+  an `UnsignedEvent` is `throws(EventSigner.Error)` and `HTTPAuth.authorizationHeaderValue(for:)` is
   `throws(HTTPAuth.AuthorizationError)`. `KeyPair(mnemonicPhrase:passphrase:account:)` and
   `KeyPair.generate(wordCount:passphrase:)` are `throws(KeyPair.Error)`, wrapping a bad phrase or word
-  count in the new `KeyPair.Error.invalidMnemonic(Mnemonic.Error)`. `EncryptedPrivateKey.encrypt`,
+  count in `KeyPair.Error.invalidMnemonic(Mnemonic.Error)`. `EncryptedPrivateKey.encrypt`,
   `decrypt(password:maximumLogN:)`, `KeyPair.encryptedPrivateKey(password:logN:keySecurity:maximumLogN:)`,
-  and `KeyPair(ncryptsec:password:maximumLogN:)` are `throws(EncryptedPrivateKey.Error)`, which gains
-  `invalidPrivateKeyLength(Int)`, `keyDerivationFailed`, and `invalidPrivateKey` (for a decrypted key
-  that is not a valid secp256k1 scalar). `serializedForHashing()` writes the NIP-01 serialization
-  itself instead of through `JSONSerialization`, with the same bytes on every platform.
+  and `KeyPair(ncryptsec:password:maximumLogN:)` are `throws(EncryptedPrivateKey.Error)` (see below).
+  `serializedForHashing()` writes the NIP-01 serialization itself instead of through
+  `JSONSerialization`, with the same bytes on every platform.
 - **Bech32, key, mnemonic, and NIP-49 failures have their own error types** (breaking): each
   domain throws a nested `Error` with typed throws, so callers can branch on why parsing failed.
   `Bech32.encode/decode/decodeToWords` throw `Bech32.Error` (`invalidHumanReadablePart`, `mixedCase`,
   `missingSeparator`, `invalidLength`, `invalidCharacter`, `invalidChecksum`, `invalidPadding`) instead
-  of `NostrError.invalidBech32`. `PublicKey`, `EventID`, `Signature`, and `KeyPair` initializers throw
-  `PublicKey.Error` / `EventID.Error` / `Signature.Error` / `KeyPair.Error` — `invalidHex`,
-  `invalidLength(Int)`, and for npub/note/nsec `invalidBech32(Bech32.Error)` or
-  `unexpectedPrefix(String)` — instead of `invalidPublicKey`, `invalidEventID`, `invalidSignature`,
+  of `NostrError.invalidBech32`. `PublicKey`, `EventID`, `Signature`, `PrivateKey`, and `KeyPair`
+  initializers throw `PublicKey.Error` / `EventID.Error` / `Signature.Error` / `KeyPair.Error` —
+  `invalidHex`, `invalidLength(Int)`, and for npub/note/nsec `invalidBech32(Bech32.Error)` or
+  `unexpectedPrefix(String)` — instead of `invalidPublicKey`, `invalidEventId`, `invalidSignature`,
   `invalidHex`, `invalidBech32`, and `unknownPrefix`; `KeyPair.Error.invalidPrivateKey` (also thrown by
-  `KeyDerivation`) replaces `NostrError.invalidPrivateKey`. `EventSigner(privateKeyHex:)`,
-  `EventSigner(nsec:)`, `setPrivateKey(_:)`, and `setNsec(_:)` throw `KeyPair.Error`. `Mnemonic.Error`
+  `KeyDerivation`) replaces `NostrError.invalidPrivateKey`. `EventSigner(nsec:)` and
+  `identity.setPrivateKey(_:)` and `setNsec(_:)` throw `KeyPair.Error`. `Mnemonic.Error`
   replaces `invalidMnemonic` (now `invalidWordCount(Int)` or `invalidEntropyLength(Int)`),
   `invalidMnemonicWord` (`unknownWord`), and `invalidMnemonicChecksum` (`invalidChecksum`).
   `EncryptedPrivateKey.Error` replaces `invalidNcryptsec` (`malformedPayload`), `unsupportedScryptCost`,
-  and NIP-49's `decryptionFailed`; encrypting a key that is not 32 bytes throws
-  `EncryptedPrivateKey.Error.invalidPrivateKeyLength(Int)`. `LNURL.decode(_:)` throws `LNURL.Error` (`invalidBech32`,
-  `unexpectedPrefix`, `invalidURL`). `KeyPair.nsec` and `LNURL.encode(_:)` no longer throw.
+  and NIP-49's `decryptionFailed`, and adds `invalidPrivateKeyLength(Int)` (encrypting a key that is
+  not 32 bytes), `keyDerivationFailed`, and `invalidPrivateKey` (a decrypted key that is not a valid
+  secp256k1 scalar). `LNURL.decode(_:)` throws `LNURL.Error` (`invalidBech32`, `unexpectedPrefix`,
+  `invalidURL`), and `LNURL.encode(_:)` no longer throws.
   Secure random bytes come from `SystemRandomNumberGenerator` on every platform, so
   `NostrError.randomGenerationFailed` is gone with the other replaced cases.
-- **NIP-44, event verification, relay message, and relay URL failures have their own error
-  types** (breaking): `SealedMessage` seal and open, and `EventSigner.nip44Encrypt/nip44Decrypt`,
-  throw `SealedMessage.Error` with typed throws — `invalidConversationKey` and
+- **NIP-44, relay message, and relay URL failures have their own error types** (breaking):
+  `SealedMessage` seal and open, and `EventSigner.nip44Encrypt/nip44Decrypt`, throw
+  `SealedMessage.Error` with typed throws — `invalidConversationKey` and
   `invalidPlaintextLength(Int)` (were `encryptionFailed` / NIP-44's `decryptionFailed`),
   `invalidPublicKey` (a peer key not on secp256k1), `malformedPayload` (was `invalidPayloadFormat`),
   `unsupportedVersion(UInt8)` (was `unsupportedEncryptionVersion`), `invalidMAC` (was
-  `hmacVerificationFailed`), and `invalidPadding`. `Event.verify()` is
-  `throws(Event.VerificationError)` — `idMismatch` (was `invalidEventID`) or `missingSignature` (was
-  `invalidSignature`).
-  `RelayMessage.parse(_:)` is `throws(RelayMessage.Error)`, whose `malformed` replaces
-  `invalidMessageFormat` and the `DecodingError` of an `EVENT` carrying a malformed event.
+  `hmacVerificationFailed`), and `invalidPadding`. `RelayMessage.parse(_:)` is
+  `throws(RelayMessage.Error)`, whose `malformed` replaces `invalidMessageFormat` and the
+  `DecodingError` of an `EVENT` carrying a malformed event.
   `RelayURL(string:)` / `RelayURL(url:)` are `throws(RelayURL.Error)` — `malformed`,
   `unsupportedScheme(String)`, `missingHost`, `containsFragment`, `containsCredentials` — instead of
   `invalidRelayURL(String)`. `ProofOfWork.mine` and `sign(_:proofOfWork:)` throw
@@ -306,20 +313,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **NIP-19, gift wrap, direct-message, list, and group-reference failures have their own error
   types** (breaking): `NIP19Entity.decode(_:)`, `encoded`, `init(nostrURI:)`, `nostrURI`, and the
   `NProfile`, `NEvent`, and `NAddr` initializers and `encoded` are `throws(NIP19Entity.Error)` —
-  `invalidBech32(Bech32.Error)` (was a bare `Bech32.Error`), `unknownPrefix(String)`,
+  `invalidBech32(Bech32.Error)` (was `invalidBech32`), `unknownPrefix(String)`,
   `unexpectedPrefix(String)` (another entity's prefix, was `unknownPrefix`), `malformedTLV` (was
   `invalidTLV`), `missingPublicKey` / `missingEventID` / `missingIdentifier` / `missingAuthor` /
   `missingKind`, `invalidLength(Int)`, `fieldTooLong(Int)` (was `invalidTLV`), and
-  `kindOutOfRange(Int)` (each was `invalidNIP19Entity` or `invalidTLV`), and `missingNostrScheme` /
-  `privateKeyInURI` (were `invalidNostrURI`); `LongFormContent.naddr(author:relays:)` and
+  `kindOutOfRange(Event.Kind)` (each was `invalidNIP19Entity` or `invalidTLV`), `invalidPrivateKey`
+  (see below), and `missingNostrScheme` / `privateKeyInURI` (were `invalidNostrURI`);
+  `LongFormContent.naddr(author:relays:)` and
   `NostrListSet.naddr(author:relays:)` throw it too. `GroupReference` is
   `throws(GroupReference.Error)` — `invalidCoordinate(NIP19Entity.Error)`, `unexpectedKind(Event.Kind)`,
   `missingRelay`, `unknownRelayPublicKey` — instead of `invalidNIP19Entity`. `GiftWrap.unwrap`
   throws `GiftWrap.Error`: `unexpectedKind(Event.Kind)` (was `invalidData`), `invalidSealSignature`
-  and `authorMismatch` (were `verificationFailed`), and `invalidRumorID` (was `invalidEventID`).
+  and `authorMismatch` (were `verificationFailed`), and `invalidRumorID` (was `invalidEventId`).
   `DirectMessageParser` and `client.messages` `parse`, `parseReaction`, and `parseFile` throw
   `DirectMessagePayload.Error` — `unexpectedKind(Event.Kind)`, `invalidRecipient`,
-  `missingReactionTarget`, `missingFileURL`, `invalidDecryptionKey`, `invalidDecryptionNonce` —
+  `missingReactionTarget`, `invalidFileURL`, `invalidDecryptionKey`, `invalidDecryptionNonce` —
   instead of `invalidData`. `EncryptedFile.decrypt` is `throws(EncryptedFile.Error)`:
   `invalidKeyLength(Int)` and `invalidNonceLength(Int)` (a key that is not 32 bytes or a nonce that is
   not 12 is now rejected up front), `truncated`, and `authenticationFailed` (were `decryptionFailed`).
@@ -353,7 +361,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `relayError("Publish quorum not met: …")`), `subscriptionFailed` (was a `relayError` string), and
   `allConnectionsFailed` (was `connectionFailed("All relays failed to connect")`).
   `RelayPool.connectAll()`, `RelayPool.subscribe(filters:to:bufferingPolicy:)`,
-  `client.relays.connect()`, and `client.subscriptions.subscribe(filters:to:bufferingPolicy:)` are
+  `client.relays.connect()`, and `client.subscriptions.subscribe(filters:route:bufferingPolicy:)` are
   `throws(RelayPool.Error)`. Operations that need a signer throw `NostrClient.Error.signerNotSet`
   (was `NostrError.signerNotSet`), which capability extensions can throw too, and
   `client.routing.connectDirectMessageInboxRelays()` is `throws(NostrClient.Error)`. `NostrError` is
@@ -368,8 +376,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   canonical hex of the right length fails decoding rather than failing `verify()` later, so
   `RelayMessage.parse(_:)` throws for an `EVENT` frame carrying one and the relay connection drops it.
 - **`UnsignedEvent.pubkey` is a `PublicKey`, and `computedId` is now `computedID: EventID`**
-  (breaking). The `pubkey:` parameters of `UnsignedEvent.init`, `Groups.joinRequest`,
-  `Groups.leaveRequest`, `Groups.contentEvent`, and `Groups.moderationEvent` take a `PublicKey`.
+  (breaking). The `pubkey:` parameter of `UnsignedEvent.init` takes a `PublicKey`.
 - **Filters take typed ids and public keys** (breaking): `Filter.ids` and `eventReferences` (`#e`)
   are `[EventID]?`, `authors` and `pubkeyReferences` (`#p`) are `[PublicKey]?`, and the factories
   `userNotes(pubkey:)`, `metadata(pubkeys:)`, `replies(to:)`, `mentions(pubkey:)`, `contactList`,
@@ -389,15 +396,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Signers deal in `PublicKey`** (breaking): `EventSigner.publicKey` and the `NostrSigning.publicKey`
   requirement are `PublicKey`, and `nip44Encrypt(_:to:)` / `nip44Decrypt(_:from:)` take one — on
   `EventSigner`, `NostrSigning`, and `RemoteSigner` alike — as do `SealedMessage.seal(_:for:using:)`
-  and `open(from:using:)`. `EventSigner.signDeletion(eventIds:reason:)` is now
-  `signDeletion(eventIDs:reason:)` taking `[EventID]`, and `signZapRequest` takes a `PublicKey`
-  recipient and an `eventID: EventID?` (was `eventId: String?`). A `RemoteSigner` parses the
+  and `open(from:using:)`. A `RemoteSigner` parses the
   signer's `get_public_key` reply and throws `RemoteSignerError.responseValidationFailed` for
   anything but a canonical hex key, from both `publicKey` and `userPublicKey()`.
 - **`RelayMessage.ok` carries an `EventID`** (breaking): the case is now
   `ok(eventID:accepted:message:)`. An `OK` frame whose id is not canonical hex cannot answer any
-  event this client sent, so `RelayMessage.parse(_:)` throws `invalidMessageFormat` for it, as it
-  does for other malformed frames, and the relay connection drops it.
+  event this client sent, so `RelayMessage.parse(_:)` throws for it, as it does for other malformed
+  frames, and the relay connection drops it.
   `RelayConnection.authenticatedPubkeys` is a `Set<PublicKey>`.
 - **Third-party documents read their public keys leniently** (breaking):
   `RelayInformation.pubkey` and `selfPubkey` (NIP-11) and `LNURLPayResponse.nostrPubkey` (NIP-57)
@@ -416,16 +421,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   that passed a public key or event id as a `String` now uses `PublicKey` or `EventID`, so there is
   no string left to validate at the boundary. `identity.publicKey` (and the `NostrIdentityProviding`
   requirement) is a `PublicKey?`; `identity.npub` is removed in favor of `publicKey?.npub`, and
-  `identity.nip44Encrypt(_:to:)` / `nip44Decrypt(_:from:)` take a `PublicKey`. The `subscriptions`
-  conveniences (`userTimeline`, `mentions`, `metadata(pubkeys:)`), `events.fetchEvent(id:)`,
-  `fetchMetadata(pubkey:)`, `fetchLongFormContent(author:identifier:timeout:)`, and
-  `publishReport(pubkey:…)`, the `routing` relay-list fetches, caches, and `subscribeOutbox(authors:)`,
-  the `lists` fetches' `for:`, `groups.fetchMetadata` / `fetchState(authorPubkey:)` and
-  `fetchSimpleGroupList(for:)`, `messages.send` / `sendFile` / `sendGiftWrapped(to:)` and
-  `send(replyTo:)`, `DirectMessageBuilder`, `GiftWrap.wrap(recipientPubkey:)` and
-  `UnwrappedMessage.senderPubkey`, `EventSigner.signContactList(pubkeys:)` and `signReport(pubkey:)`,
-  `LongFormContent.naddr(author:)`, and `NostrListSet.naddr(author:)` / `coordinate(author:)` all take
-  or return the typed values. `events.publishDeletion(eventIds:reason:strategy:)` is now
+  `identity.nip44Encrypt(_:to:)` / `nip44Decrypt(_:from:)` take a `PublicKey`.
+  `events.fetchEvent(id:)`, `fetchMetadata(pubkey:)`, `fetchLongFormContent(author:identifier:timeout:)`,
+  and `publishReport(pubkey:…)`, the `routing` relay-list fetches and caches, the `lists` fetches'
+  `for:`, `groups.fetchMetadata` / `fetchState(authorPubkey:)` and `fetchSimpleGroupList(for:)`,
+  `messages.send` / `sendFile` / `sendGiftWrapped(to:)` and `send(replyTo:)`, `DirectMessageBuilder`,
+  `GiftWrap.wrap(recipientPubkey:)` and `UnwrappedMessage.senderPubkey`,
+  `LongFormContent.naddr(author:)`, and `NostrListSet.naddr(author:)` / `coordinate(author:)` all
+  take or return the typed values. `events.publishDeletion(eventIds:reason:strategy:)` is now
   `publishDeletion(eventIDs:reason:strategy:)` taking `[EventID]`.
 - **NostrClient models hold typed keys and event ids** (breaking): `Contact.pubkey`,
   `GroupReference.relayPubkey`, `InternetIdentifier.VerificationResult.pubkey`, and the
@@ -433,7 +436,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `DirectMessage.rumorId` is now `rumorID: EventID` (also its `Identifiable` id) and `replyTo` is an
   `EventID?`. `DirectMessageReaction` has `rumorID`, `messageID: EventID` (was `messageId`), and a
   typed `senderPubkey` and `messageAuthorPubkey`; `DirectMessageFile.rumorId` is now `rumorID`.
-  `Contact.init(npub:relayURL:petname:)` is removed in favor of `Contact(pubkey: PublicKey(npub:))`.
+  `Contact.init(npub:relayURL:petname:)` is removed in favor of `Contact(publicKey: PublicKey(npub:))`.
 - **NIP-19 entities hold typed values** (breaking): `NIP19Entity.npub` carries a `PublicKey` and
   `.note` an `EventID`, `NProfile.publicKey` and `NAddr.author` are
   `PublicKey`, and `NEvent.eventId` / `author` are now `eventID: EventID` and `author: PublicKey?`,
@@ -476,10 +479,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `remove(_:)`, and `relay(for:)` each take one `RelayURL`, and `addRelays(_:)`, `relays.add(_:)`, and
   `relays.connect(to:)` take any sequence of them; none of the membership calls throws any more.
 - **Relay targets are a `Set<RelayURL>?`** (breaking): the `to:` parameter of `RelayPool.publish`,
-  `count`, and `subscribe` was `[String]?`; the client's operations take a `RelayRoute` instead (see
-  above). Nil still broadcasts to the whole pool, an empty set still throws, and targets not in
-  the pool are still skipped; an invalid target can no longer reach these calls, so they no longer
-  throw `invalidRelayURL`. `RelayPool.Error.noMatchingRelays` carries `[RelayURL]`, sorted by canonical
+  `count` (now `countEvents(matching:from:timeout:)`), and `subscribe` was `[String]?`; the client's
+  operations take a `RelayRoute` instead (see above). Nil still broadcasts to the whole pool, an
+  empty set still throws, and targets not in the pool are still skipped; an invalid target can no
+  longer reach these calls, so they no longer throw `invalidRelayURL`. `RelayPool.Error.noMatchingRelays` carries `[RelayURL]`, sorted by canonical
   string.
 - **Relay results are keyed by `RelayURL`** (breaking): `PublishResult.statuses` is
   `[RelayURL: PublishRelayStatus]`, `acceptedRelays` / `failedRelays` / `pendingRelays` are
@@ -488,14 +491,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `SubscriptionSequence.expectedRelays` and the direct-message sequences' are `Set<RelayURL>`; every
   `SubscriptionEvent` case and its `relayURL` carry a `RelayURL`; and
   `routing.connectDirectMessageInboxRelays()` returns `Set<RelayURL>`.
-- **NIP-42 authentication takes a `RelayURL`** (breaking): `identity.authenticate(relayURL:)`,
-  `EventSigner.signClientAuthentication(relayURL:challenge:)`, and `Tag.relay(_:)`. The `relay` tag is
-  the canonical URL, which is the URL the connection opens.
+- **NIP-42 authentication takes a `RelayURL`** (breaking): `identity.authenticate(relayURL:)` and
+  `Tag.relay(_:)`, as does `EventTemplate.clientAuthentication(relayURL:challenge:)`. The `relay` tag
+  is the canonical URL, which is the URL the connection opens.
 - **NIP-11 fetches take a `RelayURL`** (breaking): `RelayInformation.fetch(from:urlSession:)` takes one,
   `fetch(fromRelayURLString:urlSession:)` is removed, `informationURL(from:)` takes a `RelayURL` and
   no longer returns an optional, and `RelayInformation.FetchError.invalidRelayURL` is removed.
 - **Relay hints are `RelayURL?`** (breaking): the `relayURL:` hint of `Tag.event`, `Tag.quote`,
-  `Tag.pubkey(_:relayURL:petname:)`, and `Tag.address`, of `EventSigner.signRepost(of:relayURL:)`, and
+  `Tag.pubkey(_:relayURL:petname:)`, and `Tag.address`, of `EventTemplate.reply` and `repost`, and
   of `events.publishReply` and `publishRepost` is written in canonical form. `Contact.relayURL` is a
   `RelayURL?`, and `Contact.fromTag(_:)` reads a hint that is not a valid relay URL as nil rather than
   keeping the string. Hints read from other authors' events are parsed the same way: a reply to an
@@ -503,9 +506,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `nostr:` `nprofile` / `nevent` / `naddr` reference's tag carries its first valid relay hint.
 - **Relay lists hold `RelayURL`s** (breaking): `RelayListEntry.url`, `RelayListMetadata.readRelays` and
   `writeRelays`, and `DirectMessageRelayList.relays` are typed, as are
-  `DirectMessageRelayList(relays:)`, `EventSigner.signRelayListMetadata(read:write:)` and
-  `signDirectMessageRelayList(relays:)`, and `routing.publishRelayList(read:write:strategy:)` and
-  `publishDirectMessageRelayList(relays:strategy:)` (with their `NostrRelayRouting` requirements). A
+  `DirectMessageRelayList(relays:)` and `routing.publishRelayList(read:write:strategy:)` and
+  `publishDirectMessageRelayList(relays:strategy:)`. A
   NIP-65 `r` tag or NIP-17 `relay` tag whose URL is not a valid relay URL is skipped when parsing, so
   routing only ever sees usable relays; lists de-duplicate by relay and are written in canonical form
   instead of keeping the first spelling verbatim.
@@ -523,8 +525,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **NIP-05 relays are `[RelayURL]`** (breaking): `InternetIdentifier.VerificationResult.relays` and
   `InternetIdentifier.lookupRelays(_:)`. A `nostr.json` relay entry that is not a valid relay URL is
   skipped.
-- **`EventSigner.signZapRequest` takes `relays: [RelayURL]`** (breaking), written to the `relays` tag
-  in canonical form.
 - **Connection URIs hold `RelayURL`s** (breaking): `BunkerURI.relays`, `NostrConnectURI.relays`, and
   `WalletConnectURI.relays` are `[RelayURL]`, their initializers and `NostrConnectURI.invitation` take
   one, and `RemoteSigner.switchRelays()` returns `[RelayURL]?`. Parsing a `bunker://`,
@@ -537,20 +537,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `UnsignedEvent.createdAt`, `Filter.since`, and `Filter.until` were `Int64`, as were the matching
   parameters of `Event.init`, `UnsignedEvent.init` (default `.now`), `Filter.init`, and
   `Filter.groupTimeline`. The wire format and event ids are unchanged.
-- **NIP-29 and NIP-98 builders take a `Timestamp`** (breaking): the `createdAt:` parameters of
-  `Groups.joinRequest`, `leaveRequest`, `contentEvent`, and `moderationEvent`, and of
-  `HTTPAuth.authorizationEvent` and `authorizationHeaderValue(url:…)`, were `Date`; they default to
-  `.now`. An infinite or out-of-range time no longer traps.
-  `HTTPAuth.ValidationError.timestampOutOfTolerance(createdAt:)` carries the event's `Timestamp`.
 - **NIP-40 expirations are `Timestamp`** (breaking): `Tag.expiration(_:)` takes one,
   `Event.expiration` returns one, and `Event.isExpired(asOf:)` compares against one (default `.now`).
   So does every `expiration:` parameter that was `Date?` — `client.messages.send`, `react`,
   `sendFile`, and `sendGiftWrapped`, the `NostrMessaging` requirements, the `DirectMessageBuilder`
   methods, and `GiftWrap.wrap`.
-- **`subscriptionId` is spelled `subscriptionID`** (breaking): the acronym is now cased the same way
-  as `groupID`, `eventID`, and `computedID` throughout. This renames the associated values of
-  `ClientMessage.request`, `close`, and `count` and of `RelayMessage.event`, `endOfStoredEvents`,
-  `closed`, and `count`. The wire format is unchanged.
 - **Conversions are initializers and properties** (breaking): following the Swift API Design
   Guidelines, which discourage `to`/`from` prefixes. `Mnemonic.fromEntropy(_:)` is
   `Mnemonic(entropy:)` and `Mnemonic.toSeed(passphrase:)` is `seed(passphrase:)`.
@@ -566,13 +557,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `fetchEvent`. `get_info` returns the wallet's Lightning node info, so it is named apart from
   `fetchInfo()`, which reads the kind-13194 info event. The `WalletConnectMethod` constants and the
   `GetBalanceResult`/`GetInfoResult` types keep their NIP-47 method names.
-- **`Filter.getTagQuery(_:)` is removed** (breaking): use `tagQuery(_:)`, which it forwarded to.
 - **Direct message times are `Timestamp`** (breaking): `createdAt` and `expiresAt` on
   `DirectMessage`, `DirectMessageReaction`, and `DirectMessageFile`, and their initializers, were
   `Date`. They carry the rumor's `created_at` and the gift wrap's `expiration` exactly as received.
 - **Other protocol times are `Timestamp`** (breaking): `LongFormContent.publishedAt` (`published_at`
-  is now kept exactly rather than clamped), the `since:` of `client.groups.timeline` and its
-  `NostrGroupManaging` requirement, and `Bolt11Invoice.timestamp` were `Date`; NIP-47
+  is now kept exactly rather than clamped), the `since:` of `client.groups.timeline` (now
+  `subscribe(to:kinds:since:limit:)`), and `Bolt11Invoice.timestamp` were `Date`; NIP-47
   `WalletConnectTransaction.createdAt`, `expiresAt`, and `settledAt` and `ListTransactionsParams.from`
   and `until` were `Int64`. The NIP-47 JSON is unchanged.
 - **Relay connection periods are `Duration`** (breaking): `RelayConnectionConfig.connectionTimeout`,
@@ -585,7 +575,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `authChallengeTimeout`, and `WalletConnection.Config.requestTimeout`, were `TimeInterval`. The
   defaults are unchanged.
 - **`HTTPAuth.validate` takes a `Duration` tolerance and a `Timestamp` clock** (breaking):
-  `tolerance:` was `TimeInterval` (default `.seconds(60)`) and `now:` was `Date` (default `.now`).
+  `tolerance:` was `TimeInterval` (default `.seconds(60)`) and `now:` was `Date` (default `.now`), and
+  `HTTPAuth.ValidationError.timestampOutOfTolerance(createdAt:)` carries the event's `Timestamp`
+  instead of a `Date`.
 - **Invoice expiries are `Duration`** (breaking): `Bolt11Invoice.expirySeconds: Int64?` is now
   `expiry: Duration?`, and NIP-47 `MakeInvoiceParams.expiry` was `Int64?`. The NIP-47 `expiry`
   field still carries whole seconds; a sub-second part is truncated toward zero when encoding.
@@ -597,10 +589,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and a non-integer value still fails decoding.
 - **Per-call fetch and count timeouts are `Duration?`** (breaking): the `timeout:` of every one-shot
   fetch and count on `client.events`, `client.routing`, `client.groups`, and `client.lists`, of
-  `RelayPool.count`, of `RelayConnection.count`, and of the matching capability protocol
-  requirements was `TimeInterval` defaulting to 10. It now defaults to `nil`, which uses the
-  configured `queryTimeout`; `RelayPool.count` passes its resolved timeout to every connection, so
-  the pool's setting governs pool calls.
+  `RelayPool.countEvents(matching:from:timeout:)`, of `RelayConnection.countEvents(matching:timeout:)`,
+  and of the matching capability protocol requirements was `TimeInterval` defaulting to 10. It is
+  now `nil` (or omitted through a short form), which uses the configured `queryTimeout`;
+  `RelayPool.countEvents` passes its resolved timeout to every connection, so the pool's setting
+  governs pool calls.
 - **`maxLogN` is spelled `maximumLogN`** (breaking): `EncryptedPrivateKey.decrypt(password:maxLogN:)`
   is `decrypt(password:maximumLogN:)` and `KeyPair(ncryptsec:password:maxLogN:)` is
   `KeyPair(ncryptsec:password:maximumLogN:)`, so reading and writing a NIP-49 key bound the scrypt
@@ -608,13 +601,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Relay counts and NIP-45 counts are named apart** (breaking): `count` meant both the number of
   relays and a COUNT query. `NostrRelaysAPI.count` and `RelayPool.count` are `relayCount`, and
   `connectedCount()` on `NostrRelaysAPI`, `RelayPool`, and `NostrRelayManaging` is
-  `connectedRelayCount()`. The NIP-45 queries `NostrEventsAPI.count(filters:to:timeout:)`,
-  `RelayPool.count(filters:to:timeout:)`, and the `NostrEventFetching` requirement are
-  `countEvents(matching:from:timeout:)`, and `RelayConnection.count(filters:timeout:)` is
-  `countEvents(matching:timeout:)`.
-- **Fetches read from relays** (breaking): `NostrEventsAPI.fetch(filters:to:timeout:)` and the
-  `NostrEventFetching` requirement are `fetch(filters:from:timeout:)`, so a scoped fetch reads as
-  fetching from those relays. `publish(_:to:)` and `subscribe(filters:to:)` keep `to`.
+  `connectedRelayCount()`. The NIP-45 query `RelayPool.count(filters:to:timeout:)` is
+  `countEvents(matching:from:timeout:)` and `RelayConnection.count(filters:timeout:)` is
+  `countEvents(matching:timeout:)`; `NostrEventsAPI.count(filters:to:timeout:)` and the
+  `NostrEventFetching` requirement are `countEvents(matching:route:timeout:)` (see above).
 - **NostrCore spells public keys `publicKey`** (breaking): the same concept was spelled `pubkey`,
   `xxxPubkey`, and `publicKey`. Swift names now follow the API Design Guidelines, as `signature` and
   `createdAt` already did; the JSON keys (`pubkey`, `self`, `nostrPubkey`, `#p`) are unchanged.
@@ -628,16 +618,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `RelayInformation.pubkey`/`selfPubkey` are `publicKey`/`selfPublicKey`, and
   `LNURLPayResponse.nostrPubkey` is `nostrPublicKey`. In NIP-29, the state parsers take
   `relayPublicKey:`, `Groups.Admin.pubkey` is `publicKey`, `Groups.ModerationAction.putUser(pubkey:roles:)`
-  and `removeUser(pubkey:)` are `putUser(publicKey:roles:)` and `removeUser(publicKey:)`, and the
-  `joinRequest`, `leaveRequest`, `contentEvent`, and `moderationEvent` builders take `publicKey:`.
-  `EventSigner.signZapRequest(recipientPubkey:...)` is `signZapRequest(recipientPublicKey:...)`, and
+  and `removeUser(pubkey:)` are `putUser(publicKey:roles:)` and `removeUser(publicKey:)`.
   `RelayConnection.authenticatedPubkeys` is `authenticatedPublicKeys`. The `NostrSigning` and
   `EventSigner` NIP-44 methods and `SealedMessage` name their parameters `recipientPublicKey` and
   `senderPublicKey`; their argument labels are unchanged.
 - **NostrClient spells public keys `publicKey`** (breaking): the rename NostrCore made now covers
   the client models and APIs, so `publicKey` names one concept everywhere; the JSON keys and tags
-  are unchanged. `EventSigner.signContactList(pubkeys:)` and `signReport(pubkey:type:reason:)` are
-  `signContactList(publicKeys:)` and `signReport(publicKey:type:reason:)`. `Contact.pubkey` and
+  are unchanged. `Contact.pubkey` and
   `Contact(pubkey:relayURL:petname:)` are `publicKey` (still `pubkey` in JSON). In NIP-05,
   `InternetIdentifier.VerificationResult.pubkey` (and its initializer label) is `publicKey`,
   `verify(_:expectedPubkey:)` is `verify(_:expectedPublicKey:)`, `lookupPubkey(_:)` is
@@ -653,10 +640,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `validate(lnurlProviderPublicKey:...)`, and `ValidationError.payeePubkeyMismatch` is
   `payeePublicKeyMismatch`. `GroupReference.relayPubkey` (and its initializer label) is
   `relayPublicKey`, and `NostrGroupsAPI.fetchState` and `fetchMetadata` (and their
-  `NostrGroupManaging` requirements) take `authorPublicKey:`. `NostrSubscriptionsAPI.userTimeline(pubkey:limit:)`, `mentions(pubkey:limit:)`,
-  and `metadata(pubkeys:)` and `NostrEventsAPI.fetchMetadata(pubkey:timeout:)` and
-  `publishReport(pubkey:type:reason:strategy:)` take `publicKey:`/`publicKeys:`, as do the matching
-  `NostrEventPublishing`, `NostrEventFetching`, and `NostrSubscribing` requirements.
+  `NostrGroupManaging` requirements) take `authorPublicKey:`. `events.fetchMetadata(pubkey:timeout:)`
+  and `publishReport(pubkey:type:reason:strategy:)` take `publicKey:`.
 - **NostrConnect spells public keys `publicKey`** (breaking): `RemoteSigner.remoteSignerPubkey` is
   `remoteSignerPublicKey`, `BunkerURI.remoteSignerPubkey` and `BunkerURI(remoteSignerPubkey:relays:secret:)`
   are `remoteSignerPublicKey`, and `NostrConnectURI.clientPubkey` and its `clientPubkey:` initializer
@@ -665,12 +650,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **NostrWalletConnect spells public keys `publicKey`, and Lightning node keys `nodePublicKey`**
   (breaking): `WalletConnectURI.walletPubkey` and its `walletPubkey:` initializer label are
   `walletPublicKey`. `PayKeysendParams.pubkey`, `MultiPayKeysendParams.Keysend.pubkey`, and
-  `GetInfoResult.pubkey` (and their initializer labels) are `nodePublicKey`: each is a Lightning
-  node's hex public key, not a Nostr `PublicKey`, so it stays a `String` and takes a name of its
-  own. The NIP-47 JSON key is still `pubkey`.
+  `GetInfoResult.pubkey` (and their initializer labels) are `nodePublicKey`, on the types now named
+  `PayKeysendRequest`, `MultiPayKeysendItem`, and `GetInfoResult`: each is a Lightning node's hex
+  public key, not a Nostr `PublicKey`, so it stays a `String` and takes a name of its own. The
+  NIP-47 JSON key is still `pubkey`.
 - **Events are signed from `EventTemplate`s** (breaking): `EventSigner.signTextNote(content:tags:)`,
-  `signReaction(to:content:)`, `signRepost(of:relayURL:)`, `signDeletion(eventIDs:reason:)`,
-  `signClientAuthentication(relayURL:challenge:)`, and `signZapRequest(recipientPublicKey:...)` are
+  `signReaction(to:content:)`, `signRepost(of:relayURL:)`, `signDeletion(eventIds:reason:)`,
+  `signClientAuthentication(relayURL:challenge:)`, and `signZapRequest(recipientPubkey:...)` are
   removed. Sign the matching template instead — `signer.sign(.textNote("gm"))`,
   `.deletion(of:reason:)`, `.zapRequest(to:relays:...)`, and so on — which also works with a remote
   signer, so a `RemoteSigner` can now sign zap requests.
@@ -678,15 +664,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   taking an `UnsignedEvent` is replaced by `NostrSigning.sign(_:proofOfWork:)` taking an
   `EventTemplate`. To mine an `UnsignedEvent` keyed in advance, use
   `ProofOfWork.mine(event:difficulty:)` and sign the result.
+- **`NostrSigning` requires `sign(_:)` for an `EventTemplate`** (breaking for conformers): the
+  requirement has no default implementation, so a held `EventSigner` exposes only its synchronous,
+  non-throwing `sign(_:)` and `signer.sign(.textNote("gm"))` needs no `await` even in async code. A
+  third-party conformance must implement it, typically as
+  `try await sign(UnsignedEvent(template, publicKey: publicKey))`. `RemoteSigner` implements it.
 - **`identity.sign(_:)` signs an `EventTemplate`** (breaking): `NostrIdentityAPI.sign(_:)` and the
   `NostrIdentityProviding` requirement take a template and sign it as the configured signer's public
   key, instead of an `UnsignedEvent` the caller had to key with `identity.publicKey`.
 - **`RelayConnection.authenticate(using:)` takes any `NostrSigning`**, so a remote signer can answer
   a relay's AUTH challenge on a direct connection too.
 - **NostrClient's models are signed from `EventTemplate`s** (breaking):
-  `EventSigner.signMetadata(_:)`, `signContactList(_:)`, `signContactList(publicKeys:)`,
+  `EventSigner.signMetadata(_:)`, `signContactList(_:)`, `signContactList(pubkeys:)`,
   `signRelayListMetadata(_:)`, `signRelayListMetadata(read:write:)`, `signDirectMessageRelayList(_:)`,
-  `signDirectMessageRelayList(relays:)`, `signReport(publicKey:type:reason:)`,
+  `signDirectMessageRelayList(relays:)`, `signReport(pubkey:type:reason:)`,
   `signReport(event:type:reason:)`, `signLongFormContent(_:draft:)`, `signList(_:)`, and `signSet(_:)`
   are removed. Sign the matching template instead — `signer.sign(.metadata(profile))`,
   `.contactList(publicKeys.map { Contact(publicKey: $0) })`,
@@ -700,7 +691,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `EventSigner.sign(_:withOTS:)` are replaced by setting `EventTemplate.openTimestamps` before
   signing.
 - **NIP-29 group and NIP-98 authorization events are built as `EventTemplate`s** (breaking):
-  `Groups.joinRequest`, `leaveRequest`, `contentEvent`, and `moderationEvent` — both the `publicKey:`
+  `Groups.joinRequest`, `leaveRequest`, `contentEvent`, and `moderationEvent` — both the `pubkey:`
   variants returning an `UnsignedEvent` and the `signer:` variants returning a signed `Event` — are
   removed, as are `HTTPAuth.authorizationEvent(url:method:payload:createdAt:signer:)` and
   `HTTPAuth.authorizationHeaderValue(url:method:payload:createdAt:signer:)`. Sign the matching
@@ -708,33 +699,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `.groupModeration(action, groupID: id)`, and so on, setting the template's `createdAt` for a custom
   time — and encode a signed `.httpAuthorization(url:method:payload:)` event with
   `HTTPAuth.authorizationHeaderValue(for:)`. `URLRequest.setNostrAuthorization(signer:)` is unchanged.
-
 - **`NostrEventPublishing` and `NostrEventFetching` require only their primitives** (breaking):
-  `NostrEventPublishing` requires `publish(_:to:strategy:)` for an `EventTemplate` and for a signed
-  `Event`, and `NostrEventFetching` requires `fetch(filters:from:timeout:)` and
-  `countEvents(matching:from:timeout:)`. `publishTextNote`, `publishReply`, `publishMetadata`,
+  `NostrEventPublishing` requires `publish(_:route:strategy:)` for an `EventTemplate` and for a
+  signed `Event`, and `NostrEventFetching` requires `fetch(filters:route:timeout:)` and
+  `countEvents(matching:route:timeout:)`. `publishTextNote`, `publishReply`, `publishMetadata`,
   `publishReaction`, `publishRepost`, `publishDeletion`, both `publishReport` overloads,
   `publishLongFormContent`, `fetchEvent`, `fetchMetadata`, and both `fetchLongFormContent` overloads
-  move to protocol extensions built on those primitives, with the same signatures and defaults, as do
-  the short forms `publish(_:strategy:)`, `fetch(filters:timeout:)`, and
-  `countEvents(matching:timeout:)`. A conformer implements the four primitives and inherits the rest,
-  and a call through `any NostrEventPublishing` takes the same defaults as one through
-  `client.events`. The targeted short forms take a non-optional `Set<RelayURL>`, so
-  `publish(event, to: nil)` without a `strategy:` and `fetch(filters:from: nil)` without a `timeout:`
-  no longer compile: omit `to:` / `from:` to reach the whole pool.
-
+  move to protocol extensions built on those primitives, with the same defaults, as do the short
+  forms `publish(_:route:)`, `fetch(filters:route:)`, and `countEvents(matching:route:)`. A conformer
+  implements the four primitives and inherits the rest, and a call through `any NostrEventPublishing`
+  takes the same defaults as one through `client.events`.
 - **`NostrSubscribing`, `NostrRelayManaging`, and `NostrIdentityProviding` require only their
-  primitives** (breaking): `NostrSubscribing` requires `subscribe(filters:to:bufferingPolicy:)`,
+  primitives** (breaking): `NostrSubscribing` requires `subscribe(filters:route:bufferingPolicy:)`,
   `unsubscribe(id:)`, and `unsubscribeAll()`; `NostrRelayManaging` requires
   `add(_:config:)`, `remove(_:)`, `connect()`, `disconnect()`, `connections`,
   `connectedRelayCount()`, `relay(for:)`, and `clearDeduplicationCache()`; `NostrIdentityProviding`
-  keeps every requirement but `setPrivateKey(_:)` and `setNsec(_:)`. `add(_:)` for one relay and for
+  no longer requires `setPrivateKey(_:)` and `setNsec(_:)`. `add(_:)` for one relay and for
   a sequence, `connect(to:)`, `relayCount`, `setPrivateKey(_:)`, and `setNsec(_:)` move to protocol
-  extensions built on those primitives, with the same defaults and errors, as do the short forms
-  `subscribe(filters:bufferingPolicy:)` and `subscribe(filters:to:bufferingPolicy:)` for a
-  non-optional `Set<RelayURL>`, so `subscribe(filters:to: nil)` without a `bufferingPolicy:` no
-  longer compiles: omit `to:` to subscribe on the whole pool.
-
+  extensions built on those primitives, with the same defaults and errors, as does the short form
+  `subscribe(filters:route:)`.
 - **`NostrMessaging` requires only its primitives, and `sendGiftWrapped` takes an `EventTemplate`**
   (breaking): the requirements are `sendGiftWrapped(_:to:expiration:strategy:)`,
   `parsePayload(_:)`, and `subscribe(limit:)`. `sendGiftWrapped` now authors the
@@ -746,7 +729,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `DirectMessagePayload.Error.unexpectedKind` for any other payload. The extension also adds the
   short forms `sendGiftWrapped(_:to:expiration:)` and `subscribe()`, so a `strategy:` needs every
   argument spelled out.
-
 - **`NostrRelayRouting` and `NostrListManaging` require only their primitives** (breaking):
   `publishRelayList(read:write:strategy:)` and `publishDirectMessageRelayList(relays:strategy:)` move
   to a protocol extension that builds the `RelayListMetadata` or `DirectMessageRelayList` and
@@ -755,12 +737,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   author through `fetchSet(kind:identifier:for:timeout:)` — the author is named, so private items
   stay encrypted and relay hints stay unused, as before. The extensions also add short forms with
   the old defaults: `fetchRelayList(for:)`, `fetchDirectMessageRelayList(for:)`,
-  `publishRelayList(_:)`, `publishDirectMessageRelayList(_:)`, `publishGossip(_:)`,
-  `subscribeOutbox(authors:kinds:)` and `subscribeOutbox(authors:kinds:limit:)` for a non-optional
-  `Int`, `publish(_:)`, `publishSet(_:)`, `fetch(kind:for:)`, `fetchSet(kind:identifier:for:)`, and
-  `fetchSets(kind:for:)`, whose `for:` defaults to nil (the current user). An optional `limit` or a
-  `timeout` therefore needs every argument spelled out.
-
+  `publishRelayList(_:)`, `publishDirectMessageRelayList(_:)`, `publish(_:)`, `publishSet(_:)`,
+  `fetch(kind:for:)`, `fetchSet(kind:identifier:for:)`, and `fetchSets(kind:for:)`, whose `for:`
+  defaults to nil (the current user). A `timeout` or `strategy` therefore needs every argument
+  spelled out.
 - **`NostrGroupManaging` publishes through one primitive** (breaking):
   `publish(_:in:strategy:)` signs any `EventTemplate` and publishes it to the group's relay only,
   adding and connecting it on demand after signing, as every group write did. `join`, `leave`,
@@ -789,7 +769,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   public: `MultiPayInvoiceParams.Invoice` is `MultiPayInvoiceItem` and
   `MultiPayKeysendParams.Keysend` is `MultiPayKeysendItem`, which `multiPayInvoice(_:)` and
   `multiPayKeysend(_:)` take in arrays as before.
-
 - **`RemoteSignerMethod` is an open struct** (breaking): it was a closed `enum` and is now a
   `RawRepresentable` struct over the wire token, with a non-failable `init(rawValue:)` and the same
   ten methods as static constants, so a method a signer implements beyond them can be named and
@@ -797,30 +776,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   is the token. `CaseIterable` is gone, and a `switch` over it needs a `default` case.
 - **Tag queries are a `Filter[tag:]` subscript** (breaking): `filter[tag: .hashtag] = ["nostr"]`
   replaces `addTagQuery(_:values:)`, which replaced rather than added, and `filter[tag: .hashtag]`
-  replaces `tagQuery(_:)`; assigning nil removes the query. The name is the tag name, so a leading
-  `#` is no longer stripped: `"#t"` names a different tag than `"t"`. `filter[tag: .event]` and
+  replaces `tagQuery(_:)` and `getTagQuery(_:)`; assigning nil removes the query. The name is the
+  tag name, so a leading `#` is no longer stripped: `"#t"` names a different tag than `"t"`. `filter[tag: .event]` and
   `filter[tag: .publicKey]` are the `#e` and `#p` queries behind `eventReferences` and
   `publicKeyReferences`, as hex strings; values set through the subscript are encoded as given, and
   the typed properties leave out any that are not canonical hex.
 - **Protocol requirements whose conformers throw one error type use typed throws** (breaking for
   custom conformers, which must declare the same type): a call through the protocol now gets the
-  concrete error instead of `any Error`. `NostrRelayManaging.connect()` and `connect(to:)`,
-  `NostrSubscribing.subscribe(filters:to:bufferingPolicy:)` with its short forms, `events`, and the
-  feeds, and `NostrRelayRouting.subscribeOutbox(authors:kinds:limit:)` with its short forms are
+  concrete error instead of `any Error`. `NostrRelayManaging.connect()` and `connect(to:)`, and
+  `NostrSubscribing.subscribe(filters:route:bufferingPolicy:)` and its short form are
   `throws(RelayPool.Error)`; `NostrRelayRouting.connectDirectMessageInboxRelays()` is
   `throws(NostrClient.Error)`; and `RelayTransport`'s `connect()`, `subscribe(id:filters:)`, and
   `send(_:)` are `throws(RelayConnection.Error)`.
 - **NostrWalletConnect and NostrConnect use typed throws** (breaking): `WalletConnection` and
   `WalletConnectURI` are `throws(WalletConnectError)`, and `RemoteSigner`, `BunkerURI`, and
   `NostrConnectURI` are `throws(RemoteSignerError)`, so a `catch .timedOut` needs no cast.
-  Relay failures that used to escape as `RelayConnection.Error` are wrapped in the new
-  `transportFailed(_:)` case of each. A cancelled task now fails a command, `fetchInfo()`, or
+  Relay transport failures are wrapped in the new `transportFailed(RelayConnection.Error)` case of
+  each. A cancelled task now fails a command, `fetchInfo()`, or
   `awaitConnection()` at once with the new `cancelled` case instead of `timedOut`, and a command
   from an already-cancelled task is not sent; `awaitConnection()` previously ignored cancellation.
   `RemoteSigner(bunker:)` no longer throws. `payZap(...)` stays untyped: it also throws
   `LNURLPayResponse.InvoiceError`.
 - **NIP-19 and NIP-11 kinds are `Event.Kind`** (breaking): `NAddr.kind`, `NEvent.kind`, their
-  initializers, `NIP19Entity.Error.kindOutOfRange`, `RelayInformation.FeeSchedule.kinds`, and the
+  initializers, `RelayInformation.FeeSchedule.kinds`, and the
   `RelayInformation.KindSpec` cases `.single` and `.range`. The wire format is unchanged.
 - **Protocol URLs are `URL`** (breaking): `RelayInformation`'s `banner`, `icon`, `termsOfService`,
   `postingPolicy`, and `paymentsURL`; `LNURLPayResponse.callback`; `DirectMessageFile.url` and the
@@ -828,10 +806,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Tag.url(_:)` and `Tag.reference(_:)`. Each is written as its `absoluteString`. A NIP-11 URL that
   does not parse decodes as nil. An LNURL-pay response whose `callback` is not an `http` or `https`
   URL with a host fails to decode, and a file message whose content is not one is rejected with
-  `DirectMessagePayload.Error.invalidFileURL`, which replaces `missingFileURL`, so a third party
+  `DirectMessagePayload.Error.invalidFileURL`, so a third party
   cannot point a download at a `file:`, `data:`, or custom-scheme URL.
 - **`NIP19Entity.nsec` carries a `PrivateKey`** (breaking), so its description never shows the
-  key. Decoding an `nsec` whose payload is not a valid secp256k1 scalar throws the new
+  key. Decoding an `nsec` whose payload is not a valid secp256k1 scalar throws
   `NIP19Entity.Error.invalidPrivateKey`, and encoding an `nsec` no longer fails.
 - **NIP-47 transaction and notification values are typed** (breaking):
   `WalletConnectTransaction.type` is a `TransactionType`, `WalletConnectTransaction.state` the new
@@ -854,8 +832,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   counting, and authenticating all send this way.
 - **A subscription or fetch whose targets are not in the pool no longer sends a stray CLOSE**:
   when none of the targeted relays was in the pool (`noMatchingRelays`), the client still sent `CLOSE`
-  for the never-opened subscription to every relay in the pool. Nothing is sent now, so `fetchLongFormContent(naddr:)` falling back from relay
-  hints that are not in the pool to the whole pool sends a single `REQ`.
+  for the never-opened subscription to every relay in the pool. Nothing is sent now, so
+  `fetchLongFormContent(naddr:)` falling back from relay hints that are not in the pool to the whole
+  pool sends a single `REQ`.
 - **Ending a subscription no longer reconnects relays to close it**: `RelayPool.unsubscribe` — run
   when a `for await` over a client subscription ends — sent `CLOSE` to every relay in the pool, and
   each disconnected, failed, or backing-off relay reconnected (blocking up to `connectionTimeout`)
@@ -870,8 +849,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with an id and signature that could not verify. It now throws the new
   `EventSigner.Error.publicKeyMismatch`, and `NostrSigning.sign(_:)` requires every conformance to
   reject such an event; `RemoteSigner` already did, with `RemoteSignerError.responseValidationFailed`.
-- **`#e` and `#p` tag queries round-trip**: a query set with `addTagQuery(.event, …)` or
-  `addTagQuery(.publicKey, …)` was stored apart from `eventReferences` and `publicKeyReferences`,
+- **`#e` and `#p` tag queries round-trip**: a query set with `addTagQuery("e", …)` or
+  `addTagQuery("p", …)` was stored apart from `eventReferences` and `pubkeyReferences`,
   so a filter holding both wrote two values to the same `#e` or `#p` key, and decoding never
   restored the generic query. Each tag query now has a single value, encoded once.
 - **Notification and auth-challenge streams finish when the relays' streams end**: once automatic
@@ -884,13 +863,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   out their whole timeout for a reply that could no longer arrive. They now throw
   `WalletConnectError.notConnected` and `RemoteSignerError.notConnected` at once, as on
   `disconnect()` and like the in-flight requests the connection fails.
-- **`EventSigner` signs a template without `await` in async code** (breaking for `NostrSigning`
-  conformers): in an async context Swift preferred the async `NostrSigning.sign(_:)` extension
-  method over `EventSigner`'s synchronous `sign(_:)`, so `try signer.sign(.textNote("gm"))` on an
-  `EventSigner` failed to compile without `await`. `sign(_ template: EventTemplate)` is now a
-  `NostrSigning` requirement with no default implementation, which `EventSigner` satisfies
-  synchronously; a third-party conformance must implement it, typically as
-  `try await sign(UnsignedEvent(template, publicKey: publicKey))`. `RemoteSigner` implements it.
 
 ## [0.8.0] - 2026-10-25
 
@@ -1472,7 +1444,8 @@ remote signing, a spec-compliance fix to NIP-44 encryption, and expanded test co
 
 - Initial release: NIP-01 events, filters, subscriptions, and single-relay support.
 
-[Unreleased]: https://github.com/yysskk/swift-nostr/compare/0.8.0...HEAD
+[Unreleased]: https://github.com/yysskk/swift-nostr/compare/0.9.0...HEAD
+[0.9.0]: https://github.com/yysskk/swift-nostr/compare/0.8.0...0.9.0
 [0.8.0]: https://github.com/yysskk/swift-nostr/compare/0.7.0...0.8.0
 [0.7.0]: https://github.com/yysskk/swift-nostr/compare/0.6.0...0.7.0
 [0.6.0]: https://github.com/yysskk/swift-nostr/compare/0.5.0...0.6.0

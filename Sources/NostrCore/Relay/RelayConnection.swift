@@ -862,8 +862,10 @@ public actor RelayConnection {
     /// Relays that do not implement NIP-45 usually never reply; the call then fails with
     /// ``RelayConnection/Error/timedOut`` after `timeout`. A CLOSED for the COUNT subscription
     /// fails fast with a ``RelayRejection``.
-    /// - Parameter timeout: How long to wait for the relay to answer; `nil` uses
-    ///   ``RelayConnectionConfig/queryTimeout``.
+    /// - Parameters:
+    ///   - filters: The filters whose matching events to count.
+    ///   - timeout: How long to wait for the relay to answer; `nil` uses
+    ///     ``RelayConnectionConfig/queryTimeout``.
     /// - Throws: ``RelayRejection`` when the relay answers CLOSED,
     ///   ``RelayConnection/Error/timedOut`` when no answer arrives within `timeout`,
     ///   ``RelayConnection/Error/notConnected`` when not connected or torn down while waiting, or

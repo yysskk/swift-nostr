@@ -5,7 +5,7 @@ import Foundation
 /// The textual form is NIP-01's `<kind>:<pubkey>:<identifier>`, as carried by "a" tags — the kind in
 /// decimal, the public key as canonical hex, and the identifier verbatim (empty for a replaceable
 /// event). An identifier may itself contain `:`, so parsing splits only at the first two. The value
-/// encodes to and from JSON as that string. ``Tag/address(_:relayURL:)`` builds an "a" tag from it.
+/// encodes to and from JSON as that string. ``Event/Tag/address(_:relayURL:)`` builds an "a" tag from it.
 /// https://github.com/nostr-protocol/nips/blob/master/01.md
 public struct EventCoordinate: Sendable, Hashable {
     /// The event kind.

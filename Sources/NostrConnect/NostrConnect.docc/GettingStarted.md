@@ -9,7 +9,7 @@ NostrConnect ships in the same package as `NostrClient`. Add the package depende
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/yysskk/swift-nostr", from: "0.5.0")
+    .package(url: "https://github.com/yysskk/swift-nostr", from: "0.9.0")
 ]
 ```
 
