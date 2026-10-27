@@ -35,8 +35,19 @@ public struct EventSigner: Sendable {
         keyPair.publicKey.npub
     }
 
-    /// Signs an unsigned event and returns a complete signed event
+    /// Signs an unsigned event and returns a complete signed event.
+    /// - Parameter unsignedEvent: The event to sign. Its `publicKey` must be this signer's
+    ///   ``publicKey``.
+    /// - Returns: The signed ``Event``.
+    /// - Throws: ``EventSigner/Error/publicKeyMismatch`` if `unsignedEvent` is keyed to another
+    ///   public key; an error if the event cannot be serialized for hashing or signed.
     public func sign(_ unsignedEvent: UnsignedEvent) throws -> Event {
+        // The id commits to the public key, so signing another key's event would produce one whose
+        // signature cannot verify.
+        guard unsignedEvent.publicKey == publicKey else {
+            throw Error.publicKeyMismatch
+        }
+
         // Serialize the event for hashing
         let serialized = try unsignedEvent.serializedForHashing()
 
@@ -94,6 +105,19 @@ public struct EventSigner: Sendable {
         _ ciphertext: String, from senderPublicKey: PublicKey
     ) throws(SealedMessage.Error) -> String {
         try SealedMessage(payload: ciphertext).open(from: senderPublicKey, using: keyPair)
+    }
+
+    /// Why ``EventSigner`` refused to sign an event.
+    public enum Error: Swift.Error, LocalizedError, Sendable, Equatable {
+        /// The event's `publicKey` is not this signer's ``EventSigner/publicKey``.
+        case publicKeyMismatch
+
+        public var errorDescription: String? {
+            switch self {
+            case .publicKeyMismatch:
+                return "The event's public key does not match the signer's"
+            }
+        }
     }
 }
 

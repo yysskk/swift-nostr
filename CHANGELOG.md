@@ -694,6 +694,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   that window found nothing to close and the REQ then registered it, leaving it open on the relay
   and replayed on reconnect. It is now recorded before the REQ is sent, and a REQ that fails to
   send restores what its ID held before unless a newer subscribe or unsubscribe has replaced it.
+- **`EventSigner` no longer signs another key's event** (breaking): `sign(_:)` copied the
+  `UnsignedEvent`'s public key into the result unchecked, so an event keyed to anyone else came back
+  with an id and signature that could not verify. It now throws the new
+  `EventSigner.Error.publicKeyMismatch`, and `NostrSigning.sign(_:)` requires every conformance to
+  reject such an event; `RemoteSigner` already did, with `RemoteSignerError.responseValidationFailed`.
 
 ## [0.8.0] - 2026-10-25
 

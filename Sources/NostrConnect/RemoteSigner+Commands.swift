@@ -30,7 +30,8 @@ extension RemoteSigner {
     ///   under that key.
     /// - Returns: The signed ``Event``.
     /// - Throws: ``RemoteSignerError/responseValidationFailed`` if the returned event fails to
-    ///   verify or does not match the request.
+    ///   verify or does not match the request — including when `event` is keyed to another public
+    ///   key, since the signer signs under the user's.
     public func sign(_ event: UnsignedEvent) async throws -> Event {
         let requestJSON = try encodeUnsignedEvent(event)
         let result = try await send(.signEvent, params: [requestJSON])
