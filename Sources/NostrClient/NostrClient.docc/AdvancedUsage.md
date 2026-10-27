@@ -444,7 +444,8 @@ public key is resolved once and cached, so ``NostrIdentityAPI/publicKey`` stays 
 hop.
 
 Every feature runs through the signer, so a remote one is a drop-in for a local key: the generic
-``NostrIdentityAPI/sign(_:)`` and ``NostrEventPublishing/publish(_:to:strategy:)-(EventTemplate,Set<RelayURL>?,_)``, the convenience `publish*`
+``NostrIdentityAPI/sign(_:)`` and
+``NostrEventPublishing/publish(_:route:strategy:)-(EventTemplate,_,_)``, the convenience `publish*`
 helpers, NIP-17 direct messages, NIP-51 private list items, and NIP-42 authentication all work
 unchanged. Set the signer and use the same API you would with an `nsec`:
 
@@ -634,25 +635,28 @@ let relayList = try await client.routing.fetchRelayList(for: try PublicKey(npub:
 print("Writes to: \(relayList?.writeRelays ?? [])")
 ```
 
-An **outbox read** subscribes to each author on *their* write relays, resolving and connecting
-relays on demand with ``NostrRoutingAPI/subscribeOutbox(authors:kinds:limit:)``:
+Pass ``RelayRoute/outbox`` as the `route:` of a read or a publish to route it by those lists,
+resolving and connecting relays on demand. An **outbox read** — a fetch, count, or subscription —
+asks each of the filters' authors on *their* write relays:
 
 ```swift
-let outbox = try await client.routing.subscribeOutbox(authors: follows)  // [PublicKey]
+let filter = Filter(authors: follows, kinds: [.textNote])  // follows: [PublicKey]
+let outbox = try await client.subscriptions.subscribe(filters: [filter], route: .outbox)
 for await event in outbox.events {
     print("Note: \(event.content)")
 }
 ```
 
-A **gossip publish** routes an event to the author's write relays plus the inbox (read) relays of
-every public key it mentions in `p` tags, with ``NostrRoutingAPI/publishGossip(_:strategy:)``:
+An **outbox publish** sends an event to the author's write relays plus the inbox (read) relays of
+every public key it mentions in `p` tags:
 
 ```swift
-let signer = EventSigner(keyPair: keyPair)
 let alice = try PublicKey(npub: "npub1...")
-let note = signer.sign(.textNote("gm!", tags: [.publicKey(alice)]))
-try await client.routing.publishGossip(note)
+try await client.events.publish(.textNote("gm!", tags: [.publicKey(alice)]), route: .outbox)
 ```
+
+Either falls back to the whole pool when the lists do not resolve, so no author or recipient is
+silently dropped.
 
 By default the client adds and connects resolved relays on demand (capped per resolve). Pass
 `gossipPolicy: .requirePresent` (a ``GossipRelayPolicy``) to `NostrClient(...)` to route only to
@@ -749,7 +753,7 @@ let client = NostrClient(relayPoolConfig: poolConfig)
 finish when the call passes no `timeout:`; pass one to override it for a single call:
 
 ```swift
-let events = try await client.events.fetch(filters: [filter], timeout: .seconds(5))
+let events = try await client.events.fetch(filters: [filter], route: .pool, timeout: .seconds(5))
 ```
 
 ### Publish Strategies
@@ -763,10 +767,10 @@ early never cancels the in-flight sends to slower relays.
 try await client.events.publish(event)
 
 // Wait until 2 relays acknowledge
-try await client.events.publish(event, strategy: .quorum(2))
+try await client.events.publish(event, route: .pool, strategy: .quorum(2))
 
 // Wait for every relay to settle (accept, reject, or time out)
-try await client.events.publish(event, strategy: .allSettled)
+try await client.events.publish(event, route: .pool, strategy: .allSettled)
 
 // Change the pool-wide default
 let poolConfig = RelayPoolConfig(defaultPublishStrategy: .allSettled)
@@ -783,7 +787,7 @@ print("failed:", result.failedRelays)
 print("still in flight:", result.pendingRelays)
 ```
 
-To send an event to chosen relays rather than the whole pool, pass `to:` — with an
+To send an event to chosen relays rather than the whole pool, pass `route: .relays(_:)` — with an
 already-signed event, or with an ``EventTemplate`` that is signed by the configured signer first.
 Targets must already be in the pool; ones that are not are skipped, and an empty set throws
 rather than broadcasting:
@@ -791,8 +795,8 @@ rather than broadcasting:
 ```swift
 let relay = try RelayURL(string: "wss://relay.example.com")
 await client.relays.add(relay)
-try await client.events.publish(event, to: [relay], strategy: .allSettled)
-let published = try await client.events.publish(.textNote("Only here"), to: [relay])  // PublishedEvent
+try await client.events.publish(event, route: .relays([relay]), strategy: .allSettled)
+let published = try await client.events.publish(.textNote("Only here"), route: .relays([relay]))  // PublishedEvent
 ```
 
 The convenience publish methods (``NostrEventPublishing/publishTextNote(content:tags:strategy:)``,
@@ -866,7 +870,7 @@ let opened = try await NostrList(event: listEvent, decryptingWith: signer)
 ``RelayPool`` automatically deduplicates events across relays using an in-memory cache.
 Deduplication is scoped to a single subscription: an event stored on several relays is
 delivered once, while an event matching two subscriptions is delivered to both — so
-overlapping feeds and repeated ``NostrEventFetching/fetch(filters:from:timeout:)-(_,Set<RelayURL>?,_)`` calls each see it.
+overlapping feeds and repeated ``NostrEventFetching/fetch(filters:route:timeout:)`` calls each see it.
 A subscription's cache is discarded when it ends, so a later subscription receives events its
 predecessor already delivered.
 

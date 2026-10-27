@@ -72,7 +72,7 @@ The package vends four libraries:
 | `client.relays` | Pool membership, connection lifecycle, and the underlying `RelayPool` |
 | `client.events` | Publishing, one-time fetches, NIP-23 long-form content |
 | `client.subscriptions` | Live subscriptions as async sequences |
-| `client.routing` | NIP-65 outbox/gossip and NIP-17 DM relay lists |
+| `client.routing` | NIP-65 relay lists (behind `route: .outbox`) and NIP-17 DM relay lists |
 | `client.messages` | NIP-17 private direct messages |
 | `client.groups` | NIP-29 relay-based groups and the kind-10009 group list |
 | `client.lists` | NIP-51 lists and sets |
@@ -143,8 +143,10 @@ print("Accepted by \(note.result.acceptedRelays.count) relay(s)")
 
 try await client.events.publishReaction(to: note.event, content: "🤙")
 
-// Any EventTemplate is signed with the configured signer, then sent to the whole pool or chosen relays.
-try await client.events.publish(.textNote("Only on relay 2"), to: [RelayURL(string: "wss://relay2.example.com")])
+// Any EventTemplate is signed with the configured signer, then sent along a RelayRoute:
+// the whole pool (the default), chosen relays, or the NIP-65 outbox.
+let relay2 = try RelayURL(string: "wss://relay2.example.com")
+try await client.events.publish(.textNote("Only on relay 2"), route: .relays([relay2]))
 ```
 
 A `RelayURL` is a validated `ws`/`wss` URL in canonical form (lowercased scheme and host, no root slash or default port), so every spelling of a relay names the same pool entry; `RelayURL(string:)` throws a `RelayURL.Error` naming why anything else is rejected.
@@ -319,7 +321,7 @@ Private groups require NIP-42 AUTH, which the client answers automatically once 
 Each of these is covered in depth, with worked examples, in the [documentation](https://yysskk.github.io/swift-nostr/documentation/nostrclient):
 
 - **Lightning Zaps (NIP-57)** — resolve an LNURL-pay endpoint, sign a zap request, fetch the bolt11 invoice, and verify the kind-9735 receipt.
-- **Outbox model (NIP-65)** — publish your read/write relay list and route reads/writes to each user's declared relays with `routing.subscribeOutbox` / `routing.publishGossip`.
+- **Outbox model (NIP-65)** — publish your read/write relay list and route reads/writes to each user's declared relays by passing `route: .outbox` to a publish, fetch, or subscription.
 - **Client authentication (NIP-42)** — AUTH challenges are answered automatically once a signer is set, with auth-required publish retry; an opt-in manual mode is available.
 - **HTTP authorization (NIP-98)** — sign requests with `URLRequest.setNostrAuthorization(signer:)` or `EventTemplate.httpAuthorization(url:method:payload:)`, and validate incoming headers with `HTTPAuth.validate`.
 - **Relay-based groups (NIP-29)** — parse `naddr` share links with `GroupReference`, join and leave, chat with timeline references, moderate with `Groups.ModerationAction`, fetch validated relay-signed state with `groups.fetchState`, and keep the kind-10009 simple group list fresh.

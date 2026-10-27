@@ -3,9 +3,8 @@ import NostrClient
 import NostrCore
 
 /// A stand-in for ``NostrRoutingAPI`` that implements only the ``NostrRelayRouting`` primitives: it
-/// records every call, signs each published list for real without sending it, answers fetches with
-/// canned lists, and opens each outbox subscription as an already-finished sequence, so the protocol
-/// extension can be exercised without a relay pool.
+/// records every call, signs each published list for real without sending it, and answers fetches
+/// with canned lists, so the protocol extension can be exercised without a relay pool.
 actor RecordingRoutingCapabilities: NostrRelayRouting {
     struct Fetch: Sendable, Equatable {
         let publicKey: PublicKey
@@ -22,17 +21,6 @@ actor RecordingRoutingCapabilities: NostrRelayRouting {
         let strategy: PublishStrategy?
     }
 
-    struct OutboxSubscribe: Sendable, Equatable {
-        let authors: [PublicKey]
-        let kinds: [Event.Kind]
-        let limit: Int?
-    }
-
-    struct GossipPublish: Sendable {
-        let event: Event
-        let strategy: PublishStrategy?
-    }
-
     /// Signs the published lists.
     let signer: EventSigner
     /// What every relay-list fetch returns.
@@ -44,8 +32,6 @@ actor RecordingRoutingCapabilities: NostrRelayRouting {
     private(set) var directMessageRelayListFetches: [Fetch] = []
     private(set) var relayListPublishes: [RelayListPublish] = []
     private(set) var directMessageRelayListPublishes: [DirectMessageRelayListPublish] = []
-    private(set) var outboxSubscribes: [OutboxSubscribe] = []
-    private(set) var gossipPublishes: [GossipPublish] = []
     private(set) var inboxConnects = 0
 
     init(
@@ -73,22 +59,6 @@ actor RecordingRoutingCapabilities: NostrRelayRouting {
         relayListPublishes.append(RelayListPublish(relayList: relayList, strategy: strategy))
         return PublishedEvent(
             event: signer.sign(.relayListMetadata(relayList)), result: PublishResult(statuses: [:]))
-    }
-
-    func subscribeOutbox(
-        authors: [PublicKey], kinds: [Event.Kind], limit: Int?
-    ) async throws(RelayPool.Error) -> SubscriptionSequence {
-        outboxSubscribes.append(OutboxSubscribe(authors: authors, kinds: kinds, limit: limit))
-        let (stream, continuation) = AsyncStream.makeStream(of: SubscriptionEvent.self)
-        continuation.finish()
-        return SubscriptionSequence(
-            id: SubscriptionID(rawValue: "outbox_\(outboxSubscribes.count)"), expectedRelays: [], stream: stream,
-            onClose: {})
-    }
-
-    func publishGossip(_ event: Event, strategy: PublishStrategy?) async throws -> PublishResult {
-        gossipPublishes.append(GossipPublish(event: event, strategy: strategy))
-        return PublishResult(statuses: [:])
     }
 
     func fetchDirectMessageRelayList(

@@ -37,7 +37,7 @@ The client's API is reached through eight namespaces rather than as a flat list 
 | ``NostrClient/relays`` | Pool membership, connection lifecycle, and the underlying ``RelayPool`` |
 | ``NostrClient/events`` | Publishing, one-time fetches, NIP-23 long-form content |
 | ``NostrClient/subscriptions`` | Live subscriptions as async sequences |
-| ``NostrClient/routing`` | NIP-65 outbox/gossip and NIP-17 DM relay lists |
+| ``NostrClient/routing`` | NIP-65 relay lists behind ``RelayRoute/outbox``, and NIP-17 DM relay lists |
 | ``NostrClient/messages`` | NIP-17 private direct messages |
 | ``NostrClient/groups`` | NIP-29 relay-based groups and the kind-10009 group list |
 | ``NostrClient/lists`` | NIP-51 lists and sets |
@@ -144,6 +144,7 @@ add NIP helpers and namespaces of your own; see <doc:ExtendingTheClient>.
 
 - ``RelayPool``
 - ``RelayPoolConfig``
+- ``RelayRoute``
 - ``AuthenticationMode``
 
 ### Outbox Model (NIP-65)

@@ -390,7 +390,7 @@ struct NIP45CountTests {
         // Target relay A only, spelled differently from its pool key.
         let task = Task {
             try await client.events.countEvents(
-                matching: [Filter(kinds: [.textNote])], from: [RelayURL("WSS://Relay-A.example.com/")!])
+                matching: [Filter(kinds: [.textNote])], route: .relays([RelayURL("WSS://Relay-A.example.com/")!]))
         }
 
         try await pollUntil { mockA.sentTextFrames.contains { $0.hasPrefix("[\"COUNT\"") } }

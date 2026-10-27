@@ -26,7 +26,7 @@ extension NostrClient {
     /// Live subscriptions as async sequences.
     public nonisolated var subscriptions: NostrSubscriptionsAPI { NostrSubscriptionsAPI(client: self) }
 
-    /// Relay discovery and routing: NIP-65 outbox/gossip and NIP-17 DM relay lists.
+    /// Relay discovery: the NIP-65 relay lists behind ``RelayRoute/outbox``, and NIP-17 DM relay lists.
     public nonisolated var routing: NostrRoutingAPI { NostrRoutingAPI(client: self) }
 
     /// NIP-17 private direct messages.

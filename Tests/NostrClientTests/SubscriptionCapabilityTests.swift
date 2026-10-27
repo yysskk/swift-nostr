@@ -7,7 +7,7 @@ import Testing
 
 /// The ``NostrSubscribing`` short forms are written once, in a protocol extension over the
 /// primitives. Driving them through a stub that implements only the primitives shows what each one
-/// forwards — filters, targets, and buffering policy, defaults included — without a relay pool.
+/// forwards — filters, route, and buffering policy, defaults included — without a relay pool.
 @Suite("Subscription Capability Tests")
 struct SubscriptionCapabilityTests {
     private let relayA = RelayURL("wss://a.example.com")!
@@ -34,10 +34,10 @@ struct SubscriptionCapabilityTests {
         return "unknown"
     }
 
-    // MARK: - Subscribe primitive's short forms
+    // MARK: - Subscribe primitive's short form
 
-    @Test("subscribing without targets opens on the whole pool with unbounded buffering")
-    func subscribeShortFormBroadcasts() async throws {
+    @Test("subscribing without a route opens on the whole pool with unbounded buffering")
+    func subscribeShortFormDefaultsToPool() async throws {
         let event = try note("live")
         let stub = RecordingSubscriptionCapabilities(cannedItems: [
             .eose(relayURL: relayA), .event(relayURL: relayA, event: event),
@@ -49,7 +49,7 @@ struct SubscriptionCapabilityTests {
 
         let recorded = try await onlySubscribe(stub)
         #expect(recorded.filters == [filter])
-        #expect(recorded.relayURLs == nil)
+        #expect(recorded.route == .pool)
         #expect(policy(recorded.bufferingPolicy) == "unbounded")
         // The sequence handed back is the primitive's, unchanged.
         var relays: [RelayURL] = []
@@ -59,35 +59,22 @@ struct SubscriptionCapabilityTests {
         #expect(relays == [relayA, relayA])
     }
 
-    @Test("subscribing without targets forwards a custom buffering policy")
-    func subscribeShortFormForwardsBufferingPolicy() async throws {
+    @Test("subscribing along a route forwards it with unbounded buffering, an empty relay set included")
+    func subscribeShortFormForwardsRoute() async throws {
         let stub = RecordingSubscriptionCapabilities()
         let subscriptions: any NostrSubscribing = stub
+        let filter = Filter(authors: [PublicKey.fixture("author")], kinds: [.textNote])
 
-        _ = try await subscriptions.subscribe(
-            filters: [Filter(kinds: [.textNote])], bufferingPolicy: .bufferingNewest(5))
-
-        let recorded = try await onlySubscribe(stub)
-        #expect(recorded.relayURLs == nil)
-        #expect(policy(recorded.bufferingPolicy) == "newest(5)")
-    }
-
-    @Test("subscribing to chosen relays forwards them, an empty set included")
-    func subscribeShortFormTargets() async throws {
-        let stub = RecordingSubscriptionCapabilities()
-        let subscriptions: any NostrSubscribing = stub
-        let filter = Filter(kinds: [.textNote])
-
-        _ = try await subscriptions.subscribe(filters: [filter], to: [relayA, relayB])
-        _ = try await subscriptions.subscribe(filters: [filter], to: [relayB], bufferingPolicy: .bufferingOldest(2))
-        // An empty set stays a set — it reaches the primitive, which rejects it, rather than
-        // collapsing to nil and subscribing on the whole pool.
+        _ = try await subscriptions.subscribe(filters: [filter], route: .relays([relayA, relayB]))
+        _ = try await subscriptions.subscribe(filters: [filter], route: .outbox)
+        // An empty set stays a `.relays` route — it reaches the primitive, which rejects it, rather
+        // than collapsing to the whole pool.
         await #expect(throws: RelayPool.Error.noMatchingRelays([])) {
-            try await subscriptions.subscribe(filters: [filter], to: [])
+            try await subscriptions.subscribe(filters: [filter], route: .relays([]))
         }
 
         let recorded = await stub.subscribes
-        #expect(recorded.map(\.relayURLs) == [[relayA, relayB], [relayB], []])
-        #expect(recorded.map { policy($0.bufferingPolicy) } == ["unbounded", "oldest(2)", "unbounded"])
+        #expect(recorded.map(\.route) == [.relays([relayA, relayB]), .outbox, .relays([])])
+        #expect(recorded.allSatisfy { policy($0.bufferingPolicy) == "unbounded" })
     }
 }

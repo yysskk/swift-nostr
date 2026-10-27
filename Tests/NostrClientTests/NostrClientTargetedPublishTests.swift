@@ -41,11 +41,9 @@ struct NostrClientTargetedPublishTests {
     func publishReachesOnlyTargetedRelays() async throws {
         let (client, sockets) = try await makeClient(relayURLs: [urlA, urlB, urlC])
         let event = try makeEvent()
+        let targets: Set = [RelayURL("wss://a.example.com")!, RelayURL("wss://c.example.com")!]
 
-        let task = Task {
-            try await client.events.publish(
-                event, to: [RelayURL("wss://a.example.com")!, RelayURL("wss://c.example.com")!], strategy: .allSettled)
-        }
+        let task = Task { try await client.events.publish(event, route: .relays(targets), strategy: .allSettled) }
         let sentToA = try await PublishAckSupport.acknowledgePublish(on: sockets[0])
         let sentToC = try await PublishAckSupport.acknowledgePublish(on: sockets[2])
         let result = try await task.value
@@ -65,7 +63,8 @@ struct NostrClientTargetedPublishTests {
 
         // Upper-case host and a root trailing slash normalize to relay A's pool key.
         let result = try await PublishAckSupport.acknowledgingPublishes(on: sockets[0]) {
-            try await client.events.publish(event, to: [RelayURL("wss://A.EXAMPLE.COM/")!], strategy: .allSettled)
+            try await client.events.publish(
+                event, route: .relays([RelayURL("wss://A.EXAMPLE.COM/")!]), strategy: .allSettled)
         }
 
         #expect(result.acceptedRelays == [urlA])
@@ -80,7 +79,7 @@ struct NostrClientTargetedPublishTests {
 
         let result = try await PublishAckSupport.acknowledgingPublishes(on: sockets[0]) {
             try await client.events.publish(
-                event, to: [RelayURL("wss://a.example.com")!, RelayURL("wss://unknown.example.com")!],
+                event, route: .relays([RelayURL("wss://a.example.com")!, RelayURL("wss://unknown.example.com")!]),
                 strategy: .allSettled)
         }
 
@@ -96,7 +95,7 @@ struct NostrClientTargetedPublishTests {
         let (client, sockets) = try await makeClient(relayURLs: [urlA, urlB, urlC])
         let event = try makeEvent()
 
-        let task = Task { try await client.events.publish(event, to: nil, strategy: .allSettled) }
+        let task = Task { try await client.events.publish(event, route: .pool, strategy: .allSettled) }
         for socket in sockets {
             try await PublishAckSupport.acknowledgePublish(on: socket)
         }
@@ -113,7 +112,8 @@ struct NostrClientTargetedPublishTests {
         try await client.identity.setPrivateKey(keyPair.privateKey.hex)
 
         let task = Task {
-            try await client.events.publish(.textNote("templated"), to: [urlA, urlC], strategy: .allSettled)
+            try await client.events.publish(
+                .textNote("templated"), route: .relays([urlA, urlC]), strategy: .allSettled)
         }
         let sentToA = try await PublishAckSupport.acknowledgePublish(on: sockets[0])
         let sentToC = try await PublishAckSupport.acknowledgePublish(on: sockets[2])
@@ -137,7 +137,7 @@ struct NostrClientTargetedPublishTests {
         try await client.identity.setPrivateKey(KeyPair().privateKey.hex)
 
         await #expect(throws: RelayPool.Error.noMatchingRelays([])) {
-            try await client.events.publish(.textNote("nowhere"), to: [])
+            try await client.events.publish(.textNote("nowhere"), route: .relays([]))
         }
         #expect(sockets.allSatisfy { PublishAckSupport.eventFrames(in: $0).isEmpty })
         await client.relays.disconnect()
@@ -149,7 +149,7 @@ struct NostrClientTargetedPublishTests {
         let event = try makeEvent()
 
         await #expect(throws: RelayPool.Error.noMatchingRelays([])) {
-            try await client.events.publish(event, to: [])
+            try await client.events.publish(event, route: .relays([]))
         }
         #expect(sockets.allSatisfy { PublishAckSupport.eventFrames(in: $0).isEmpty })
         await client.relays.disconnect()
@@ -161,7 +161,7 @@ struct NostrClientTargetedPublishTests {
         let event = try makeEvent()
 
         await #expect(throws: RelayPool.Error.noMatchingRelays([RelayURL("wss://unknown.example.com")!])) {
-            try await client.events.publish(event, to: [RelayURL("wss://Unknown.Example.com/")!])
+            try await client.events.publish(event, route: .relays([RelayURL("wss://Unknown.Example.com/")!]))
         }
         #expect(PublishAckSupport.eventFrames(in: sockets[0]).isEmpty)
         #expect(await client.relays.relayCount == 1)

@@ -44,7 +44,7 @@ public struct NostrIdentityAPI: NostrIdentityProviding {
     /// Signs `template` as ``publicKey`` with the configured signer, local or remote.
     ///
     /// To sign and publish an event this library has no helper for in one step, use
-    /// ``NostrEventPublishing/publish(_:to:strategy:)-(EventTemplate,Set<RelayURL>?,_)``.
+    /// ``NostrEventPublishing/publish(_:route:strategy:)-(EventTemplate,_,_)``.
     /// - Parameter template: The event to sign.
     /// - Returns: The signed ``Event``.
     /// - Throws: ``NostrClient/Error/signerNotSet`` if no signer is set, plus anything the signer throws.

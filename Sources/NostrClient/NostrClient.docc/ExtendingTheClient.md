@@ -15,10 +15,10 @@ Each capability protocol — ``NostrEventPublishing``, ``NostrEventFetching``,
 ``NostrIdentityProviding``, and the rest — requires only its primitives: the minimal operations
 everything else is built from, every parameter spelled out, since Swift does not allow default
 argument values on protocol requirements. ``NostrEventPublishing`` requires just
-``NostrEventPublishing/publish(_:to:strategy:)-(EventTemplate,Set<RelayURL>?,_)`` and its
+``NostrEventPublishing/publish(_:route:strategy:)-(EventTemplate,_,_)`` and its
 signed-event counterpart; ``NostrEventFetching`` requires
-``NostrEventFetching/fetch(filters:from:timeout:)-(_,Set<RelayURL>?,_)`` and
-``NostrEventFetching/countEvents(matching:from:timeout:)-(_,Set<RelayURL>?,_)``.
+``NostrEventFetching/fetch(filters:route:timeout:)`` and
+``NostrEventFetching/countEvents(matching:route:timeout:)``.
 
 The conveniences — NIP helpers such as
 ``NostrEventPublishing/publishTextNote(content:tags:strategy:)`` and short forms of the primitives
@@ -51,7 +51,7 @@ extension NostrEventPublishing {
         if let expiration {
             template.tags.append(.expiration(expiration))
         }
-        return try await publish(template, strategy: strategy)
+        return try await publish(template, route: .pool, strategy: strategy)
     }
 }
 
@@ -93,7 +93,8 @@ public struct ZapsAPI: Sendable {
     public func received(limit: Int = 50, timeout: Duration? = nil) async throws -> [ZapReceipt] {
         guard let publicKey = await identity.publicKey else { throw NostrClient.Error.signerNotSet }
         let filter = Filter(kinds: [.zap], publicKeyReferences: [publicKey], limit: limit)
-        return try await events.fetch(filters: [filter], timeout: timeout).compactMap(ZapReceipt.init(event:))
+        return try await events.fetch(filters: [filter], route: .pool, timeout: timeout)
+            .compactMap(ZapReceipt.init(event:))
     }
 }
 
@@ -127,12 +128,12 @@ actor CannedEvents: NostrEventFetching {
 
     init(_ events: [Event]) { self.events = events }
 
-    func fetch(filters: [Filter], from relayURLs: Set<RelayURL>?, timeout: Duration?) async throws -> [Event] {
+    func fetch(filters: [Filter], route: RelayRoute, timeout: Duration?) async throws -> [Event] {
         requests.append(filters)
         return events
     }
 
-    func countEvents(matching filters: [Filter], from relayURLs: Set<RelayURL>?, timeout: Duration?) async throws -> Int {
+    func countEvents(matching filters: [Filter], route: RelayRoute, timeout: Duration?) async throws -> Int {
         events.count
     }
 }
@@ -153,4 +154,4 @@ actor CannedEvents: NostrEventFetching {
 
 A helper is tested the same way: `publishStatus` called on a stub ``NostrEventPublishing`` hands
 the template it built to the stub's
-``NostrEventPublishing/publish(_:to:strategy:)-(EventTemplate,Set<RelayURL>?,_)``.
+``NostrEventPublishing/publish(_:route:strategy:)-(EventTemplate,_,_)``.

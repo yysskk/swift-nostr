@@ -11,7 +11,7 @@ extension NostrClient {
     /// the whole pool. A nil `timeout` resolves to the pool's ``RelayPoolConfig/queryTimeout``
     /// here, so the public wrappers just forward the caller's optional.
     ///
-    /// Backs ``NostrEventFetching/fetch(filters:from:timeout:)-(_,Set<RelayURL>?,_)``.
+    /// Backs ``NostrEventFetching/fetch(filters:route:timeout:)``.
     func fetch(
         filters: [Filter],
         fromURLs relayURLs: Set<RelayURL>?,
@@ -23,10 +23,14 @@ extension NostrClient {
         let timeoutTask = Task {
             do {
                 try await Task.sleep(for: timeout)
-                await subscription.close()
             } catch {
                 // Cancelled because fetch finished first: nothing to do.
+                return
             }
+            // Closing ends the stream, so fetch returns and cancels this task while the CLOSE frames
+            // are still being sent — and a cancelled send counts as a failed one, which drops the
+            // connection. The close therefore runs in a task of its own.
+            await Task { await subscription.close() }.value
         }
         defer { timeoutTask.cancel() }
 

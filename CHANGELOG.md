@@ -78,11 +78,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   template's NIP-03 `ots` tag, replacing any existing one.
 - **`RelayListMetadata(read:write:)` is public**, building a NIP-65 list from read and write relay
   URLs (a URL in both is read+write).
-- **`events.publish(_:to:strategy:)` signs and publishes an `EventTemplate`**: the template is
-  signed by the configured signer, local or remote, then sent to the whole pool or — with `to:` — to
-  chosen relays, with the same targeting rules as publishing a signed event (an empty set throws,
-  relays not in the pool are skipped). It returns a `PublishedEvent`. `publish(_:strategy:)` is the
-  whole-pool short form.
+- **`RelayRoute` says which relays an operation goes to**: `.pool` (every relay in the pool),
+  `.relays(Set<RelayURL>)` (exactly these — relays not in the pool are skipped, and when none is
+  pooled, an empty set included, the call throws `RelayPool.Error.noMatchingRelays`), or `.outbox`
+  (NIP-65). Every publish, fetch, count, and subscription takes one as `route:`. Along `.outbox` a
+  publish reaches the author's WRITE relays plus the READ relays of its "p"-tagged keys, and a fetch,
+  count, or subscription reaches the WRITE relays of the filters' authors; relay lists are fetched
+  when not cached and connected per the `GossipRelayPolicy`, and the route falls back to the whole
+  pool when they do not resolve — for a read, also when a filter names no authors or any author has
+  no known list. The lists not yet cached are discovered together in one kind-10002 query, and a
+  key that query returns no list for is not looked up again until a list for it arrives. A publish
+  whose author has no available WRITE relay goes to the whole pool as well as the recipients' READ
+  relays.
+- **`events.publish(_:route:strategy:)` signs and publishes an `EventTemplate`**: the template is
+  signed by the configured signer, local or remote, then sent along the route with the same rules as
+  publishing a signed event; `.outbox` resolves from the signed event. It returns a
+  `PublishedEvent`. `publish(_:route:)` is the short form, with `route` defaulting to `.pool`.
 - **`SubscriptionSequence(id:expectedRelays:stream:onClose:)` is public**, so a stub
   `NostrSubscribing` conformer can return a subscription over its own `AsyncStream`; `onClose` runs on
   every `close()`.
@@ -114,6 +125,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Operations take a `RelayRoute` instead of an optional relay set, and the outbox methods are
+  removed** (breaking): nil no longer means the whole pool, and each operation has one short form,
+  whose `route` defaults to `.pool`. To pass a `strategy` or `timeout`, spell out the primitive with
+  `route: .pool`.
+  - `events.publish(_:to:strategy:)` (template and signed event) → `publish(_:route:strategy:)`;
+    the short forms `publish(_:strategy:)` and `publish(_:to:strategy:)` → `publish(_:route:)`.
+  - `events.fetch(filters:from:timeout:)` → `fetch(filters:route:timeout:)`; `fetch(filters:timeout:)`
+    and `fetch(filters:from:timeout:)` with a non-optional set → `fetch(filters:route:)`.
+  - `events.countEvents(matching:from:timeout:)` → `countEvents(matching:route:timeout:)`;
+    `countEvents(matching:timeout:)` and its targeted short form → `countEvents(matching:route:)`.
+  - `subscriptions.subscribe(filters:to:bufferingPolicy:)` → `subscribe(filters:route:bufferingPolicy:)`;
+    `subscribe(filters:bufferingPolicy:)` and its targeted short form → `subscribe(filters:route:)`,
+    which buffers without bound.
+  - `routing.subscribeOutbox(authors:kinds:limit:)` and its short forms are removed:
+    `subscriptions.subscribe(filters: [Filter(authors:kinds:limit:)], route: .outbox)`.
+  - `routing.publishGossip(_:strategy:)` and `publishGossip(_:)` are removed:
+    `events.publish(_:route: .outbox)` or `publish(_:route:strategy:)`.
+
 - **Every live stream opens with `subscribe`, and each primitive has one short form** (breaking):
   a namespace's stream-opening method is `subscribe(...)`, with arguments naming what to receive.
   - `client.subscriptions`: `events(filters:)` and `events(filters:to:)` are removed; read
@@ -130,8 +159,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     forms are one, `subscribe(to:kinds:since:limit:)`, with every argument after the group
     defaulting to nil.
   - Each primitive keeps at most one short form, with other argument labels, so none needs a
-    disambiguated documentation link. Outside relay targeting, the short form drops the trailing
-    `timeout` or `strategy`; to pass one, spell out the primitive. `lists.fetch(kind:timeout:)`,
+    disambiguated documentation link. The short form drops the trailing `timeout` or `strategy`; to
+    pass one, spell out the primitive. `lists.fetch(kind:timeout:)`,
     `fetchSet(kind:identifier:timeout:)`, `fetchSets(kind:timeout:)`, and
     `groups.fetchSimpleGroupList(timeout:)` are the primitives with `for: nil`
     (`fetch(kind: .muteList, for: nil, timeout: .seconds(2))`), `groups.fetchMetadata(for:timeout:)`
@@ -447,9 +476,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `remove(_:)`, and `relay(for:)` each take one `RelayURL`, and `addRelays(_:)`, `relays.add(_:)`, and
   `relays.connect(to:)` take any sequence of them; none of the membership calls throws any more.
 - **Relay targets are a `Set<RelayURL>?`** (breaking): the `to:` parameter of `RelayPool.publish`,
-  `count`, and `subscribe`, of `client.events.publish`, `fetch`, and `count`, and of
-  `client.subscriptions.subscribe` and `events` (and their capability-protocol requirements) was
-  `[String]?`. Nil still broadcasts to the whole pool, an empty set still throws, and targets not in
+  `count`, and `subscribe` was `[String]?`; the client's operations take a `RelayRoute` instead (see
+  above). Nil still broadcasts to the whole pool, an empty set still throws, and targets not in
   the pool are still skipped; an invalid target can no longer reach these calls, so they no longer
   throw `invalidRelayURL`. `RelayPool.Error.noMatchingRelays` carries `[RelayURL]`, sorted by canonical
   string.
@@ -816,6 +844,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A fetch that times out no longer drops relay connections**: the timeout closed the subscription,
+  which let the fetch return and cancel the close while its `CLOSE` frames were still being sent;
+  a cancelled send counts as a failed one, so the relay was marked failed and a later publish or
+  fetch on it failed or waited out its timeout. The close now runs to completion on its own.
 - **A subscription or fetch whose targets are not in the pool no longer sends a stray CLOSE**:
   when none of the targeted relays was in the pool (`noMatchingRelays`), the client still sent `CLOSE`
   for the never-opened subscription to every relay in the pool. Nothing is sent now, so `fetchLongFormContent(naddr:)` falling back from relay

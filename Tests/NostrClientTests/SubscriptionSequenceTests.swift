@@ -108,7 +108,7 @@ struct SubscriptionSequenceTests {
         let (client, socket) = try await makeConnectedClient()
 
         let subscription = try await client.subscriptions.subscribe(
-            filters: [Filter()], to: [RelayURL("WSS://Relay.Example.COM/")!])
+            filters: [Filter()], route: .relays([RelayURL("WSS://Relay.Example.COM/")!]))
         try await NIP42TestSupport.pollUntil {
             socket.sentTextFrames.contains { $0.hasPrefix("[\"REQ\"") }
         }
@@ -226,8 +226,8 @@ struct SubscriptionSequenceTests {
         await client.relays.disconnect()
     }
 
-    @Test("subscribeOutbox returns a sequence using the cached relay list")
-    func subscribeOutboxReturnsSequence() async throws {
+    @Test("an outbox subscription returns a sequence using the cached relay list")
+    func outboxSubscriptionReturnsSequence() async throws {
         // .requirePresent keeps the gossip resolver from dialing relays that are
         // not already in the pool, so the test stays on the single mock relay.
         let (client, socket) = try await makeConnectedClient(gossipPolicy: .requirePresent)
@@ -238,7 +238,9 @@ struct SubscriptionSequenceTests {
         }
         let author = await client.identity.publicKey!
 
-        let outbox = try await client.routing.subscribeOutbox(authors: [author])
+        let outbox = try await client.subscriptions.subscribe(
+            filters: [Filter(authors: [author], kinds: [.textNote])], route: .outbox)
+        #expect(outbox.expectedRelays == [relayURL])
         #expect(await client.activeSubscriptionCount == 1)
         await outbox.close()
         #expect(await client.activeSubscriptionCount == 0)
