@@ -21,7 +21,7 @@ actor FakeWalletConnectTransport: RelayTransport {
 
     init() {}
 
-    func connect() async throws {
+    func connect() async throws(RelayConnection.Error) {
         connectCount += 1
         if !isGateOpen {
             await withCheckedContinuation { gate = $0 }
@@ -29,7 +29,7 @@ actor FakeWalletConnectTransport: RelayTransport {
         isConnected = true
     }
 
-    func subscribe(id: String, filters: [Filter]) async throws {
+    func subscribe(id: String, filters: [Filter]) async throws(RelayConnection.Error) {
         subscriptions[id] = filters
     }
 
@@ -37,7 +37,7 @@ actor FakeWalletConnectTransport: RelayTransport {
         subscriptions[id] = nil
     }
 
-    func send(_ event: Event) async throws {
+    func send(_ event: Event) async throws(RelayConnection.Error) {
         if subscriptions.isEmpty {
             sendsBeforeSubscribe += 1
         }

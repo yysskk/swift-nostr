@@ -97,7 +97,7 @@ public protocol NostrRelayManaging: Sendable {
     /// Connects to all relays in the pool.
     /// - Throws: ``RelayPool/Error/allConnectionsFailed`` if every relay in the pool fails to connect;
     ///   partial connection failures are tolerated.
-    func connect() async throws
+    func connect() async throws(RelayPool.Error)
     /// Disconnects from all relays, ending every open subscription.
     func disconnect() async
 
@@ -230,7 +230,7 @@ public protocol NostrSubscribing: Sendable {
         filters: [Filter],
         to relayURLs: Set<RelayURL>?,
         bufferingPolicy: AsyncStream<SubscriptionEvent>.Continuation.BufferingPolicy
-    ) async throws -> SubscriptionSequence
+    ) async throws(RelayPool.Error) -> SubscriptionSequence
 
     /// Closes one subscription; a no-op for unknown IDs.
     func unsubscribe(subscriptionID: String) async
@@ -281,11 +281,11 @@ public protocol NostrRelayRouting: Sendable {
     ///   - kinds: The event kinds to receive.
     ///   - limit: How many stored events each relay sends before live ones, or nil for no limit.
     /// - Returns: The subscription.
-    /// - Throws: ``RelayPool/Error/emptyPool`` when the fallback finds the pool empty, or the errors
-    ///   of opening the subscription.
+    /// - Throws: ``RelayPool/Error/emptyPool`` when the fallback finds the pool empty, or
+    ///   ``RelayPool/Error/subscriptionFailed`` when every relay fails to subscribe.
     func subscribeOutbox(
         authors: [PublicKey], kinds: [Event.Kind], limit: Int?
-    ) async throws -> SubscriptionSequence
+    ) async throws(RelayPool.Error) -> SubscriptionSequence
     /// Publishes a signed event using the NIP-65 gossip model: to the author's own WRITE relays plus
     /// the READ (inbox) relays of every public key in its "p" tags, so mentions and replies reach
     /// their recipients.
@@ -335,7 +335,7 @@ public protocol NostrRelayRouting: Sendable {
     /// - Returns: The connected inbox relay URLs (empty if you have advertised no DM relay list).
     /// - Throws: ``NostrClient/Error/signerNotSet`` if no signer is configured.
     @discardableResult
-    func connectDirectMessageInboxRelays() async throws -> Set<RelayURL>
+    func connectDirectMessageInboxRelays() async throws(NostrClient.Error) -> Set<RelayURL>
 }
 // MARK: - Messages
 

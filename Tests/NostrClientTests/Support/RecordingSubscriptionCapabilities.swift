@@ -35,7 +35,7 @@ actor RecordingSubscriptionCapabilities: NostrSubscribing {
         filters: [Filter],
         to relayURLs: Set<RelayURL>?,
         bufferingPolicy: AsyncStream<SubscriptionEvent>.Continuation.BufferingPolicy
-    ) async throws -> SubscriptionSequence {
+    ) async throws(RelayPool.Error) -> SubscriptionSequence {
         subscribes.append(Subscribe(filters: filters, relayURLs: relayURLs, bufferingPolicy: bufferingPolicy))
         try checkTargets(relayURLs)
 
@@ -62,11 +62,11 @@ actor RecordingSubscriptionCapabilities: NostrSubscribing {
 
     // MARK: - Private
 
-    private func checkTargets(_ relayURLs: Set<RelayURL>?) throws {
+    private func checkTargets(_ relayURLs: Set<RelayURL>?) throws(RelayPool.Error) {
         guard let relayURLs else { return }
         let reachable = pooledRelays.map { relayURLs.intersection($0) } ?? relayURLs
         guard !reachable.isEmpty else {
-            throw RelayPool.Error.noMatchingRelays(relayURLs.sorted { $0.description < $1.description })
+            throw .noMatchingRelays(relayURLs.sorted { $0.description < $1.description })
         }
     }
 }

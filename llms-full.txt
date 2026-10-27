@@ -126,7 +126,11 @@ come from its extension. `NostrGroupManaging` requires `publish(_:in:strategy:)`
 `join`, `leave`, `publishMessage`, and `publishModeration` come from its extension, built on the
 `EventTemplate.group*` factories. Every protocol follows this rule, so a stub implements only the
 primitives. `NostrRelayManaging` deliberately omits `pool`: the pool carries publish,
-subscribe, and count too, so it stays on the concrete `NostrRelaysAPI`.
+subscribe, and count too, so it stays on the concrete `NostrRelaysAPI`. A requirement whose errors
+come from one type declares it: `connect()`, `subscribe(filters:to:bufferingPolicy:)`, and
+`subscribeOutbox(authors:kinds:limit:)` (with their short forms and the feeds) are
+`throws(RelayPool.Error)`, and `connectDirectMessageInboxRelays()` is `throws(NostrClient.Error)`.
+The rest stay untyped: they forward the signer's errors, or mix pool, relay, and cancellation errors.
 
 `NostrClient` itself exposes only its initializers and these namespaces.
 
@@ -1692,7 +1696,8 @@ Cases: `.disconnected`, `.connecting`, `.connected`, `.disconnecting`, `.failed(
 A session's seam over relay I/O (protocol: Sendable). A NIP-46 signer session (`RemoteSigner`) or a
 NIP-47 wallet connection (`WalletConnection`) talks to this instead of touching relays directly, and
 both accept one in their initializer. Requirements: `connect()`, `subscribe(id:filters:)`,
-`unsubscribe(id:)`, `send(_:)`, `events() -> AsyncStream<Event>`, `disconnect()`. Request events in
+`unsubscribe(id:)`, `send(_:)`, `events() -> AsyncStream<Event>`, `disconnect()`; `connect()`,
+`subscribe(id:filters:)`, and `send(_:)` are `throws(RelayConnection.Error)`. Request events in
 both protocols are ephemeral, so `send(_:)` is fire-and-forget -- the matching response on `events()`
 is the completion signal, not a relay `OK`.
 

@@ -237,6 +237,33 @@ struct NostrClientNamespaceTests {
         await client.relays.disconnect()
     }
 
+    // MARK: - Typed errors through the protocols
+
+    @Test("subscriptions throws RelayPool.Error through NostrSubscribing")
+    func subscribingThrowsTypedError() async {
+        let subscriptions: any NostrSubscribing = NostrClient().subscriptions
+
+        await #expect(throws: RelayPool.Error.emptyPool) {
+            try await subscriptions.subscribe(filters: [Filter(kinds: [.textNote])])
+        }
+        await #expect(throws: RelayPool.Error.emptyPool) {
+            try await subscriptions.globalFeed()
+        }
+    }
+
+    @Test("routing throws RelayPool.Error and NostrClient.Error through NostrRelayRouting")
+    func routingThrowsTypedErrors() async {
+        let routing: any NostrRelayRouting = NostrClient().routing
+
+        // No relay list resolves on an empty pool, so the outbox falls back to the whole pool.
+        await #expect(throws: RelayPool.Error.emptyPool) {
+            try await routing.subscribeOutbox(authors: [PublicKey.fixture("author")])
+        }
+        await #expect(throws: NostrClient.Error.signerNotSet) {
+            try await routing.connectDirectMessageInboxRelays()
+        }
+    }
+
     // MARK: - Namespaces are values
 
     @Test("a namespace is Sendable and survives being handed to another task")

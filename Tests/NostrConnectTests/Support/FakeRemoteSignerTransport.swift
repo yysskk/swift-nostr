@@ -16,12 +16,12 @@ actor FakeRemoteSignerTransport: RelayTransport {
 
     init() {}
 
-    func connect() async throws {
+    func connect() async throws(RelayConnection.Error) {
         isConnected = true
         connectCount += 1
     }
 
-    func subscribe(id: String, filters: [Filter]) async throws {
+    func subscribe(id: String, filters: [Filter]) async throws(RelayConnection.Error) {
         subscriptions[id] = filters
     }
 
@@ -29,7 +29,7 @@ actor FakeRemoteSignerTransport: RelayTransport {
         subscriptions[id] = nil
     }
 
-    func send(_ event: Event) async throws {
+    func send(_ event: Event) async throws(RelayConnection.Error) {
         sentEvents.append(event)
     }
 

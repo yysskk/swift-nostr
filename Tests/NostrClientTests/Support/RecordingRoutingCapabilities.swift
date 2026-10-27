@@ -75,7 +75,9 @@ actor RecordingRoutingCapabilities: NostrRelayRouting {
             event: signer.sign(.relayListMetadata(relayList)), result: PublishResult(statuses: [:]))
     }
 
-    func subscribeOutbox(authors: [PublicKey], kinds: [Event.Kind], limit: Int?) async throws -> SubscriptionSequence {
+    func subscribeOutbox(
+        authors: [PublicKey], kinds: [Event.Kind], limit: Int?
+    ) async throws(RelayPool.Error) -> SubscriptionSequence {
         outboxSubscribes.append(OutboxSubscribe(authors: authors, kinds: kinds, limit: limit))
         let (stream, continuation) = AsyncStream.makeStream(of: SubscriptionEvent.self)
         continuation.finish()
@@ -108,7 +110,7 @@ actor RecordingRoutingCapabilities: NostrRelayRouting {
             event: signer.sign(.directMessageRelayList(relayList)), result: PublishResult(statuses: [:]))
     }
 
-    func connectDirectMessageInboxRelays() async throws -> Set<RelayURL> {
+    func connectDirectMessageInboxRelays() async throws(NostrClient.Error) -> Set<RelayURL> {
         inboxConnects += 1
         return Set(cannedDirectMessageRelayList?.relays ?? [])
     }

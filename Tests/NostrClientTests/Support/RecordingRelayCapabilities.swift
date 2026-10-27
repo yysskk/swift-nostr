@@ -49,7 +49,7 @@ actor RecordingRelayCapabilities: NostrRelayManaging {
         pool[url] = nil
     }
 
-    func connect() async throws {
+    func connect() async throws(RelayPool.Error) {
         calls.append(.connect)
         if let connectError {
             throw connectError

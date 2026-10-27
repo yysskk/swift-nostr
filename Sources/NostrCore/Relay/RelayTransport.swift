@@ -12,16 +12,19 @@
 /// https://github.com/nostr-protocol/nips/blob/master/47.md
 public protocol RelayTransport: Sendable {
     /// Establishes the underlying relay connection(s).
-    func connect() async throws
+    /// - Throws: ``RelayConnection/Error`` when no relay can be connected.
+    func connect() async throws(RelayConnection.Error)
 
     /// Opens a subscription for `filters` under `id`.
-    func subscribe(id: String, filters: [Filter]) async throws
+    /// - Throws: ``RelayConnection/Error`` when no relay accepts the subscription.
+    func subscribe(id: String, filters: [Filter]) async throws(RelayConnection.Error)
 
     /// Closes the subscription with `id`.
     func unsubscribe(id: String) async
 
     /// Publishes `event` to the relay(s) without waiting for an acknowledgment.
-    func send(_ event: Event) async throws
+    /// - Throws: ``RelayConnection/Error`` when no relay accepts the event.
+    func send(_ event: Event) async throws(RelayConnection.Error)
 
     /// A stream of every event received from the relay(s).
     func events() async -> AsyncStream<Event>
