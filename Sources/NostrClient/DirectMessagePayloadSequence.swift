@@ -5,10 +5,10 @@ import NostrCore
 /// wrap already unwrapped and classified as a ``DirectMessagePayload`` — a message, a reaction
 /// to one, or a file.
 ///
-/// Returned by ``NostrMessaging/payloads(limit:)``:
+/// Returned by ``NostrMessaging/subscribe(limit:)``:
 ///
 /// ```swift
-/// for try await payload in try await client.messages.payloads() {
+/// for try await payload in try await client.messages.subscribe() {
 ///     switch payload {
 ///     case .message(let message): print("\(message.senderPublicKey): \(message.content)")
 ///     case .reaction(let reaction): print("\(reaction.senderPublicKey) reacted \(reaction.content)")
@@ -21,11 +21,14 @@ import NostrCore
 /// or carrying an inner kind that is none of the three — are skipped. A signer that fails to
 /// *attempt* the read is different: with a remote NIP-46 signer every unwrap is a relay round-trip,
 /// so a timeout, a disconnect, or a refused request throws out of the iteration instead of silently
-/// dropping payloads. Resubscribe to resume. Use ``NostrMessaging/subscribe(limit:)`` for
-/// messages only, or ``NostrMessaging/giftWraps(limit:)`` for the raw gift-wrap events.
+/// dropping payloads. Resubscribe to resume. Iterate ``messages`` for messages only, or
+/// ``giftWraps`` for the raw gift-wrap events.
 ///
 /// Like ``SubscriptionSequence``, ending iteration, cancelling the consuming task, or calling
-/// ``close()`` sends CLOSE to the relays. Single-consumer.
+/// ``close()`` sends CLOSE to the relays.
+///
+/// - Important: The sequence is single-consumer: create one iterator — on this sequence, on
+///   ``messages``, or on ``giftWraps``, not more. Multiple iterators race for elements.
 public struct DirectMessagePayloadSequence: AsyncSequence, Sendable {
     public typealias Element = DirectMessagePayload
 
@@ -51,6 +54,18 @@ public struct DirectMessagePayloadSequence: AsyncSequence, Sendable {
     /// Closes the subscription: sends CLOSE to the relays and ends iteration.
     public func close() async {
         await base.close()
+    }
+
+    /// A view of this subscription that yields only the private direct messages (kind 14),
+    /// skipping reactions and file messages before they are parsed.
+    public var messages: DirectMessageSequence {
+        DirectMessageSequence(messagesOf: self)
+    }
+
+    /// The underlying subscription, yielding the gift wraps (kind 1059) still sealed; open each
+    /// event with ``NostrMessaging/parsePayload(_:)``.
+    public var giftWraps: SubscriptionSequence {
+        base
     }
 
     public func makeAsyncIterator() -> AsyncIterator {

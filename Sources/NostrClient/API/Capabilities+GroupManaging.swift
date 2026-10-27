@@ -16,137 +16,67 @@ extension NostrGroupManaging {
         try await publish(template, in: group, strategy: nil)
     }
 
-    /// Fetches the group's kind-39000 metadata from its relay, validated against
-    /// `group.relayPublicKey` when the reference carries one. See
-    /// ``NostrGroupManaging/fetchMetadata(for:authorPublicKey:timeout:)-(_,PublicKey?,_)``.
+    /// Fetches the group's kind-39000 metadata from its relay, waiting up to the pool config's
+    /// ``RelayPoolConfig/queryTimeout``. See
+    /// ``NostrGroupManaging/fetchMetadata(for:authorPublicKey:timeout:)``.
     /// - Parameters:
     ///   - group: The group to query; its relay is added to the pool and connected on demand.
-    ///   - timeout: How long to wait for the relay to finish; `nil` uses
-    ///     ``RelayPoolConfig/queryTimeout``.
-    /// - Returns: The parsed metadata, or nil when the relay returned no usable event.
-    public func fetchMetadata(for group: GroupReference, timeout: Duration? = nil) async throws -> Groups.Metadata? {
-        try await fetchMetadata(for: group, authorPublicKey: nil, timeout: timeout)
-    }
-
-    /// Fetches the group's kind-39000 metadata from its relay, validated against `authorPublicKey`.
-    /// See ``NostrGroupManaging/fetchMetadata(for:authorPublicKey:timeout:)-(_,PublicKey?,_)``.
-    /// - Parameters:
-    ///   - group: The group to query; its relay is added to the pool and connected on demand.
-    ///   - authorPublicKey: The relay public key to validate against, overriding
-    ///     `group.relayPublicKey`.
-    ///   - timeout: How long to wait for the relay to finish; `nil` uses
-    ///     ``RelayPoolConfig/queryTimeout``.
+    ///   - authorPublicKey: The relay public key to validate against (default: nil, for
+    ///     `group.relayPublicKey`).
     /// - Returns: The parsed metadata, or nil when the relay returned no usable event.
     public func fetchMetadata(
         for group: GroupReference,
-        authorPublicKey: PublicKey,
-        timeout: Duration? = nil
+        authorPublicKey: PublicKey? = nil
     ) async throws -> Groups.Metadata? {
-        try await fetchMetadata(for: group, authorPublicKey: Optional(authorPublicKey), timeout: timeout)
+        try await fetchMetadata(for: group, authorPublicKey: authorPublicKey, timeout: nil)
     }
 
-    /// Fetches the group's full state snapshot from its relay, validated against
-    /// `group.relayPublicKey` when the reference carries one. See
-    /// ``NostrGroupManaging/fetchState(for:authorPublicKey:timeout:)-(_,PublicKey?,_)``.
+    /// Fetches the group's full state snapshot from its relay, waiting up to the pool config's
+    /// ``RelayPoolConfig/queryTimeout``. See
+    /// ``NostrGroupManaging/fetchState(for:authorPublicKey:timeout:)``.
     /// - Parameters:
     ///   - group: The group to query; its relay is added to the pool and connected on demand.
-    ///   - timeout: How long to wait for the relay to finish; `nil` uses
-    ///     ``RelayPoolConfig/queryTimeout``.
+    ///   - authorPublicKey: The relay public key to validate against (default: nil, for
+    ///     `group.relayPublicKey`).
     /// - Returns: The snapshot, with a nil field per kind the relay did not answer for.
-    public func fetchState(for group: GroupReference, timeout: Duration? = nil) async throws -> GroupState {
-        try await fetchState(for: group, authorPublicKey: nil, timeout: timeout)
+    public func fetchState(for group: GroupReference, authorPublicKey: PublicKey? = nil) async throws -> GroupState {
+        try await fetchState(for: group, authorPublicKey: authorPublicKey, timeout: nil)
     }
 
-    /// Fetches the group's full state snapshot from its relay, validated against `authorPublicKey`.
-    /// See ``NostrGroupManaging/fetchState(for:authorPublicKey:timeout:)-(_,PublicKey?,_)``.
-    /// - Parameters:
-    ///   - group: The group to query; its relay is added to the pool and connected on demand.
-    ///   - authorPublicKey: The relay public key to validate against, overriding
-    ///     `group.relayPublicKey`.
-    ///   - timeout: How long to wait for the relay to finish; `nil` uses
-    ///     ``RelayPoolConfig/queryTimeout``.
-    /// - Returns: The snapshot, with a nil field per kind the relay did not answer for.
-    public func fetchState(
-        for group: GroupReference,
-        authorPublicKey: PublicKey,
-        timeout: Duration? = nil
-    ) async throws -> GroupState {
-        try await fetchState(for: group, authorPublicKey: Optional(authorPublicKey), timeout: timeout)
-    }
-
-    /// Subscribes to the group's whole live timeline — every content kind, no time bound, no
-    /// limit. See ``NostrGroupManaging/timeline(_:kinds:since:limit:)-(_,[Event.Kind]?,_,_)``.
-    /// - Parameter group: The group to follow; its relay is added to the pool and connected on
-    ///   demand.
-    /// - Returns: The subscription as an async sequence of relay-aware events.
-    public func timeline(_ group: GroupReference) async throws -> SubscriptionSequence {
-        try await timeline(group, kinds: nil, since: nil, limit: nil)
-    }
-
-    /// Subscribes to the group's live timeline of the given content kinds. See
-    /// ``NostrGroupManaging/timeline(_:kinds:since:limit:)-(_,[Event.Kind]?,_,_)``.
+    /// Subscribes to the group's live timeline — events carrying its "h" tag — from its relay only,
+    /// with one ``Filter/groupTimeline(groupID:kinds:since:limit:)`` filter. See
+    /// ``NostrGroupManaging/subscribe(to:filters:)``.
+    ///
+    /// ```swift
+    /// for await message in try await client.groups.subscribe(to: group, kinds: [.chatMessage]).events {
+    ///     print(message.content)
+    /// }
+    /// ```
     /// - Parameters:
     ///   - group: The group to follow; its relay is added to the pool and connected on demand.
-    ///   - kinds: The content kinds to receive.
-    ///   - since: Only events whose `created_at` is at or after this time, if given.
-    ///   - limit: The maximum number of stored events the relay should send, if given.
+    ///   - kinds: The content kinds to receive (default: nil, for every kind).
+    ///   - since: Only events whose `created_at` is at or after this time (default: nil, for no
+    ///     bound).
+    ///   - limit: The maximum number of stored events the relay should send (default: nil, for no
+    ///     limit).
     /// - Returns: The subscription as an async sequence of relay-aware events.
-    public func timeline(
-        _ group: GroupReference,
-        kinds: [Event.Kind],
+    public func subscribe(
+        to group: GroupReference,
+        kinds: [Event.Kind]? = nil,
         since: Timestamp? = nil,
         limit: Int? = nil
     ) async throws -> SubscriptionSequence {
-        try await timeline(group, kinds: Optional(kinds), since: since, limit: limit)
+        try await subscribe(
+            to: group, filters: [.groupTimeline(groupID: group.id, kinds: kinds, since: since, limit: limit)])
     }
 
-    /// Subscribes to the group's live timeline of every content kind from `since` on. See
-    /// ``NostrGroupManaging/timeline(_:kinds:since:limit:)-(_,[Event.Kind]?,_,_)``.
-    /// - Parameters:
-    ///   - group: The group to follow; its relay is added to the pool and connected on demand.
-    ///   - since: Only events whose `created_at` is at or after this time.
-    ///   - limit: The maximum number of stored events the relay should send, if given.
-    /// - Returns: The subscription as an async sequence of relay-aware events.
-    public func timeline(
-        _ group: GroupReference,
-        since: Timestamp,
-        limit: Int? = nil
-    ) async throws -> SubscriptionSequence {
-        try await timeline(group, kinds: nil, since: Optional(since), limit: limit)
-    }
-
-    /// Subscribes to the group's live timeline of every content kind, with the relay sending up to
-    /// `limit` stored events. See
-    /// ``NostrGroupManaging/timeline(_:kinds:since:limit:)-(_,[Event.Kind]?,_,_)``.
-    /// - Parameters:
-    ///   - group: The group to follow; its relay is added to the pool and connected on demand.
-    ///   - limit: The maximum number of stored events the relay should send.
-    /// - Returns: The subscription as an async sequence of relay-aware events.
-    public func timeline(_ group: GroupReference, limit: Int) async throws -> SubscriptionSequence {
-        try await timeline(group, kinds: nil, since: nil, limit: Optional(limit))
-    }
-
-    /// Fetches the current user's kind-10009 simple group list, decrypting its private entries. See
-    /// ``NostrGroupManaging/fetchSimpleGroupList(for:timeout:)-(PublicKey?,_)``.
-    /// - Parameter timeout: How long to wait for relays to finish; `nil` uses
-    ///   ``RelayPoolConfig/queryTimeout``.
+    /// Fetches a user's kind-10009 simple group list, waiting up to the pool config's
+    /// ``RelayPoolConfig/queryTimeout``. See ``NostrGroupManaging/fetchSimpleGroupList(for:timeout:)``.
+    /// - Parameter publicKey: The list's author (default: nil, for the current user, whose private
+    ///   entries are decrypted).
     /// - Returns: The typed list, or nil if none was found.
-    public func fetchSimpleGroupList(timeout: Duration? = nil) async throws -> SimpleGroupList? {
-        try await fetchSimpleGroupList(for: nil, timeout: timeout)
-    }
-
-    /// Fetches another user's kind-10009 simple group list, with only its public entries. See
-    /// ``NostrGroupManaging/fetchSimpleGroupList(for:timeout:)-(PublicKey?,_)``.
-    /// - Parameters:
-    ///   - publicKey: The list's author.
-    ///   - timeout: How long to wait for relays to finish; `nil` uses
-    ///     ``RelayPoolConfig/queryTimeout``.
-    /// - Returns: The typed list, or nil if none was found.
-    public func fetchSimpleGroupList(
-        for publicKey: PublicKey,
-        timeout: Duration? = nil
-    ) async throws -> SimpleGroupList? {
-        try await fetchSimpleGroupList(for: Optional(publicKey), timeout: timeout)
+    public func fetchSimpleGroupList(for publicKey: PublicKey? = nil) async throws -> SimpleGroupList? {
+        try await fetchSimpleGroupList(for: publicKey, timeout: nil)
     }
 
     /// Signs and publishes the current user's kind-10009 group list to the whole pool, waiting for

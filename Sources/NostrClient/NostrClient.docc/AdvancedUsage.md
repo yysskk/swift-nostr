@@ -31,24 +31,25 @@ reported on the result as `recipientPublishResult` and `selfCopyPublishResult`.
 
 ### Receiving
 
-``NostrMessaging/subscribe(limit:)`` delivers messages already unwrapped and parsed. A
-gift-wrap stream carries everyone's messages, so wraps sealed to someone else — and malformed
-ones — are skipped. A signer that cannot *attempt* the read is a different matter: with a remote
-NIP-46 signer every unwrap is a relay round-trip, so a timeout, a disconnect, or a refused request
-throws out of the loop rather than silently dropping messages. Resubscribe to resume.
+``NostrMessaging/subscribe(limit:)`` delivers the payloads already unwrapped and parsed, and its
+``DirectMessagePayloadSequence/messages`` view keeps the messages only. A gift-wrap stream carries
+everyone's messages, so wraps sealed to someone else — and malformed ones — are skipped. A signer
+that cannot *attempt* the read is a different matter: with a remote NIP-46 signer every unwrap is a
+relay round-trip, so a timeout, a disconnect, or a refused request throws out of the loop rather
+than silently dropping messages. Resubscribe to resume.
 
 ```swift
-for try await message in try await client.messages.subscribe() {
+for try await message in try await client.messages.subscribe().messages {
     print("From: \(message.senderPublicKey)")
     print("Content: \(message.content)")
 }
 ```
 
-For the raw gift-wrap events, use ``NostrMessaging/giftWraps(limit:)``
+For the raw gift-wrap events, use the ``DirectMessagePayloadSequence/giftWraps`` view
 and parse manually:
 
 ```swift
-let giftWraps = try await client.messages.giftWraps()
+let giftWraps = try await client.messages.subscribe().giftWraps
 for await giftWrap in giftWraps.events {
     let dm = try await client.messages.parse(giftWrap)
     print("From: \(dm.senderPublicKey): \(dm.content)")
@@ -96,7 +97,7 @@ let data = try EncryptedFile.decrypt(blob, key: file.decryptionKey, nonce: file.
 
 ### Gift-Wrapped Rumors of Any Kind
 
-``NostrMessaging/sendGiftWrapped(_:to:expiration:strategy:)-(_,_,Timestamp?,_)`` delivers a rumor of
+``NostrMessaging/sendGiftWrapped(_:to:expiration:strategy:)`` delivers a rumor of
 any kind with the same wrapping and routing as
 ``NostrMessaging/send(_:to:subject:replyTo:expiration:strategy:)``: a recipient copy and a self-copy,
 each sent to its addressee's DM relays. The client authors the rumor from an ``EventTemplate`` under
@@ -110,7 +111,7 @@ try await client.messages.sendGiftWrapped(template, to: recipient)
 ```
 
 To build the gift wrap without publishing, use ``GiftWrap/wrap(event:signer:recipientPublicKey:expiration:)``.
-On the receiving side, read the raw stream from ``NostrMessaging/giftWraps(limit:)`` and open each
+On the receiving side, read the raw stream from ``DirectMessagePayloadSequence/giftWraps`` and open each
 event with ``GiftWrap/unwrap(giftWrap:recipient:)``; the parsing helpers understand only kinds 14, 15,
 and 7.
 
@@ -130,11 +131,11 @@ try await client.messages.send(
 
 ### Receiving Mixed Payloads
 
-``NostrMessaging/payloads(limit:)`` delivers messages, reactions, and file messages
+``NostrMessaging/subscribe(limit:)`` delivers messages, reactions, and file messages
 together as a ``DirectMessagePayload``, so one loop can handle every kind:
 
 ```swift
-for try await payload in try await client.messages.payloads() {
+for try await payload in try await client.messages.subscribe() {
     switch payload {
     case .message(let message):
         print("\(message.senderPublicKey): \(message.content)")
@@ -509,7 +510,7 @@ round-trips the invite code.
 
 ### Timeline and Chat
 
-``NostrGroupsAPI/timeline(_:kinds:since:limit:)`` follows the group's content —
+``NostrGroupManaging/subscribe(to:kinds:since:limit:)`` follows the group's content —
 events carrying its "h" tag — from its relay. Keep the events you see: the spec asks each
 message to reference a few recent timeline events in a "previous" tag so an out-of-context
 rebroadcast is detectable, and `Groups.previousReferences(from:excludingAuthor:maximumCount:)`
@@ -518,7 +519,7 @@ samples them for you. Check inbound events' references against what you have see
 
 ```swift
 var recent: [Event] = []
-let timeline = try await client.groups.timeline(group)
+let timeline = try await client.groups.subscribe(to: group)
 for await event in timeline.events {
     let unknown = Groups.unknownPreviousReferences(of: event, knownEventIDs: recent.map(\.id))
     if !unknown.isEmpty {

@@ -392,13 +392,13 @@ struct NIP29GroupClientTests {
 
     // MARK: - Timeline subscription
 
-    @Test("groups.timeline requests the group's #h timeline from its relay")
+    @Test("groups.subscribe(to:kinds:since:limit:) requests the group's #h timeline from its relay")
     func subscribeToGroupTimelineFilter() async throws {
         let (client, socket) = makeClient()
 
         let group = GroupReference(relayURL: groupRelayURL, id: groupID)
-        let subscription = try await client.groups.timeline(
-            group,
+        let subscription = try await client.groups.subscribe(
+            to: group,
             kinds: [.chatMessage],
             since: Timestamp(rawValue: 1_700_000_000),
             limit: 50
@@ -410,6 +410,45 @@ struct NIP29GroupClientTests {
         #expect(filter["kinds"] as? [Int] == [9])
         #expect(filter["since"] as? Int == 1_700_000_000)
         #expect(filter["limit"] as? Int == 50)
+        await subscription.close()
+        await client.relays.disconnect()
+    }
+
+    @Test("groups.subscribe(to:) requests only the group's #h tag")
+    func subscribeToWholeGroupTimeline() async throws {
+        let (client, socket) = makeClient()
+
+        let subscription = try await client.groups.subscribe(to: GroupReference(relayURL: groupRelayURL, id: groupID))
+        try await NIP42TestSupport.pollUntil { socket.sentTextFrames.contains { $0.hasPrefix("[\"REQ\"") } }
+        let (_, filter) = try sentREQ(in: socket)
+
+        #expect(Set(filter.keys) == ["#h"])
+        #expect(filter["#h"] as? [String] == [groupID])
+        await subscription.close()
+        await client.relays.disconnect()
+    }
+
+    @Test("groups.subscribe(to:filters:) scopes every filter to the group, replacing its #h values")
+    func subscribeToGroupWithFilters() async throws {
+        let (client, socket) = makeClient()
+        var foreign = Filter(kinds: [.thread], limit: 5)
+        foreign[tag: .group] = ["another-group"]
+        let author = PublicKey.fixture("author")
+
+        let subscription = try await client.groups.subscribe(
+            to: GroupReference(relayURL: groupRelayURL, id: groupID),
+            filters: [Filter(authors: [author], kinds: [.chatMessage]), foreign]
+        )
+        try await NIP42TestSupport.pollUntil { socket.sentTextFrames.contains { $0.hasPrefix("[\"REQ\"") } }
+        let frame = try #require(socket.sentTextFrames.first { $0.hasPrefix("[\"REQ\"") })
+        let request = try #require(try JSONSerialization.jsonObject(with: Data(frame.utf8)) as? [Any])
+        let filters = request.dropFirst(2).compactMap { $0 as? [String: Any] }
+
+        #expect(filters.count == 2)
+        #expect(filters.map { $0["#h"] as? [String] } == [[groupID], [groupID]])
+        #expect(filters.map { $0["kinds"] as? [Int] } == [[9], [11]])
+        #expect(filters.first?["authors"] as? [String] == [author.hex])
+        #expect(filters.last?["limit"] as? Int == 5)
         await subscription.close()
         await client.relays.disconnect()
     }

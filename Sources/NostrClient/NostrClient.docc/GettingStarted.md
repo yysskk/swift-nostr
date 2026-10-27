@@ -85,14 +85,14 @@ the subscription automatically.
 ```swift
 // User timeline
 let alice = try PublicKey(npub: "npub1...")
-let timeline = try await client.subscriptions.userTimeline(publicKey: alice)
+let timeline = try await client.subscriptions.subscribe(filters: [.userNotes(publicKey: alice, limit: 100)])
 for await event in timeline.events {
     print("Note: \(event.content)")
 }
 
 // Custom filter, events only
 let filter = Filter(authors: [alice], kinds: [1], limit: 100)
-for await event in try await client.subscriptions.events(filters: [filter]) {
+for await event in try await client.subscriptions.subscribe(filters: [filter]).events {
     print("Received: \(event.id)")
 }
 

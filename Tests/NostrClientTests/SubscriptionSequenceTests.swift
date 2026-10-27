@@ -208,22 +208,21 @@ struct SubscriptionSequenceTests {
         await client.relays.disconnect()
     }
 
-    @Test("convenience subscriptions return sequences")
-    func convenienceSubscriptionsReturnSequences() async throws {
-        let (client, _) = try await makeConnectedClient()
+    @Test("a Filter preset reaches the relay unchanged through subscribe(filters:)")
+    func filterPresetRequest() async throws {
+        let (client, socket) = try await makeConnectedClient()
 
-        let publicKey = PublicKey.fixture("author")
-        let timeline = try await client.subscriptions.userTimeline(publicKey: publicKey)
-        let global = try await client.subscriptions.globalFeed(limit: 10)
-        let mentions = try await client.subscriptions.mentions(publicKey: publicKey)
-        let metadata = try await client.subscriptions.metadata(publicKeys: [publicKey])
+        let feed = try await client.subscriptions.subscribe(filters: [.globalFeed(limit: 50)])
+        try await NIP42TestSupport.pollUntil { socket.sentTextFrames.contains { $0.hasPrefix("[\"REQ\"") } }
+        let frame = try #require(socket.sentTextFrames.first { $0.hasPrefix("[\"REQ\"") })
+        let request = try #require(try JSONSerialization.jsonObject(with: Data(frame.utf8)) as? [Any])
+        let filter = try #require(request.last as? [String: Any])
 
-        #expect(await client.activeSubscriptionCount == 4)
-
-        for subscription in [timeline, global, mentions, metadata] {
-            await subscription.close()
-        }
-        #expect(await client.activeSubscriptionCount == 0)
+        #expect(request.count == 3)
+        #expect(Set(filter.keys) == ["kinds", "limit"])
+        #expect(filter["kinds"] as? [Int] == [1])
+        #expect(filter["limit"] as? Int == 50)
+        await feed.close()
         await client.relays.disconnect()
     }
 
@@ -243,30 +242,6 @@ struct SubscriptionSequenceTests {
         #expect(await client.activeSubscriptionCount == 1)
         await outbox.close()
         #expect(await client.activeSubscriptionCount == 0)
-        await client.relays.disconnect()
-    }
-
-    @Test("events(filters:) returns the filtered view directly")
-    func eventsConvenienceReturnsFilteredView() async throws {
-        let (client, _) = try await makeConnectedClient()
-        let events = try await client.subscriptions.events(filters: [Filter()])
-        #expect(await client.activeSubscriptionCount == 1)
-        await events.close()
-        #expect(await client.activeSubscriptionCount == 0)
-        await client.relays.disconnect()
-    }
-
-    @Test("messages.giftWraps requires a signer")
-    func subscribeToDirectMessagesRequiresSigner() async throws {
-        let (client, _) = try await makeConnectedClient()
-        await #expect(throws: NostrClient.Error.signerNotSet) {
-            _ = try await client.messages.giftWraps()
-        }
-
-        try await client.identity.setPrivateKey(String(repeating: "1", count: 64))
-        let messages = try await client.messages.giftWraps()
-        #expect(await client.activeSubscriptionCount == 1)
-        await messages.close()
         await client.relays.disconnect()
     }
 }

@@ -62,7 +62,7 @@ public struct NostrGroupsAPI: NostrGroupManaging {
 
     /// Fetches the group's full relay-generated state snapshot from its relay in one round trip,
     /// newest per kind, with the same author validation as
-    /// ``fetchMetadata(for:authorPublicKey:timeout:)-(_,PublicKey?,_)``.
+    /// ``fetchMetadata(for:authorPublicKey:timeout:)``.
     public func fetchState(
         for group: GroupReference,
         authorPublicKey: PublicKey?,
@@ -95,22 +95,16 @@ public struct NostrGroupsAPI: NostrGroupManaging {
         return state
     }
 
-    /// Subscribes to the live timeline of the group's content — events carrying its "h" tag — from
-    /// its relay only.
-    public func timeline(
-        _ group: GroupReference,
-        kinds: [Event.Kind]?,
-        since: Timestamp?,
-        limit: Int?
-    ) async throws -> SubscriptionSequence {
+    /// Subscribes to the group's live content matching `filters`, each scoped to the group by its
+    /// "h" tag, from its relay only.
+    public func subscribe(to group: GroupReference, filters: [Filter]) async throws -> SubscriptionSequence {
         let relayURL = try await ensureRelay(group)
-        let filter = Filter.groupTimeline(
-            groupID: group.id,
-            kinds: kinds,
-            since: since,
-            limit: limit
-        )
-        return try await client.pool.subscribe(filters: [filter], to: [relayURL])
+        let scoped = filters.map { filter in
+            var filter = filter
+            filter[tag: .group] = [group.id]
+            return filter
+        }
+        return try await client.pool.subscribe(filters: scoped, to: [relayURL])
     }
 
     // MARK: - Membership list (NIP-51 kind 10009)

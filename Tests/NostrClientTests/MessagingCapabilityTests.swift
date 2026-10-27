@@ -54,35 +54,23 @@ struct MessagingCapabilityTests {
 
     // MARK: - Send primitive's short forms
 
-    @Test("sendGiftWrapped without an expiration forwards none and the strategy")
-    func sendGiftWrappedShortFormWithoutExpiration() async throws {
+    @Test("sendGiftWrapped forwards the template, recipient, and expiration, none by default, and no strategy")
+    func sendGiftWrappedShortForm() async throws {
         let stub = makeStub()
         let messaging: any NostrMessaging = stub
         let template = EventTemplate(kind: Event.Kind(rawValue: 30_999), content: "payload")
-
-        let result = try await messaging.sendGiftWrapped(template, to: alice.publicKey, strategy: .firstAck)
-
-        let recorded = try await onlySend(stub)
-        #expect(recorded.template == template)
-        #expect(recorded.recipientPublicKey == alice.publicKey)
-        #expect(recorded.expiration == nil)
-        #expect(recorded.strategy == .firstAck)
-        #expect(result.rumor.publicKey == bob.publicKey)
-        #expect(result.rumor.kind == Event.Kind(rawValue: 30_999))
-    }
-
-    @Test("sendGiftWrapped with an expiration forwards it, and the strategy defaults to nil")
-    func sendGiftWrappedShortFormWithExpiration() async throws {
-        let stub = makeStub()
-        let messaging: any NostrMessaging = stub
         let expiry = Timestamp(rawValue: 2_000_000_000)
 
-        try await messaging.sendGiftWrapped(
-            EventTemplate(kind: Event.Kind(rawValue: 30_999)), to: alice.publicKey, expiration: expiry)
+        let result = try await messaging.sendGiftWrapped(template, to: alice.publicKey)
+        try await messaging.sendGiftWrapped(template, to: alice.publicKey, expiration: expiry)
 
-        let recorded = try await onlySend(stub)
-        #expect(recorded.expiration == expiry)
-        #expect(recorded.strategy == nil)
+        let recorded = await stub.sends
+        #expect(recorded.map(\.template) == [template, template])
+        #expect(recorded.map(\.recipientPublicKey) == [alice.publicKey, alice.publicKey])
+        #expect(recorded.map(\.expiration) == [nil, expiry])
+        #expect(recorded.map(\.strategy) == [nil, nil])
+        #expect(result.rumor.publicKey == bob.publicKey)
+        #expect(result.rumor.kind == Event.Kind(rawValue: 30_999))
     }
 
     // MARK: - Send conveniences
@@ -284,8 +272,35 @@ struct MessagingCapabilityTests {
 
     // MARK: - Receiving
 
-    @Test("subscribe keeps only the messages of payloads, with a default limit of 100")
-    func subscribeKeepsMessagesOfPayloads() async throws {
+    @Test("subscribe() asks for 100 and delivers every payload kind")
+    func subscribeShortForm() async throws {
+        let message = try await fromAlice.createMessageWithSelfCopy(content: "hi", to: bob.publicKey)
+        let reaction = try await fromAlice.createReactionWithSelfCopy(
+            to: message.rumor.id, author: alice.publicKey, recipientPublicKey: bob.publicKey)
+        let file = try await fromAlice.createFileMessageWithSelfCopy(
+            url: URL(string: "https://files.example.com/blob")!, mimeType: "image/jpeg",
+            encryption: try encryptedFile(),
+            to: bob.publicKey)
+        let stub = makeStub(cannedGiftWraps: [
+            message.recipientGiftWrap, reaction.recipientGiftWrap, file.recipientGiftWrap,
+        ])
+        let messaging: any NostrMessaging = stub
+
+        var kinds: [String] = []
+        for try await payload in try await messaging.subscribe() {
+            switch payload {
+            case .message: kinds.append("message")
+            case .reaction: kinds.append("reaction")
+            case .file: kinds.append("file")
+            }
+        }
+
+        #expect(kinds == ["message", "reaction", "file"])
+        #expect(await stub.subscribeLimits == [100])
+    }
+
+    @Test("the messages view keeps only the readable messages of the same subscription")
+    func messagesView() async throws {
         let message = try await fromAlice.createMessageWithSelfCopy(content: "first", to: bob.publicKey)
         let reaction = try await fromAlice.createReactionWithSelfCopy(
             to: message.rumor.id, author: alice.publicKey, recipientPublicKey: bob.publicKey)
@@ -301,7 +316,7 @@ struct MessagingCapabilityTests {
         ])
         let messaging: any NostrMessaging = stub
 
-        let messages = try await messaging.subscribe()
+        let messages = try await messaging.subscribe(limit: 5).messages
         var contents: [String] = []
         for try await received in messages {
             contents.append(received.content)
@@ -310,60 +325,23 @@ struct MessagingCapabilityTests {
         #expect(contents == ["first", "second"])
         #expect(messages.id == "payloads_1")
         #expect(messages.expectedRelays == [relayURL])
-        #expect(await stub.payloadLimits == [100])
-        #expect(await stub.giftWrapLimits.isEmpty)
+        #expect(await stub.subscribeLimits == [5])
     }
 
-    @Test("subscribe forwards its limit to payloads")
-    func subscribeForwardsLimit() async throws {
-        let stub = makeStub()
-        let messaging: any NostrMessaging = stub
-
-        _ = try await messaging.subscribe(limit: 5)
-
-        #expect(await stub.payloadLimits == [5])
-    }
-
-    @Test("payloads() asks for 100 and delivers every payload kind")
-    func payloadsShortForm() async throws {
-        let message = try await fromAlice.createMessageWithSelfCopy(content: "hi", to: bob.publicKey)
-        let reaction = try await fromAlice.createReactionWithSelfCopy(
-            to: message.rumor.id, author: alice.publicKey, recipientPublicKey: bob.publicKey)
-        let file = try await fromAlice.createFileMessageWithSelfCopy(
-            url: URL(string: "https://files.example.com/blob")!, mimeType: "image/jpeg",
-            encryption: try encryptedFile(),
-            to: bob.publicKey)
-        let stub = makeStub(cannedGiftWraps: [
-            message.recipientGiftWrap, reaction.recipientGiftWrap, file.recipientGiftWrap,
-        ])
-        let messaging: any NostrMessaging = stub
-
-        var kinds: [String] = []
-        for try await payload in try await messaging.payloads() {
-            switch payload {
-            case .message: kinds.append("message")
-            case .reaction: kinds.append("reaction")
-            case .file: kinds.append("file")
-            }
-        }
-
-        #expect(kinds == ["message", "reaction", "file"])
-        #expect(await stub.payloadLimits == [100])
-    }
-
-    @Test("giftWraps() asks for 100 and delivers the raw gift wraps")
-    func giftWrapsShortForm() async throws {
+    @Test("the giftWraps view delivers the raw gift wraps of the same subscription")
+    func giftWrapsView() async throws {
         let message = try await fromAlice.createMessageWithSelfCopy(content: "hi", to: bob.publicKey)
         let stub = makeStub(cannedGiftWraps: [message.recipientGiftWrap])
         let messaging: any NostrMessaging = stub
 
+        let giftWraps = try await messaging.subscribe().giftWraps
         var ids: [EventID] = []
-        for await event in try await messaging.giftWraps().events {
+        for await event in giftWraps.events {
             ids.append(event.id)
         }
 
         #expect(ids == [message.recipientGiftWrap.id])
-        #expect(await stub.giftWrapLimits == [100])
-        #expect(await stub.payloadLimits.isEmpty)
+        #expect(giftWraps.id == "payloads_1")
+        #expect(await stub.subscribeLimits == [100])
     }
 }

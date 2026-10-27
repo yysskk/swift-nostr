@@ -4,10 +4,10 @@ import NostrCore
 /// A live subscription to the current user's NIP-17 direct messages,
 /// delivered already unwrapped and parsed.
 ///
-/// Returned by ``NostrMessaging/subscribe(limit:)``:
+/// The ``DirectMessagePayloadSequence/messages`` view of ``NostrMessaging/subscribe(limit:)``:
 ///
 /// ```swift
-/// for try await message in try await client.messages.subscribe() {
+/// for try await message in try await client.messages.subscribe().messages {
 ///     print("\(message.senderPublicKey): \(message.content)")
 /// }
 /// ```
@@ -17,7 +17,7 @@ import NostrCore
 /// fails to *attempt* the read is different: with a remote NIP-46 signer every unwrap is a relay
 /// round-trip, so a timeout, a disconnect, or a refused request throws out of the iteration
 /// instead of silently dropping messages. Resubscribe to resume. Use
-/// ``NostrMessaging/giftWraps(limit:)`` for the raw gift-wrap events instead.
+/// ``DirectMessagePayloadSequence/giftWraps`` for the raw gift-wrap events instead.
 ///
 /// Like ``SubscriptionSequence``, ending iteration, cancelling the consuming
 /// task, or calling ``close()`` sends CLOSE to the relays. Single-consumer.

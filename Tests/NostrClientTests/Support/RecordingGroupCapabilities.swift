@@ -19,11 +19,9 @@ actor RecordingGroupCapabilities: NostrGroupManaging {
         let timeout: Duration?
     }
 
-    struct Timeline: Sendable, Equatable {
+    struct Subscribe: Sendable, Equatable {
         let group: GroupReference
-        let kinds: [Event.Kind]?
-        let since: Timestamp?
-        let limit: Int?
+        let filters: [Filter]
     }
 
     struct ListFetch: Sendable, Equatable {
@@ -42,7 +40,7 @@ actor RecordingGroupCapabilities: NostrGroupManaging {
     private(set) var publishes: [Publish] = []
     private(set) var metadataFetches: [StateFetch] = []
     private(set) var stateFetches: [StateFetch] = []
-    private(set) var timelines: [Timeline] = []
+    private(set) var subscribes: [Subscribe] = []
     private(set) var listFetches: [ListFetch] = []
     private(set) var listPublishes: [ListPublish] = []
 
@@ -77,17 +75,12 @@ actor RecordingGroupCapabilities: NostrGroupManaging {
         return GroupState()
     }
 
-    func timeline(
-        _ group: GroupReference,
-        kinds: [Event.Kind]?,
-        since: Timestamp?,
-        limit: Int?
-    ) async throws -> SubscriptionSequence {
-        timelines.append(Timeline(group: group, kinds: kinds, since: since, limit: limit))
+    func subscribe(to group: GroupReference, filters: [Filter]) async throws -> SubscriptionSequence {
+        subscribes.append(Subscribe(group: group, filters: filters))
         let (stream, continuation) = AsyncStream.makeStream(of: SubscriptionEvent.self)
         continuation.finish()
         return SubscriptionSequence(
-            id: SubscriptionID(rawValue: "timeline_\(timelines.count)"), expectedRelays: [group.relayURL],
+            id: SubscriptionID(rawValue: "group_\(subscribes.count)"), expectedRelays: [group.relayURL],
             stream: stream, onClose: {})
     }
 

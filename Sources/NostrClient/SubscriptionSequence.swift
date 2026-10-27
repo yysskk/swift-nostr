@@ -4,7 +4,8 @@ import NostrCore
 /// A live relay subscription delivered as an async sequence of relay-aware events.
 ///
 /// Returned by ``NostrSubscribing/subscribe(filters:to:bufferingPolicy:)-(_,Set<RelayURL>?,_)``,
-/// ``RelayPool/subscribe(filters:to:bufferingPolicy:)``, and the convenience subscription methods.
+/// ``RelayPool/subscribe(filters:to:bufferingPolicy:)``, ``NostrGroupManaging/subscribe(to:filters:)``,
+/// and ``NostrRelayRouting/subscribeOutbox(authors:kinds:limit:)-(_,_,Int?)``.
 /// Iterate it with `for await`:
 ///
 /// ```swift

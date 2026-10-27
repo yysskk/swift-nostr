@@ -158,14 +158,14 @@ Subscriptions are async sequences — iterate them with `for await`. The subscri
 ```swift
 // Live timeline
 let alice = try PublicKey(npub: "npub1...")
-let timeline = try await client.subscriptions.userTimeline(publicKey: alice)
+let timeline = try await client.subscriptions.subscribe(filters: [.userNotes(publicKey: alice, limit: 100)])
 for await event in timeline.events {
     print(event.content)
 }
 
 // Custom filter
 let filter = Filter(authors: [alice], kinds: [1], limit: 100)
-for await event in try await client.subscriptions.events(filters: [filter]) {
+for await event in try await client.subscriptions.subscribe(filters: [filter]).events {
     print(event.id)
 }
 
@@ -185,7 +185,7 @@ try await client.routing.connectDirectMessageInboxRelays()
 
 // Receive — already decrypted and parsed. Wraps meant for someone else are skipped;
 // a signer that cannot be reached throws, so a failure is never mistaken for silence.
-for try await message in try await client.messages.subscribe() {
+for try await message in try await client.messages.subscribe().messages {
     print("\(message.senderPublicKey): \(message.content)")
 }
 
@@ -297,7 +297,7 @@ try await client.groups.join(group)
 
 // Follow the live timeline, keeping recent events for timeline references.
 var recent: [Event] = []
-let timeline = try await client.groups.timeline(group)
+let timeline = try await client.groups.subscribe(to: group)
 for await event in timeline.events {
     recent.append(event)
     print(event.content)

@@ -1,5 +1,6 @@
 import Foundation
 import NostrCore
+import NostrTestSupport
 import Testing
 
 @testable import NostrClient
@@ -184,7 +185,7 @@ struct DirectMessageSequenceTests {
         await sequence.close()
     }
 
-    @Test("messages.subscribe(limit:) requires a signer")
+    @Test("messages.subscribe requires a signer")
     func directMessagesRequiresSigner() async throws {
         let client = NostrClient()
         await #expect(throws: NostrClient.Error.signerNotSet) {
@@ -192,7 +193,7 @@ struct DirectMessageSequenceTests {
         }
     }
 
-    @Test("messages.subscribe(limit:) opens and closes a subscription")
+    @Test("messages.subscribe opens and closes a subscription")
     func directMessagesOpensAndClosesSubscription() async throws {
         let (client, _) = try await ConnectedClientFixture.make()
         try await client.identity.setPrivateKey(String(repeating: "1", count: 64))
@@ -201,6 +202,32 @@ struct DirectMessageSequenceTests {
         #expect(await client.activeSubscriptionCount == 1)
         await messages.close()
         #expect(await client.activeSubscriptionCount == 0)
+        await client.relays.disconnect()
+    }
+
+    @Test("messages.subscribe requests the gift wraps tagged to the signer, 100 by default or the given limit")
+    func directMessagesRequestFilter() async throws {
+        let (client, socket) = try await ConnectedClientFixture.make()
+        let bob = KeyPair()
+        await client.identity.setSigner(EventSigner(keyPair: bob))
+
+        let byDefault = try await client.messages.subscribe()
+        let limited = try await client.messages.subscribe(limit: 5)
+        try await NIP42TestSupport.pollUntil {
+            socket.sentTextFrames.filter { $0.hasPrefix("[\"REQ\"") }.count == 2
+        }
+        let filters = try socket.sentTextFrames.filter { $0.hasPrefix("[\"REQ\"") }.map { frame in
+            let request = try #require(try JSONSerialization.jsonObject(with: Data(frame.utf8)) as? [Any])
+            #expect(request.count == 3)
+            return try #require(request.last as? [String: Any])
+        }
+
+        #expect(filters.map { Set($0.keys) } == [["kinds", "#p", "limit"], ["kinds", "#p", "limit"]])
+        #expect(filters.map { $0["kinds"] as? [Int] } == [[1059], [1059]])
+        #expect(filters.map { $0["#p"] as? [String] } == [[bob.publicKey.hex], [bob.publicKey.hex]])
+        #expect(filters.map { $0["limit"] as? Int } == [100, 5])
+        await byDefault.close()
+        await limited.close()
         await client.relays.disconnect()
     }
 }
