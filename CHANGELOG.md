@@ -678,6 +678,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ten methods as static constants, so a method a signer implements beyond them can be named and
   sent with `RemoteSigner.send(_:params:)`. It encodes as a bare JSON string and its `description`
   is the token. `CaseIterable` is gone, and a `switch` over it needs a `default` case.
+- **Tag queries are a `Filter[tag:]` subscript** (breaking): `filter[tag: .hashtag] = ["nostr"]`
+  replaces `addTagQuery(_:values:)`, which replaced rather than added, and `filter[tag: .hashtag]`
+  replaces `tagQuery(_:)`; assigning nil removes the query. The name is the tag name, so a leading
+  `#` is no longer stripped: `"#t"` names a different tag than `"t"`. `filter[tag: .event]` and
+  `filter[tag: .publicKey]` are the `#e` and `#p` queries behind `eventReferences` and
+  `publicKeyReferences`, as hex strings; values set through the subscript are encoded as given, and
+  the typed properties leave out any that are not canonical hex.
 
 ### Fixed
 
@@ -699,6 +706,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with an id and signature that could not verify. It now throws the new
   `EventSigner.Error.publicKeyMismatch`, and `NostrSigning.sign(_:)` requires every conformance to
   reject such an event; `RemoteSigner` already did, with `RemoteSignerError.responseValidationFailed`.
+- **`#e` and `#p` tag queries round-trip**: a query set with `addTagQuery(.event, …)` or
+  `addTagQuery(.publicKey, …)` was stored apart from `eventReferences` and `publicKeyReferences`,
+  so a filter holding both wrote two values to the same `#e` or `#p` key, and decoding never
+  restored the generic query. Each tag query now has a single value, encoded once.
 
 ## [0.8.0] - 2026-10-25
 

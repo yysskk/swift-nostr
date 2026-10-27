@@ -83,7 +83,7 @@ public struct NostrListsAPI: NostrListManaging {
     ) async throws -> NostrListSet? {
         let target = try await author(publicKey)
         var filter = Filter(authors: [target], kinds: [kind])
-        filter.addTagQuery(.identifier, values: [identifier])
+        filter[tag: .identifier] = [identifier]
         let events = try await client.fetch(filters: [filter], fromURLs: nil, timeout: timeout)
         // Addressable event: the identifier is part of its coordinates, so it is matched alongside
         // the author and kind before the newest signed copy is chosen.

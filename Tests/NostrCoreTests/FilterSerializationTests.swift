@@ -25,7 +25,7 @@ struct FilterSerializationTests {
     )
     func uppercaseTagQueryIsPreserved(letter: String) throws {
         var filter = Filter(kinds: [1111])
-        filter.addTagQuery(Tag.Name(rawValue: letter), values: ["30023"])
+        filter[tag: Tag.Name(rawValue: letter)] = ["30023"]
 
         let dictionary = try serializedFilter(filter)
 
@@ -36,7 +36,7 @@ struct FilterSerializationTests {
     @Test("lowercase tag queries are unchanged")
     func lowercaseTagQueryIsPreserved() throws {
         var filter = Filter(kinds: [1])
-        filter.addTagQuery("t", values: ["nostr"])
+        filter[tag: "t"] = ["nostr"]
 
         let dictionary = try serializedFilter(filter)
 
@@ -46,8 +46,8 @@ struct FilterSerializationTests {
     @Test("mixed-case tag queries survive alongside each other")
     func mixedCaseTagQueriesCoexist() throws {
         var filter = Filter(kinds: [1111])
-        filter.addTagQuery("K", values: ["30023"])
-        filter.addTagQuery("k", values: ["1"])
+        filter[tag: "K"] = ["30023"]
+        filter[tag: "k"] = ["1"]
 
         let dictionary = try serializedFilter(filter)
 
@@ -55,22 +55,27 @@ struct FilterSerializationTests {
         #expect(dictionary["#k"] as? [String] == ["1"])
     }
 
-    /// A leading `#` is ignored, so a name spelled with or without it addresses the same `#x` key
-    /// rather than producing `##t`.
-    @Test("tag queries encode to the same key with or without a leading #")
-    func tagQueryLeadingHashIsIgnored() throws {
-        var withoutHash = Filter(kinds: [1])
-        withoutHash.addTagQuery(.hashtag, values: ["nostr"])
-        var withHash = Filter(kinds: [1])
-        withHash.addTagQuery("#t", values: ["nostr"])
+    /// `#e` and `#p` have one source of truth, so setting them through the typed properties or the
+    /// tag subscript must reach the relay as a single key, not a second copy that overwrites it.
+    @Test("#e and #p are emitted exactly once however they are set")
+    func eventAndPublicKeyReferencesAreEmittedOnce() throws {
+        let referencedEvent = EventID.fixture("referenced event")
+        let referencedPublicKey = PublicKey.fixture("referenced public key")
+        var viaSubscript = Filter(kinds: [1])
+        viaSubscript[tag: .event] = [referencedEvent.hex]
+        viaSubscript[tag: .publicKey] = [referencedPublicKey.hex]
+        let viaProperties = Filter(
+            kinds: [1], eventReferences: [referencedEvent], publicKeyReferences: [referencedPublicKey])
 
-        let encodedWithoutHash = try serializedFilter(withoutHash)
-        let encodedWithHash = try serializedFilter(withHash)
-
-        #expect(encodedWithoutHash["#t"] as? [String] == ["nostr"])
-        #expect(encodedWithHash["#t"] as? [String] == ["nostr"])
-        #expect(encodedWithHash["##t"] == nil)
-        #expect(withoutHash == withHash)
+        for filter in [viaSubscript, viaProperties] {
+            let json = try ClientMessage.request(subscriptionID: "sub", filters: [filter]).serialize()
+            #expect(json.components(separatedBy: "\"#e\"").count == 2)
+            #expect(json.components(separatedBy: "\"#p\"").count == 2)
+            let dictionary = try serializedFilter(filter)
+            #expect(dictionary["#e"] as? [String] == [referencedEvent.hex])
+            #expect(dictionary["#p"] as? [String] == [referencedPublicKey.hex])
+        }
+        #expect(viaSubscript == viaProperties)
     }
 
     /// The declared keys already carry their wire spelling, so removing the key strategy must not
@@ -109,7 +114,7 @@ struct FilterSerializationTests {
     @Test("count messages serialize tag queries identically")
     func countMessageMatchesRequest() throws {
         var filter = Filter(kinds: [1111])
-        filter.addTagQuery("K", values: ["30023"])
+        filter[tag: "K"] = ["30023"]
 
         let json = try ClientMessage.count(subscriptionID: "sub", filters: [filter]).serialize()
         let array = try #require(JSONSerialization.jsonObject(with: Data(json.utf8)) as? [Any])

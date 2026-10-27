@@ -234,21 +234,100 @@ struct FilterTests {
         #expect(filter.limit == 20)
     }
 
-    @Test("Filter with generic tag query")
-    func filterWithGenericTagQuery() {
+    @Test("Tag subscript sets, reads, and removes a generic tag query")
+    func tagSubscriptSetsReadsAndRemoves() {
         var filter = Filter(kinds: [1])
-        filter.addTagQuery("t", values: ["nostr", "bitcoin"])
+        filter[tag: .hashtag] = ["nostr", "bitcoin"]
 
-        #expect(filter.tagQuery("t") == ["nostr", "bitcoin"])
-        #expect(filter.tagQuery("#t") == ["nostr", "bitcoin"])
+        #expect(filter[tag: .hashtag] == ["nostr", "bitcoin"])
+        #expect(filter[tag: "t"] == ["nostr", "bitcoin"])
+        #expect(filter[tag: "r"] == nil)
+
+        filter[tag: .hashtag] = ["nostr"]
+        #expect(filter[tag: .hashtag] == ["nostr"])
+
+        filter[tag: .hashtag] = nil
+        #expect(filter[tag: .hashtag] == nil)
+        #expect(filter == Filter(kinds: [1]))
     }
 
-    @Test("Tag query lookup misses return nil")
-    func tagQueryMissReturnsNil() {
+    /// The name is the tag name; `#` is wire syntax, so `"#t"` names a different tag than `"t"`.
+    @Test("Tag subscript takes the name without the wire #")
+    func tagSubscriptNameIsTheTagName() {
         var filter = Filter(kinds: [1])
-        filter.addTagQuery("t", values: ["nostr"])
+        filter[tag: .hashtag] = ["nostr"]
 
-        #expect(filter.tagQuery("r") == nil)
-        #expect(Filter(kinds: [1]).tagQuery("t") == nil)
+        #expect(filter[tag: "#t"] == nil)
+    }
+
+    @Test("Tag subscript on e and p is the same query as the typed references")
+    func tagSubscriptSharesEventAndPublicKeyReferences() {
+        var filter = Filter(kinds: [1])
+        filter[tag: .event] = [note.hex]
+        filter[tag: .publicKey] = [alice.hex]
+
+        #expect(filter.eventReferences == [note])
+        #expect(filter.publicKeyReferences == [alice])
+
+        filter.eventReferences = [reply]
+        filter.publicKeyReferences = [bob]
+
+        #expect(filter[tag: .event] == [reply.hex])
+        #expect(filter[tag: .publicKey] == [bob.hex])
+
+        filter[tag: .event] = nil
+        filter.publicKeyReferences = nil
+
+        #expect(filter.eventReferences == nil)
+        #expect(filter[tag: .publicKey] == nil)
+    }
+
+    /// Values assigned through the subscript are never dropped: the query keeps and encodes them as
+    /// given, and only the typed view leaves out what it cannot represent.
+    @Test("Non-canonical e and p values set through the tag subscript are kept and encoded")
+    func tagSubscriptKeepsNonCanonicalReferences() throws {
+        var filter = Filter(kinds: [1])
+        filter[tag: .event] = [note.hex, "not-an-id"]
+        filter[tag: .publicKey] = [alice.hex.uppercased()]
+
+        #expect(filter[tag: .event] == [note.hex, "not-an-id"])
+        #expect(filter[tag: .publicKey] == [alice.hex.uppercased()])
+        #expect(filter.eventReferences == [note])
+        #expect(filter.publicKeyReferences == [])
+
+        let data = try JSONEncoder().encode(filter)
+        let json = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        #expect(json["#e"] as? [String] == [note.hex, "not-an-id"])
+        #expect(json["#p"] as? [String] == [alice.hex.uppercased()])
+
+        #expect(throws: DecodingError.self) {
+            try JSONDecoder().decode(Filter.self, from: data)
+        }
+    }
+
+    @Test("Filter JSON round-trips every tag query, e and p included")
+    func filterJSONRoundTripsTagQueries() throws {
+        let json = """
+            {
+                "kinds": [30023],
+                "#t": ["nostr"],
+                "#e": ["\(note.hex)", "\(reply.hex)"],
+                "#p": ["\(alice.hex)"],
+                "#d": ["essay"]
+            }
+            """
+
+        let decoded = try JSONDecoder().decode(Filter.self, from: Data(json.utf8))
+        let reencoded = try JSONEncoder().encode(decoded)
+        let redecoded = try JSONDecoder().decode(Filter.self, from: reencoded)
+
+        #expect(redecoded == decoded)
+        #expect(redecoded[tag: .hashtag] == ["nostr"])
+        #expect(redecoded[tag: .identifier] == ["essay"])
+        #expect(redecoded[tag: .event] == [note.hex, reply.hex])
+        #expect(redecoded.eventReferences == [note, reply])
+        #expect(redecoded.publicKeyReferences == [alice])
+        let object = try #require(JSONSerialization.jsonObject(with: reencoded) as? [String: Any])
+        #expect(Set(object.keys) == ["kinds", "#t", "#e", "#p", "#d"])
     }
 }

@@ -368,7 +368,7 @@ struct NIP29GroupStateTests {
         let filter = Filter.groupState(groupID: "abcdef")
 
         #expect(filter.kinds == [.groupMetadata, .groupAdmins, .groupMembers, .groupRoles, .groupPinList])
-        #expect(filter.tagQuery("d") == ["abcdef"])
+        #expect(filter[tag: "d"] == ["abcdef"])
     }
 
     @Test("groupState honors a custom kind list")
@@ -376,7 +376,7 @@ struct NIP29GroupStateTests {
         let filter = Filter.groupState(groupID: "abcdef", kinds: [.groupMetadata])
 
         #expect(filter.kinds == [.groupMetadata])
-        #expect(filter.tagQuery("d") == ["abcdef"])
+        #expect(filter[tag: "d"] == ["abcdef"])
     }
 }
 

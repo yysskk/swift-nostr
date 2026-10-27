@@ -391,7 +391,7 @@ struct EventCapabilityTests {
             author: author.publicKey, identifier: "essay", timeout: .seconds(4))
 
         var expected = Filter(authors: [author.publicKey], kinds: [.longFormContent])
-        expected.addTagQuery("d", values: ["essay"])
+        expected[tag: "d"] = ["essay"]
         let recorded = try await onlyFetch(stub)
         #expect(recorded.filters == [expected])
         #expect(recorded.relayURLs == nil)
@@ -411,7 +411,7 @@ struct EventCapabilityTests {
 
         // The whole hint set goes to the primitive, which skips the hint not in the pool.
         var expected = Filter(authors: [author.publicKey], kinds: [.longFormContent])
-        expected.addTagQuery("d", values: ["essay"])
+        expected[tag: "d"] = ["essay"]
         let recorded = try await onlyFetch(stub)
         #expect(recorded.filters == [expected])
         #expect(recorded.relayURLs == [relayA, relayB])

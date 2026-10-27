@@ -13,10 +13,24 @@ public struct Filter: Codable, Sendable, Hashable {
     public var kinds: [Event.Kind]?
 
     /// Event ids to match against the events' "e" tags (`#e` on the wire).
-    public var eventReferences: [EventID]?
+    ///
+    /// This is a typed view of `self[tag: .event]`: both read and write the same `#e` query.
+    /// Values set through the subscript that are not canonical hex event ids are left out of this
+    /// view, but stay in the query and are encoded.
+    public var eventReferences: [EventID]? {
+        get { tagQueries[.event].map { $0.compactMap(EventID.init) } }
+        set { tagQueries[.event] = newValue.map { $0.map(\.hex) } }
+    }
 
     /// Public keys to match against the events' "p" tags (`#p` on the wire).
-    public var publicKeyReferences: [PublicKey]?
+    ///
+    /// This is a typed view of `self[tag: .publicKey]`: both read and write the same `#p` query.
+    /// Values set through the subscript that are not canonical hex public keys are left out of this
+    /// view, but stay in the query and are encoded.
+    public var publicKeyReferences: [PublicKey]? {
+        get { tagQueries[.publicKey].map { $0.compactMap(PublicKey.init) } }
+        set { tagQueries[.publicKey] = newValue.map { $0.map(\.hex) } }
+    }
 
     /// The earliest `created_at` to match, inclusive.
     public var since: Timestamp?
@@ -32,15 +46,13 @@ public struct Filter: Codable, Sendable, Hashable {
     /// https://github.com/nostr-protocol/nips/blob/master/50.md
     public var search: String?
 
-    /// Generic tag queries (e.g., #t for hashtags)
-    private var tagQueries: [String: [String]]
+    /// Every tag query, `#e` and `#p` included, keyed by tag name; each encodes as `#<name>`.
+    private var tagQueries: [Tag.Name: [String]]
 
     enum CodingKeys: String, CodingKey {
         case ids
         case authors
         case kinds
-        case eventReferences = "#e"
-        case publicKeyReferences = "#p"
         case since
         case until
         case limit
@@ -64,13 +76,27 @@ public struct Filter: Codable, Sendable, Hashable {
         self.ids = ids
         self.authors = authors
         self.kinds = kinds
-        self.eventReferences = eventReferences
-        self.publicKeyReferences = publicKeyReferences
         self.since = since
         self.until = until
         self.limit = limit
         self.search = search
         self.tagQueries = [:]
+        self.eventReferences = eventReferences
+        self.publicKeyReferences = publicKeyReferences
+    }
+
+    /// The values of the query on the tag named `name`, encoded as `#<name>` (e.g. `#t` for
+    /// `.hashtag`); assigning nil removes the query.
+    ///
+    ///     filter[tag: .hashtag] = ["nostr"]
+    ///
+    /// `self[tag: .event]` and `self[tag: .publicKey]` are the same `#e` and `#p` queries as
+    /// ``eventReferences`` and ``publicKeyReferences``, as hex strings. Values assigned to them
+    /// are kept and encoded as given, even if they are not canonical hex; the typed properties
+    /// leave such values out, and decoding a filter that holds them throws.
+    public subscript(tag name: Tag.Name) -> [String]? {
+        get { tagQueries[name] }
+        set { tagQueries[name] = newValue }
     }
 
     /// Decodes a NIP-01 filter object.
@@ -82,19 +108,22 @@ public struct Filter: Codable, Sendable, Hashable {
         ids = try container.decodeIfPresent([EventID].self, forKey: .ids)
         authors = try container.decodeIfPresent([PublicKey].self, forKey: .authors)
         kinds = try container.decodeIfPresent([Event.Kind].self, forKey: .kinds)
-        eventReferences = try container.decodeIfPresent([EventID].self, forKey: .eventReferences)
-        publicKeyReferences = try container.decodeIfPresent([PublicKey].self, forKey: .publicKeyReferences)
         since = try container.decodeIfPresent(Timestamp.self, forKey: .since)
         until = try container.decodeIfPresent(Timestamp.self, forKey: .until)
         limit = try container.decodeIfPresent(Int.self, forKey: .limit)
         search = try container.decodeIfPresent(String.self, forKey: .search)
 
-        // Decode generic tag queries
-        let dynamicContainer = try decoder.container(keyedBy: DynamicCodingKeys.self)
-        var tagQueries: [String: [String]] = [:]
-        for key in dynamicContainer.allKeys {
-            if key.stringValue.hasPrefix("#") && key.stringValue != "#e" && key.stringValue != "#p" {
-                tagQueries[key.stringValue] = try dynamicContainer.decode([String].self, forKey: key)
+        let tagContainer = try decoder.container(keyedBy: DynamicCodingKeys.self)
+        var tagQueries: [Tag.Name: [String]] = [:]
+        for key in tagContainer.allKeys where key.stringValue.hasPrefix("#") {
+            let name = Tag.Name(rawValue: String(key.stringValue.dropFirst()))
+            switch name {
+            case .event:
+                tagQueries[name] = try tagContainer.decode([EventID].self, forKey: key).map(\.hex)
+            case .publicKey:
+                tagQueries[name] = try tagContainer.decode([PublicKey].self, forKey: key).map(\.hex)
+            default:
+                tagQueries[name] = try tagContainer.decode([String].self, forKey: key)
             }
         }
         self.tagQueries = tagQueries
@@ -106,39 +135,15 @@ public struct Filter: Codable, Sendable, Hashable {
         try container.encodeIfPresent(ids, forKey: .ids)
         try container.encodeIfPresent(authors, forKey: .authors)
         try container.encodeIfPresent(kinds, forKey: .kinds)
-        try container.encodeIfPresent(eventReferences, forKey: .eventReferences)
-        try container.encodeIfPresent(publicKeyReferences, forKey: .publicKeyReferences)
         try container.encodeIfPresent(since, forKey: .since)
         try container.encodeIfPresent(until, forKey: .until)
         try container.encodeIfPresent(limit, forKey: .limit)
         try container.encodeIfPresent(search, forKey: .search)
 
-        // Encode generic tag queries
-        var dynamicContainer = encoder.container(keyedBy: DynamicCodingKeys.self)
-        for (key, value) in tagQueries {
-            try dynamicContainer.encode(value, forKey: DynamicCodingKeys(stringValue: key)!)
+        var tagContainer = encoder.container(keyedBy: DynamicCodingKeys.self)
+        for (name, values) in tagQueries {
+            try tagContainer.encode(values, forKey: DynamicCodingKeys(stringValue: "#\(name.rawValue)")!)
         }
-    }
-
-    /// Adds a generic tag query, encoded as `#<name>` (e.g. `#t` for hashtags), replacing any
-    /// existing query for the same tag.
-    ///
-    /// A leading `#` in `name` is ignored: `addTagQuery(.hashtag, values:)` and
-    /// `addTagQuery("#t", values:)` set the same `#t` query.
-    public mutating func addTagQuery(_ name: Tag.Name, values: [String]) {
-        tagQueries[Self.tagQueryKey(for: name)] = values
-    }
-
-    /// Returns the values of a generic tag query (e.g. `#t` for hashtags).
-    ///
-    /// A leading `#` in `name` is ignored: `tagQuery(.hashtag)` and `tagQuery("#t")` look up
-    /// the same query.
-    public func tagQuery(_ name: Tag.Name) -> [String]? {
-        tagQueries[Self.tagQueryKey(for: name)]
-    }
-
-    private static func tagQueryKey(for name: Tag.Name) -> String {
-        name.rawValue.hasPrefix("#") ? name.rawValue : "#\(name.rawValue)"
     }
 }
 
@@ -278,7 +283,7 @@ extension Filter {
             since: since,
             limit: limit
         )
-        filter.addTagQuery(.group, values: [groupID])
+        filter[tag: .group] = [groupID]
         return filter
     }
 
@@ -290,7 +295,7 @@ extension Filter {
         kinds: [Event.Kind] = [.groupMetadata, .groupAdmins, .groupMembers, .groupRoles, .groupPinList]
     ) -> Filter {
         var filter = Filter(kinds: kinds)
-        filter.addTagQuery(.identifier, values: [groupID])
+        filter[tag: .identifier] = [groupID]
         return filter
     }
 }
