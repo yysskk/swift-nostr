@@ -157,6 +157,26 @@ struct RemoteSignerCommandsTests {
         await #expect(throws: RemoteSignerError.responseValidationFailed) { try await signed.value }
     }
 
+    @Test("sign rejects a request keyed to a key other than the user's")
+    func signRejectsForeignRequestKey() async throws {
+        let (remote, transport) = try await connected()
+        let unsigned = UnsignedEvent(
+            publicKey: try KeyPair().publicKey, createdAt: Timestamp(rawValue: 1000), kind: .textNote,
+            content: "requested")
+
+        let signed = Task { try await remote.sign(unsigned) }
+        let request = try await nextRequest(transport)
+
+        // An honest signer signs under the user key whatever key the request carried.
+        let toSign = try RemoteSignerFixtures.unsignedEvent(from: request, author: signer.publicKey)
+        let json = try RemoteSignerFixtures.signedEventJSON(toSign, signer: signer)
+        try await transport.deliver(
+            RemoteSignerFixtures.response(
+                requestID: request.id, result: json, client: client, signer: signer))
+
+        await #expect(throws: RemoteSignerError.responseValidationFailed) { try await signed.value }
+    }
+
     // MARK: - ping
 
     @Test("ping succeeds on pong")

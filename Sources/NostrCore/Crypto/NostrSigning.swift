@@ -17,9 +17,14 @@ public protocol NostrSigning: Sendable {
     var publicKey: PublicKey { get async throws }
 
     /// Signs `event`, returning the complete signed event.
-    /// - Parameter event: The unsigned event to sign. Its `publicKey` should be this signer's
+    ///
+    /// A conformance must reject an event whose `publicKey` is not this signer's ``publicKey``
+    /// rather than return an event whose signature cannot verify.
+    /// - Parameter event: The unsigned event to sign. Its `publicKey` must be this signer's
     ///   ``publicKey``.
     /// - Returns: The signed ``Event``.
+    /// - Throws: An error if `event` is keyed to another public key —
+    ///   ``EventSigner/Error/publicKeyMismatch`` from a local ``EventSigner`` — or cannot be signed.
     func sign(_ event: UnsignedEvent) async throws -> Event
 
     /// Encrypts `plaintext` to `recipientPublicKey` with NIP-44 as this signer's identity.

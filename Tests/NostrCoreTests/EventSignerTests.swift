@@ -20,6 +20,14 @@ struct EventSignerTests {
         #expect(try event.verify())
     }
 
+    @Test("sign rejects an unsigned event keyed to another public key")
+    func signRejectsForeignPublicKey() throws {
+        let signer = try makeSigner()
+        let unsigned = UnsignedEvent(publicKey: try KeyPair().publicKey, kind: .textNote, content: "hello")
+
+        #expect(throws: EventSigner.Error.publicKeyMismatch) { try signer.sign(unsigned) }
+    }
+
     @Test("sign(_:) signs a template under the signer's public key, keeping its fields")
     func signTemplate() throws {
         let signer = try makeSigner()
