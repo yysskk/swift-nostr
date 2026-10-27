@@ -87,11 +87,7 @@ public actor WalletConnection {
 
     /// Disconnects, failing any in-flight requests and ending the notification streams.
     public func disconnect() async {
-        pendingInfo?.finish(throwing: WalletConnectError.notConnected)
-        pendingInfo = nil
-
-        finishNotificationStreams()
-
+        connectionEnded()
         await session.disconnect()
     }
 
@@ -104,9 +100,17 @@ public actor WalletConnection {
         ) { [weak self] event in
             await self?.handle(event)
         } onEnded: { [weak self] in
-            // The relays' streams ended: no notification can arrive on this connection any more.
-            await self?.finishNotificationStreams()
+            // The relays' streams ended. A restart waits for this handler, so the waiter and streams
+            // it ends are never a newer connection's.
+            await self?.connectionEnded()
         }
+    }
+
+    /// Fails a pending ``fetchInfo()`` and ends the notification streams: nothing can answer either
+    /// once the connection has ended.
+    private func connectionEnded() {
+        failPendingInfo(with: .notConnected)
+        finishNotificationStreams()
     }
 
     // MARK: - Info
@@ -114,7 +118,10 @@ public actor WalletConnection {
     /// Fetches the wallet's NIP-47 info event (kind 13194) and caches it, so later commands use the
     /// negotiated encryption scheme.
     /// - Returns: The parsed ``WalletInfo``.
-    /// - Throws: ``WalletConnectError/timedOut`` if no info event arrives within the request timeout.
+    /// - Throws: ``WalletConnectError/timedOut`` if no info event arrives within the request timeout,
+    ///   ``WalletConnectError/notConnected`` if the connection ends first — on ``disconnect()``, or
+    ///   when the relays' streams end — or ``WalletConnectError/superseded`` if a later call replaces
+    ///   this one.
     @discardableResult
     public func fetchInfo() async throws -> WalletInfo {
         try await ensureStarted()
@@ -142,7 +149,7 @@ public actor WalletConnection {
             // If this call was superseded/finished, its timeout was cancelled — don't end the
             // continuation that now belongs to a concurrent fetchInfo().
             guard !Task.isCancelled else { return }
-            await self?.failPendingInfo()
+            await self?.failPendingInfo(with: .timedOut)
         }
         defer { timeoutTask.cancel() }
 
@@ -152,8 +159,9 @@ public actor WalletConnection {
         throw WalletConnectError.timedOut
     }
 
-    private func failPendingInfo() {
-        pendingInfo?.finish(throwing: WalletConnectError.timedOut)
+    /// Fails the current ``fetchInfo()`` waiter, if any, with `error`.
+    private func failPendingInfo(with error: WalletConnectError) {
+        pendingInfo?.finish(throwing: error)
         pendingInfo = nil
     }
 

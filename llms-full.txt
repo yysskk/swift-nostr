@@ -1815,7 +1815,8 @@ let signer = try RemoteSigner(invitation: invitation, clientKeyPair: clientKeyPa
 // Waits for the first kind-24133 response whose result echoes the invitation secret (validated per
 // spec), pins subsequent traffic to that public key, marks the session connected, and returns it. A
 // response with a mismatched secret is ignored (keeps waiting); throws RemoteSignerError.timedOut
-// after Config.requestTimeout. Commands then work exactly as in the bunker flow.
+// after Config.requestTimeout, or .notConnected if the session ends first (disconnect(), or the
+// relays' streams end). Commands then work exactly as in the bunker flow.
 let remoteSignerPublicKey: PublicKey = try await signer.awaitConnection()
 ```
 

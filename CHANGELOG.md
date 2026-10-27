@@ -715,6 +715,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   left every `notifications()` and `authChallenges()` stream open, so a `for await` over one never
   ended. They now finish, as they do on `disconnect()`; call either method again for a fresh stream,
   which the next request (or `notifications()` itself) reconnects to serve.
+- **`fetchInfo()` and `awaitConnection()` fail when the relays' streams end**: once automatic
+  reconnection gave up, `WalletConnection.fetchInfo()` and `RemoteSigner.awaitConnection()` waited
+  out their whole timeout for a reply that could no longer arrive. They now throw
+  `WalletConnectError.notConnected` and `RemoteSignerError.notConnected` at once, as on
+  `disconnect()` and like the in-flight requests the connection fails.
 - **`EventSigner` signs a template without `await` in async code** (breaking for `NostrSigning`
   conformers): in an async context Swift preferred the async `NostrSigning.sign(_:)` extension
   method over `EventSigner`'s synchronous `sign(_:)`, so `try signer.sign(.textNote("gm"))` on an

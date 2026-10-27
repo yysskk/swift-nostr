@@ -164,6 +164,39 @@ struct RemoteSignerNostrConnectFlowTests {
         }
     }
 
+    // MARK: - session end
+
+    /// No connect response can arrive once the relays' streams have ended, so the wait fails then
+    /// rather than when its timeout elapses.
+    /// The timeout is long enough to tell the two apart, yet bounds the run if this regresses.
+    @Test("awaitConnection fails when the relays' event stream ends", .timeLimit(.minutes(1)))
+    func awaitConnectionFailsWhenEventStreamEnds() async throws {
+        let invitation = try makeInvitation()
+        let transport = FakeRemoteSignerTransport()
+        let remote = try makeSigner(invitation: invitation, transport: transport, requestTimeout: .seconds(20))
+
+        let connection = Task { try await remote.awaitConnection() }
+        try await waitForConnectionWaiter(remote)
+        await transport.endEvents()
+
+        await #expect(throws: RemoteSignerError.notConnected) { try await connection.value }
+        #expect(await remote.isAwaitingConnectionForTesting == false)
+    }
+
+    @Test("awaitConnection fails when the session disconnects", .timeLimit(.minutes(1)))
+    func awaitConnectionFailsOnDisconnect() async throws {
+        let invitation = try makeInvitation()
+        let transport = FakeRemoteSignerTransport()
+        let remote = try makeSigner(invitation: invitation, transport: transport, requestTimeout: .seconds(20))
+
+        let connection = Task { try await remote.awaitConnection() }
+        try await waitForConnectionWaiter(remote)
+        await remote.disconnect()
+
+        await #expect(throws: RemoteSignerError.notConnected) { try await connection.value }
+        #expect(await remote.isAwaitingConnectionForTesting == false)
+    }
+
     // MARK: - concurrent calls
 
     @Test("a concurrent awaitConnection throws connectionInProgress, distinct from notConnected")
