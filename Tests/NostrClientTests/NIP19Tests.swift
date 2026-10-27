@@ -155,7 +155,7 @@ struct NIP19Tests {
 
     @Test("NAddr(event:) extracts the d tag")
     func naddrFromEvent() throws {
-        let event = makeEvent(kind: 30023, tags: [["t", "nostr"], ["d", "my-article"]])
+        let event = makeEvent(kind: 30023, tags: [.hashtag("nostr"), .identifier("my-article")])
         let addr = try NAddr(event: event)
         #expect(addr.identifier == "my-article")
         #expect(addr.author == publicKey)
@@ -346,7 +346,7 @@ struct NIP19Tests {
 
     // MARK: - helpers
 
-    private func makeEvent(kind: Event.Kind, tags: [[String]]) -> Event {
+    private func makeEvent(kind: Event.Kind, tags: [Event.Tag]) -> Event {
         Event(
             id: eventID,
             publicKey: publicKey,

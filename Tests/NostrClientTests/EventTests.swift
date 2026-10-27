@@ -29,7 +29,7 @@ struct EventTests {
             publicKey: try PublicKey(hex: publicKey),
             createdAt: Timestamp(rawValue: 1_234_567_890),
             kind: 1,
-            tags: [["p", "test"]],
+            tags: [Event.Tag(name: .publicKey, values: ["test"])],
             content: "test content"
         )
 
@@ -110,8 +110,8 @@ struct EventTests {
 
         #expect(reaction.kind == 7)
         #expect(reaction.content == "🤙")
-        #expect(reaction.tags.contains { $0.first == "e" && $0.contains(targetEvent.id.hex) })
-        #expect(reaction.tags.contains { $0.first == "p" && $0.contains(targetEvent.publicKey.hex) })
+        #expect(reaction.tags.contains { $0.name == .event && $0.primaryValue == targetEvent.id.hex })
+        #expect(reaction.tags.contains { $0.name == .publicKey && $0.primaryValue == targetEvent.publicKey.hex })
         #expect(try reaction.verify())
     }
 

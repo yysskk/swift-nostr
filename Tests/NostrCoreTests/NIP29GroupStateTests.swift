@@ -176,7 +176,7 @@ struct NIP29GroupStateTests {
                 ["private"],
                 ["closed"],
                 ["supported_kinds", "9", "11"],
-            ],
+            ].map(Event.Tag.init(rawArray:)),
             content: "",
             signature: nil
         )
@@ -286,18 +286,20 @@ struct NIP29GroupStateTests {
         let admins = try stateEvent(
             kind: .groupAdmins,
             tags: [.identifier("abcdef")] + malformed.map { Event.Tag(name: "p", values: [$0, "ceo"]) }
-                + [["p", member.hex, "admin"]],
+                + [.publicKey(member, roles: ["admin"])],
             signer: relay)
         #expect(try Groups.AdminList(event: admins).admins == [Groups.Admin(publicKey: member, roles: ["admin"])])
 
         let members = try stateEvent(
             kind: .groupMembers,
-            tags: [.identifier("abcdef")] + malformed.map { Event.Tag(name: "p", values: [$0]) } + [["p", member.hex]],
+            tags: [.identifier("abcdef")] + malformed.map { Event.Tag(name: "p", values: [$0]) } + [.publicKey(member)],
             signer: relay)
         #expect(try Groups.MemberList(event: members).members == [member])
 
         let pins = try stateEvent(
-            kind: .groupPinList, tags: [["d", "abcdef"], ["e", "not-an-id"], ["e", pinned.hex]], signer: relay)
+            kind: .groupPinList,
+            tags: [.identifier("abcdef"), Event.Tag(name: .event, values: ["not-an-id"]), .event(pinned)], signer: relay
+        )
         #expect(try Groups.PinList(event: pins).items == [.event(id: pinned)])
     }
 
@@ -395,7 +397,7 @@ struct NIP29GroupMembershipTests {
         id: EventID,
         kind: Event.Kind,
         createdAt: Timestamp,
-        tags: [[String]]
+        tags: [Event.Tag]
     ) -> Event {
         Event(
             id: id, publicKey: PublicKey.fixture("admin"), createdAt: createdAt, kind: kind, tags: tags, content: "",
@@ -405,13 +407,13 @@ struct NIP29GroupMembershipTests {
     private func putUser(id: EventID, createdAt: Timestamp, roles: [String]) -> Event {
         moderation(
             id: id, kind: .groupPutUser, createdAt: createdAt,
-            tags: [["h", "abcdef"], ["p", member.hex] + roles])
+            tags: [.group("abcdef"), .publicKey(member, roles: roles)])
     }
 
     private func removeUser(id: EventID, createdAt: Timestamp) -> Event {
         moderation(
             id: id, kind: .groupRemoveUser, createdAt: createdAt,
-            tags: [["h", "abcdef"], ["p", member.hex]])
+            tags: [.group("abcdef"), .publicKey(member)])
     }
 
     @Test("membership is nil when no moderation event targets the public key")
@@ -470,7 +472,7 @@ struct NIP29GroupMembershipTests {
             putUser(id: paddedID(1), createdAt: Timestamp(rawValue: 1_700_000_000), roles: ["member"]),
             moderation(
                 id: paddedID(2), kind: .groupRemoveUser, createdAt: Timestamp(rawValue: 1_700_000_100),
-                tags: [["h", "abcdef"], ["p", other.hex]]),
+                tags: [.group("abcdef"), .publicKey(other)]),
         ]
 
         #expect(Groups.membership(of: member, in: events) == .member(roles: ["member"]))
@@ -483,10 +485,10 @@ struct NIP29GroupMembershipTests {
             putUser(id: paddedID(1), createdAt: Timestamp(rawValue: 1_700_000_000), roles: ["member"]),
             moderation(
                 id: paddedID(2), kind: .chatMessage, createdAt: Timestamp(rawValue: 1_700_000_100),
-                tags: [["h", "abcdef"], ["p", member.hex]]),
+                tags: [.group("abcdef"), .publicKey(member)]),
             moderation(
                 id: paddedID(3), kind: .groupDeleteEvent, createdAt: Timestamp(rawValue: 1_700_000_200),
-                tags: [["h", "abcdef"], ["p", member.hex]]),
+                tags: [.group("abcdef"), .publicKey(member)]),
         ]
 
         #expect(Groups.membership(of: member, in: events) == .member(roles: ["member"]))
@@ -497,7 +499,10 @@ struct NIP29GroupMembershipTests {
         let other = PublicKey.fixture("other")
         let event = moderation(
             id: paddedID(1), kind: .groupPutUser, createdAt: Timestamp(rawValue: 1_700_000_000),
-            tags: [["h", "abcdef"], ["p", other.hex, "ceo"], ["p", member.hex, "moderator"]])
+            tags: [
+                .group("abcdef"), Event.Tag(name: .publicKey, values: [other.hex, "ceo"]),
+                Event.Tag(name: .publicKey, values: [member.hex, "moderator"]),
+            ])
 
         #expect(Groups.membership(of: member, in: [event]) == .member(roles: ["moderator"]))
         #expect(Groups.membership(of: other, in: [event]) == .member(roles: ["ceo"]))

@@ -7,8 +7,8 @@ import Foundation
 public typealias Tag = Event.Tag
 
 extension Event {
-    /// A single Nostr event tag (NIP-01): a non-empty string array whose first
-    /// element is the tag name.
+    /// A single Nostr event tag (NIP-01): a string array whose first element is
+    /// the tag name.
     ///
     /// Build tags with the typed constructors instead of hand-rolling arrays —
     /// they take care of NIP positional conventions, including the empty-string
@@ -18,38 +18,41 @@ extension Event {
     /// Tag.event(note.id, marker: .reply)  // ["e", "<id hex>", "", "reply"]
     /// Tag.publicKey(alice, petname: "alice") // ["p", "<public key hex>", "", "alice"]
     /// Tag.hashtag("nostr")                // ["t", "nostr"]
+    /// Tag(name: "client", values: ["my-app"]) // ["client", "my-app"]
     /// ```
     ///
-    /// `Tag` is also expressible as an array literal (`["t", "nostr"]`), so call
-    /// sites that passed `[[String]]` literals keep compiling unchanged.
+    /// A tag keeps the exact array it was built or decoded from, so tags of any
+    /// shape a relay sends round-trip unchanged and still hash to the event id.
     public struct Tag: Sendable, Hashable {
+        /// The raw NIP-01 representation: `[name] + values`.
+        ///
+        /// Usually non-empty; an empty array decoded from the wire is kept as is,
+        /// with an empty ``name`` and no ``values``.
+        public let rawArray: [String]
+
+        public init(name: Name, values: [String] = []) {
+            self.rawArray = [name.rawValue] + values
+        }
+
+        /// Wraps a raw NIP-01 tag array, e.g. one copied from another event.
+        public init(rawArray: [String]) {
+            self.rawArray = rawArray
+        }
+
         /// The tag name, e.g. ``Name/event`` ("e") or ``Name/hashtag`` ("t").
-        public let name: Name
+        public var name: Name {
+            Name(rawValue: rawArray.first ?? "")
+        }
 
         /// The elements after the name. Positional per NIP conventions;
         /// empty strings act as placeholders for skipped elements.
-        public let values: [String]
-
-        public init(name: Name, values: [String] = []) {
-            self.name = name
-            self.values = values
-        }
-
-        /// Parses a raw NIP-01 tag array. Returns nil if the array is empty.
-        public init?(rawArray: [String]) {
-            guard let name = rawArray.first else { return nil }
-            self.name = Name(rawValue: name)
-            self.values = Array(rawArray.dropFirst())
-        }
-
-        /// The raw NIP-01 representation: `[name] + values`.
-        public var rawArray: [String] {
-            [name.rawValue] + values
+        public var values: [String] {
+            Array(rawArray.dropFirst())
         }
 
         /// The first value — the id, public key, or topic for single-value tags.
         public var primaryValue: String? {
-            values.first
+            rawArray.count > 1 ? rawArray[1] : nil
         }
     }
 }
@@ -359,22 +362,6 @@ extension Tag {
         }
         return Tag(name: .simpleGroup, values: values)
     }
-
-    /// An arbitrary raw tag. Returns nil if the array is empty.
-    public static func raw(_ array: [String]) -> Tag? {
-        Tag(rawArray: array)
-    }
-}
-
-// MARK: - Array Literal
-extension Tag: ExpressibleByArrayLiteral {
-    /// Builds a tag from a string array literal: `["t", "nostr"]`.
-    /// The literal must contain at least the tag name.
-    public init(arrayLiteral elements: String...) {
-        precondition(!elements.isEmpty, "A tag array literal requires at least the tag name")
-        self.name = Name(rawValue: elements[0])
-        self.values = Array(elements.dropFirst())
-    }
 }
 
 // MARK: - Codable
@@ -387,27 +374,15 @@ extension Tag: Codable {
 
     public init(from decoder: any Decoder) throws {
         let container = try decoder.singleValueContainer()
-        let rawArray = try container.decode([String].self)
-        guard let tag = Tag(rawArray: rawArray) else {
-            throw DecodingError.dataCorruptedError(
-                in: container,
-                debugDescription: "A tag array must contain at least the tag name"
-            )
-        }
-        self = tag
+        self.init(rawArray: try container.decode([String].self))
     }
 }
 
 // MARK: - Event Tag Accessors
 extension Event {
-    /// A typed view of this event's tags (malformed empty arrays are skipped).
-    public var structuredTags: [Tag] {
-        tags.compactMap(Tag.init(rawArray:))
-    }
-
     /// All tags with the given name.
     public func tags(named name: Tag.Name) -> [Tag] {
-        structuredTags.filter { $0.name == name }
+        tags.filter { $0.name == name }
     }
 
     /// The first value of the first tag with the given name.
@@ -420,7 +395,7 @@ extension Event {
     /// Tags come from whoever wrote the event, so an "e" tag whose value is not a canonical
     /// 64-digit lowercase hex id is skipped rather than reported.
     public var referencedEventIDs: [EventID] {
-        tags.compactMap { $0.count >= 2 && $0[0] == "e" ? EventID($0[1]) : nil }
+        tags(named: .event).compactMap { $0.primaryValue.flatMap(EventID.init) }
     }
 
     /// The public keys referenced by "p" tags, in tag order.
@@ -428,7 +403,7 @@ extension Event {
     /// Tags come from whoever wrote the event, so a "p" tag whose value is not a canonical
     /// 64-digit lowercase hex public key is skipped rather than reported.
     public var referencedPublicKeys: [PublicKey] {
-        tags.compactMap { $0.count >= 2 && $0[0] == "p" ? PublicKey($0[1]) : nil }
+        tags(named: .publicKey).compactMap { $0.primaryValue.flatMap(PublicKey.init) }
     }
 
     /// The event's NIP-40 expiration time, if it carries a valid `expiration` tag.

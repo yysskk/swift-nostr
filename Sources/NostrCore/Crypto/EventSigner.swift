@@ -144,7 +144,7 @@ extension Event {
             publicKey: publicKey,
             createdAt: createdAt,
             kind: kind,
-            rawTags: tags,
+            tags: tags,
             content: content
         )
 

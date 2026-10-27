@@ -343,7 +343,7 @@ public actor RemoteSigner {
             let unsigned = UnsignedEvent(
                 publicKey: clientKeyPair.publicKey,
                 kind: .nostrConnect,
-                rawTags: [["p", signerPublicKey.hex]],
+                tags: [.publicKey(signerPublicKey)],
                 content: sealed.payload)
             return try signer.sign(unsigned)
         } catch {

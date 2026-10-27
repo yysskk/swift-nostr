@@ -36,9 +36,9 @@ enum NWCFixtures {
         scheme: WalletConnectEncryption = .nip44, dTag: String? = nil,
         declaringEncryption: Bool = false
     ) throws -> Event {
-        var tags = [["e", requestID.hex], ["p", client.publicKey.hex]]
-        if let dTag { tags.append(["d", dTag]) }
-        if declaringEncryption { tags.append(["encryption", scheme.rawValue]) }
+        var tags: [Event.Tag] = [.event(requestID), .publicKey(client.publicKey)]
+        if let dTag { tags.append(.identifier(dTag)) }
+        if declaringEncryption { tags.append(Event.Tag(name: "encryption", values: [scheme.rawValue])) }
         return try signed(
             kind: .walletConnectResponse,
             tags: tags,
@@ -48,11 +48,11 @@ enum NWCFixtures {
 
     /// Signs `content` as `wallet`, so the event carries the id and signature the connection checks.
     static func signed(
-        kind: Event.Kind, tags: [[String]], content: String, wallet: KeyPair, createdAt: Int64 = 0
+        kind: Event.Kind, tags: [Event.Tag], content: String, wallet: KeyPair, createdAt: Int64 = 0
     ) throws -> Event {
         try EventSigner(keyPair: wallet).sign(
             UnsignedEvent(
-                publicKey: wallet.publicKey, createdAt: Timestamp(rawValue: createdAt), kind: kind, rawTags: tags,
+                publicKey: wallet.publicKey, createdAt: Timestamp(rawValue: createdAt), kind: kind, tags: tags,
                 content: content))
     }
 
@@ -63,13 +63,13 @@ enum NWCFixtures {
     ) throws -> Event {
         try signed(
             kind: kind,
-            tags: [["p", client.publicKey.hex]],
+            tags: [.publicKey(client.publicKey)],
             content: try encrypt(notificationJSON, to: client, from: wallet, scheme: scheme),
             wallet: wallet)
     }
 
     /// Builds a signed kind-13194 info event.
-    static func info(content: String, tags: [[String]], wallet: KeyPair) throws -> Event {
+    static func info(content: String, tags: [Event.Tag], wallet: KeyPair) throws -> Event {
         try signed(kind: .walletConnectInfo, tags: tags, content: content, wallet: wallet)
     }
 

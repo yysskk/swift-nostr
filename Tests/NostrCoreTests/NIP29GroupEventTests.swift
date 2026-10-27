@@ -24,7 +24,7 @@ private func makeEvent(
     publicKey: PublicKey = .fixture("pk"),
     createdAt: Timestamp = Timestamp(rawValue: 1_700_000_000),
     kind: Event.Kind = .chatMessage,
-    tags: [[String]] = []
+    tags: [Event.Tag] = []
 ) -> Event {
     Event(id: id, publicKey: publicKey, createdAt: createdAt, kind: kind, tags: tags, content: "", signature: nil)
 }
@@ -180,7 +180,7 @@ struct NIP29GroupEventTests {
         #expect(event.kind == .groupJoinRequest)
         #expect(event.publicKey == signer.keyPair.publicKey)
         #expect(event.createdAt == createdAt)
-        #expect(event.tags == [["h", "abcdef"], ["code", "invite123"]])
+        #expect(event.tags.map(\.rawArray) == [["h", "abcdef"], ["code", "invite123"]])
         #expect(event.content == "let me in")
         #expect(try event.verify())
     }
@@ -205,7 +205,7 @@ struct NIP29GroupEventTests {
 
         #expect(event.kind == .groupLeaveRequest)
         #expect(event.publicKey == signer.keyPair.publicKey)
-        #expect(event.tags == [["h", "abcdef"]])
+        #expect(event.tags.map(\.rawArray) == [["h", "abcdef"]])
         #expect(event.content.isEmpty)
         #expect(try event.verify())
     }
@@ -260,7 +260,7 @@ struct NIP29GroupEventTests {
         #expect(event.kind == .chatMessage)
         #expect(event.publicKey == signer.keyPair.publicKey)
         #expect(event.createdAt == createdAt)
-        #expect(event.tags == [["h", "abcdef"], ["previous", "00000001"]])
+        #expect(event.tags.map(\.rawArray) == [["h", "abcdef"], ["previous", "00000001"]])
         #expect(event.content == "hello")
         #expect(try event.verify())
     }
@@ -304,21 +304,21 @@ struct NIP29GroupEventTests {
 
     @Test("groupID reads the h tag of user events")
     func groupIDFromHTag() {
-        let event = makeEvent(tags: [["x", "other"], ["h", "abcdef"]])
+        let event = makeEvent(tags: [Event.Tag(name: "x", values: ["other"]), .group("abcdef")])
 
         #expect(event.groupID == "abcdef")
     }
 
     @Test("groupID falls back to the d tag for relay-generated group state")
     func groupIDFromDTag() {
-        let state = makeEvent(kind: .groupMetadata, tags: [["d", "abcdef"]])
+        let state = makeEvent(kind: .groupMetadata, tags: [.identifier("abcdef")])
 
         #expect(state.groupID == "abcdef")
     }
 
     @Test("groupID is nil for a d tag outside the relay-state kinds and for no tags")
     func groupIDNilCases() {
-        let note = makeEvent(kind: .textNote, tags: [["d", "abcdef"]])
+        let note = makeEvent(kind: .textNote, tags: [.identifier("abcdef")])
 
         #expect(note.groupID == nil)
         #expect(makeEvent().groupID == nil)
@@ -423,7 +423,7 @@ struct NIP29TimelineReferenceTests {
 
     @Test("previousReferences(of:) reads the previous tag")
     func previousReferencesOfEvent() {
-        let event = makeEvent(tags: [["h", "abcdef"], ["previous", "00000001", "00000002"]])
+        let event = makeEvent(tags: [.group("abcdef"), Event.Tag(name: .previous, values: ["00000001", "00000002"])])
 
         #expect(Groups.previousReferences(of: event) == ["00000001", "00000002"])
         #expect(Groups.previousReferences(of: makeEvent()) == [])
@@ -432,7 +432,7 @@ struct NIP29TimelineReferenceTests {
     @Test("references matching known ids by 8-character prefix are not unknown")
     func allReferencesKnown() {
         let known = [paddedID(1), paddedID(2), paddedID(3)]
-        let event = makeEvent(tags: [["previous", reference(1), reference(3)]])
+        let event = makeEvent(tags: [Event.Tag(name: .previous, values: [reference(1), reference(3)])])
 
         #expect(Groups.unknownPreviousReferences(of: event, knownEventIDs: known).isEmpty)
     }
@@ -442,7 +442,7 @@ struct NIP29TimelineReferenceTests {
         let known = [paddedID(1), paddedID(2)]
         let forged = "deadbeef"
         let wrongLength = String(reference(1).prefix(4))
-        let event = makeEvent(tags: [["previous", reference(1), forged, wrongLength]])
+        let event = makeEvent(tags: [Event.Tag(name: .previous, values: [reference(1), forged, wrongLength])])
 
         #expect(
             Groups.unknownPreviousReferences(of: event, knownEventIDs: known)

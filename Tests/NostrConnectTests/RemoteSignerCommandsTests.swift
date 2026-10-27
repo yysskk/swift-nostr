@@ -70,7 +70,7 @@ struct RemoteSignerCommandsTests {
         let (remote, transport) = try await connected()
         let unsigned = UnsignedEvent(
             publicKey: signer.publicKey, createdAt: Timestamp(rawValue: 1000), kind: .textNote,
-            rawTags: [["t", "nostr"]],
+            tags: [.hashtag("nostr")],
             content: "hello from the bunker")
 
         async let signed = remote.sign(unsigned)
@@ -88,7 +88,7 @@ struct RemoteSignerCommandsTests {
         #expect(try event.verify() == true)
         #expect(event.kind == .textNote)
         #expect(event.content == "hello from the bunker")
-        #expect(event.tags == [["t", "nostr"]])
+        #expect(event.tags.map(\.rawArray) == [["t", "nostr"]])
         #expect(event.createdAt.rawValue == 1000)
         #expect(event.publicKey == signer.publicKey)
     }

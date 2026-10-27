@@ -34,7 +34,7 @@ public struct DirectMessageRelayList: Codable, Hashable, Sendable {
         guard event.kind == .directMessageRelayList else {
             return nil
         }
-        self.init(tags: event.structuredTags)
+        self.init(tags: event.tags)
     }
 
     /// Parses a DM relay list from tags (kind-agnostic). A `relay` tag whose URL is not a

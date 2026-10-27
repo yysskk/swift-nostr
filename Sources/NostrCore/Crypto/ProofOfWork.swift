@@ -24,9 +24,9 @@ public enum ProofOfWork {
 
         // The committed target lives in the third element of the nonce tag; without it a merely
         // lucky id could masquerade as intentional work, so an absent or short commitment fails.
-        guard let nonceTag = event.tags.first(where: { $0.first == "nonce" }),
-            nonceTag.count >= 3,
-            let committedTarget = Int(nonceTag[2]),
+        guard let nonceTag = event.tags(named: .nonce).first,
+            nonceTag.values.count >= 2,
+            let committedTarget = Int(nonceTag.values[1]),
             committedTarget >= minimumDifficulty
         else {
             return false
@@ -52,8 +52,7 @@ public enum ProofOfWork {
             throw Error.invalidDifficulty(difficulty)
         }
 
-        let strippedTags = event.tags.filter { $0.first != "nonce" }
-        let target = String(difficulty)
+        let strippedTags = event.tags.filter { $0.name != .nonce }
 
         var nonce = 0
         var iterations = 0
@@ -62,7 +61,7 @@ public enum ProofOfWork {
                 publicKey: event.publicKey,
                 createdAt: event.createdAt,
                 kind: event.kind,
-                rawTags: strippedTags + [["nonce", String(nonce), target]],
+                tags: strippedTags + [.nonce(String(nonce), target: difficulty)],
                 content: event.content
             )
             // `Self.` disambiguates from the `difficulty` parameter that shadows the method here.

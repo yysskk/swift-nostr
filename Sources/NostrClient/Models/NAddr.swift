@@ -48,7 +48,7 @@ public struct NAddr: Sendable, Hashable {
     ///   than 255 bytes, or ``NIP19Entity/Error/kindOutOfRange(_:)`` if the event's kind does not
     ///   fit in a 32-bit unsigned integer.
     public init(event: Event, relays: [RelayURL] = []) throws(NIP19Entity.Error) {
-        let identifier = event.tags.first { $0.first == "d" }.flatMap { $0.count > 1 ? $0[1] : "" } ?? ""
+        let identifier = event.firstTagValue(named: .identifier) ?? ""
         try self.init(identifier: identifier, author: event.publicKey, kind: event.kind.rawValue, relays: relays)
     }
 

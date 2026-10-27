@@ -67,7 +67,7 @@ public struct LongFormContent: Sendable, Hashable {
         var hashtags: [String] = []
         var additionalTags: [Tag] = []
 
-        for tag in event.structuredTags {
+        for tag in event.tags {
             let value = tag.primaryValue
             switch tag.name {
             case .identifier:

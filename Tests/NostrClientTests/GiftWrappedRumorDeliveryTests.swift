@@ -44,7 +44,7 @@ struct GiftWrappedRumorDeliveryTests {
         #expect(received.event.id == result.rumor.id)
         #expect(received.event.kind == customKind)
         #expect(received.event.content == template.content)
-        #expect(received.event.tags == template.tags.map(\.rawArray))
+        #expect(received.event.tags == template.tags)
         #expect(received.event.signature == nil)
 
         let selfCopy = try await GiftWrap.unwrap(

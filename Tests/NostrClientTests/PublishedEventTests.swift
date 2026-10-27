@@ -43,8 +43,8 @@ struct PublishedEventTests {
 
         #expect(published.event.kind == .textNote)
         // NIP-10 positional form: ["e", <id>, <relay-url placeholder>, <marker>]
-        #expect(published.event.tags.contains(["e", root.id.hex, "", "root"]))
-        #expect(published.event.tags.contains(["p", root.publicKey.hex]))
+        #expect(published.event.tags.contains(Event.Tag(rawArray: ["e", root.id.hex, "", "root"])))
+        #expect(published.event.tags.contains(Event.Tag(rawArray: ["p", root.publicKey.hex])))
         #expect(published.result.acceptedRelays == [relayURL])
         await client.relays.disconnect()
     }
@@ -63,7 +63,8 @@ struct PublishedEventTests {
             )
         }
 
-        #expect(published.event.tags.contains(["e", root.id.hex, "wss://hint.example.com", "root"]))
+        #expect(
+            published.event.tags.contains(Event.Tag(rawArray: ["e", root.id.hex, "wss://hint.example.com", "root"])))
         await client.relays.disconnect()
     }
 
@@ -99,8 +100,8 @@ struct PublishedEventTests {
         }
 
         #expect(repost.event.kind == .repost)
-        #expect(repost.event.tags.contains(["e", note.id.hex, "wss://hint.example.com"]))
-        #expect(repost.event.tags.contains(["p", note.publicKey.hex]))
+        #expect(repost.event.tags.contains(Event.Tag(rawArray: ["e", note.id.hex, "wss://hint.example.com"])))
+        #expect(repost.event.tags.contains(Event.Tag(rawArray: ["p", note.publicKey.hex])))
         await client.relays.disconnect()
     }
 
@@ -117,7 +118,7 @@ struct PublishedEventTests {
             try await client.events.publishDeletion(eventIDs: [metadata.event.id], reason: "cleanup")
         }
         #expect(deletion.event.kind == .eventDeletion)
-        #expect(deletion.event.tags.contains(["e", metadata.event.id.hex]))
+        #expect(deletion.event.tags.contains(Event.Tag(rawArray: ["e", metadata.event.id.hex])))
         await client.relays.disconnect()
     }
 

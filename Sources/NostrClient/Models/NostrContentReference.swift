@@ -101,10 +101,10 @@ public struct NostrContentReference: Sendable, Hashable {
     /// The deduplicated tags for every `nostr:` reference in `content`, in first-seen order.
     public static func tags(for content: String) -> [Tag] {
         var tags: [Tag] = []
-        var seen: Set<[String]> = []
+        var seen: Set<Tag> = []
         for reference in references(in: content) {
             let tag = reference.tag
-            if seen.insert(tag.rawArray).inserted {
+            if seen.insert(tag).inserted {
                 tags.append(tag)
             }
         }

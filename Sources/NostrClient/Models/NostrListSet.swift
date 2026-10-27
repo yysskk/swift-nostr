@@ -61,7 +61,7 @@ public struct NostrListSet: Sendable, Hashable {
     /// ``init(event:decryptingWith:)``).
     /// - Throws: ``NostrListSet/Error/missingIdentifier`` when the event has no `d` identifier tag.
     public init(event: Event) throws(NostrListSet.Error) {
-        let tags = event.structuredTags
+        let tags = event.tags
         guard let identifier = tags.first(where: { $0.name == .identifier })?.primaryValue else {
             throw .missingIdentifier
         }

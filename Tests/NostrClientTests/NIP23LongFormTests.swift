@@ -33,19 +33,19 @@ struct NIP23LongFormTests {
         )
 
         let tags = article.tags
-        #expect(tags[0] == ["d", "my-article"])
-        #expect(tags.contains(["title", "Hello"]))
-        #expect(tags.contains(["summary", "A summary"]))
-        #expect(tags.contains(["image", "https://example.com/cover.png"]))
-        #expect(tags.contains(["published_at", "1700000000"]))
-        #expect(tags.contains(["t", "nostr"]))
-        #expect(tags.contains(["t", "swift"]))
+        #expect(tags[0].rawArray == ["d", "my-article"])
+        #expect(tags.contains(Event.Tag(rawArray: ["title", "Hello"])))
+        #expect(tags.contains(Event.Tag(rawArray: ["summary", "A summary"])))
+        #expect(tags.contains(Event.Tag(rawArray: ["image", "https://example.com/cover.png"])))
+        #expect(tags.contains(Event.Tag(rawArray: ["published_at", "1700000000"])))
+        #expect(tags.contains(Event.Tag(rawArray: ["t", "nostr"])))
+        #expect(tags.contains(Event.Tag(rawArray: ["t", "swift"])))
     }
 
     @Test("tags omits optional fields when nil")
     func tagsOmitsOptionalFields() {
         let article = LongFormContent(identifier: "minimal")
-        #expect(article.tags == [["d", "minimal"]])
+        #expect(article.tags.map(\.rawArray) == [["d", "minimal"]])
     }
 
     @Test("init(event:) round-trips the modeled fields")
@@ -76,11 +76,11 @@ struct NIP23LongFormTests {
         let article = LongFormContent(
             identifier: "lossless",
             title: "Kept",
-            additionalTags: [["client", "x"]]
+            additionalTags: [Event.Tag(name: "client", values: ["x"])]
         )
 
         // The unmodeled tag is emitted by tags.
-        #expect(article.tags.contains(["client", "x"]))
+        #expect(article.tags.contains(Event.Tag(name: "client", values: ["x"])))
 
         // Parsing the emitted tags back preserves it in additionalTags, not elsewhere.
         let event = Event(
@@ -88,12 +88,12 @@ struct NIP23LongFormTests {
             publicKey: PublicKey(String(repeating: "a", count: 64))!,
             createdAt: Timestamp(rawValue: 1),
             kind: .longFormContent,
-            tags: article.tags.map(\.rawArray),
+            tags: article.tags,
             content: "",
             signature: nil
         )
         let parsed = LongFormContent(event: event)
-        #expect(parsed?.additionalTags == [["client", "x"]])
+        #expect(parsed?.additionalTags == [Event.Tag(name: "client", values: ["x"])])
         #expect(parsed?.title == "Kept")
     }
 
@@ -147,11 +147,12 @@ struct NIP23LongFormTests {
         let event = try signer.sign(
             UnsignedEvent(
                 publicKey: signer.publicKey, kind: .longFormContent,
-                rawTags: [["d", "d"], ["published_at", "9223372036854775807"]], content: ""))
+                tags: [.identifier("d"), Event.Tag(name: "published_at", values: ["9223372036854775807"])], content: "")
+        )
 
         let article = try #require(LongFormContent(event: event))
         #expect(article.publishedAt == Timestamp(rawValue: .max))
-        #expect(article.tags.contains(["published_at", "9223372036854775807"]))
+        #expect(article.tags.contains(Event.Tag(rawArray: ["published_at", "9223372036854775807"])))
     }
 
     @Test("a published_at that is not an integer is ignored")
@@ -160,7 +161,7 @@ struct NIP23LongFormTests {
         let event = try signer.sign(
             UnsignedEvent(
                 publicKey: signer.publicKey, kind: .longFormContent,
-                rawTags: [["d", "d"], ["published_at", "1.5e9"]], content: ""))
+                tags: [.identifier("d"), Event.Tag(name: "published_at", values: ["1.5e9"])], content: ""))
 
         #expect(LongFormContent(event: event)?.publishedAt == nil)
     }
@@ -230,7 +231,7 @@ struct NIP23LongFormTests {
             "pubkey": event.publicKey.hex,
             "created_at": event.createdAt.rawValue,
             "kind": event.kind.rawValue,
-            "tags": event.tags,
+            "tags": event.tags.map(\.rawArray),
             "content": event.content,
             "sig": event.signature?.hex ?? "",
         ]

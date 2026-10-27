@@ -37,7 +37,7 @@ struct EventTemplateTests {
 
         #expect(unsigned.publicKey == .fixture("author"))
         #expect(unsigned.kind == .reaction)
-        #expect(unsigned.tags == [["e", EventID.fixture("note").hex], ["t", "nostr"]])
+        #expect(unsigned.tags.map(\.rawArray) == [["e", EventID.fixture("note").hex], ["t", "nostr"]])
         #expect(unsigned.content == "+")
         #expect(unsigned.createdAt == Timestamp(rawValue: 1_700_000_000))
     }
@@ -54,7 +54,7 @@ struct EventTemplateTests {
         let event = signer.sign(template)
 
         #expect(event.content == "final")
-        #expect(event.tags == [["expiration", "1700003600"]])
+        #expect(event.tags.map(\.rawArray) == [["expiration", "1700003600"]])
         #expect(event.createdAt == Timestamp(rawValue: 1_700_000_000))
         #expect(try event.verify())
     }
@@ -77,17 +77,17 @@ struct EventTemplateTests {
     private let siblingID = EventID.fixture("sibling")
 
     /// A note carrying `tags`, to be replied to.
-    private func parent(tags: [[String]]) throws -> Event {
+    private func parent(tags: [Event.Tag]) throws -> Event {
         let signer = EventSigner(keyPair: KeyPair())
         return try signer.sign(
             UnsignedEvent(
                 publicKey: signer.publicKey, createdAt: Timestamp(rawValue: 1_700_000_000), kind: .textNote,
-                rawTags: tags, content: "parent"))
+                tags: tags, content: "parent"))
     }
 
     @Test("a reply to an event with no e tags names it as the root and mentions its author")
     func replyToRootEvent() throws {
-        let parent = try parent(tags: [["p", PublicKey.fixture("someone").hex]])
+        let parent = try parent(tags: [.publicKey(.fixture("someone"))])
 
         let reply = EventTemplate.reply(to: parent, content: "a reply")
         let hinted = EventTemplate.reply(to: parent, content: "a reply", relayURL: relayURL)
@@ -101,8 +101,9 @@ struct EventTemplateTests {
     @Test("a reply carries the parent's marked root over verbatim and marks the parent as replied to")
     func replyCarriesMarkedRoot() throws {
         let parent = try parent(tags: [
-            ["e", rootID.hex, "wss://root.example.com", "root", PublicKey.fixture("op").hex],
-            ["e", siblingID.hex, "wss://root.example.com", "reply"],
+            Event.Tag(
+                name: .event, values: [rootID.hex, "wss://root.example.com", "root", PublicKey.fixture("op").hex]),
+            Event.Tag(name: .event, values: [siblingID.hex, "wss://root.example.com", "reply"]),
         ])
 
         let reply = EventTemplate.reply(to: parent, content: "a reply", relayURL: relayURL)
@@ -119,7 +120,7 @@ struct EventTemplateTests {
     /// "reply" is not a marker, so the parent has no root and is itself the root.
     @Test("a value of root outside the marker position is not a marker")
     func replyIgnoresRootOutsideMarkerPosition() throws {
-        let parent = try parent(tags: [["e", siblingID.hex, "root", "reply"]])
+        let parent = try parent(tags: [Event.Tag(name: .event, values: [siblingID.hex, "root", "reply"])])
 
         let reply = EventTemplate.reply(to: parent, content: "a reply")
 
@@ -128,7 +129,9 @@ struct EventTemplateTests {
 
     @Test("a marked thread with no root marker is treated as rootless")
     func replyToMarkedButRootlessThread() throws {
-        let parent = try parent(tags: [["e", siblingID.hex, "wss://root.example.com", "mention"]])
+        let parent = try parent(tags: [
+            Event.Tag(name: .event, values: [siblingID.hex, "wss://root.example.com", "mention"])
+        ])
 
         let reply = EventTemplate.reply(to: parent, content: "a reply")
 
@@ -139,7 +142,9 @@ struct EventTemplateTests {
     /// explicit marker, keeping a relay hint that is a valid relay URL in canonical form.
     @Test("a positional root is re-emitted marked, with a valid relay hint canonicalized")
     func replyRecoversPositionalRootWithValidHint() throws {
-        let parent = try parent(tags: [["e", rootID.hex, "WSS://Hint.Example.com/"], ["e", siblingID.hex]])
+        let parent = try parent(tags: [
+            Event.Tag(name: .event, values: [rootID.hex, "WSS://Hint.Example.com/"]), .event(siblingID),
+        ])
 
         let reply = EventTemplate.reply(to: parent, content: "a reply")
 
@@ -153,7 +158,9 @@ struct EventTemplateTests {
 
     @Test("a positional root drops a relay hint that is not a relay URL")
     func replyRecoversPositionalRootWithInvalidHint() throws {
-        let parent = try parent(tags: [["e", rootID.hex, "https://not-a-relay.example.com"], ["e", siblingID.hex]])
+        let parent = try parent(tags: [
+            Event.Tag(name: .event, values: [rootID.hex, "https://not-a-relay.example.com"]), .event(siblingID),
+        ])
 
         let reply = EventTemplate.reply(to: parent, content: "a reply")
 
@@ -165,7 +172,7 @@ struct EventTemplateTests {
 
     @Test("a positional root whose id is not an event id leaves the parent as the root")
     func replyIgnoresMalformedPositionalRoot() throws {
-        let parent = try parent(tags: [["e", "not-an-event-id"]])
+        let parent = try parent(tags: [Event.Tag(name: .event, values: ["not-an-event-id"])])
 
         let reply = EventTemplate.reply(to: parent, content: "a reply")
 

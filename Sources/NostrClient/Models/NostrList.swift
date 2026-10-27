@@ -31,7 +31,7 @@ public struct NostrList: Sendable, Hashable {
     /// needs the author's key — see ``init(event:decryptingWith:)``).
     public init(event: Event) {
         self.kind = event.kind
-        self.publicItems = event.structuredTags
+        self.publicItems = event.tags
         self.privateItems = []
     }
 
@@ -104,6 +104,6 @@ enum ListItemCipher {
         guard let rawArrays = (try? JSONSerialization.jsonObject(with: Data(json.utf8))) as? [[String]] else {
             return nil
         }
-        return rawArrays.compactMap(Tag.init(rawArray:))
+        return rawArrays.map(Tag.init(rawArray:))
     }
 }

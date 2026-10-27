@@ -145,15 +145,15 @@ struct NIP25DirectMessageReactionTests {
     @Test(
         "a reaction whose e or p tag is not canonical hex is rejected",
         arguments: [
-            [["e", "message"], ["p", authorKey.hex]],
-            [["e", messageID.hex], ["p", authorKey.hex.uppercased()]],
+            [Event.Tag(name: .event, values: ["message"]), .publicKey(authorKey)],
+            [.event(messageID), Event.Tag(name: .publicKey, values: [authorKey.hex.uppercased()])],
         ])
-    func reactionWithMalformedReferencesRejected(rawTags: [[String]]) async throws {
+    func reactionWithMalformedReferencesRejected(tags: [Event.Tag]) async throws {
         let sender = KeyPair()
         let recipient = KeyPair()
 
         let rumor = UnsignedEvent(
-            publicKey: sender.publicKey, kind: .reaction, rawTags: rawTags, content: "+"
+            publicKey: sender.publicKey, kind: .reaction, tags: tags, content: "+"
         ).asRumor()
         let giftWrap = try await GiftWrap.wrap(
             event: rumor, signer: EventSigner(keyPair: sender), recipientPublicKey: recipient.publicKey)

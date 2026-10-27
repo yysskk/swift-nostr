@@ -18,7 +18,7 @@ struct ProofOfWorkTests {
                 publicKey: try PublicKey(hex: "a48380f4cfcc1ad5378294fcac36439770f9c878dd880ffa94bb74ea54a6f243"),
                 createdAt: Timestamp(rawValue: 1_651_794_653),
                 kind: 1,
-                tags: [["nonce", "776797", "20"]],
+                tags: [Event.Tag(name: .nonce, values: ["776797", "20"])],
                 content: "It's just me mining my own business",
                 signature:
                     try Signature(
@@ -102,10 +102,10 @@ struct ProofOfWorkTests {
         let mined = try await ProofOfWork.mine(event: try unsignedNote(for: signer), difficulty: difficulty)
 
         // Exactly one nonce tag, committing to the requested target.
-        let nonceTags = mined.tags.filter { $0.first == "nonce" }
+        let nonceTags = mined.tags.filter { $0.name == .nonce }
         #expect(nonceTags.count == 1)
-        #expect(nonceTags.first?.count == 3)
-        #expect(nonceTags.first?[2] == String(difficulty))
+        #expect(nonceTags.first?.values.count == 2)
+        #expect(nonceTags.first?.values.last == String(difficulty))
 
         let signed = try signer.sign(mined)
         #expect(ProofOfWork.difficulty(of: signed.id) >= difficulty)
@@ -120,11 +120,11 @@ struct ProofOfWorkTests {
 
         let mined = try await ProofOfWork.mine(event: seeded, difficulty: 8)
 
-        let nonceTags = mined.tags.filter { $0.first == "nonce" }
+        let nonceTags = mined.tags.filter { $0.name == .nonce }
         #expect(nonceTags.count == 1)
-        #expect(nonceTags.first?[2] == "8")
+        #expect(nonceTags.first?.values.last == "8")
         // Non-nonce tags are preserved.
-        #expect(mined.tags.contains { $0.first == "t" && $0.dropFirst().first == "nostr" })
+        #expect(mined.tags.contains(.hashtag("nostr")))
     }
 
     @Test("mining rejects a difficulty outside 0...256")
@@ -165,8 +165,8 @@ struct ProofOfWorkTests {
         #expect(signed.kind == .textNote)
         #expect(signed.content == "proof of work")
         #expect(signed.createdAt == template.createdAt)
-        #expect(signed.tags.filter { $0.first == "nonce" }.count == 1)
-        #expect(signed.tags.contains(["t", "nostr"]))
+        #expect(signed.tags(named: .nonce).count == 1)
+        #expect(signed.tags.contains(.hashtag("nostr")))
         #expect(ProofOfWork.difficulty(of: signed.id) >= 8)
         #expect(try signed.verify())
         #expect(ProofOfWork.validate(event: signed, minimumDifficulty: 8))

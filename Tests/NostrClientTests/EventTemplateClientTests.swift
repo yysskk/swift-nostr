@@ -256,7 +256,7 @@ struct EventTemplateClientTests {
         ]
 
         #expect(rumors.map(\.kind) == expected.map(\.kind))
-        #expect(rumors.map(\.tags) == expected.map { $0.tags.map(\.rawArray) })
+        #expect(rumors.map(\.tags) == expected.map(\.tags))
         #expect(rumors.map(\.content) == expected.map(\.content))
         #expect(rumors.allSatisfy { $0.publicKey == alice.publicKey && $0.signature == nil })
     }

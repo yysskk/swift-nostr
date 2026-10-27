@@ -32,12 +32,10 @@ public struct OpenTimestamps: Sendable, Hashable {
 extension Event {
     /// Returns the OpenTimestamps attestation if present
     public var openTimestamps: OpenTimestamps? {
-        guard let otsTag = tags.first(where: { $0.first == "ots" }),
-            otsTag.count >= 2
-        else {
+        guard let otsData = firstTagValue(named: "ots") else {
             return nil
         }
-        return OpenTimestamps(base64EncodedOTS: otsTag[1])
+        return OpenTimestamps(base64EncodedOTS: otsData)
     }
 
     /// Returns true if this event has an OpenTimestamps attestation

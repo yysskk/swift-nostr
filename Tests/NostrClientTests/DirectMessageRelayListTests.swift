@@ -18,7 +18,7 @@ struct DirectMessageRelayListTests {
         ])
 
         #expect(
-            list.tags == [
+            list.tags.map(\.rawArray) == [
                 ["relay", "wss://inbox.example.com"],
                 ["relay", "wss://dm.example.com"],
             ]
@@ -38,42 +38,46 @@ struct DirectMessageRelayListTests {
 
     @Test("Parsing ignores non-relay tags")
     func parsingIgnoresOtherTags() {
-        let list = DirectMessageRelayList(tags: [
-            ["relay", "wss://a.example.com"],
-            ["r", "wss://b.example.com"],
-            ["p", "somepublickey"],
-            ["relay", "wss://c.example.com"],
-        ])
+        let list = DirectMessageRelayList(
+            tags: [
+                ["relay", "wss://a.example.com"],
+                ["r", "wss://b.example.com"],
+                ["p", "somepublickey"],
+                ["relay", "wss://c.example.com"],
+            ].map(Event.Tag.init(rawArray:)))
         #expect(list.relays == [RelayURL("wss://a.example.com")!, RelayURL("wss://c.example.com")!])
     }
 
     @Test("Empty or missing relay URL is skipped")
     func parsingSkipsEmptyURL() {
-        let list = DirectMessageRelayList(tags: [
-            ["relay"],
-            ["relay", ""],
-            ["relay", "wss://a.example.com"],
-        ])
+        let list = DirectMessageRelayList(
+            tags: [
+                ["relay"],
+                ["relay", ""],
+                ["relay", "wss://a.example.com"],
+            ].map(Event.Tag.init(rawArray:)))
         #expect(list.relays == [RelayURL("wss://a.example.com")!])
     }
 
     @Test("Duplicate relay URLs are de-duplicated (first wins)")
     func duplicateURLs() {
-        let list = DirectMessageRelayList(tags: [
-            ["relay", "wss://a.example.com"],
-            ["relay", "wss://a.example.com"],
-            ["relay", "wss://b.example.com"],
-        ])
+        let list = DirectMessageRelayList(
+            tags: [
+                ["relay", "wss://a.example.com"],
+                ["relay", "wss://a.example.com"],
+                ["relay", "wss://b.example.com"],
+            ].map(Event.Tag.init(rawArray:)))
         #expect(list.relays == [RelayURL("wss://a.example.com")!, RelayURL("wss://b.example.com")!])
     }
 
     @Test("Trailing slash and case duplicates collapse")
     func trailingSlashDedup() {
-        let list = DirectMessageRelayList(tags: [
-            ["relay", "wss://a.example.com"],
-            ["relay", "wss://a.example.com/"],
-            ["relay", "wss://A.EXAMPLE.com"],
-        ])
+        let list = DirectMessageRelayList(
+            tags: [
+                ["relay", "wss://a.example.com"],
+                ["relay", "wss://a.example.com/"],
+                ["relay", "wss://A.EXAMPLE.com"],
+            ].map(Event.Tag.init(rawArray:)))
         #expect(list.relays == [RelayURL("wss://a.example.com")!])
     }
 
@@ -95,24 +99,25 @@ struct DirectMessageRelayListTests {
         let list = DirectMessageRelayList(relays: [RelayURL("wss://a.example.com")!, RelayURL("wss://a.example.com/")!])
         let event = signer.sign(.directMessageRelayList(list))
         // The signed event's tags and the re-parsed list agree — no dangling duplicate tags.
-        #expect(event.tags == [["relay", "wss://a.example.com"]])
+        #expect(event.tags.map(\.rawArray) == [["relay", "wss://a.example.com"]])
         #expect(event.directMessageRelayList?.relays == [RelayURL("wss://a.example.com")!])
     }
 
     @Test("A parsed relay is written back in canonical form")
     func parsedURLIsCanonical() {
-        let list = DirectMessageRelayList(tags: [["relay", "wss://Inbox.Example.com/"]])
+        let list = DirectMessageRelayList(tags: [Event.Tag(name: .relay, values: ["wss://Inbox.Example.com/"])])
         #expect(list.relays == [RelayURL("wss://inbox.example.com")!])
-        #expect(list.tags == [["relay", "wss://inbox.example.com"]])
+        #expect(list.tags.map(\.rawArray) == [["relay", "wss://inbox.example.com"]])
     }
 
     @Test("A relay tag whose URL is not a relay URL is skipped")
     func parsingSkipsMalformedURL() {
-        let list = DirectMessageRelayList(tags: [
-            ["relay", "https://inbox.example.com"],
-            ["relay", "not a relay"],
-            ["relay", "wss://a.example.com"],
-        ])
+        let list = DirectMessageRelayList(
+            tags: [
+                ["relay", "https://inbox.example.com"],
+                ["relay", "not a relay"],
+                ["relay", "wss://a.example.com"],
+            ].map(Event.Tag.init(rawArray:)))
         #expect(list.relays == [RelayURL("wss://a.example.com")!])
     }
 
@@ -131,7 +136,7 @@ struct DirectMessageRelayListTests {
 
         #expect(event.kind == 10050)
         #expect(event.content == "")
-        #expect(event.structuredTags == list.tags)
+        #expect(event.tags == list.tags)
         #expect(try event.verify())
     }
 

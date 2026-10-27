@@ -128,7 +128,7 @@ struct NIP29GroupClientTests {
         let published = try await joinTask.value
 
         #expect(sent.kind == .groupJoinRequest)
-        #expect(sent.structuredTags.first == .group(groupID))
+        #expect(sent.tags.first == .group(groupID))
         #expect(sent.firstTagValue(named: "code") == "welcome")
         #expect(sent.content == "please let me in")
         #expect(try sent.verify())
@@ -165,7 +165,7 @@ struct NIP29GroupClientTests {
         _ = try await leaveTask.value
 
         #expect(sent.kind == .groupLeaveRequest)
-        #expect(sent.structuredTags == [.group(groupID)])
+        #expect(sent.tags == [.group(groupID)])
         #expect(sent.content == "goodbye")
         #expect(try sent.verify())
         await client.relays.disconnect()
@@ -190,7 +190,7 @@ struct NIP29GroupClientTests {
         _ = try await publishTask.value
 
         #expect(sent.kind == .chatMessage)
-        #expect(sent.structuredTags == [.group(groupID), .hashtag("intro"), .previous(["deadbeef", "cafebabe"])])
+        #expect(sent.tags == [.group(groupID), .hashtag("intro"), .previous(["deadbeef", "cafebabe"])])
         #expect(sent.content == "hello group")
         await client.relays.disconnect()
     }
@@ -214,7 +214,7 @@ struct NIP29GroupClientTests {
         _ = try await moderationTask.value
 
         #expect(sent.kind == .groupPutUser)
-        #expect(sent.structuredTags == [.group(groupID), .publicKey(member, roles: ["moderator"])])
+        #expect(sent.tags == [.group(groupID), .publicKey(member, roles: ["moderator"])])
         #expect(sent.content == "promoting")
         await client.relays.disconnect()
     }

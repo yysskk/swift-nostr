@@ -103,8 +103,7 @@ struct NIP17Tests {
         #expect(wrapped.kind == .giftWrap)
 
         // Verify the p tag points to Bob
-        let pTag = wrapped.tags.first { $0.first == "p" }
-        #expect(pTag?[1] == bob.publicKey.hex)
+        #expect(wrapped.referencedPublicKeys == [bob.publicKey])
 
         // Bob unwraps the event
         let unwrapped = try await GiftWrap.unwrap(giftWrap: wrapped, recipient: EventSigner(keyPair: bob))
@@ -239,8 +238,8 @@ struct NIP17Tests {
         #expect(result.rumor.signature == nil)
 
         // Each wrap is addressed to its own recipient
-        #expect(result.recipientGiftWrap.tags.first { $0.first == "p" }?[1] == bob.publicKey.hex)
-        #expect(result.selfGiftWrap.tags.first { $0.first == "p" }?[1] == alice.publicKey.hex)
+        #expect(result.recipientGiftWrap.referencedPublicKeys == [bob.publicKey])
+        #expect(result.selfGiftWrap.referencedPublicKeys == [alice.publicKey])
 
         // Bob unwraps the recipient copy, Alice unwraps the self-copy — same rumor
         let bobUnwrapped = try await GiftWrap.unwrap(
@@ -262,7 +261,7 @@ struct NIP17Tests {
         let bob = KeyPair()
         let rumor = UnsignedEvent(
             publicKey: alice.publicKey, kind: .privateDirectMessage,
-            rawTags: [["p", bob.publicKey.hex.uppercased()]], content: "hi"
+            tags: [Event.Tag(name: .publicKey, values: [bob.publicKey.hex.uppercased()])], content: "hi"
         ).asRumor()
         let giftWrap = try await GiftWrap.wrap(
             event: rumor, signer: EventSigner(keyPair: alice), recipientPublicKey: bob.publicKey)
@@ -278,7 +277,8 @@ struct NIP17Tests {
         let bob = KeyPair()
         let rumor = UnsignedEvent(
             publicKey: alice.publicKey, kind: .privateDirectMessage,
-            rawTags: [["p", bob.publicKey.hex], ["e", "not-an-id", "", "reply"]], content: "hi"
+            tags: [.publicKey(bob.publicKey), Event.Tag(name: .event, values: ["not-an-id", "", "reply"])],
+            content: "hi"
         ).asRumor()
         let giftWrap = try await GiftWrap.wrap(
             event: rumor, signer: EventSigner(keyPair: alice), recipientPublicKey: bob.publicKey)
@@ -325,7 +325,7 @@ struct NIP17Tests {
             publicKey: alice.publicKey,
             createdAt: Timestamp(rawValue: 1_700_000_000),
             kind: .privateDirectMessage,
-            tags: [["p", alice.publicKey.hex]],
+            tags: [.publicKey(alice.publicKey)],
             content: "id derivation check"
         )
 

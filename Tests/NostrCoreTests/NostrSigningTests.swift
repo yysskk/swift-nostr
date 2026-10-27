@@ -38,7 +38,7 @@ struct NostrSigningTests {
 
         #expect(event.publicKey == keyPair.publicKey)
         #expect(event.kind == .textNote)
-        #expect(event.tags == [["t", "nostr"]])
+        #expect(event.tags.map(\.rawArray) == [["t", "nostr"]])
         #expect(event.content == "hello")
         #expect(event.createdAt == template.createdAt)
         #expect(try event.verify())

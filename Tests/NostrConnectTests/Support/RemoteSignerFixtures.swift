@@ -44,7 +44,7 @@ enum RemoteSignerFixtures {
             publicKey: signer.publicKey,
             createdAt: Timestamp(rawValue: 0),
             kind: .nostrConnect,
-            tags: [["p", client.publicKey.hex]],
+            tags: [.publicKey(client.publicKey)],
             content: sealed.payload,
             signature: nil)
     }
@@ -69,7 +69,9 @@ enum RemoteSignerFixtures {
         let content = object["content"] as? String ?? ""
         let createdAt = Timestamp(rawValue: (object["created_at"] as? Int).map(Int64.init) ?? 0)
         let tags = object["tags"] as? [[String]] ?? []
-        return UnsignedEvent(publicKey: author, createdAt: createdAt, kind: kind, rawTags: tags, content: content)
+        return UnsignedEvent(
+            publicKey: author, createdAt: createdAt, kind: kind, tags: tags.map(Event.Tag.init(rawArray:)),
+            content: content)
     }
 
     /// Polls until `transport` has recorded at least `count` sent events, returning them.

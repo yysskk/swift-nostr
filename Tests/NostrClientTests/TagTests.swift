@@ -28,22 +28,22 @@ struct TagTests {
     func rawArrayRoundTrips() {
         let raw = ["e", "abc", "", "reply"]
         let tag = Event.Tag(rawArray: raw)
-        #expect(tag?.rawArray == raw)
+        #expect(tag.rawArray == raw)
+        #expect(tag == Event.Tag(name: .event, values: ["abc", "", "reply"]))
+        #expect(Event.Tag(rawArray: ["t", "nostr"]) == .hashtag("nostr"))
     }
 
-    @Test("init(rawArray:) returns nil for an empty array")
-    func initRawArrayNilForEmpty() {
-        #expect(Event.Tag(rawArray: []) == nil)
-        #expect(Event.Tag.raw([]) == nil)
-        #expect(Event.Tag.raw(["x"]) == Event.Tag(name: "x"))
-    }
-
-    @Test("array literal builds a tag")
-    func arrayLiteralBuildsTag() {
-        let tag: Event.Tag = ["t", "nostr"]
-        #expect(tag.name == "t")
-        #expect(tag.values == ["nostr"])
-        #expect(tag == Event.Tag.hashtag("nostr"))
+    /// NIP-01 does not forbid an empty tag array, and dropping one would change the event id, so
+    /// it is kept as is rather than folded into the name-only tag `[""]`.
+    @Test("an empty raw array is kept distinct from an empty name")
+    func emptyRawArrayIsKept() {
+        let empty = Event.Tag(rawArray: [])
+        #expect(empty.rawArray == [])
+        #expect(empty.name == "")
+        #expect(empty.values.isEmpty)
+        #expect(empty.primaryValue == nil)
+        #expect(empty != Event.Tag(name: ""))
+        #expect(Event.Tag(name: "").rawArray == [""])
     }
 
     // MARK: - Tag Name
@@ -192,14 +192,13 @@ struct TagTests {
         #expect(String(data: data, encoding: .utf8) == #"["e","\#(id1.hex)","","reply"]"#)
     }
 
-    @Test("decodes from a bare JSON array and rejects empty arrays")
+    @Test("decodes from a bare JSON array, including an empty one")
     func decodesFromBareArray() throws {
         let tag = try JSONDecoder().decode(Event.Tag.self, from: Data(#"["t","nostr"]"#.utf8))
         #expect(tag == .hashtag("nostr"))
 
-        #expect(throws: DecodingError.self) {
-            _ = try JSONDecoder().decode(Event.Tag.self, from: Data("[]".utf8))
-        }
+        let empty = try JSONDecoder().decode(Event.Tag.self, from: Data("[]".utf8))
+        #expect(empty.rawArray == [])
     }
 
     // MARK: - UnsignedEvent Integration
@@ -212,14 +211,7 @@ struct TagTests {
             tags: [.hashtag("nostr"), .event(id1, marker: .reply)],
             content: "hi"
         )
-        #expect(unsigned.tags == [["t", "nostr"], ["e", id1.hex, "", "reply"]])
-    }
-
-    @Test("UnsignedEvent rawTags initializer keeps arrays untouched")
-    func unsignedEventRawTagsUntouched() {
-        let raw = [["e", id1.hex, "wss://r.example", "root"], ["custom", "x", "y"]]
-        let unsigned = UnsignedEvent(publicKey: PublicKey.fixture("pk"), kind: 1, rawTags: raw, content: "hi")
-        #expect(unsigned.tags == raw)
+        #expect(unsigned.tags.map(\.rawArray) == [["t", "nostr"], ["e", id1.hex, "", "reply"]])
     }
 
     @Test("Tag-built and raw-built events hash identically")
@@ -235,7 +227,7 @@ struct TagTests {
             publicKey: PublicKey.fixture("pk"),
             createdAt: Timestamp(rawValue: 1_700_000_000),
             kind: 1,
-            rawTags: [["e", id1.hex, "", "reply"], ["p", pk2.hex]],
+            tags: [Event.Tag(name: .event, values: [id1.hex, "", "reply"]), .publicKey(pk2)],
             content: "hi"
         )
         #expect(viaTags.serializedForHashing() == viaRaw.serializedForHashing())
@@ -245,13 +237,13 @@ struct TagTests {
     func signedEventsCarryTypedTags() throws {
         let signer = EventSigner(keyPair: KeyPair())
         let event = signer.sign(.textNote("hi", tags: [.hashtag("nostr")]))
-        #expect(event.tags == [["t", "nostr"]])
+        #expect(event.tags.map(\.rawArray) == [["t", "nostr"]])
         #expect(try event.verify())
     }
 
     // MARK: - Event Accessors
 
-    private func makeEvent(tags: [[String]]) -> Event {
+    private func makeEvent(tags: [Event.Tag]) -> Event {
         Event(
             id: EventID.fixture("id"),
             publicKey: PublicKey.fixture("pk"),
@@ -263,15 +255,11 @@ struct TagTests {
         )
     }
 
-    @Test("structuredTags skips malformed empty arrays")
-    func structuredTagsSkipsEmptyArrays() {
-        let event = makeEvent(tags: [["e", id1.hex], [], ["t", "nostr"]])
-        #expect(event.structuredTags == [.event(id1), .hashtag("nostr")])
-    }
-
     @Test("tags(named:) filters by name")
     func tagsNamedFilters() {
-        let event = makeEvent(tags: [["e", id1.hex], ["p", pk1.hex], ["e", id2.hex, "", "reply"]])
+        let event = makeEvent(tags: [
+            .event(id1), .publicKey(pk1), Event.Tag(name: .event, values: [id2.hex, "", "reply"]),
+        ])
         #expect(event.tags(named: "e") == [.event(id1), .event(id2, marker: .reply)])
         #expect(event.tags(named: "x").isEmpty)
         #expect(event.tags(named: .publicKey) == [.publicKey(pk1)])
@@ -279,7 +267,7 @@ struct TagTests {
 
     @Test("firstTagValue returns the first value of the first match")
     func firstTagValueReturnsFirstMatch() {
-        let event = makeEvent(tags: [["subject", "greetings"], ["subject", "second"], ["e"]])
+        let event = makeEvent(tags: [.subject("greetings"), .subject("second"), Event.Tag(name: .event)])
         #expect(event.firstTagValue(named: "subject") == "greetings")
         #expect(event.firstTagValue(named: "e") == nil)
         #expect(event.firstTagValue(named: "missing") == nil)
@@ -289,7 +277,8 @@ struct TagTests {
     @Test("referenced ids and public keys")
     func referencedIDsAndPublicKeys() {
         let event = makeEvent(tags: [
-            ["e", id1.hex], ["e", id2.hex, "wss://r.example"], ["p", pk1.hex], ["e"], ["p", pk2.hex],
+            .event(id1), Event.Tag(name: .event, values: [id2.hex, "wss://r.example"]), .publicKey(pk1),
+            Event.Tag(name: .event), Event.Tag(rawArray: []), .publicKey(pk2),
         ])
         #expect(event.referencedEventIDs == [id1, id2])
         #expect(event.referencedPublicKeys == [pk1, pk2])
@@ -299,10 +288,11 @@ struct TagTests {
     /// key is not something to hand back typed — it is skipped, keeping the well-formed ones.
     @Test("referenced ids and public keys skip malformed values")
     func referencedValuesSkipMalformed() {
-        let event = makeEvent(tags: [
-            ["e", "id1"], ["e", id1.hex.uppercased()], ["e", id2.hex],
-            ["p", "pk1"], ["p", String(pk1.hex.dropLast())], ["p", pk2.hex],
-        ])
+        let event = makeEvent(
+            tags: [
+                ["e", "id1"], ["e", id1.hex.uppercased()], ["e", id2.hex],
+                ["p", "pk1"], ["p", String(pk1.hex.dropLast())], ["p", pk2.hex],
+            ].map(Event.Tag.init(rawArray:)))
         #expect(event.referencedEventIDs == [id2])
         #expect(event.referencedPublicKeys == [pk2])
     }

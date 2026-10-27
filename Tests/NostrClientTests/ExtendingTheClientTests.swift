@@ -137,7 +137,7 @@ struct ExtendingTheClientTests {
         #expect(sent == published.event)
         #expect(sent.kind == userStatusKind)
         #expect(sent.content == "Reading NIP-38")
-        #expect(sent.tags == [["d", "general"], ["expiration", expiration.description]])
+        #expect(sent.tags.map(\.rawArray) == [["d", "general"], ["expiration", expiration.description]])
         #expect(sent.publicKey == signer.publicKey)
         #expect(try sent.verify())
         #expect(published.result.statuses[relayURL] == .accepted)
