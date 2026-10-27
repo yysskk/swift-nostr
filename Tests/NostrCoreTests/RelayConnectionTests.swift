@@ -47,11 +47,12 @@ struct RelayConnectionTests {
     }
 
     /// A socket whose REQ sends suspend until the test releases them, one at a time, so a test can
-    /// act while a subscribe is mid-send. Every other frame goes straight to the wrapped mock.
+    /// act while a subscribe is mid-send. Every other frame goes straight to the wrapped mock. A held
+    /// send fails with `CancellationError` when its task is cancelled, as a platform socket's does.
     private final class GatedRequestSocket: WebSocketSession, @unchecked Sendable {
         let mock = MockWebSocketSession()
         private let lock = NSLock()
-        private var held: [(text: String, continuation: CheckedContinuation<Void, any Swift.Error>)] = []
+        private var held: [(id: UUID, continuation: CheckedContinuation<Void, any Swift.Error>)] = []
 
         func resume() { mock.resume() }
 
@@ -64,10 +65,36 @@ struct RelayConnectionTests {
                 try await mock.send(message)
                 return
             }
-            try await withCheckedThrowingContinuation { continuation in
-                lock.withLock { held.append((text, continuation)) }
+            let id = UUID()
+            try await withTaskCancellationHandler {
+                try await withCheckedThrowingContinuation {
+                    (continuation: CheckedContinuation<Void, any Swift.Error>) in
+                    hold(id: id, continuation)
+                }
+            } onCancel: {
+                cancelHeld(id: id)
             }
             try await mock.send(message)
+        }
+
+        private func hold(id: UUID, _ continuation: CheckedContinuation<Void, any Swift.Error>) {
+            // Checked under the lock `cancelHeld` takes, so a cancellation is never missed.
+            let cancelled: Bool = lock.withLock {
+                guard !Task.isCancelled else { return true }
+                held.append((id, continuation))
+                return false
+            }
+            if cancelled {
+                continuation.resume(throwing: CancellationError())
+            }
+        }
+
+        private func cancelHeld(id: UUID) {
+            let continuation: CheckedContinuation<Void, any Swift.Error>? = lock.withLock {
+                guard let index = held.firstIndex(where: { $0.id == id }) else { return nil }
+                return held.remove(at: index).continuation
+            }
+            continuation?.resume(throwing: CancellationError())
         }
 
         func receive() async throws -> WebSocketMessage {
@@ -94,13 +121,17 @@ struct RelayConnectionTests {
         }
     }
 
-    private func makeGatedConnection() -> (RelayConnection, GatedRequestSocket) {
+    private func makeGatedConnection(
+        sendTimeout: Duration = .seconds(10),
+        autoReconnect: Bool = false
+    ) -> (RelayConnection, GatedRequestSocket) {
         let socket = GatedRequestSocket()
         let connection = RelayConnection(
             url: RelayURL("wss://relay.example.com")!,
             webSocketFactory: GatedRequestSocketFactory(socket: socket),
             config: RelayConnectionConfig(
-                connectionTimeout: .seconds(1), pingInterval: .seconds(60), autoReconnect: false)
+                connectionTimeout: .seconds(1), sendTimeout: sendTimeout, pingInterval: .seconds(60),
+                autoReconnect: autoReconnect)
         )
         return (connection, socket)
     }
@@ -345,29 +376,72 @@ struct RelayConnectionTests {
         await #expect(throws: RelayConnection.Error.notConnected) { try await subscribing.value }
 
         #expect(await !connection.hasSubscription(Self.subscriptionID))
+        guard case .failed = await connection.state else {
+            Issue.record("a socket send error should fail the connection")
+            return
+        }
+        #expect(socket.mock.didCancel)
         await connection.disconnect()
     }
 
-    @Test("a failed REQ leaves a newer subscribe on the same id registered")
-    func failedRequestKeepsNewerSubscription() async throws {
-        let (connection, socket) = makeGatedConnection()
+    @Test("a send that outlasts the send timeout fails the connection", .timeLimit(.minutes(1)))
+    func timedOutSendFailsConnection() async throws {
+        let (connection, socket) = makeGatedConnection(sendTimeout: .milliseconds(50))
         try await connection.connect()
 
-        let first = Task {
+        await #expect(throws: RelayConnection.Error.timedOut) {
+            try await connection.subscribe(id: Self.subscriptionID, filters: [Filter(kinds: [.textNote])])
+        }
+
+        guard case .failed = await connection.state else {
+            Issue.record("a timed-out send should fail the connection")
+            return
+        }
+        #expect(socket.mock.didCancel)
+        #expect(await !connection.hasSubscription(Self.subscriptionID))
+        await connection.disconnect()
+    }
+
+    @Test("cancelling a subscribe mid-send still delivers the REQ and keeps the connection", .timeLimit(.minutes(1)))
+    func cancelledInFlightSendKeepsConnection() async throws {
+        let (connection, socket) = makeGatedConnection(autoReconnect: true)
+        try await connection.connect()
+
+        let subscribing = Task {
             try await connection.subscribe(id: Self.subscriptionID, filters: [Filter(kinds: [.textNote])])
         }
         try await pollUntil { socket.heldCount == 1 }
-        await connection.unsubscribe(id: Self.subscriptionID)
-        let second = Task {
-            try await connection.subscribe(id: Self.subscriptionID, filters: [Filter(kinds: [.reaction])])
+
+        subscribing.cancel()
+        // Give a cancellation that did reach the send the chance to fail it before the frame is let go.
+        try await Task.sleep(for: .milliseconds(50))
+        try #require(socket.heldCount == 1)
+        socket.release()
+        try await subscribing.value
+
+        #expect(Self.sentFrame("REQ", in: socket.mock) != nil)
+        #expect(await connection.state == .connected)
+        #expect(!socket.mock.didCancel)
+        #expect(await connection.hasSubscription(Self.subscriptionID))
+        await connection.disconnect()
+    }
+
+    @Test("a subscribe from an already-cancelled task still sends its REQ", .timeLimit(.minutes(1)))
+    func alreadyCancelledSendKeepsConnection() async throws {
+        let (connection, socket) = makeGatedConnection(autoReconnect: true)
+        try await connection.connect()
+
+        let subscribing = Task {
+            withUnsafeCurrentTask { $0?.cancel() }
+            try await connection.subscribe(id: Self.subscriptionID, filters: [Filter(kinds: [.textNote])])
         }
-        try await pollUntil { socket.heldCount == 2 }
+        try await pollUntil { socket.heldCount == 1 }
+        socket.release()
+        try await subscribing.value
 
-        socket.release(at: 1)
-        try await second.value
-        socket.release(error: URLError(.networkConnectionLost))
-        await #expect(throws: RelayConnection.Error.notConnected) { try await first.value }
-
+        #expect(Self.sentFrame("REQ", in: socket.mock) != nil)
+        #expect(await connection.state == .connected)
+        #expect(!socket.mock.didCancel)
         #expect(await connection.hasSubscription(Self.subscriptionID))
         await connection.disconnect()
     }

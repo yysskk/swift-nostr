@@ -844,10 +844,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **A fetch that times out no longer drops relay connections**: the timeout closed the subscription,
-  which let the fetch return and cancel the close while its `CLOSE` frames were still being sent;
-  a cancelled send counts as a failed one, so the relay was marked failed and a later publish or
-  fetch on it failed or waited out its timeout. The close now runs to completion on its own.
+- **Cancelling a send no longer drops the relay connection**: `RelayConnection.send(_:)` raced the
+  socket write against its timeout in child tasks of the caller, so cancelling the caller ended the
+  race at once and the healthy connection was marked failed and torn down. A fetch that timed out
+  did exactly this — it returned and cancelled the close while its `CLOSE` frames were going out —
+  and a later publish or fetch on the relay failed or waited out its timeout. The write now runs
+  apart from the caller: the frame is sent even when the caller is cancelled, and only a socket
+  failure or the send timeout fails the connection. Subscribing, unsubscribing, publishing,
+  counting, and authenticating all send this way.
 - **A subscription or fetch whose targets are not in the pool no longer sends a stray CLOSE**:
   when none of the targeted relays was in the pool (`noMatchingRelays`), the client still sent `CLOSE`
   for the never-opened subscription to every relay in the pool. Nothing is sent now, so `fetchLongFormContent(naddr:)` falling back from relay
