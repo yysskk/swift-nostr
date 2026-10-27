@@ -80,7 +80,7 @@ stored or passed to a view model.
 - `client.relays` -- `add`, `remove`, `connect`, `disconnect`, pool inspection, and `pool: RelayPool`
 - `client.events` -- the `publish*` helpers, `publish(_:)`, `fetch`, `count`, NIP-23 long-form content
 - `client.subscriptions` -- `subscribe(filters:)` (feeds are `Filter` presets) and `unsubscribe`
-- `client.routing` -- NIP-65 relay lists with outbox/gossip, NIP-17 DM relay lists
+- `client.routing` -- NIP-65 relay lists (behind `RelayRoute.outbox`), NIP-17 DM relay lists
 - `client.messages` -- NIP-17 private direct messages
 - `client.groups` -- NIP-29 groups and the kind-10009 simple group list
 - `client.lists` -- NIP-51 lists and sets
@@ -99,12 +99,12 @@ ChatViewModel(messages: client.messages)
 ```
 
 Swift forbids default arguments on protocol requirements. `NostrEventPublishing` and
-`NostrEventFetching` therefore require only their primitives — `publish(_:to:strategy:)` for an
-`EventTemplate` and for a signed `Event`, `fetch(filters:from:timeout:)`, and
-`countEvents(matching:from:timeout:)`, every parameter spelled out — and provide the `publish*` /
+`NostrEventFetching` therefore require only their primitives — `publish(_:route:strategy:)` for an
+`EventTemplate` and for a signed `Event`, `fetch(filters:route:timeout:)`, and
+`countEvents(matching:route:timeout:)`, every parameter spelled out — and provide the `publish*` /
 `fetch*` helpers and the short forms (`publish(_:)`, `fetch(filters:)`, …) with their defaults in
 protocol extensions, so a stub implements four methods and a call through the protocol is as short
-as one through `client.events`. `NostrSubscribing` (`subscribe(filters:to:bufferingPolicy:)`,
+as one through `client.events`. `NostrSubscribing` (`subscribe(filters:route:bufferingPolicy:)`,
 `unsubscribe(id:)`, `unsubscribeAll()`), `NostrRelayManaging` (`add(_:config:)`,
 `remove(_:)`, `connect()`, `disconnect()`, `connections`, `connectedRelayCount()`, `relay(for:)`,
 `clearDeduplicationCache()`), and `NostrIdentityProviding` (both `setSigner(_:)` overloads,
@@ -115,9 +115,8 @@ extensions; a stub returns a `SubscriptionSequence(id:expectedRelays:stream:onCl
 `EventTemplate`, `parsePayload(_:)`, and `subscribe(limit:)`; `send`, `react`, `sendFile`, `parse`,
 `parseReaction`, `parseFile`, and the short forms (`sendGiftWrapped(_:to:expiration:)`, `subscribe()`)
 come from its extension, and a stub returns a `DirectMessagePayloadSequence(subscription:parser:)`.
-`NostrRelayRouting` requires the list fetches, caches, and publishes,
-`subscribeOutbox(authors:kinds:limit:)`, `publishGossip(_:strategy:)`,
-and `connectDirectMessageInboxRelays()`; `publishRelayList(read:write:strategy:)`,
+`NostrRelayRouting` requires the list fetches, caches, and publishes, and
+`connectDirectMessageInboxRelays()`; `publishRelayList(read:write:strategy:)`,
 `publishDirectMessageRelayList(relays:strategy:)`, and the short forms come from its extension.
 `NostrListManaging` requires `publish`, `fetch`, `publishSet`, `fetchSet(kind:identifier:for:timeout:)`,
 and `fetchSets`; `fetchSet(naddr:timeout:)` and the short forms (omit `for:` for the current user)
@@ -129,13 +128,13 @@ kind-10009 list; `subscribe(to:kinds:since:limit:)`, `join`, `leave`, `publishMe
 primitives. A primitive has at most one short form, with other argument labels: it drops the trailing
 `timeout` or `strategy` (nil means the pool default) and defaults the rest, so
 `fetch(kind: .muteList, for: alice)` is a short form and
-`fetch(kind: .muteList, for: nil, timeout: .seconds(2))` calls the primitive. Only the
-relay-targeting primitives (`to:` / `from:` a relay set) keep both a pool-wide and a targeted short
-form. `NostrRelayManaging` deliberately omits `pool`: the pool carries publish, subscribe, and
-count too, so it stays on the concrete `NostrRelaysAPI`. A requirement whose errors come from one
-type declares it: `connect()`, `subscribe(filters:to:bufferingPolicy:)`, and
-`subscribeOutbox(authors:kinds:limit:)` (with their short forms) are `throws(RelayPool.Error)`, and
-`connectDirectMessageInboxRelays()` is `throws(NostrClient.Error)`.
+`fetch(kind: .muteList, for: nil, timeout: .seconds(2))` calls the primitive; likewise
+`fetch(filters: f, route: .outbox)` is a short form (`route` defaults to `.pool`) and
+`fetch(filters: f, route: .pool, timeout: .seconds(2))` the primitive. `NostrRelayManaging`
+deliberately omits `pool`: the pool carries publish, subscribe, and count too, so it stays on the
+concrete `NostrRelaysAPI`. A requirement whose errors come from one type declares it: `connect()`
+and `subscribe(filters:route:bufferingPolicy:)` (with its short form) are `throws(RelayPool.Error)`,
+and `connectDirectMessageInboxRelays()` is `throws(NostrClient.Error)`.
 The rest stay untyped: they forward the signer's errors, or mix pool, relay, and cancellation errors.
 
 `NostrClient` itself exposes only its initializers and these namespaces.
@@ -179,7 +178,8 @@ public struct ZapsAPI: Sendable {
     public func received(limit: Int = 50, timeout: Duration? = nil) async throws -> [ZapReceipt] {
         guard let publicKey = await identity.publicKey else { throw NostrClient.Error.signerNotSet }
         let filter = Filter(kinds: [.zap], publicKeyReferences: [publicKey], limit: limit)
-        return try await events.fetch(filters: [filter], timeout: timeout).compactMap(ZapReceipt.init(event:))
+        return try await events.fetch(filters: [filter], route: .pool, timeout: timeout)
+            .compactMap(ZapReceipt.init(event:))
     }
 }
 
@@ -187,8 +187,8 @@ extension NostrClient {
     public nonisolated var zaps: ZapsAPI { ZapsAPI(events: events, identity: identity) }
 }
 
-// In a test: a stub implementing only fetch(filters:from:timeout:) and
-// countEvents(matching:from:timeout:), with the client's offline identity.
+// In a test: a stub implementing only fetch(filters:route:timeout:) and
+// countEvents(matching:route:timeout:), with the client's offline identity.
 let zaps = ZapsAPI(events: CannedEvents([receipt]), identity: client.identity)
 ```
 
@@ -208,7 +208,7 @@ and cached, so `identity.publicKey` stays a single actor hop even for a remote s
 Setting a signer also starts answering NIP-42 AUTH challenges automatically (see Authentication).
 
 Every feature runs through the signer, so a remote one is a drop-in for a local key: `sign(_:)`,
-`publish(_:to:strategy:)` (a template or a signed event), the convenience `publish*` helpers, NIP-17 direct messages, NIP-51 private
+`publish(_:route:strategy:)` (a template or a signed event), the convenience `publish*` helpers, NIP-17 direct messages, NIP-51 private
 list items, and NIP-42 authentication all work unchanged:
 
 ```swift
@@ -288,8 +288,25 @@ try await client.events.publishReport(publicKey: author, type: .impersonation)  
 try await client.events.publishReport(event: note.event, type: .spam, reason: "unsolicited")  // report an event and its author
 try await client.events.publishTextNote(content: "Important!", strategy: .quorum(2))
 try await client.events.publish(signedEvent)  // publish any pre-signed event
-try await client.events.publish(signedEvent, to: [relay])  // Set<RelayURL> targets; [] throws
-let published = try await client.events.publish(.textNote("gm"), to: [relay])  // sign a template, then publish
+try await client.events.publish(signedEvent, route: .relays([relay]))  // only these relays; [] throws
+let published = try await client.events.publish(.textNote("gm"), route: .relays([relay]))  // sign, then publish
+try await client.events.publish(.textNote("gm", tags: [.publicKey(alice)]), route: .outbox)  // NIP-65 outbox
+try await client.events.publish(signedEvent, route: .pool, strategy: .allSettled)  // the primitive
+```
+
+`RelayRoute` picks the relays of every publish, fetch, count, and subscription (`route:`, default
+`.pool` in the short forms):
+
+- `.pool` -- every relay in the pool
+- `.relays(Set<RelayURL>)` -- exactly these; relays not in the pool are skipped, and when none is
+  pooled (an empty set included) the call throws `RelayPool.Error.noMatchingRelays`
+- `.outbox` -- NIP-65, relay lists fetched when not cached and connected per `GossipRelayPolicy`.
+  A publish goes to the author's WRITE relays plus the READ relays of its "p"-tagged keys; a
+  fetch, count, or subscription goes to the WRITE relays of the filters' authors. Falls back to the
+  whole pool when nothing resolves (reads also when a filter has no authors or any author has no
+  known list)
+
+```swift
 ```
 
 ### Subscriptions
@@ -311,6 +328,9 @@ let metadata = try await client.subscriptions.subscribe(filters: [.metadata(publ
 // Custom filter subscription, events only
 let filter = Filter(authors: [alice, bob], kinds: [1], limit: 100)  // [PublicKey]
 for await event in try await client.subscriptions.subscribe(filters: [filter]).events { print(event.id) }
+
+// The same authors on their NIP-65 WRITE relays (RelayRoute.outbox)
+let outbox = try await client.subscriptions.subscribe(filters: [filter], route: .outbox)
 
 // Relay-aware iteration
 let subscription = try await client.subscriptions.subscribe(filters: [filter])
@@ -338,9 +358,11 @@ results. With zero resolved relays they throw (`RelayPool.Error.emptyPool` /
 let events = try await client.events.fetch(filters: [filter])
 let event = try await client.events.fetchEvent(id: eventID)      // EventID
 let metadata = try await client.events.fetchMetadata(publicKey: alice)
-// Scope a fetch to a subset of relays (e.g. naddr relay hints): `from:` is a Set<RelayURL>;
-// omit it for the whole pool. [] throws, and relays not in the pool are skipped.
-let scoped = try await client.events.fetch(filters: [filter], from: [relay])
+// Scope a fetch to a subset of relays (e.g. naddr relay hints) with `route: .relays(_:)`;
+// omit `route:` for the whole pool. [] throws, and relays not in the pool are skipped.
+let scoped = try await client.events.fetch(filters: [filter], route: .relays([relay]))
+let outbox = try await client.events.fetch(filters: [filter], route: .outbox)  // authors' WRITE relays
+let quick = try await client.events.fetch(filters: [filter], route: .pool, timeout: .seconds(2))
 ```
 
 ### Event Counts (NIP-45)
@@ -352,8 +374,8 @@ uses `RelayPoolConfig.queryTimeout`, 10 seconds); a CLOSED for the count fails f
 ```swift
 // Max count across relays (each relay's count is a lower bound):
 let total = try await client.events.countEvents(matching: [filter])
-// Scope to a subset of relays (same `from:` semantics as fetch):
-let scoped = try await client.events.countEvents(matching: [filter], from: [relay])
+// Scope to a subset of relays (same `route:` semantics as fetch, `.outbox` included):
+let scoped = try await client.events.countEvents(matching: [filter], route: .relays([relay]))
 // Per-relay counts:
 let byRelay = try await client.relays.pool.countEvents(matching: [filter])  // [RelayURL: EventCount]
 ```
@@ -675,8 +697,7 @@ All cases expose `relayURL` property to identify the source relay.
 ## SubscriptionSequence
 
 A live subscription as an `AsyncSequence` of `SubscriptionEvent` (struct: Sendable).
-Returned by `subscribe(filters:to:bufferingPolicy:)`, `groups.subscribe(to:filters:)`, and
-`routing.subscribeOutbox(authors:kinds:limit:)`.
+Returned by `subscribe(filters:route:bufferingPolicy:)` and `groups.subscribe(to:filters:)`.
 
 - `id: SubscriptionID` -- generated by the pool (usable with `unsubscribe(id:)`)
 - `expectedRelays: Set<RelayURL>` -- relays that accepted the REQ

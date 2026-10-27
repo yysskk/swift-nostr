@@ -65,7 +65,7 @@ struct NostrClientFetchTests {
         // start — assert it does not consume the (long) timeout.
         let start = ContinuousClock.now
         await #expect(throws: RelayPool.Error.emptyPool) {
-            _ = try await client.events.fetch(filters: [Filter()], timeout: .seconds(10))
+            _ = try await client.events.fetch(filters: [Filter()], route: .pool, timeout: .seconds(10))
         }
         #expect(ContinuousClock.now - start < .seconds(5))
     }
@@ -77,7 +77,7 @@ struct NostrClientFetchTests {
         let (client, _) = try await ConnectedClientFixture.make()
 
         let fetchTask = Task {
-            try await client.events.fetch(filters: [Filter()], timeout: .seconds(10))
+            try await client.events.fetch(filters: [Filter()], route: .pool, timeout: .seconds(10))
         }
 
         try await Task.sleep(for: .milliseconds(100))
@@ -127,7 +127,7 @@ struct NostrClientFetchTests {
         let client = try await makeSilentRelayClient(queryTimeout: .seconds(30))
 
         let start = ContinuousClock.now
-        let events = try await client.events.fetch(filters: [Filter()], timeout: .milliseconds(50))
+        let events = try await client.events.fetch(filters: [Filter()], route: .pool, timeout: .milliseconds(50))
 
         #expect(events.isEmpty)
         #expect(ContinuousClock.now - start < .seconds(5))
@@ -139,7 +139,7 @@ struct NostrClientFetchTests {
         let client = try await makeSilentRelayClient(queryTimeout: .milliseconds(20))
 
         let start = ContinuousClock.now
-        let events = try await client.events.fetch(filters: [Filter()], timeout: .milliseconds(300))
+        let events = try await client.events.fetch(filters: [Filter()], route: .pool, timeout: .milliseconds(300))
         let elapsed = ContinuousClock.now - start
 
         #expect(events.isEmpty)

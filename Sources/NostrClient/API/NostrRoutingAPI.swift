@@ -2,11 +2,11 @@ import Foundation
 import NostrCore
 
 /// Where a user's events live and where their messages should be delivered: NIP-65 relay list
-/// metadata with outbox/gossip routing, and NIP-17 DM relay lists.
-/// Reached as ``NostrClient/routing``.
+/// metadata and NIP-17 DM relay lists. Reached as ``NostrClient/routing``.
 ///
 /// Both lists are cached per public key, newest wins, and both grow the pool per the client's
-/// ``GossipRelayPolicy`` when a route resolves to a relay that is not connected yet.
+/// ``GossipRelayPolicy`` when a route resolves to a relay that is not connected yet. The NIP-65
+/// lists drive ``RelayRoute/outbox``, which every publish, fetch, count, and subscription accepts.
 ///
 /// Implements the ``NostrRelayRouting`` primitives over the client's relay-list caches and pool;
 /// ``NostrRelayRouting/publishRelayList(read:write:strategy:)``,
@@ -51,40 +51,6 @@ public struct NostrRoutingAPI: NostrRelayRouting {
         let result = try await client.pool.publish(event, strategy: strategy)
         await client.relayListStore.store(relayList, createdAt: event.createdAt, for: event.publicKey)
         return PublishedEvent(event: event, result: result)
-    }
-
-    /// Subscribes to authors on their own WRITE relays (the NIP-65 outbox model), falling back to
-    /// the whole pool when any author has no known relay list.
-    public func subscribeOutbox(
-        authors: [PublicKey],
-        kinds: [Event.Kind],
-        limit: Int?
-    ) async throws(RelayPool.Error) -> SubscriptionSequence {
-        let routeSet = await resolveOutboxRelays(authors: authors)
-        let filter = Filter(authors: authors, kinds: kinds, limit: limit)
-        return try await client.pool.subscribe(filters: [filter], to: routeSet)
-    }
-
-    /// Publishes a signed event to the author's WRITE relays and its mentions' READ relays (the
-    /// NIP-65 gossip model), falling back to the whole pool when nothing resolves.
-    @discardableResult
-    public func publishGossip(_ event: Event, strategy: PublishStrategy?) async throws -> PublishResult {
-        var targets: Set<RelayURL> = []
-
-        targets.formUnion(await writeRelays(for: event.publicKey))
-
-        let referencedPublicKeys = Set(event.referencedPublicKeys)
-        for publicKey in referencedPublicKeys {
-            if await cachedRelayList(for: publicKey) == nil {
-                _ = try? await fetchRelayList(for: publicKey)
-            }
-            targets.formUnion(await client.relayListStore.readRelayURLs(for: publicKey))
-        }
-
-        let available = await client.relayListStore.ensureConnected(targets)
-        return try await client.pool.publish(
-            event, to: available.isEmpty ? nil : available, strategy: strategy
-        )
     }
 
     // MARK: - Direct message relay list (NIP-17, kind 10050)
@@ -140,6 +106,61 @@ public struct NostrRoutingAPI: NostrRelayRouting {
 
     // MARK: - Internal
 
+    /// The relays a publish of `event` along `route` targets, or nil for the whole pool.
+    ///
+    /// For ``RelayRoute/outbox``: the author's WRITE relays plus the READ relays of every public key
+    /// in its "p" tags, connected per the ``GossipRelayPolicy``, or nil when nothing resolves.
+    func relayURLs(publishing event: Event, along route: RelayRoute) async -> Set<RelayURL>? {
+        switch route {
+        case .pool: return nil
+        case .relays(let relayURLs): return relayURLs
+        case .outbox: break
+        }
+        var targets = await writeRelays(for: event.publicKey)
+        for publicKey in Set(event.referencedPublicKeys) {
+            if await cachedRelayList(for: publicKey) == nil {
+                _ = try? await fetchRelayList(for: publicKey)
+            }
+            targets.formUnion(await client.relayListStore.readRelayURLs(for: publicKey))
+        }
+        let available = await client.relayListStore.ensureConnected(targets)
+        return available.isEmpty ? nil : available
+    }
+
+    /// The relays a read of `filters` along `route` targets, or nil for the whole pool.
+    ///
+    /// For ``RelayRoute/outbox``: the WRITE relays of the filters' authors, connected per the
+    /// ``GossipRelayPolicy``, or nil when a filter names no authors, an author has no known relay
+    /// list, or nothing could be connected.
+    func relayURLs(reading filters: [Filter], along route: RelayRoute) async -> Set<RelayURL>? {
+        switch route {
+        case .pool: return nil
+        case .relays(let relayURLs): return relayURLs
+        case .outbox: break
+        }
+        // A filter without authors can match anyone's events, and an author with no known relay list
+        // would be silently dropped, so either falls back to the whole pool — after connecting the
+        // relays that did resolve, which the pool then covers too.
+        var fallsBackToPool = false
+        var targets: Set<RelayURL> = []
+        for filter in filters {
+            guard let authors = filter.authors, !authors.isEmpty else {
+                fallsBackToPool = true
+                continue
+            }
+            for author in authors {
+                let writeURLs = await writeRelays(for: author)
+                if writeURLs.isEmpty {
+                    fallsBackToPool = true
+                } else {
+                    targets.formUnion(writeURLs)
+                }
+            }
+        }
+        let available = await client.relayListStore.ensureConnected(targets)
+        return (fallsBackToPool || available.isEmpty) ? nil : available
+    }
+
     /// Resolves and connects a public key's kind-10050 DM inbox relays, fetching the list first if it
     /// is not cached and at least one relay is connected to query.
     ///
@@ -167,26 +188,6 @@ public struct NostrRoutingAPI: NostrRelayRouting {
     }
 
     // MARK: - Private
-
-    /// Resolves the WRITE relays of the given authors for outbox routing.
-    /// - Returns: The connected target set, or `nil` to fall back to the full pool
-    ///   when an author is unresolved or nothing could be connected.
-    private func resolveOutboxRelays(authors: [PublicKey]) async -> Set<RelayURL>? {
-        var targets: Set<RelayURL> = []
-        var hasUnresolved = false
-
-        for author in authors {
-            let writeURLs = await writeRelays(for: author)
-            if writeURLs.isEmpty {
-                hasUnresolved = true
-            } else {
-                targets.formUnion(writeURLs)
-            }
-        }
-
-        let available = await client.relayListStore.ensureConnected(targets)
-        return (hasUnresolved || available.isEmpty) ? nil : available
-    }
 
     /// A public key's WRITE relays, discovering its relay list first when nothing is cached.
     private func writeRelays(for publicKey: PublicKey) async -> Set<RelayURL> {

@@ -23,10 +23,9 @@ import NostrCore
 //
 // A primitive has at most one short form, and its argument labels differ from the primitive's:
 // usually it drops the trailing `timeout` or `strategy`, whose nil already means the pool default,
-// and defaults the rest. The two never need disambiguating, and the short form can never turn into
-// the primitive's default implementation; to set the dropped parameter, call the primitive. The
-// relay-targeting primitives (`to:` or `from:` a relay set) are the exception, with a pool-wide and
-// a targeted short form each.
+// and defaults the rest — a `route` to ``RelayRoute/pool``. The two never need disambiguating, and
+// the short form can never turn into the primitive's default implementation; to set the dropped
+// parameter, call the primitive.
 //
 // The protocols are also the public extension points: a helper added to one in an extension works on
 // the namespace, on any conformer, and on stubs, and a namespace of your own composes the protocols
@@ -126,44 +125,42 @@ public protocol NostrRelayManaging: Sendable {
 /// ``publishReply(to:content:relayURL:strategy:)``, …) and the short forms of the primitives are
 /// provided by an extension built on them.
 public protocol NostrEventPublishing: Sendable {
-    /// Signs `template` with the configured signer and publishes it to the whole pool (nil) or to the
-    /// given relays.
+    /// Signs `template` with the configured signer and publishes it along `route`.
     ///
-    /// Targeting follows ``publish(_:to:strategy:)-(Event,Set<RelayURL>?,_)``: an empty set always throws, and
-    /// targets not in the pool are skipped.
+    /// Signing comes first, so ``RelayRoute/outbox`` resolves from the signed event's author and "p"
+    /// tags; otherwise routing follows ``publish(_:route:strategy:)-(Event,_,_)``.
     /// - Parameters:
     ///   - template: The event to sign and publish.
-    ///   - relayURLs: The relays to publish to, or nil for the whole pool.
+    ///   - route: The relays to publish to.
     ///   - strategy: How many relay acknowledgments to wait for before returning, or nil for the
     ///     pool config's ``RelayPoolConfig/defaultPublishStrategy``.
     /// - Returns: The signed event together with the per-relay publish outcome.
     /// - Throws: ``NostrClient/Error/signerNotSet`` if no signer is set, anything the signer throws, or the
-    ///   errors of ``publish(_:to:strategy:)-(Event,Set<RelayURL>?,_)``.
+    ///   errors of ``publish(_:route:strategy:)-(Event,_,_)``.
     @discardableResult
     func publish(
-        _ template: EventTemplate, to relayURLs: Set<RelayURL>?, strategy: PublishStrategy?
+        _ template: EventTemplate, route: RelayRoute, strategy: PublishStrategy?
     ) async throws -> PublishedEvent
 
-    /// Publishes an already-signed event to the whole pool (nil) or to the given relays.
+    /// Publishes an already-signed event along `route`.
     ///
-    /// Pass relays to target a subset — for example, an event signed by a separate key that should
-    /// reach only a few named relays. An empty set always throws, so an accidentally-empty computed
-    /// list never fans out to the whole pool. Targets not in the pool are skipped, not connected on
-    /// demand: add them with ``NostrRelaysAPI/add(_:config:)`` first.
+    /// Route ``RelayRoute/relays(_:)`` to target a subset — for example, an event signed by a
+    /// separate key that should reach only a few named relays — or ``RelayRoute/outbox`` to reach
+    /// the author's WRITE relays and the READ relays of the keys it mentions (NIP-65).
     /// - Parameters:
     ///   - event: The already-signed event to publish.
-    ///   - relayURLs: The relays to publish to, or nil for the whole pool.
+    ///   - route: The relays to publish to.
     ///   - strategy: How many relay acknowledgments to wait for before returning, or nil for the
     ///     pool config's ``RelayPoolConfig/defaultPublishStrategy``.
     /// - Returns: The per-relay outcome of the publish, keyed by relay URL.
     /// - Throws: ``RelayPool/Error/emptyPool`` when broadcasting to an empty pool,
-    ///   ``RelayPool/Error/noMatchingRelays(_:)`` when none of the targeted URLs are in the pool
-    ///   (including an empty set), the last relay's error (a ``RelayRejection`` or a
+    ///   ``RelayPool/Error/noMatchingRelays(_:)`` when none of a ``RelayRoute/relays(_:)`` route's URLs
+    ///   are in the pool (including an empty set), the last relay's error (a ``RelayRejection`` or a
     ///   ``RelayConnection/Error``) if no targeted relay accepts the event, or
     ///   ``RelayPool/Error/quorumNotMet(acknowledged:required:)`` if a `.quorum` strategy cannot be
     ///   satisfied.
     @discardableResult
-    func publish(_ event: Event, to relayURLs: Set<RelayURL>?, strategy: PublishStrategy?) async throws -> PublishResult
+    func publish(_ event: Event, route: RelayRoute, strategy: PublishStrategy?) async throws -> PublishResult
 }
 
 /// Reading stored events one time, without holding a subscription open.
@@ -173,48 +170,47 @@ public protocol NostrEventPublishing: Sendable {
 /// ``fetchMetadata(publicKey:timeout:)``, …) and the short forms of the primitives are provided by
 /// an extension built on them.
 public protocol NostrEventFetching: Sendable {
-    /// Fetches events matching `filters` from the whole pool (nil) or the given relays, waiting for
-    /// every targeted relay to send EOSE or for `timeout`, whichever comes first.
+    /// Fetches events matching `filters` along `route`, waiting for every targeted relay to send
+    /// EOSE or for `timeout`, whichever comes first.
     ///
-    /// Targets not in the pool are skipped; an empty set always throws.
+    /// ``RelayRoute/outbox`` reads from the WRITE relays of the filters' authors (NIP-65).
     /// - Parameters:
     ///   - filters: The filters to match.
-    ///   - relayURLs: The relays to fetch from, or nil for the whole pool.
+    ///   - route: The relays to fetch from.
     ///   - timeout: How long to wait for relays to finish, or nil for
     ///     ``RelayPoolConfig/queryTimeout``.
     /// - Returns: The events received, deduplicated across relays.
     /// - Throws: ``RelayPool/Error/emptyPool`` when the pool is empty, or
-    ///   ``RelayPool/Error/noMatchingRelays(_:)`` when none of the targeted URLs are in the pool
-    ///   (including an empty set). Both are thrown before anything is sent to a relay.
-    func fetch(filters: [Filter], from relayURLs: Set<RelayURL>?, timeout: Duration?) async throws -> [Event]
+    ///   ``RelayPool/Error/noMatchingRelays(_:)`` when none of a ``RelayRoute/relays(_:)`` route's URLs
+    ///   are in the pool (including an empty set). Both are thrown before anything is sent to a relay.
+    func fetch(filters: [Filter], route: RelayRoute, timeout: Duration?) async throws -> [Event]
 
-    /// Requests the number of events matching `filters` (NIP-45 COUNT) from the whole pool (nil) or
-    /// the given relays.
+    /// Requests the number of events matching `filters` (NIP-45 COUNT) along `route`.
     ///
     /// Returns the maximum count the targeted relays report — each relay's count is a lower bound on
-    /// the events it holds, so the maximum is the best single estimate. Targets not in the pool are
-    /// skipped; an empty set always throws. For per-relay results use
+    /// the events it holds, so the maximum is the best single estimate. ``RelayRoute/outbox`` counts
+    /// on the WRITE relays of the filters' authors, as a fetch would read. For per-relay results use
     /// ``RelayPool/countEvents(matching:from:timeout:)`` on ``NostrRelaysAPI/pool``.
     /// - Parameters:
     ///   - filters: The filters to count.
-    ///   - relayURLs: The relays to query, or nil for the whole pool.
+    ///   - route: The relays to query.
     ///   - timeout: How long to wait for relays to finish, or nil for
     ///     ``RelayPoolConfig/queryTimeout``.
     /// - Returns: The highest count any targeted relay reported.
     /// - Throws: ``RelayPool/Error/emptyPool`` when the pool is empty,
-    ///   ``RelayPool/Error/noMatchingRelays(_:)`` when none of the targeted URLs are in the pool, or the
-    ///   last relay's error (a ``RelayRejection`` or a ``RelayConnection/Error``) when no targeted
-    ///   relay answered.
-    func countEvents(matching filters: [Filter], from relayURLs: Set<RelayURL>?, timeout: Duration?) async throws -> Int
+    ///   ``RelayPool/Error/noMatchingRelays(_:)`` when none of a ``RelayRoute/relays(_:)`` route's URLs
+    ///   are in the pool, or the last relay's error (a ``RelayRejection`` or a ``RelayConnection/Error``)
+    ///   when no targeted relay answered.
+    func countEvents(matching filters: [Filter], route: RelayRoute, timeout: Duration?) async throws -> Int
 }
 
 // MARK: - Subscriptions
 
 /// Opening live subscriptions. Implemented by ``NostrSubscriptionsAPI``.
 ///
-/// The requirements are the subscribe and unsubscribe primitives; the short forms of
-/// ``subscribe(filters:to:bufferingPolicy:)-(_,Set<RelayURL>?,_)`` are provided by an extension
-/// built on them. For a feed, pass one of the `Filter` presets and read ``SubscriptionSequence/events``:
+/// The requirements are the subscribe and unsubscribe primitives; the short form of
+/// ``subscribe(filters:route:bufferingPolicy:)`` is provided by an extension built on them. For a
+/// feed, pass one of the `Filter` presets and read ``SubscriptionSequence/events``:
 ///
 /// ```swift
 /// for await note in try await client.subscriptions.subscribe(filters: [.globalFeed(limit: 50)]).events {
@@ -222,25 +218,24 @@ public protocol NostrEventFetching: Sendable {
 /// }
 /// ```
 public protocol NostrSubscribing: Sendable {
-    /// Opens a subscription on the whole pool (nil) or the given relays, as an async sequence of
-    /// relay-aware events.
+    /// Opens a subscription along `route`, as an async sequence of relay-aware events.
     ///
-    /// Targets not in the pool are skipped; an empty set always throws. Iteration termination
-    /// (breaking out of the loop, task cancellation, or discarding the sequence) sends CLOSE to the
-    /// relays.
+    /// ``RelayRoute/outbox`` follows the filters' authors on their WRITE relays (NIP-65). Iteration
+    /// termination (breaking out of the loop, task cancellation, or discarding the sequence) sends
+    /// CLOSE to the relays.
     /// - Parameters:
     ///   - filters: The NIP-01 filters the relays match events against.
-    ///   - relayURLs: The relays to subscribe on, or nil for the whole pool.
+    ///   - route: The relays to subscribe on.
     ///   - bufferingPolicy: How items are buffered while the consumer is slower than the relays.
     ///     Use `.bufferingNewest(n)` for firehose subscriptions where memory matters.
     /// - Returns: The subscription.
     /// - Throws: ``RelayPool/Error/emptyPool`` when the pool is empty,
-    ///   ``RelayPool/Error/noMatchingRelays(_:)`` when none of the targeted URLs are in the pool
-    ///   (including an empty set), or ``RelayPool/Error/subscriptionFailed`` when every relay fails to
-    ///   subscribe.
+    ///   ``RelayPool/Error/noMatchingRelays(_:)`` when none of a ``RelayRoute/relays(_:)`` route's URLs
+    ///   are in the pool (including an empty set), or ``RelayPool/Error/subscriptionFailed`` when every
+    ///   relay fails to subscribe.
     func subscribe(
         filters: [Filter],
-        to relayURLs: Set<RelayURL>?,
+        route: RelayRoute,
         bufferingPolicy: AsyncStream<SubscriptionEvent>.Continuation.BufferingPolicy
     ) async throws(RelayPool.Error) -> SubscriptionSequence
 
@@ -252,13 +247,14 @@ public protocol NostrSubscribing: Sendable {
 
 // MARK: - Routing
 
-/// Discovering where a user's events live (NIP-65) and where their messages go (NIP-17),
-/// and routing by those lists. Implemented by ``NostrRoutingAPI``.
+/// Discovering where a user's events live (NIP-65) and where their messages go (NIP-17).
+/// Implemented by ``NostrRoutingAPI``.
 ///
-/// The requirements are the primitives — fetching, caching, and publishing each list, the outbox
-/// subscription, the gossip publish, and connecting the DM inbox;
-/// ``publishRelayList(read:write:strategy:)``, ``publishDirectMessageRelayList(relays:strategy:)``,
-/// and the short forms of the primitives are provided by an extension built on them.
+/// To publish, fetch, or subscribe by the NIP-65 lists, pass ``RelayRoute/outbox`` to the
+/// operation itself. The requirements are the primitives — fetching, caching, and publishing each
+/// list, and connecting the DM inbox; ``publishRelayList(read:write:strategy:)``,
+/// ``publishDirectMessageRelayList(relays:strategy:)``, and the short forms of the primitives are
+/// provided by an extension built on them.
 public protocol NostrRelayRouting: Sendable {
     /// Fetches a user's NIP-65 relay list (kind 10002) from the whole pool, caching it (newer wins).
     ///
@@ -282,36 +278,6 @@ public protocol NostrRelayRouting: Sendable {
     func publishRelayList(
         _ relayList: RelayListMetadata, strategy: PublishStrategy?
     ) async throws -> PublishedEvent
-    /// Subscribes to authors on their own WRITE relays (the NIP-65 outbox model).
-    ///
-    /// Each author's relay list is resolved (fetched when not cached), its WRITE relays are
-    /// connected per the client's ``GossipRelayPolicy``, and one subscription is opened on them.
-    /// If any author has no known relay list, the subscription falls back to the whole pool so no
-    /// author is silently dropped.
-    /// - Parameters:
-    ///   - authors: The authors to follow.
-    ///   - kinds: The event kinds to receive.
-    ///   - limit: How many stored events each relay sends before live ones, or nil for no limit.
-    /// - Returns: The subscription.
-    /// - Throws: ``RelayPool/Error/emptyPool`` when the fallback finds the pool empty, or
-    ///   ``RelayPool/Error/subscriptionFailed`` when every relay fails to subscribe.
-    func subscribeOutbox(
-        authors: [PublicKey], kinds: [Event.Kind], limit: Int?
-    ) async throws(RelayPool.Error) -> SubscriptionSequence
-    /// Publishes a signed event using the NIP-65 gossip model: to the author's own WRITE relays plus
-    /// the READ (inbox) relays of every public key in its "p" tags, so mentions and replies reach
-    /// their recipients.
-    ///
-    /// Relay lists not cached are fetched first. Falls back to the whole pool when nothing resolves.
-    /// - Parameters:
-    ///   - event: The already-signed event to route.
-    ///   - strategy: How many relay acknowledgments to wait for before returning, or nil for the
-    ///     pool config's ``RelayPoolConfig/defaultPublishStrategy``.
-    /// - Returns: The per-relay outcome of the publish.
-    /// - Throws: ``RelayPool/Error/emptyPool`` when the fallback finds the pool empty, or the errors
-    ///   of the publish.
-    @discardableResult
-    func publishGossip(_ event: Event, strategy: PublishStrategy?) async throws -> PublishResult
 
     /// Fetches a user's NIP-17 DM relay list (kind 10050) from the whole pool, caching it (newer
     /// wins) — where to deliver their gift-wrapped direct messages.
@@ -486,7 +452,7 @@ public protocol NostrGroupManaging: Sendable {
     ///
     /// Each filter is scoped to the group by setting its "h" tag to the group's id, replacing any
     /// "h" values it had. Iteration termination sends CLOSE, like every subscription from
-    /// ``NostrSubscribing/subscribe(filters:to:bufferingPolicy:)-(_,Set<RelayURL>?,_)``.
+    /// ``NostrSubscribing/subscribe(filters:route:bufferingPolicy:)``.
     /// - Parameters:
     ///   - group: The group to follow; its relay is added to the pool and connected on demand.
     ///   - filters: The NIP-01 filters the relay matches the group's events against.

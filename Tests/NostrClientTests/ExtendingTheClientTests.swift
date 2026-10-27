@@ -25,7 +25,7 @@ extension NostrEventPublishing {
         if let expiration {
             template.tags.append(.expiration(expiration))
         }
-        return try await publish(template, strategy: strategy)
+        return try await publish(template, route: .pool, strategy: strategy)
     }
 }
 
@@ -51,7 +51,8 @@ private struct ZapsAPI: Sendable {
     func received(limit: Int = 50, timeout: Duration? = nil) async throws -> [ZapReceipt] {
         guard let publicKey = await identity.publicKey else { throw NostrClient.Error.signerNotSet }
         let filter = Filter(kinds: [.zap], publicKeyReferences: [publicKey], limit: limit)
-        return try await events.fetch(filters: [filter], timeout: timeout).compactMap(ZapReceipt.init(event:))
+        return try await events.fetch(filters: [filter], route: .pool, timeout: timeout)
+            .compactMap(ZapReceipt.init(event:))
     }
 }
 
@@ -68,13 +69,12 @@ private actor CannedEvents: NostrEventFetching {
 
     init(_ events: [Event]) { self.events = events }
 
-    func fetch(filters: [Filter], from relayURLs: Set<RelayURL>?, timeout: Duration?) async throws -> [Event] {
+    func fetch(filters: [Filter], route: RelayRoute, timeout: Duration?) async throws -> [Event] {
         requests.append(filters)
         return events
     }
 
-    func countEvents(matching filters: [Filter], from relayURLs: Set<RelayURL>?, timeout: Duration?) async throws -> Int
-    {
+    func countEvents(matching filters: [Filter], route: RelayRoute, timeout: Duration?) async throws -> Int {
         events.count
     }
 }
@@ -157,7 +157,7 @@ struct ExtendingTheClientTests {
         #expect(publishes[0].template.kind == userStatusKind)
         #expect(publishes[0].template.content == "Away")
         #expect(publishes[0].template.tags == [.identifier("general")])
-        #expect(publishes[0].relayURLs == nil)
+        #expect(publishes[0].route == .pool)
         #expect(publishes[0].strategy == nil)
         #expect(publishes[1].template.content == "Back soon")
         #expect(publishes[1].strategy == .allSettled)
@@ -220,7 +220,7 @@ struct ExtendingTheClientTests {
         let fetches = await events.fetches
         #expect(fetches.count == 1)
         #expect(fetches[0].filters == [Filter(kinds: [.zap], publicKeyReferences: [signer.publicKey], limit: 50)])
-        #expect(fetches[0].relayURLs == nil)
+        #expect(fetches[0].route == .pool)
         #expect(fetches[0].timeout == nil)
         #expect(receipts.first?.amountMillisats == 5_000)
     }

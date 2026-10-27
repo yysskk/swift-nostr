@@ -7,8 +7,8 @@ import Testing
 
 /// The ``NostrRelayRouting`` conveniences are written once, in a protocol extension over the
 /// primitives. Driving them through a stub that implements only the primitives shows which list
-/// each one builds and what it forwards — public key, timeout, kinds, limit, strategy, and the
-/// defaults — without a relay pool.
+/// each one builds and what it forwards — public key, timeout, strategy, and the defaults —
+/// without a relay pool.
 @Suite("Routing Capability Tests")
 struct RoutingCapabilityTests {
     private let readRelay = RelayURL("wss://read.example.com")!
@@ -54,11 +54,9 @@ struct RoutingCapabilityTests {
         let routing: any NostrRelayRouting = stub
         let relayList = RelayListMetadata(read: [readRelay], write: [writeRelay])
         let dmRelayList = DirectMessageRelayList(relays: [inboxRelay])
-        let note = signer.sign(.textNote("gossip"))
 
         let relayListEvent = try await routing.publishRelayList(relayList)
         let dmRelayListEvent = try await routing.publishDirectMessageRelayList(dmRelayList)
-        try await routing.publishGossip(note)
 
         let relayListPublishes = await stub.relayListPublishes
         #expect(relayListPublishes.map(\.relayList) == [relayList])
@@ -69,42 +67,6 @@ struct RoutingCapabilityTests {
         #expect(dmRelayListPublishes.map(\.relayList) == [dmRelayList])
         #expect(dmRelayListPublishes.map(\.strategy) == [nil])
         #expect(dmRelayListEvent.event.kind == .directMessageRelayList)
-
-        let gossipPublishes = await stub.gossipPublishes
-        #expect(gossipPublishes.map(\.event) == [note])
-        #expect(gossipPublishes.map(\.strategy) == [nil])
-    }
-
-    @Test("subscribeOutbox defaults to text notes with no limit")
-    func subscribeOutboxDefaults() async throws {
-        let stub = RecordingRoutingCapabilities(signer: signer)
-        let routing: any NostrRelayRouting = stub
-        let authors = [PublicKey.fixture("a"), PublicKey.fixture("b")]
-
-        _ = try await routing.subscribeOutbox(authors: authors)
-        _ = try await routing.subscribeOutbox(authors: authors, kinds: [.longFormContent])
-
-        #expect(
-            await stub.outboxSubscribes == [
-                .init(authors: authors, kinds: [.textNote], limit: nil),
-                .init(authors: authors, kinds: [.longFormContent], limit: nil),
-            ])
-    }
-
-    @Test("subscribeOutbox with a limit forwards it, with or without kinds")
-    func subscribeOutboxWithLimit() async throws {
-        let stub = RecordingRoutingCapabilities(signer: signer)
-        let routing: any NostrRelayRouting = stub
-        let authors = [PublicKey.fixture("a")]
-
-        _ = try await routing.subscribeOutbox(authors: authors, limit: 20)
-        _ = try await routing.subscribeOutbox(authors: authors, kinds: [.reaction], limit: 5)
-
-        #expect(
-            await stub.outboxSubscribes == [
-                .init(authors: authors, kinds: [.textNote], limit: 20),
-                .init(authors: authors, kinds: [.reaction], limit: 5),
-            ])
     }
 
     // MARK: - Conveniences

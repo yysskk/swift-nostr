@@ -3,9 +3,8 @@ import NostrCore
 
 /// A live relay subscription delivered as an async sequence of relay-aware events.
 ///
-/// Returned by ``NostrSubscribing/subscribe(filters:to:bufferingPolicy:)-(_,Set<RelayURL>?,_)``,
-/// ``RelayPool/subscribe(filters:to:bufferingPolicy:)``, ``NostrGroupManaging/subscribe(to:filters:)``,
-/// and ``NostrRelayRouting/subscribeOutbox(authors:kinds:limit:)-(_,_,Int?)``.
+/// Returned by ``NostrSubscribing/subscribe(filters:route:bufferingPolicy:)``,
+/// ``RelayPool/subscribe(filters:to:bufferingPolicy:)``, and ``NostrGroupManaging/subscribe(to:filters:)``.
 /// Iterate it with `for await`:
 ///
 /// ```swift
@@ -36,7 +35,7 @@ public struct SubscriptionSequence: AsyncSequence, Sendable {
     public let id: SubscriptionID
 
     /// The relays that accepted the REQ. EOSE completion is measured against
-    /// this set (see ``NostrEventFetching/fetch(filters:from:timeout:)-(_,Set<RelayURL>?,_)``).
+    /// this set (see ``NostrEventFetching/fetch(filters:route:timeout:)``).
     public let expectedRelays: Set<RelayURL>
 
     let stream: AsyncStream<SubscriptionEvent>

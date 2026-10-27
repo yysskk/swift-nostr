@@ -4,68 +4,32 @@ import NostrCore
 // MARK: - Short forms of the primitives
 
 extension NostrEventFetching {
-    /// Fetches events matching `filters` from the whole pool, waiting for every relay to send EOSE
-    /// or for `timeout`, whichever comes first.
+    /// Fetches events matching `filters` along `route`, waiting for every targeted relay to send
+    /// EOSE or for ``RelayPoolConfig/queryTimeout``, whichever comes first. See
+    /// ``NostrEventFetching/fetch(filters:route:timeout:)``.
     /// - Parameters:
     ///   - filters: The filters to match.
-    ///   - timeout: How long to wait for relays to finish; `nil` uses
-    ///     ``RelayPoolConfig/queryTimeout``.
+    ///   - route: The relays to fetch from (default: the whole pool).
     /// - Returns: The events received, deduplicated across relays.
-    /// - Throws: ``RelayPool/Error/emptyPool`` when the pool is empty.
-    public func fetch(filters: [Filter], timeout: Duration? = nil) async throws -> [Event] {
-        try await fetch(filters: filters, from: nil, timeout: timeout)
+    /// - Throws: ``RelayPool/Error/emptyPool`` when the pool is empty, or
+    ///   ``RelayPool/Error/noMatchingRelays(_:)`` when none of a ``RelayRoute/relays(_:)`` route's URLs
+    ///   are in the pool.
+    public func fetch(filters: [Filter], route: RelayRoute = .pool) async throws -> [Event] {
+        try await fetch(filters: filters, route: route, timeout: nil)
     }
 
-    /// Fetches events matching `filters` from the given relays only — for example, `naddr` relay
-    /// hints.
-    ///
-    /// Targets not in the pool are skipped; an empty set always throws.
-    /// - Parameters:
-    ///   - filters: The filters to match.
-    ///   - relayURLs: The relays to fetch from.
-    ///   - timeout: How long to wait for relays to finish; `nil` uses
-    ///     ``RelayPoolConfig/queryTimeout``.
-    /// - Returns: The events received, deduplicated across relays.
-    /// - Throws: ``RelayPool/Error/noMatchingRelays(_:)`` when none of the targeted URLs are in the pool.
-    public func fetch(
-        filters: [Filter],
-        from relayURLs: Set<RelayURL>,
-        timeout: Duration? = nil
-    ) async throws -> [Event] {
-        try await fetch(filters: filters, from: Optional(relayURLs), timeout: timeout)
-    }
-
-    /// Requests the number of events matching `filters` (NIP-45 COUNT) from the whole pool,
-    /// returning the highest count any relay reported.
+    /// Requests the number of events matching `filters` (NIP-45 COUNT) along `route`, waiting up to
+    /// ``RelayPoolConfig/queryTimeout`` and returning the highest count any relay reported. See
+    /// ``NostrEventFetching/countEvents(matching:route:timeout:)``.
     /// - Parameters:
     ///   - filters: The filters to count.
-    ///   - timeout: How long to wait for relays to finish; `nil` uses
-    ///     ``RelayPoolConfig/queryTimeout``.
-    /// - Returns: The highest count any relay reported.
-    /// - Throws: ``RelayPool/Error/emptyPool`` when the pool is empty, or the last relay error when
-    ///   no relay answered.
-    public func countEvents(matching filters: [Filter], timeout: Duration? = nil) async throws -> Int {
-        try await countEvents(matching: filters, from: nil, timeout: timeout)
-    }
-
-    /// Requests the number of events matching `filters` (NIP-45 COUNT) from the given relays only,
-    /// returning the highest count any of them reported.
-    ///
-    /// Targets not in the pool are skipped; an empty set always throws.
-    /// - Parameters:
-    ///   - filters: The filters to count.
-    ///   - relayURLs: The relays to query.
-    ///   - timeout: How long to wait for relays to finish; `nil` uses
-    ///     ``RelayPoolConfig/queryTimeout``.
+    ///   - route: The relays to query (default: the whole pool).
     /// - Returns: The highest count any targeted relay reported.
-    /// - Throws: ``RelayPool/Error/noMatchingRelays(_:)`` when none of the targeted URLs are in the pool,
-    ///   or the last relay error when no targeted relay answered.
-    public func countEvents(
-        matching filters: [Filter],
-        from relayURLs: Set<RelayURL>,
-        timeout: Duration? = nil
-    ) async throws -> Int {
-        try await countEvents(matching: filters, from: Optional(relayURLs), timeout: timeout)
+    /// - Throws: ``RelayPool/Error/emptyPool`` when the pool is empty,
+    ///   ``RelayPool/Error/noMatchingRelays(_:)`` when none of a ``RelayRoute/relays(_:)`` route's URLs
+    ///   are in the pool, or the last relay error when no targeted relay answered.
+    public func countEvents(matching filters: [Filter], route: RelayRoute = .pool) async throws -> Int {
+        try await countEvents(matching: filters, route: route, timeout: nil)
     }
 }
 
@@ -82,7 +46,7 @@ extension NostrEventFetching {
     ///     ``RelayPoolConfig/queryTimeout``.
     /// - Returns: The event, or nil if no relay returned it with a valid signature.
     public func fetchEvent(id: EventID, timeout: Duration? = nil) async throws -> Event? {
-        let events = try await fetch(filters: [Filter(ids: [id])], timeout: timeout)
+        let events = try await fetch(filters: [Filter(ids: [id])], route: .pool, timeout: timeout)
         return VerifiedEventSelection.event(withID: id, in: events)
     }
 
@@ -96,7 +60,7 @@ extension NostrEventFetching {
     ///     ``RelayPoolConfig/queryTimeout``.
     /// - Returns: The profile, or nil if none was found or its content does not decode.
     public func fetchMetadata(publicKey: PublicKey, timeout: Duration? = nil) async throws -> UserMetadata? {
-        let events = try await fetch(filters: [.metadata(publicKeys: [publicKey])], timeout: timeout)
+        let events = try await fetch(filters: [.metadata(publicKeys: [publicKey])], route: .pool, timeout: timeout)
 
         guard let event = VerifiedEventSelection.newest(in: events, kind: .setMetadata, author: publicKey)
         else { return nil }
@@ -119,7 +83,7 @@ extension NostrEventFetching {
     ) async throws -> LongFormContent? {
         var filter = Filter(authors: [author], kinds: [.longFormContent])
         filter[tag: .identifier] = [identifier]
-        let events = try await fetch(filters: [filter], timeout: timeout)
+        let events = try await fetch(filters: [filter], route: .pool, timeout: timeout)
         // Addressable event: the newest copy the named author signed under this identifier.
         guard
             let newest = VerifiedEventSelection.newest(
@@ -146,14 +110,14 @@ extension NostrEventFetching {
 
         let events: [Event]
         if naddr.relays.isEmpty {
-            events = try await fetch(filters: [filter], timeout: timeout)
+            events = try await fetch(filters: [filter], route: .pool, timeout: timeout)
         } else {
             do {
-                events = try await fetch(filters: [filter], from: Set(naddr.relays), timeout: timeout)
+                events = try await fetch(filters: [filter], route: .relays(Set(naddr.relays)), timeout: timeout)
             } catch RelayPool.Error.noMatchingRelays {
                 // None of the hints is in the pool. Targeting fails before anything is sent to a
                 // relay, so falling back here queries the whole pool exactly once.
-                events = try await fetch(filters: [filter], timeout: timeout)
+                events = try await fetch(filters: [filter], route: .pool, timeout: timeout)
             }
         }
 

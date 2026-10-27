@@ -144,7 +144,7 @@ struct NostrClientNamespaceTests {
         let note = EventSigner(keyPair: author).sign(.textNote("stored"))
 
         let events = try await answering(socket, with: [note]) {
-            try await fetching.fetch(filters: [Filter(kinds: [.textNote])], timeout: .seconds(5))
+            try await fetching.fetch(filters: [Filter(kinds: [.textNote])], route: .pool, timeout: .seconds(5))
         }
 
         #expect(events.map(\.content) == ["stored"])
@@ -246,16 +246,17 @@ struct NostrClientNamespaceTests {
         await #expect(throws: RelayPool.Error.emptyPool) {
             try await subscriptions.subscribe(filters: [Filter(kinds: [.textNote])])
         }
+        // No relay list resolves on an empty pool, so the outbox falls back to the whole pool.
+        await #expect(throws: RelayPool.Error.emptyPool) {
+            try await subscriptions.subscribe(
+                filters: [Filter(authors: [PublicKey.fixture("author")], kinds: [.textNote])], route: .outbox)
+        }
     }
 
-    @Test("routing throws RelayPool.Error and NostrClient.Error through NostrRelayRouting")
+    @Test("routing throws NostrClient.Error through NostrRelayRouting")
     func routingThrowsTypedErrors() async {
         let routing: any NostrRelayRouting = NostrClient().routing
 
-        // No relay list resolves on an empty pool, so the outbox falls back to the whole pool.
-        await #expect(throws: RelayPool.Error.emptyPool) {
-            try await routing.subscribeOutbox(authors: [PublicKey.fixture("author")])
-        }
         await #expect(throws: NostrClient.Error.signerNotSet) {
             try await routing.connectDirectMessageInboxRelays()
         }

@@ -7,7 +7,7 @@ import Testing
 
 /// The ``NostrEventPublishing`` and ``NostrEventFetching`` conveniences are written once, in protocol
 /// extensions over the primitives. Driving them through a stub that implements only the primitives
-/// shows what each one builds and forwards — template, targets, strategy, filters, timeout, and the
+/// shows what each one builds and forwards — template, route, strategy, filters, timeout, and the
 /// defaults — without a relay pool.
 @Suite("Event Capability Tests")
 struct EventCapabilityTests {
@@ -58,8 +58,8 @@ struct EventCapabilityTests {
 
     // MARK: - Publish primitives' short forms
 
-    @Test("publishing a template without targets signs it and sends it to the whole pool")
-    func templatePublishShortFormBroadcasts() async throws {
+    @Test("publishing a template without a route signs it and sends it to the whole pool")
+    func templatePublishShortFormDefaultsToPool() async throws {
         let stub = try makeStub()
         let publishing: any NostrEventPublishing = stub
 
@@ -67,57 +67,59 @@ struct EventCapabilityTests {
 
         let recorded = try await onlyTemplatePublish(stub)
         #expect(recorded.template.content == "templated")
-        #expect(recorded.relayURLs == nil)
+        #expect(recorded.route == .pool)
         #expect(recorded.strategy == nil)
         #expect(published.event.content == "templated")
         #expect(published.event.publicKey == stub.signer.publicKey)
         #expect(published.result.acceptedRelays == [relayA])
     }
 
-    @Test("publishing a template to chosen relays forwards exactly those relays and the strategy")
-    func templatePublishShortFormTargets() async throws {
+    @Test("publishing a template along a route forwards it with no strategy")
+    func templatePublishShortFormForwardsRoute() async throws {
         let stub = try makeStub()
         let publishing: any NostrEventPublishing = stub
 
-        try await publishing.publish(.textNote("targeted"), to: [relayA, relayB], strategy: .allSettled)
+        try await publishing.publish(.textNote("targeted"), route: .relays([relayA, relayB]))
+        try await publishing.publish(.textNote("gossip"), route: .outbox)
 
-        let recorded = try await onlyTemplatePublish(stub)
-        #expect(recorded.relayURLs == [relayA, relayB])
-        #expect(recorded.strategy == .allSettled)
+        let recorded = await stub.templatePublishes
+        #expect(recorded.map(\.route) == [.relays([relayA, relayB]), .outbox])
+        #expect(recorded.map(\.strategy) == [nil, nil])
     }
 
-    @Test("publishing a signed event without targets sends it to the whole pool")
-    func eventPublishShortFormBroadcasts() async throws {
+    @Test("publishing a signed event without a route sends it to the whole pool")
+    func eventPublishShortFormDefaultsToPool() async throws {
         let stub = try makeStub()
         let publishing: any NostrEventPublishing = stub
         let event = try note()
 
-        let result = try await publishing.publish(event, strategy: .quorum(2))
+        let result = try await publishing.publish(event)
 
         let recorded = try #require(await stub.eventPublishes.first)
         #expect(await stub.eventPublishes.count == 1)
         #expect(recorded.event == event)
-        #expect(recorded.relayURLs == nil)
-        #expect(recorded.strategy == .quorum(2))
+        #expect(recorded.route == .pool)
+        #expect(recorded.strategy == nil)
         #expect(result.acceptedRelays == [relayA])
     }
 
-    @Test("publishing a signed event to chosen relays forwards them, an empty set included")
-    func eventPublishShortFormTargets() async throws {
+    @Test("publishing a signed event along a route forwards it, an empty relay set included")
+    func eventPublishShortFormForwardsRoute() async throws {
         let stub = try makeStub()
         let publishing: any NostrEventPublishing = stub
         let event = try note()
 
-        try await publishing.publish(event, to: [relayB])
-        // An empty set stays a set — it reaches the primitive, which rejects it, rather than
-        // collapsing to nil and broadcasting.
+        try await publishing.publish(event, route: .relays([relayB]))
+        try await publishing.publish(event, route: .outbox)
+        // An empty set stays a `.relays` route — it reaches the primitive, which rejects it, rather
+        // than collapsing to the whole pool.
         await #expect(throws: RelayPool.Error.noMatchingRelays([])) {
-            try await publishing.publish(event, to: [])
+            try await publishing.publish(event, route: .relays([]))
         }
 
         let recorded = await stub.eventPublishes
-        #expect(recorded.map(\.relayURLs) == [[relayB], []])
-        #expect(recorded.map(\.strategy) == [nil, nil])
+        #expect(recorded.map(\.route) == [.relays([relayB]), .outbox, .relays([])])
+        #expect(recorded.map(\.strategy) == [nil, nil, nil])
     }
 
     // MARK: - Publish conveniences
@@ -132,7 +134,7 @@ struct EventCapabilityTests {
         #expect(recorded.template.kind == .textNote)
         #expect(recorded.template.content == "gm")
         #expect(recorded.template.tags.isEmpty)
-        #expect(recorded.relayURLs == nil)
+        #expect(recorded.route == .pool)
         #expect(recorded.strategy == nil)
         #expect(published.event.content == "gm")
     }
@@ -165,7 +167,7 @@ struct EventCapabilityTests {
             recorded[0].template.tags.map(\.rawArray) == [
                 ["e", parent.id.hex, "", "root"], ["p", parent.publicKey.hex],
             ])
-        #expect(recorded[0].relayURLs == nil)
+        #expect(recorded[0].route == .pool)
         #expect(recorded[0].strategy == nil)
         #expect(recorded[1].template.tags.first?.rawArray == ["e", parent.id.hex, "wss://b.example.com", "root"])
         #expect(recorded[1].strategy == .firstAck)
@@ -183,7 +185,7 @@ struct EventCapabilityTests {
         let decoded = try JSONDecoder().decode(UserMetadata.self, from: Data(recorded.template.content.utf8))
         #expect(decoded.name == "Alice")
         #expect(decoded.about == "Nostr user")
-        #expect(recorded.relayURLs == nil)
+        #expect(recorded.route == .pool)
         #expect(recorded.strategy == .allSettled)
     }
 
@@ -215,7 +217,7 @@ struct EventCapabilityTests {
         #expect(recorded[0].template.tags.first?.rawArray == ["e", target.id.hex])
         #expect(recorded[1].template.tags.first?.rawArray == ["e", target.id.hex, "wss://a.example.com"])
         #expect(try JSONDecoder().decode(Event.self, from: Data(recorded[0].template.content.utf8)) == target)
-        #expect(recorded.allSatisfy { $0.relayURLs == nil && $0.strategy == nil })
+        #expect(recorded.allSatisfy { $0.route == .pool && $0.strategy == nil })
     }
 
     @Test("publishDeletion writes one e tag per id with an empty reason by default")
@@ -279,13 +281,13 @@ struct EventCapabilityTests {
         #expect(recorded[0].template.tags == EventTemplate.longFormContent(article).tags)
         #expect(recorded[0].template.content == "Body")
         #expect(recorded.map(\.strategy) == [nil, .allSettled])
-        #expect(recorded.allSatisfy { $0.relayURLs == nil })
+        #expect(recorded.allSatisfy { $0.route == .pool })
     }
 
     // MARK: - Fetch primitives' short forms
 
-    @Test("fetching without targets queries the whole pool with the default timeout")
-    func fetchShortFormBroadcasts() async throws {
+    @Test("fetching without a route queries the whole pool with the default timeout")
+    func fetchShortFormDefaultsToPool() async throws {
         let event = try note("stored")
         let stub = try makeStub(cannedEvents: [event])
         let fetching: any NostrEventFetching = stub
@@ -295,37 +297,39 @@ struct EventCapabilityTests {
 
         let recorded = try await onlyFetch(stub)
         #expect(recorded.filters == [filter])
-        #expect(recorded.relayURLs == nil)
+        #expect(recorded.route == .pool)
         #expect(recorded.timeout == nil)
         #expect(events == [event])
     }
 
-    @Test("fetching from chosen relays forwards exactly those relays and the timeout")
-    func fetchShortFormTargets() async throws {
+    @Test("fetching along a route forwards it with the default timeout")
+    func fetchShortFormForwardsRoute() async throws {
         let stub = try makeStub()
         let fetching: any NostrEventFetching = stub
+        let filter = Filter(authors: [PublicKey.fixture("author")], kinds: [.textNote])
 
-        _ = try await fetching.fetch(filters: [Filter(kinds: [.textNote])], from: [relayA], timeout: .seconds(3))
+        _ = try await fetching.fetch(filters: [filter], route: .relays([relayA]))
+        _ = try await fetching.fetch(filters: [filter], route: .outbox)
 
-        let recorded = try await onlyFetch(stub)
-        #expect(recorded.relayURLs == [relayA])
-        #expect(recorded.timeout == .seconds(3))
+        let recorded = await stub.fetches
+        #expect(recorded.map(\.route) == [.relays([relayA]), .outbox])
+        #expect(recorded.map(\.timeout) == [nil, nil])
     }
 
-    @Test("counting forwards the whole pool or the chosen relays, with the timeout")
-    func countShortForms() async throws {
+    @Test("counting forwards the whole pool by default or the given route, with the default timeout")
+    func countShortForm() async throws {
         let stub = try makeStub(cannedCount: 42)
         let fetching: any NostrEventFetching = stub
         let filter = Filter(kinds: [.textNote])
 
         let total = try await fetching.countEvents(matching: [filter])
-        let scoped = try await fetching.countEvents(matching: [filter], from: [relayB], timeout: .seconds(1))
+        let scoped = try await fetching.countEvents(matching: [filter], route: .relays([relayB]))
 
         let recorded = await stub.counts
         #expect(total == 42 && scoped == 42)
         #expect(recorded.map(\.filters) == [[filter], [filter]])
-        #expect(recorded.map(\.relayURLs) == [nil, [relayB]])
-        #expect(recorded.map(\.timeout) == [nil, .seconds(1)])
+        #expect(recorded.map(\.route) == [.pool, .relays([relayB])])
+        #expect(recorded.map(\.timeout) == [nil, nil])
     }
 
     // MARK: - Fetch conveniences
@@ -341,7 +345,7 @@ struct EventCapabilityTests {
 
         let recorded = try await onlyFetch(stub)
         #expect(recorded.filters == [Filter(ids: [wanted.id])])
-        #expect(recorded.relayURLs == nil)
+        #expect(recorded.route == .pool)
         #expect(recorded.timeout == .seconds(2))
         #expect(fetched == wanted)
     }
@@ -374,7 +378,7 @@ struct EventCapabilityTests {
 
         let recorded = try await onlyFetch(stub)
         #expect(recorded.filters == [.metadata(publicKeys: [author.publicKey])])
-        #expect(recorded.relayURLs == nil)
+        #expect(recorded.route == .pool)
         #expect(recorded.timeout == nil)
         #expect(metadata?.name == "New")
     }
@@ -394,7 +398,7 @@ struct EventCapabilityTests {
         expected[tag: "d"] = ["essay"]
         let recorded = try await onlyFetch(stub)
         #expect(recorded.filters == [expected])
-        #expect(recorded.relayURLs == nil)
+        #expect(recorded.route == .pool)
         #expect(recorded.timeout == .seconds(4))
         #expect(article?.title == "Wanted")
     }
@@ -414,7 +418,7 @@ struct EventCapabilityTests {
         expected[tag: "d"] = ["essay"]
         let recorded = try await onlyFetch(stub)
         #expect(recorded.filters == [expected])
-        #expect(recorded.relayURLs == [relayA, relayB])
+        #expect(recorded.route == .relays([relayA, relayB]))
         #expect(recorded.timeout == nil)
         #expect(fetched?.title == "Hinted")
     }
@@ -430,7 +434,7 @@ struct EventCapabilityTests {
         let fetched = try await stub.fetchLongFormContent(naddr: naddr, timeout: .seconds(2))
 
         let recorded = await stub.fetches
-        #expect(recorded.map(\.relayURLs) == [[relayB], nil])
+        #expect(recorded.map(\.route) == [.relays([relayB]), .pool])
         #expect(recorded.map(\.timeout) == [.seconds(2), .seconds(2)])
         #expect(recorded[0].filters == recorded[1].filters)
         #expect(fetched?.title == "Fallback")
@@ -449,7 +453,7 @@ struct EventCapabilityTests {
         let fetched = try await stub.fetchLongFormContent(naddr: naddr)
 
         let recorded = try await onlyFetch(stub)
-        #expect(recorded.relayURLs == nil)
+        #expect(recorded.route == .pool)
         #expect(fetched?.title == "Unhinted")
     }
 }

@@ -23,46 +23,6 @@ extension NostrRelayRouting {
         try await publishRelayList(relayList, strategy: nil)
     }
 
-    /// Subscribes to authors on their own WRITE relays (the NIP-65 outbox model), with no limit on
-    /// the stored events each relay sends. See
-    /// ``NostrRelayRouting/subscribeOutbox(authors:kinds:limit:)-(_,_,Int?)``.
-    /// - Parameters:
-    ///   - authors: The authors to follow.
-    ///   - kinds: The event kinds to receive (default: text notes).
-    /// - Returns: The subscription.
-    public func subscribeOutbox(
-        authors: [PublicKey],
-        kinds: [Event.Kind] = [.textNote]
-    ) async throws(RelayPool.Error) -> SubscriptionSequence {
-        try await subscribeOutbox(authors: authors, kinds: kinds, limit: nil)
-    }
-
-    /// Subscribes to authors on their own WRITE relays (the NIP-65 outbox model), with each relay
-    /// sending up to `limit` stored events before live ones. See
-    /// ``NostrRelayRouting/subscribeOutbox(authors:kinds:limit:)-(_,_,Int?)``.
-    /// - Parameters:
-    ///   - authors: The authors to follow.
-    ///   - kinds: The event kinds to receive (default: text notes).
-    ///   - limit: How many stored events each relay sends before live ones.
-    /// - Returns: The subscription.
-    public func subscribeOutbox(
-        authors: [PublicKey],
-        kinds: [Event.Kind] = [.textNote],
-        limit: Int
-    ) async throws(RelayPool.Error) -> SubscriptionSequence {
-        try await subscribeOutbox(authors: authors, kinds: kinds, limit: Optional(limit))
-    }
-
-    /// Publishes a signed event using the NIP-65 gossip model, waiting for the pool config's
-    /// ``RelayPoolConfig/defaultPublishStrategy``. See
-    /// ``NostrRelayRouting/publishGossip(_:strategy:)``.
-    /// - Parameter event: The already-signed event to route.
-    /// - Returns: The per-relay outcome of the publish.
-    @discardableResult
-    public func publishGossip(_ event: Event) async throws -> PublishResult {
-        try await publishGossip(event, strategy: nil)
-    }
-
     /// Fetches a user's NIP-17 DM relay list (kind 10050) from the whole pool, caching it (newer
     /// wins), waiting up to ``RelayPoolConfig/queryTimeout``. See
     /// ``NostrRelayRouting/fetchDirectMessageRelayList(for:timeout:)``.

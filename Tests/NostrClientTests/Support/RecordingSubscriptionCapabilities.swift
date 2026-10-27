@@ -6,16 +6,16 @@ import NostrCore
 /// primitives: it records every call and answers each subscribe with a finished sequence of canned
 /// items, so the protocol extension can be exercised without a relay pool.
 ///
-/// Targeting mimics a pool holding `pooledRelays`: a targeted subscribe none of whose relays is
-/// pooled (an empty set included) throws ``RelayPool/Error/noMatchingRelays(_:)`` after it is recorded.
+/// Targeting mimics a pool holding `pooledRelays`: a `.relays` subscribe none of whose relays
+/// is pooled (an empty set included) throws ``RelayPool/Error/noMatchingRelays(_:)`` after it is recorded.
 actor RecordingSubscriptionCapabilities: NostrSubscribing {
     struct Subscribe: Sendable {
         let filters: [Filter]
-        let relayURLs: Set<RelayURL>?
+        let route: RelayRoute
         let bufferingPolicy: AsyncStream<SubscriptionEvent>.Continuation.BufferingPolicy
     }
 
-    /// The relays a targeted subscribe may reach; nil accepts any non-empty target set.
+    /// The relays a `.relays` subscribe may reach; nil accepts any non-empty target set.
     let pooledRelays: Set<RelayURL>?
     /// What every subscription yields before it finishes.
     let cannedItems: [SubscriptionEvent]
@@ -33,11 +33,11 @@ actor RecordingSubscriptionCapabilities: NostrSubscribing {
 
     func subscribe(
         filters: [Filter],
-        to relayURLs: Set<RelayURL>?,
+        route: RelayRoute,
         bufferingPolicy: AsyncStream<SubscriptionEvent>.Continuation.BufferingPolicy
     ) async throws(RelayPool.Error) -> SubscriptionSequence {
-        subscribes.append(Subscribe(filters: filters, relayURLs: relayURLs, bufferingPolicy: bufferingPolicy))
-        try checkTargets(relayURLs)
+        subscribes.append(Subscribe(filters: filters, route: route, bufferingPolicy: bufferingPolicy))
+        try checkTargets(route)
 
         let (stream, continuation) = AsyncStream.makeStream(of: SubscriptionEvent.self)
         for item in cannedItems {
@@ -46,7 +46,7 @@ actor RecordingSubscriptionCapabilities: NostrSubscribing {
         continuation.finish()
         return SubscriptionSequence(
             id: SubscriptionID(rawValue: "stub_\(subscribes.count)"),
-            expectedRelays: relayURLs ?? pooledRelays ?? [],
+            expectedRelays: expectedRelays(for: route),
             stream: stream,
             onClose: {}
         )
@@ -62,8 +62,13 @@ actor RecordingSubscriptionCapabilities: NostrSubscribing {
 
     // MARK: - Private
 
-    private func checkTargets(_ relayURLs: Set<RelayURL>?) throws(RelayPool.Error) {
-        guard let relayURLs else { return }
+    private func expectedRelays(for route: RelayRoute) -> Set<RelayURL> {
+        if case .relays(let relayURLs) = route { return relayURLs }
+        return pooledRelays ?? []
+    }
+
+    private func checkTargets(_ route: RelayRoute) throws(RelayPool.Error) {
+        guard case .relays(let relayURLs) = route else { return }
         let reachable = pooledRelays.map { relayURLs.intersection($0) } ?? relayURLs
         guard !reachable.isEmpty else {
             throw .noMatchingRelays(relayURLs.sorted { $0.description < $1.description })
