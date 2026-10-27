@@ -17,7 +17,7 @@ import NostrCore
 ///     url: url, mimeType: "image/jpeg", encryption: encrypted, to: publicKey)
 ///
 /// // On the receiving side, after downloading the blob at `file.url`:
-/// let imageData = try EncryptedFile.decrypt(blob, key: file.decryptionKey, nonce: file.decryptionNonce)
+/// let decrypted = try EncryptedFile.decrypt(blob, key: file.decryptionKey, nonce: file.decryptionNonce)
 /// ```
 ///
 /// https://github.com/nostr-protocol/nips/blob/master/17.md

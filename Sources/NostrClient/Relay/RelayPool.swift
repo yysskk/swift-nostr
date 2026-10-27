@@ -259,8 +259,11 @@ public actor RelayPool {
     /// subset; targets not in the pool are skipped. An empty set always throws — an
     /// accidentally-empty computed target list must not fan out to the whole pool.
     ///
-    /// - Parameter timeout: How long to wait for relays to finish; `nil` uses
-    ///   ``RelayPoolConfig/queryTimeout``.
+    /// - Parameters:
+    ///   - filters: The filters whose matching events to count.
+    ///   - relayURLs: The relays to query, or nil for the whole pool.
+    ///   - timeout: How long to wait for relays to finish; `nil` uses
+    ///     ``RelayPoolConfig/queryTimeout``.
     /// - Returns: the per-relay count for every relay that answered, keyed by relay URL.
     /// - Throws: ``RelayPool/Error/emptyPool`` when the pool is empty,
     ///   ``RelayPool/Error/noMatchingRelays(_:)`` when none of the targeted URLs are in the
