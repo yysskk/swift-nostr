@@ -15,8 +15,9 @@ public struct WalletInfo: Sendable, Hashable {
     /// wallet advertises no `encryption` tag.
     public let encryptions: [WalletConnectEncryption]
 
-    /// The notification types the wallet emits (e.g. `"payment_received"`, `"payment_sent"`).
-    public let notifications: [String]
+    /// The notification types the wallet emits, in order, including types this package has no
+    /// constant for.
+    public let notifications: [WalletConnectNotificationType]
 
     /// Parses a wallet info event.
     /// - Parameter infoEvent: A kind-13194 event. Returns `nil` for any other kind.
@@ -38,7 +39,9 @@ public struct WalletInfo: Sendable, Hashable {
         }
 
         if let value = infoEvent.firstTagValue(named: "notifications") {
-            self.notifications = value.split(whereSeparator: \.isWhitespace).map(String.init)
+            self.notifications = value.split(whereSeparator: \.isWhitespace).map {
+                WalletConnectNotificationType(rawValue: String($0))
+            }
         } else {
             self.notifications = []
         }

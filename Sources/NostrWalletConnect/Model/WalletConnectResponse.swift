@@ -84,10 +84,10 @@ public struct GetInfoResult: Codable, Sendable, Hashable {
     public let blockHeight: Int64?
     /// The current block hash (hex).
     public let blockHash: String?
-    /// The methods this wallet supports.
-    public let methods: [String]
+    /// The methods this wallet supports, including methods this package has no constant for.
+    public let methods: [WalletConnectMethod]
     /// The notification types this wallet emits.
-    public let notifications: [String]?
+    public let notifications: [WalletConnectNotificationType]?
 
     enum CodingKeys: String, CodingKey {
         case alias
@@ -102,8 +102,8 @@ public struct GetInfoResult: Codable, Sendable, Hashable {
 
     public init(
         alias: String? = nil, color: String? = nil, nodePublicKey: String? = nil, network: String? = nil,
-        blockHeight: Int64? = nil, blockHash: String? = nil, methods: [String] = [],
-        notifications: [String]? = nil
+        blockHeight: Int64? = nil, blockHash: String? = nil, methods: [WalletConnectMethod] = [],
+        notifications: [WalletConnectNotificationType]? = nil
     ) {
         self.alias = alias
         self.color = color
@@ -124,8 +124,9 @@ public struct GetInfoResult: Codable, Sendable, Hashable {
         network = try container.decodeIfPresent(String.self, forKey: .network)
         blockHeight = try container.decodeIfPresent(Int64.self, forKey: .blockHeight)
         blockHash = try container.decodeIfPresent(String.self, forKey: .blockHash)
-        methods = try container.decodeIfPresent([String].self, forKey: .methods) ?? []
-        notifications = try container.decodeIfPresent([String].self, forKey: .notifications)
+        methods = try container.decodeIfPresent([WalletConnectMethod].self, forKey: .methods) ?? []
+        notifications = try container.decodeIfPresent(
+            [WalletConnectNotificationType].self, forKey: .notifications)
     }
 }
 

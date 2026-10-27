@@ -23,7 +23,7 @@ struct WalletConnectNotificationTests {
                     #"{"notification_type":"payment_received","notification":{"type":"incoming","amount":1000,"payment_hash":"aa"}}"#,
                 kind: .walletConnectNotification, client: client, wallet: wallet, scheme: .nip44))
         let received = await iterator.next()
-        #expect(received?.type == "payment_received")
+        #expect(received?.type == .paymentReceived)
         #expect(received?.transaction?.amount == 1000)
 
         await transport.emit(
@@ -32,8 +32,27 @@ struct WalletConnectNotificationTests {
                     #"{"notification_type":"payment_sent","notification":{"type":"outgoing","amount":2000,"payment_hash":"bb"}}"#,
                 kind: .walletConnectNotificationLegacy, client: client, wallet: wallet, scheme: .nip04))
         let sent = await iterator.next()
-        #expect(sent?.type == "payment_sent")
+        #expect(sent?.type == .paymentSent)
         #expect(sent?.transaction?.amount == 2000)
+    }
+
+    @Test("a notification type with no constant is kept, along with its raw payload")
+    func unknownNotificationType() throws {
+        let notification = try #require(
+            WalletConnectNotification(
+                content: #"{"notification_type":"hold_invoice_accepted","notification":{"payment_hash":"aa"}}"#))
+        #expect(notification.type == WalletConnectNotificationType(rawValue: "hold_invoice_accepted"))
+        #expect(notification.transaction == nil)
+        #expect(notification.raw["payment_hash"] == .string("aa"))
+    }
+
+    @Test("a payment notification keeps a transaction type it has no constant for")
+    func unknownTransactionTypeInNotification() throws {
+        let notification = try #require(
+            WalletConnectNotification(
+                content: #"{"notification_type":"payment_received","notification":{"type":"internal","amount":1}}"#))
+        #expect(notification.type == .paymentReceived)
+        #expect(notification.transaction?.type == TransactionType(rawValue: "internal"))
     }
 
     @Test("fetchInfo returns and caches the parsed wallet info")
@@ -152,7 +171,7 @@ struct WalletConnectNotificationTests {
             try NWCFixtures.notification(
                 notificationJSON: #"{"notification_type":"payment_received","notification":{"amount":1000}}"#,
                 kind: .walletConnectNotification, client: client, wallet: wallet, scheme: .nip44))
-        #expect(await iterator.next()?.type == "payment_received")
+        #expect(await iterator.next()?.type == .paymentReceived)
     }
 
     @Test("disconnect finishes notification streams, and one opened afterwards stays live", .timeLimit(.minutes(1)))
@@ -174,7 +193,7 @@ struct WalletConnectNotificationTests {
             try NWCFixtures.notification(
                 notificationJSON: #"{"notification_type":"payment_sent","notification":{"amount":2000}}"#,
                 kind: .walletConnectNotification, client: client, wallet: wallet, scheme: .nip44))
-        #expect(await iterator.next()?.type == "payment_sent")
+        #expect(await iterator.next()?.type == .paymentSent)
     }
 
     // MARK: - Helpers

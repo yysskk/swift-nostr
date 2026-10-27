@@ -77,7 +77,9 @@ print(payment.preimage)
 ### Transactions and Notifications
 
 - ``WalletConnectTransaction``
+- ``TransactionState``
 - ``WalletConnectNotification``
+- ``WalletConnectNotificationType``
 
 ### Wallet Info and Encryption
 

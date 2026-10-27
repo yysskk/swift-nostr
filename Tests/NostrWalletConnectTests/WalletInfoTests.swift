@@ -70,9 +70,11 @@ struct WalletInfoTests {
     @Test("parses the notifications tag")
     func parsesNotifications() throws {
         let event = infoEvent(
-            content: "pay_invoice", tags: [Event.Tag(name: "notifications", values: ["payment_received payment_sent"])])
+            content: "pay_invoice",
+            tags: [Event.Tag(name: "notifications", values: ["payment_received hold_invoice_accepted payment_sent"])])
         let info = try #require(WalletInfo(infoEvent: event))
-        #expect(info.notifications == ["payment_received", "payment_sent"])
+        let holdInvoiceAccepted = WalletConnectNotificationType(rawValue: "hold_invoice_accepted")
+        #expect(info.notifications == [.paymentReceived, holdInvoiceAccepted, .paymentSent])
     }
 
     @Test("returns nil for a non-info event")
