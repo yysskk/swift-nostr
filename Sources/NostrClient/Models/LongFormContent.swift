@@ -135,7 +135,7 @@ public struct LongFormContent: Sendable, Hashable {
         try NAddr(
             identifier: identifier,
             author: author,
-            kind: Event.Kind.longFormContent.rawValue,
+            kind: .longFormContent,
             relays: relays
         )
     }

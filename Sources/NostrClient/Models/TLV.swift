@@ -63,8 +63,8 @@ enum TLV {
     }
 
     /// Encodes an event kind as a 4-byte big-endian unsigned integer.
-    static func encodeKind(_ kind: Int) -> Data {
-        let value = UInt32(truncatingIfNeeded: kind)
+    static func encodeKind(_ kind: Event.Kind) -> Data {
+        let value = UInt32(truncatingIfNeeded: kind.rawValue)
         return Data([
             UInt8((value >> 24) & 0xFF),
             UInt8((value >> 16) & 0xFF),
@@ -75,7 +75,7 @@ enum TLV {
 
     /// Decodes a big-endian event kind, leniently accepting 1–4 bytes.
     /// - Throws: ``NIP19Entity/Error/invalidLength(_:)`` for any other length.
-    static func decodeKind(_ data: Data) throws(NIP19Entity.Error) -> Int {
+    static func decodeKind(_ data: Data) throws(NIP19Entity.Error) -> Event.Kind {
         guard (1...4).contains(data.count) else {
             throw .invalidLength(data.count)
         }
@@ -83,7 +83,7 @@ enum TLV {
         for byte in data {
             value = (value << 8) | UInt32(byte)
         }
-        return Int(value)
+        return Event.Kind(rawValue: Int(value))
     }
 
     /// The public key an `npub` payload or a ``Kind/special`` or ``Kind/author`` record carries.
@@ -117,11 +117,11 @@ enum TLV {
 
     /// Validates that an event kind fits in a 32-bit unsigned integer.
     /// - Throws: ``NIP19Entity/Error/kindOutOfRange(_:)`` otherwise.
-    static func validatedKind(_ kind: Int) throws(NIP19Entity.Error) -> Int {
+    static func validatedKind(_ kind: Event.Kind) throws(NIP19Entity.Error) -> Event.Kind {
         // `UInt32(exactly:)` rejects negative values and values above `UInt32.max`
         // without relying on an `Int` literal that would overflow on 32-bit
         // platforms such as watchOS.
-        guard UInt32(exactly: kind) != nil else {
+        guard UInt32(exactly: kind.rawValue) != nil else {
             throw .kindOutOfRange(kind)
         }
         return kind
@@ -204,7 +204,7 @@ enum TLV {
     }
 
     /// A ``Kind/kind`` record carrying a big-endian event kind.
-    static func kindRecord(_ kind: Int) -> Record {
+    static func kindRecord(_ kind: Event.Kind) -> Record {
         Record(type: Kind.kind.rawValue, value: encodeKind(kind))
     }
 }

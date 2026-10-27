@@ -201,7 +201,7 @@ struct HTTPAuthValidationTests {
             publicKey: original.publicKey,
             createdAt: original.createdAt,
             kind: original.kind,
-            tags: [.url("https://evil.example.com/"), .method("GET")],
+            tags: [.url(URL(string: "https://evil.example.com/")!), .method("GET")],
             content: original.content,
             signature: original.signature
         )

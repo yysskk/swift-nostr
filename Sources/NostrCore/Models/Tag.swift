@@ -253,8 +253,8 @@ extension Tag {
     /// A "u" tag carrying the absolute request URL, including any query
     /// parameters, of a NIP-98 HTTP authorization event.
     /// https://github.com/nostr-protocol/nips/blob/master/98.md
-    public static func url(_ url: String) -> Tag {
-        Tag(name: .url, values: [url])
+    public static func url(_ url: URL) -> Tag {
+        Tag(name: .url, values: [url.absoluteString])
     }
 
     /// A "method" tag carrying the HTTP request method of a NIP-98 HTTP
@@ -312,8 +312,8 @@ extension Tag {
     }
 
     /// An "r" tag carrying a URL reference.
-    public static func reference(_ url: String) -> Tag {
-        Tag(name: .reference, values: [url])
+    public static func reference(_ url: URL) -> Tag {
+        Tag(name: .reference, values: [url.absoluteString])
     }
 
     /// An "h" tag scoping an event to a NIP-29 group. Required on everything a user sends

@@ -106,7 +106,7 @@ public struct NostrListSet: Sendable, Hashable {
     /// - Throws: ``NIP19Entity/Error/fieldTooLong(_:)`` if a relay hint's canonical form is longer
     ///   than 255 bytes.
     public func naddr(author: PublicKey, relays: [RelayURL] = []) throws(NIP19Entity.Error) -> NAddr {
-        try NAddr(identifier: identifier, author: author, kind: kind.rawValue, relays: relays)
+        try NAddr(identifier: identifier, author: author, kind: kind, relays: relays)
     }
 
     /// An error reading or building a NIP-51 set.

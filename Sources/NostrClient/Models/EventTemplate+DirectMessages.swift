@@ -62,7 +62,7 @@ extension EventTemplate {
     ///   - recipientPublicKey: The recipient, named by the `p` tag.
     /// - Returns: The template for the file message.
     public static func fileMessage(
-        url: String,
+        url: URL,
         mimeType: String,
         encryption: EncryptedFile,
         size: Int? = nil,
@@ -88,6 +88,6 @@ extension EventTemplate {
         if let blurhash {
             tags.append(Tag(name: "blurhash", values: [blurhash]))
         }
-        return EventTemplate(kind: .fileMessage, tags: tags, content: url)
+        return EventTemplate(kind: .fileMessage, tags: tags, content: url.absoluteString)
     }
 }

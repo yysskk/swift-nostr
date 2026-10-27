@@ -174,7 +174,8 @@ struct MessagingCapabilityTests {
         let file = try encryptedFile()
 
         try await messaging.sendFile(
-            url: "https://files.example.com/blob", mimeType: "image/jpeg", encryption: file, to: alice.publicKey)
+            url: URL(string: "https://files.example.com/blob")!, mimeType: "image/jpeg", encryption: file,
+            to: alice.publicKey)
 
         let recorded = try await onlySend(stub)
         #expect(recorded.template.kind == .fileMessage)
@@ -202,7 +203,7 @@ struct MessagingCapabilityTests {
         let expiry = Timestamp(rawValue: 2_000_000_000)
 
         try await messaging.sendFile(
-            url: "https://files.example.com/blob", mimeType: "image/png", encryption: file, size: 1024,
+            url: URL(string: "https://files.example.com/blob")!, mimeType: "image/png", encryption: file, size: 1024,
             dimensions: "640x480", blurhash: "LEHV6nWB2yk8", to: alice.publicKey, expiration: expiry,
             strategy: .firstAck)
 
@@ -228,7 +229,8 @@ struct MessagingCapabilityTests {
         let reaction = try await fromAlice.createReactionWithSelfCopy(
             reaction: "🤙", to: .fixture("message"), author: bob.publicKey, recipientPublicKey: bob.publicKey)
         let file = try await fromAlice.createFileMessageWithSelfCopy(
-            url: "https://files.example.com/blob", mimeType: "image/jpeg", encryption: try encryptedFile(),
+            url: URL(string: "https://files.example.com/blob")!, mimeType: "image/jpeg",
+            encryption: try encryptedFile(),
             to: bob.publicKey)
 
         let parsedMessage = try await messaging.parse(message.recipientGiftWrap)
@@ -239,7 +241,7 @@ struct MessagingCapabilityTests {
         #expect(parsedMessage.senderPublicKey == alice.publicKey)
         #expect(parsedReaction.content == "🤙")
         #expect(parsedReaction.messageID == .fixture("message"))
-        #expect(parsedFile.url == "https://files.example.com/blob")
+        #expect(parsedFile.url == URL(string: "https://files.example.com/blob"))
         #expect(
             await stub.parsedGiftWraps.map(\.id) == [
                 message.recipientGiftWrap.id, reaction.recipientGiftWrap.id, file.recipientGiftWrap.id,
@@ -288,7 +290,8 @@ struct MessagingCapabilityTests {
         let reaction = try await fromAlice.createReactionWithSelfCopy(
             to: message.rumor.id, author: alice.publicKey, recipientPublicKey: bob.publicKey)
         let file = try await fromAlice.createFileMessageWithSelfCopy(
-            url: "https://files.example.com/blob", mimeType: "image/jpeg", encryption: try encryptedFile(),
+            url: URL(string: "https://files.example.com/blob")!, mimeType: "image/jpeg",
+            encryption: try encryptedFile(),
             to: bob.publicKey)
         let foreign = try await fromAlice.createMessageWithSelfCopy(content: "not for bob", to: alice.publicKey)
         let second = try await fromAlice.createMessageWithSelfCopy(content: "second", to: bob.publicKey)
@@ -327,7 +330,8 @@ struct MessagingCapabilityTests {
         let reaction = try await fromAlice.createReactionWithSelfCopy(
             to: message.rumor.id, author: alice.publicKey, recipientPublicKey: bob.publicKey)
         let file = try await fromAlice.createFileMessageWithSelfCopy(
-            url: "https://files.example.com/blob", mimeType: "image/jpeg", encryption: try encryptedFile(),
+            url: URL(string: "https://files.example.com/blob")!, mimeType: "image/jpeg",
+            encryption: try encryptedFile(),
             to: bob.publicKey)
         let stub = makeStub(cannedGiftWraps: [
             message.recipientGiftWrap, reaction.recipientGiftWrap, file.recipientGiftWrap,

@@ -111,16 +111,16 @@ struct NIP51SimpleGroupListTests {
         let unknown = Event.Tag(name: "client", values: ["nostrapp"])
         let malformedGroup = Event.Tag(rawArray: ["group", ""])
         let markedRelay = Event.Tag(name: "r", values: ["wss://marked.example.com", "read"])
-        let malformedRelay = Event.Tag.reference("https://not-a-relay.example.com")
+        let malformedRelay = Event.Tag.reference(URL(string: "https://not-a-relay.example.com")!)
         let list = NostrList(
             kind: .simpleGroupList,
             publicItems: [
                 .simpleGroup(id: groupID, relayURL: groupRelay, name: "Cooking"),
                 unknown,
-                .reference(groupRelay.description),
+                .reference(groupRelay.url),
                 .simpleGroup(id: "012345", relayURL: RelayURL("wss://other.example.com")!),
                 malformedGroup,
-                .reference("wss://other.example.com"),
+                .reference(URL(string: "wss://other.example.com")!),
                 markedRelay,
                 malformedRelay,
             ]
@@ -145,7 +145,7 @@ struct NIP51SimpleGroupListTests {
         let original = NostrList(
             kind: .simpleGroupList,
             publicItems: [
-                .reference(groupRelay.description),
+                .reference(groupRelay.url),
                 Event.Tag(name: "client", values: ["nostrapp"]),
                 .simpleGroup(id: groupID, relayURL: groupRelay, name: "Cooking"),
                 malformedGroup,
@@ -165,7 +165,7 @@ struct NIP51SimpleGroupListTests {
             rebuilt.publicItems == [
                 Event.Tag.simpleGroup(id: groupID, relayURL: groupRelay, name: "Cooking"),
                 .simpleGroup(id: "012345", relayURL: RelayURL("wss://other.example.com")!),
-                .reference(groupRelay.description),
+                .reference(groupRelay.url),
                 Event.Tag(name: "client", values: ["nostrapp"]),
                 malformedGroup,
             ]
@@ -379,7 +379,7 @@ struct NIP51SimpleGroupListClientTests {
         #expect(
             sentFirst.tags == [
                 .simpleGroup(id: groupID, relayURL: groupRelay, name: "Cooking"),
-                .reference(groupRelay.description),
+                .reference(groupRelay.url),
             ]
         )
         #expect(sentFirst.content == "")

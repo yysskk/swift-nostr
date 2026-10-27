@@ -199,7 +199,8 @@ struct EventTemplateClientTests {
         let file = EncryptedFile.encrypt(Data("file bytes".utf8))
 
         let template = EventTemplate.fileMessage(
-            url: "https://files.example.com/blob", mimeType: "image/jpeg", encryption: file, to: .fixture("bob"))
+            url: URL(string: "https://files.example.com/blob")!, mimeType: "image/jpeg", encryption: file,
+            to: .fixture("bob"))
 
         #expect(template.kind == .fileMessage)
         #expect(template.content == "https://files.example.com/blob")
@@ -218,7 +219,7 @@ struct EventTemplateClientTests {
     @Test("fileMessage appends size, dimensions, and blurhash in that order")
     func fileMessageOptionalTags() throws {
         let template = EventTemplate.fileMessage(
-            url: "https://files.example.com/blob", mimeType: "image/png",
+            url: URL(string: "https://files.example.com/blob")!, mimeType: "image/png",
             encryption: EncryptedFile.encrypt(Data("file bytes".utf8)), size: 1024, dimensions: "640x480",
             blurhash: "LEHV6nWB2yk8", to: .fixture("bob"))
 
@@ -240,7 +241,8 @@ struct EventTemplateClientTests {
             .directMessage("hi", to: .fixture("bob"), subject: "s", replyTo: .fixture("parent")),
             .directMessageReaction(to: .fixture("message"), author: .fixture("bob"), content: "-"),
             .fileMessage(
-                url: "https://files.example.com/blob", mimeType: "image/jpeg", encryption: file, to: .fixture("bob")),
+                url: URL(string: "https://files.example.com/blob")!, mimeType: "image/jpeg", encryption: file,
+                to: .fixture("bob")),
         ]
 
         let rumors = [
@@ -251,7 +253,8 @@ struct EventTemplateClientTests {
                 reaction: "-", to: .fixture("message"), author: .fixture("bob"), recipientPublicKey: .fixture("bob")
             ).rumor,
             try await builder.createFileMessageWithSelfCopy(
-                url: "https://files.example.com/blob", mimeType: "image/jpeg", encryption: file, to: .fixture("bob")
+                url: URL(string: "https://files.example.com/blob")!, mimeType: "image/jpeg", encryption: file,
+                to: .fixture("bob")
             ).rumor,
         ]
 

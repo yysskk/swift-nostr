@@ -136,10 +136,10 @@ struct FetchVerificationTests {
 
         let real = try signed(
             victim, kind: .relayListMetadata, createdAt: Timestamp(rawValue: 1_700_000_000),
-            tags: [.reference("wss://real.example.com")])
+            tags: [.reference(URL(string: "wss://real.example.com")!)])
         let forgery = try forged(
             claiming: victim.publicKey, kind: .relayListMetadata, createdAt: Timestamp(rawValue: 2_000_000_000),
-            tags: [.reference("wss://attacker.example.com")])
+            tags: [.reference(URL(string: "wss://attacker.example.com")!)])
 
         let list = try await answering(socket, with: [real, forgery]) {
             try await client.routing.fetchRelayList(for: victim.publicKey)

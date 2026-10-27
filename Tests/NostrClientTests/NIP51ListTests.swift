@@ -44,7 +44,7 @@ struct NIP51ListTests {
 
     @Test("reference tag")
     func referenceTag() {
-        #expect(Event.Tag.reference("https://x").rawArray == ["r", "https://x"])
+        #expect(Event.Tag.reference(URL(string: "https://x")!).rawArray == ["r", "https://x"])
     }
 
     // MARK: - list(_:encryptingWith:) / init(event:decryptingWith:) round-trip

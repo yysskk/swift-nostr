@@ -751,6 +751,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   from an already-cancelled task is not sent; `awaitConnection()` previously ignored cancellation.
   `RemoteSigner(bunker:)` no longer throws. `payZap(...)` stays untyped: it also throws
   `LNURLPayResponse.InvoiceError`.
+- **NIP-19 and NIP-11 kinds are `Event.Kind`** (breaking): `NAddr.kind`, `NEvent.kind`, their
+  initializers, `NIP19Entity.Error.kindOutOfRange`, `RelayInformation.FeeSchedule.kinds`, and the
+  `RelayInformation.KindSpec` cases `.single` and `.range`. The wire format is unchanged.
+- **Protocol URLs are `URL`** (breaking): `RelayInformation`'s `banner`, `icon`, `termsOfService`,
+  `postingPolicy`, and `paymentsURL`; `LNURLPayResponse.callback`; `DirectMessageFile.url` and the
+  `url:` of `EventTemplate.fileMessage`, `createFileMessageWithSelfCopy`, and `sendFile`; and
+  `Tag.url(_:)` and `Tag.reference(_:)`. Each is written as its `absoluteString`. A NIP-11 URL that
+  does not parse decodes as nil, an LNURL-pay response whose `callback` does not parse fails to
+  decode, and a file message whose content does not parse is rejected with
+  `DirectMessagePayload.Error.invalidFileURL`, which replaces `missingFileURL`.
 
 ### Fixed
 

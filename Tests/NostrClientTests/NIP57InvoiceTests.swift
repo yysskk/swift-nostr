@@ -10,7 +10,7 @@ struct NIP57InvoiceTests {
 
     private func makePayResponse(minimum: Int64 = 1000, maximum: Int64 = 100_000_000) -> LNURLPayResponse {
         LNURLPayResponse(
-            callback: "https://example.com/lnurl/cb", minimumSendable: minimum, maximumSendable: maximum,
+            callback: URL(string: "https://example.com/lnurl/cb")!, minimumSendable: minimum, maximumSendable: maximum,
             allowsNostr: true, nostrPublicKey: PublicKey.fixture("np"))
     }
 

@@ -49,7 +49,7 @@ public struct DirectMessageParser: Sendable {
     /// - Parameter giftWrap: The gift-wrapped event
     /// - Returns: The parsed file message
     /// - Throws: ``DirectMessagePayload/Error/unexpectedKind(_:)`` if the inner rumor is not a
-    ///   kind-15 file message, ``DirectMessagePayload/Error/missingFileURL``,
+    ///   kind-15 file message, ``DirectMessagePayload/Error/invalidFileURL``,
     ///   ``DirectMessagePayload/Error/invalidDecryptionKey``, or
     ///   ``DirectMessagePayload/Error/invalidDecryptionNonce`` if it lacks a URL or a valid
     ///   decryption key or nonce, ``DirectMessagePayload/Error/invalidRecipient`` if its `p` tag is
@@ -197,10 +197,10 @@ public struct DirectMessageParser: Sendable {
     ) async throws -> DirectMessageFile {
         let rumor = unwrapped.event
 
-        // A file message must carry a non-empty URL plus a decodable AES-256 key (32 bytes) and
-        // GCM nonce (12 bytes); reject malformed events here rather than failing later at decrypt.
-        guard !rumor.content.isEmpty else {
-            throw DirectMessagePayload.Error.missingFileURL
+        // A file message must carry a URL plus a decodable AES-256 key (32 bytes) and GCM nonce
+        // (12 bytes); reject malformed events here rather than failing later at decrypt.
+        guard let url = URL(string: rumor.content) else {
+            throw DirectMessagePayload.Error.invalidFileURL
         }
         guard
             let key = rumor.firstTagValue(named: "decryption-key").flatMap({ Data(base64Encoded: $0) }),
@@ -221,7 +221,7 @@ public struct DirectMessageParser: Sendable {
             rumorID: rumor.id,
             senderPublicKey: unwrapped.senderPublicKey,
             recipientPublicKey: recipientPublicKey,
-            url: rumor.content,
+            url: url,
             mimeType: rumor.firstTagValue(named: "file-type"),
             decryptionKey: key,
             decryptionNonce: nonce,

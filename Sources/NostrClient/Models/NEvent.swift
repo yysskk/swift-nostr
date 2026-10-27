@@ -16,14 +16,14 @@ public struct NEvent: Sendable, Hashable {
     public let author: PublicKey?
 
     /// The event kind, if known.
-    public let kind: Int?
+    public let kind: Event.Kind?
 
     /// Creates an event reference.
     /// - Throws: ``NIP19Entity/Error/fieldTooLong(_:)`` if a relay hint's canonical form is longer
     ///   than 255 bytes, or ``NIP19Entity/Error/kindOutOfRange(_:)`` if `kind` does not fit in a
     ///   32-bit unsigned integer.
     public init(
-        eventID: EventID, relays: [RelayURL] = [], author: PublicKey? = nil, kind: Int? = nil
+        eventID: EventID, relays: [RelayURL] = [], author: PublicKey? = nil, kind: Event.Kind? = nil
     ) throws(NIP19Entity.Error) {
         self.eventID = eventID
         self.relays = try TLV.validatedRelays(relays)
@@ -47,14 +47,14 @@ public struct NEvent: Sendable, Hashable {
     ///   than 255 bytes, or ``NIP19Entity/Error/kindOutOfRange(_:)`` if the event's kind does not
     ///   fit in a 32-bit unsigned integer.
     public init(event: Event, relays: [RelayURL] = []) throws(NIP19Entity.Error) {
-        try self.init(eventID: event.id, relays: relays, author: event.publicKey, kind: event.kind.rawValue)
+        try self.init(eventID: event.id, relays: relays, author: event.publicKey, kind: event.kind)
     }
 
     init(tlvData: Data) throws(NIP19Entity.Error) {
         var eventID: EventID?
         var relays: [RelayURL] = []
         var author: PublicKey?
-        var kind: Int?
+        var kind: Event.Kind?
         for record in try TLV.decode(tlvData) {
             switch record.type {
             case TLV.Kind.special.rawValue:

@@ -123,7 +123,7 @@ extension NostrListManaging {
     /// - Returns: The set, or nil if none was found.
     public func fetchSet(naddr: NAddr, timeout: Duration? = nil) async throws -> NostrListSet? {
         try await fetchSet(
-            kind: Event.Kind(rawValue: naddr.kind),
+            kind: naddr.kind,
             identifier: naddr.identifier,
             for: Optional(naddr.author),
             timeout: timeout

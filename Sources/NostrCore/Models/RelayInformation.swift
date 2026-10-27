@@ -21,10 +21,10 @@ public struct RelayInformation: Codable, Sendable, Hashable {
     public var description: String?
 
     /// URL to a banner image for the relay.
-    public var banner: String?
+    public var banner: URL?
 
     /// URL to an icon image for the relay (preferably square).
-    public var icon: String?
+    public var icon: URL?
 
     /// The administrator's public key.
     ///
@@ -49,7 +49,7 @@ public struct RelayInformation: Codable, Sendable, Hashable {
     public var version: String?
 
     /// URL to the relay's terms of service.
-    public var termsOfService: String?
+    public var termsOfService: URL?
 
     /// Protocol-level limitations advertised by the relay.
     public var limitation: Limitation?
@@ -64,10 +64,10 @@ public struct RelayInformation: Codable, Sendable, Hashable {
     public var tags: [String]?
 
     /// URL to a posting policy document.
-    public var postingPolicy: String?
+    public var postingPolicy: URL?
 
     /// URL where users can make payments to the relay.
-    public var paymentsURL: String?
+    public var paymentsURL: URL?
 
     /// Fee schedules advertised by the relay.
     public var fees: Fees?
@@ -101,21 +101,21 @@ public struct RelayInformation: Codable, Sendable, Hashable {
     public init(
         name: String? = nil,
         description: String? = nil,
-        banner: String? = nil,
-        icon: String? = nil,
+        banner: URL? = nil,
+        icon: URL? = nil,
         publicKey: PublicKey? = nil,
         selfPublicKey: PublicKey? = nil,
         contact: String? = nil,
         supportedNIPs: [Int]? = nil,
         software: String? = nil,
         version: String? = nil,
-        termsOfService: String? = nil,
+        termsOfService: URL? = nil,
         limitation: Limitation? = nil,
         relayCountries: [String]? = nil,
         languageTags: [String]? = nil,
         tags: [String]? = nil,
-        postingPolicy: String? = nil,
-        paymentsURL: String? = nil,
+        postingPolicy: URL? = nil,
+        paymentsURL: URL? = nil,
         fees: Fees? = nil,
         retention: [Retention]? = nil
     ) {
@@ -147,34 +147,62 @@ extension RelayInformation {
     ///
     /// The document is written by the relay operator, so the two public keys are read leniently:
     /// a `pubkey` or `self` value that is not a canonical 64-digit lowercase hex public key
-    /// decodes as nil instead of failing the whole document. Every other field is decoded strictly.
+    /// decodes as nil instead of failing the whole document. Likewise, a URL field holding a string
+    /// that is not a valid URL decodes as nil. Every other field is decoded strictly.
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         func lenientPublicKey(_ key: CodingKeys) -> PublicKey? {
             (try? container.decodeIfPresent(String.self, forKey: key))?.flatMap(PublicKey.init)
         }
+        func lenientURL(_ key: CodingKeys) throws -> URL? {
+            try container.decodeIfPresent(String.self, forKey: key).flatMap { URL(string: $0) }
+        }
 
         self.init(
             name: try container.decodeIfPresent(String.self, forKey: .name),
             description: try container.decodeIfPresent(String.self, forKey: .description),
-            banner: try container.decodeIfPresent(String.self, forKey: .banner),
-            icon: try container.decodeIfPresent(String.self, forKey: .icon),
+            banner: try lenientURL(.banner),
+            icon: try lenientURL(.icon),
             publicKey: lenientPublicKey(.publicKey),
             selfPublicKey: lenientPublicKey(.selfPublicKey),
             contact: try container.decodeIfPresent(String.self, forKey: .contact),
             supportedNIPs: try container.decodeIfPresent([Int].self, forKey: .supportedNIPs),
             software: try container.decodeIfPresent(String.self, forKey: .software),
             version: try container.decodeIfPresent(String.self, forKey: .version),
-            termsOfService: try container.decodeIfPresent(String.self, forKey: .termsOfService),
+            termsOfService: try lenientURL(.termsOfService),
             limitation: try container.decodeIfPresent(Limitation.self, forKey: .limitation),
             relayCountries: try container.decodeIfPresent([String].self, forKey: .relayCountries),
             languageTags: try container.decodeIfPresent([String].self, forKey: .languageTags),
             tags: try container.decodeIfPresent([String].self, forKey: .tags),
-            postingPolicy: try container.decodeIfPresent(String.self, forKey: .postingPolicy),
-            paymentsURL: try container.decodeIfPresent(String.self, forKey: .paymentsURL),
+            postingPolicy: try lenientURL(.postingPolicy),
+            paymentsURL: try lenientURL(.paymentsURL),
             fees: try container.decodeIfPresent(Fees.self, forKey: .fees),
             retention: try container.decodeIfPresent([Retention].self, forKey: .retention)
         )
+    }
+
+    /// Encodes the document, writing each URL as its absolute string.
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encodeIfPresent(name, forKey: .name)
+        try container.encodeIfPresent(description, forKey: .description)
+        try container.encodeIfPresent(banner?.absoluteString, forKey: .banner)
+        try container.encodeIfPresent(icon?.absoluteString, forKey: .icon)
+        try container.encodeIfPresent(publicKey, forKey: .publicKey)
+        try container.encodeIfPresent(selfPublicKey, forKey: .selfPublicKey)
+        try container.encodeIfPresent(contact, forKey: .contact)
+        try container.encodeIfPresent(supportedNIPs, forKey: .supportedNIPs)
+        try container.encodeIfPresent(software, forKey: .software)
+        try container.encodeIfPresent(version, forKey: .version)
+        try container.encodeIfPresent(termsOfService?.absoluteString, forKey: .termsOfService)
+        try container.encodeIfPresent(limitation, forKey: .limitation)
+        try container.encodeIfPresent(relayCountries, forKey: .relayCountries)
+        try container.encodeIfPresent(languageTags, forKey: .languageTags)
+        try container.encodeIfPresent(tags, forKey: .tags)
+        try container.encodeIfPresent(postingPolicy?.absoluteString, forKey: .postingPolicy)
+        try container.encodeIfPresent(paymentsURL?.absoluteString, forKey: .paymentsURL)
+        try container.encodeIfPresent(fees, forKey: .fees)
+        try container.encodeIfPresent(retention, forKey: .retention)
     }
 }
 
@@ -343,7 +371,7 @@ extension RelayInformation {
         public var period: Duration?
 
         /// Event kinds this fee applies to (for publication).
-        public var kinds: [Int]?
+        public var kinds: [Event.Kind]?
 
         enum CodingKeys: String, CodingKey {
             case amount
@@ -362,7 +390,7 @@ extension RelayInformation {
             amount: Int? = nil,
             unit: String? = nil,
             period: Duration? = nil,
-            kinds: [Int]? = nil
+            kinds: [Event.Kind]? = nil
         ) {
             self.amount = amount
             self.unit = unit
@@ -378,7 +406,7 @@ extension RelayInformation {
                 amount: try container.decodeIfPresent(Int.self, forKey: .amount),
                 unit: try container.decodeIfPresent(String.self, forKey: .unit),
                 period: try container.decodeIfPresent(Int.self, forKey: .period).map(Duration.seconds),
-                kinds: try container.decodeIfPresent([Int].self, forKey: .kinds))
+                kinds: try container.decodeIfPresent([Event.Kind].self, forKey: .kinds))
         }
 
         /// Encodes the fee entry, writing `period` as whole seconds truncated toward zero.
@@ -450,18 +478,18 @@ extension RelayInformation {
     /// integers and two-element arrays, e.g. `[0, 1, [5, 7]]`.
     public enum KindSpec: Codable, Sendable, Hashable {
         /// A single event kind.
-        case single(Int)
+        case single(Event.Kind)
 
         /// An inclusive range `[lower, upper]` of event kinds.
-        case range(Int, Int)
+        case range(Event.Kind, Event.Kind)
 
         public init(from decoder: any Decoder) throws {
             let container = try decoder.singleValueContainer()
-            if let value = try? container.decode(Int.self) {
+            if let value = try? container.decode(Event.Kind.self) {
                 self = .single(value)
                 return
             }
-            if let array = try? container.decode([Int].self), array.count == 2 {
+            if let array = try? container.decode([Event.Kind].self), array.count == 2 {
                 self = .range(array[0], array[1])
                 return
             }

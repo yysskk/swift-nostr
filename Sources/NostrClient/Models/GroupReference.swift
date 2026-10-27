@@ -55,8 +55,8 @@ public struct GroupReference: Sendable, Hashable {
     ///   39000, or ``GroupReference/Error/missingRelay`` unless it carries at least one valid relay
     ///   hint — a group without a relay is unusable.
     public init(naddr: NAddr, inviteCode: String? = nil) throws(GroupReference.Error) {
-        guard naddr.kind == Event.Kind.groupMetadata.rawValue else {
-            throw .unexpectedKind(Event.Kind(rawValue: naddr.kind))
+        guard naddr.kind == .groupMetadata else {
+            throw .unexpectedKind(naddr.kind)
         }
         guard let relayURL = naddr.relays.first else {
             throw .missingRelay
@@ -115,7 +115,7 @@ public struct GroupReference: Sendable, Hashable {
             return try NAddr(
                 identifier: id,
                 author: relayPublicKey,
-                kind: Event.Kind.groupMetadata.rawValue,
+                kind: .groupMetadata,
                 relays: [relayURL]
             )
         } catch {

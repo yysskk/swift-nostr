@@ -105,7 +105,7 @@ public enum NIP19Entity: Sendable, Hashable {
         /// A field is longer than the 255 bytes a TLV record can hold (payload: its byte count).
         case fieldTooLong(Int)
         /// The event kind does not fit in a 32-bit unsigned integer (payload: the kind).
-        case kindOutOfRange(Int)
+        case kindOutOfRange(Event.Kind)
         /// ``NIP19Entity/nsec(_:)`` does not hold a hexadecimal string.
         case invalidHex
         /// The string does not start with the `nostr:` scheme.

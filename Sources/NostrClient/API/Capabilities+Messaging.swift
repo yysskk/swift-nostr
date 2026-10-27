@@ -150,7 +150,7 @@ extension NostrMessaging {
     /// - Returns: The shared rumor, both gift wraps, and the per-relay publish outcomes.
     @discardableResult
     public func sendFile(
-        url: String,
+        url: URL,
         mimeType: String,
         encryption: EncryptedFile,
         size: Int? = nil,

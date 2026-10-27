@@ -96,7 +96,7 @@ struct NIP51SetTests {
             title: "Reading list",
             imageURL: "https://example.com/cover.png",
             description: "Things to read later",
-            publicItems: [.hashtag("nostr"), .reference("https://example.com")]
+            publicItems: [.hashtag("nostr"), .reference(URL(string: "https://example.com")!)]
         )
 
         let template = try await EventTemplate.set(set, encryptingWith: FailingSigner())
