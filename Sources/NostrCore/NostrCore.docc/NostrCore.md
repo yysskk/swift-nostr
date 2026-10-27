@@ -28,6 +28,7 @@ try event.verify()
 - ``EventTemplate``
 - ``UnsignedEvent``
 - ``EventID``
+- ``EventCoordinate``
 - ``Signature``
 - ``Timestamp``
 - ``Tag``

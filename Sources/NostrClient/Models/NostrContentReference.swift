@@ -86,12 +86,7 @@ public struct NostrContentReference: Sendable, Hashable {
         case .nevent(let event):
             return .quote(event.eventID, relayURL: event.relays.first, publicKey: event.author)
         case .naddr(let addr):
-            return .address(
-                kind: Event.Kind(rawValue: addr.kind),
-                publicKey: addr.author,
-                identifier: addr.identifier,
-                relayURL: addr.relays.first
-            )
+            return .address(addr.coordinate, relayURL: addr.relays.first)
         case .nsec:
             // Unreachable: the initializer rejects nsec, so a stored entity is never a private key.
             preconditionFailure("NostrContentReference never stores an nsec entity")

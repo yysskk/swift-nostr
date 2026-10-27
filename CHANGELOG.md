@@ -38,6 +38,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `advanced(by:)` and `duration(to:)` do `Duration` arithmetic without going through `Date`:
   advancing drops the sub-second part of the duration (truncating toward zero) and saturates at the
   bounds of `Int64` instead of trapping.
+- **`EventCoordinate` is a typed event coordinate**: the `kind`, `publicKey`, and `identifier` that
+  address a replaceable or addressable event. Its `description` and JSON encoding are NIP-01's
+  `<kind>:<pubkey>:<identifier>`; the failable `init?(_:)` splits at the first two colons only, so an
+  identifier may contain `:`, and returns nil for a missing part, a non-canonical kind, or a
+  non-canonical public key, and decoding such a string fails with `DecodingError.dataCorrupted`.
+  `Event.coordinate` gives an event's coordinate (nil unless its kind is replaceable or addressable),
+  and `NAddr.coordinate` an `naddr`'s, without its relay hints.
 - **One-shot fetches and counts take their default timeout from configuration**:
   `RelayPoolConfig.queryTimeout` is how long a fetch or count through `NostrClient` or `RelayPool`
   waits for relays (EOSE, or COUNT) when the call passes no timeout, and
@@ -296,6 +303,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and write its hex. `Event.referencedEventIds` is renamed `referencedEventIDs` and returns
   `[EventID]`; `referencedPubkeys` returns `[PublicKey]`. Tags are written by whoever authored the
   event, so a value that is not canonical hex is skipped rather than returned.
+- **Event coordinates are `EventCoordinate`** (breaking): `Tag.address(_:relayURL:)` takes one in
+  place of `kind:publicKey:identifier:`, as does `EventTemplate.zapRequest`'s `eventCoordinate:`;
+  `Groups.PinnedItem.address`, `ZapReceipt.zappedEventCoordinate`, and
+  `NostrListSet.coordinate(author:)` carry one instead of a `String`. An "a" value that is not a valid
+  coordinate reads as nil, and a pin list skips it. The wire format is unchanged.
 - **Signers deal in `PublicKey`** (breaking): `EventSigner.publicKey` and the `NostrSigning.publicKey`
   requirement are `PublicKey`, and `nip44Encrypt(_:to:)` / `nip44Decrypt(_:from:)` take one — on
   `EventSigner`, `NostrSigning`, and `RemoteSigner` alike — as do `SealedMessage.seal(_:for:using:)`

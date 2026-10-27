@@ -49,8 +49,11 @@ public struct ZapReceipt: Sendable, Hashable {
     /// the tag is not a canonical hex event id.
     public var zappedEventID: EventID? { event.firstTagValue(named: .event).flatMap(EventID.init) }
 
-    /// The coordinate of the addressable event that was zapped (the `a` tag), if any.
-    public var zappedEventCoordinate: String? { event.firstTagValue(named: .address) }
+    /// The coordinate of the addressable event that was zapped (the `a` tag), or nil if the zap
+    /// targeted no such event or the tag is not a valid coordinate.
+    public var zappedEventCoordinate: EventCoordinate? {
+        event.firstTagValue(named: .address).flatMap(EventCoordinate.init)
+    }
 
     /// The zapped amount in millisatoshis, taken from the embedded zap request's `amount` tag.
     ///

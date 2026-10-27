@@ -429,6 +429,7 @@ NIP-01 Nostr Event (struct: Codable, Identifiable, Hashable, Sendable).
 - `kind: Event.Kind` -- event kind (RawRepresentable struct, encodes as bare integer)
 - `tags: [Tag]` -- the event's tags, each encoded as its raw NIP-01 string array
 - `content: String` -- arbitrary string content
+- `coordinate: EventCoordinate?` -- for a replaceable (empty identifier) or addressable (`d` tag) kind, else nil
 - `signature: Signature?` -- Schnorr signature, the `sig` field on the wire; `nil` for an unsigned NIP-59 rumor, which encodes without `sig` (decoding treats a missing or empty `sig` as `nil`). A malformed `id`, `pubkey`, or `sig` fails decoding, so a relay frame carrying one is dropped. `verify()` throws `Event.VerificationError`: `idMismatch` when the id is not the hash of the other fields, `missingSignature` for a rumor, `invalidSignature` when the signature does not verify; `isValid` is the same check as a `Bool`.
 
 ### Tag
@@ -449,7 +450,7 @@ Tag.identifier("my-article")     // ["d", "my-article"]
 Tag.subject("hi")                // ["subject", "hi"]
 Tag.word("spam")                 // ["word", "spam"] (NIP-51 muted word)
 Tag.quote(id, publicKey: pk)        // ["q", id, "", pk] (NIP-18; optional relayURL:)
-Tag.address(kind: .longFormContent, publicKey: pk, identifier: "d")  // ["a", "30023:<pk>:d"] (optional relayURL:)
+Tag.address(coordinate)          // ["a", "30023:<pk>:d"] (EventCoordinate; optional relayURL:)
 Tag.reference("https://x")       // ["r", "https://x"]
 Tag.group("abcdef")              // ["h", "abcdef"] (NIP-29 group scope, on everything a user sends)
 Tag.previous(["12345678"])       // ["previous", ref...] (NIP-29 timeline references)
@@ -560,7 +561,7 @@ EventTemplate.deletion(of: [event.id], reason: "mistake")    // kind 5, one e ta
 EventTemplate.clientAuthentication(relayURL: relay, challenge: "challenge")  // kind 22242 (NIP-42)
 try EventTemplate.zapRequest(                                // kind 9734 (NIP-57); throws ZapRequestError.missingRelays for no relays
     to: recipient, relays: [relay], amountMillisats: 21_000, lnurl: lnurl,
-    eventID: nil, eventCoordinate: nil, comment: "great post")
+    eventID: nil, eventCoordinate: nil, comment: "great post")  // eventCoordinate: EventCoordinate?
 EventTemplate.httpAuthorization(url: url, method: "post", payload: body)  // kind 27235 (NIP-98)
 EventTemplate.groupJoinRequest(groupID: "abcdef")           // NIP-29 group factories: see Groups
 
@@ -842,6 +843,25 @@ let pk = try PublicKey(data: data)
 let id = try EventID(note: "note1...")
 let sig = try Signature(hex: "...")
 let parsed = EventID(someString)   // nil unless canonical hex
+```
+
+## EventCoordinate
+
+A replaceable or addressable event's NIP-01 coordinate (struct: Sendable, Hashable, Codable,
+LosslessStringConvertible): `kind: Event.Kind`, `publicKey: PublicKey`, `identifier: String` (the `d`
+tag value, may be empty). `description` and the JSON encoding are `<kind>:<pubkey hex>:<identifier>`;
+parsing splits at the first two colons only, so the identifier may contain `:`. `init?(_:)` returns nil
+for fewer than three parts, a kind that is not a canonical non-negative integer, or a non-canonical
+public key, and decoding such a string fails with `DecodingError.dataCorrupted`. Tag readers return nil
+for an invalid "a" value (`ZapReceipt.zappedEventCoordinate`); pin lists skip it.
+
+```swift
+let coordinate = EventCoordinate(kind: .longFormContent, publicKey: pk, identifier: "my-article")
+let parsed = EventCoordinate("30023:<pk hex>:my-article")   // nil unless valid
+Tag.address(coordinate, relayURL: relay)                    // ["a", "30023:<pk>:my-article", "wss://r"]
+event.coordinate                                            // EventCoordinate? (replaceable/addressable kinds)
+naddr.coordinate                                            // NAddr without its relay hints
+set.coordinate(author: pk)                                  // NostrListSet's coordinate
 ```
 
 ## Timestamp
@@ -1389,7 +1409,7 @@ let meta = try Groups.Metadata(event: e39000, relayPublicKey: relayPublicKey)
 let admins = try Groups.AdminList(event: e39001)   // .admins: [Groups.Admin] (PublicKey + roles)
 let members = try Groups.MemberList(event: e39002) // .members: [PublicKey]; may be partial or withheld
 let roles = try Groups.RoleList(event: e39003)     // .roles: [Groups.Role] (name + description?)
-let pins = try Groups.PinList(event: e39005)       // .items: [Groups.PinnedItem] (.event(id: EventID) / .address)
+let pins = try Groups.PinList(event: e39005)       // .items: [Groups.PinnedItem] (.event(id:) / .address(EventCoordinate))
 ```
 
 LiveKit AV rooms (kind 39004 and the .well-known JWT flow) are not modeled — only the

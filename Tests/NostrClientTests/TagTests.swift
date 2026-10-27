@@ -107,7 +107,7 @@ struct TagTests {
             (.kind(.textNote), .kind),
             (.nonce("1", target: 8), .nonce),
             (.word("spam"), .word),
-            (.address(kind: .longFormContent, publicKey: pk1, identifier: "post"), .address),
+            (.address(EventCoordinate(kind: .longFormContent, publicKey: pk1, identifier: "post")), .address),
             (.reference("https://example.com"), .reference),
             (.group("g"), .group),
             (.previous(["abcd1234"]), .previous),
@@ -156,9 +156,9 @@ struct TagTests {
         #expect(Event.Tag.quote(id1, relayURL: spelled).rawArray == ["q", id1.hex, "wss://r.example"])
         #expect(Event.Tag.publicKey(pk1, relayURL: spelled).rawArray == ["p", pk1.hex, "wss://r.example"])
         #expect(
-            Event.Tag.address(kind: .longFormContent, publicKey: pk1, identifier: "a", relayURL: spelled).rawArray == [
-                "a", "30023:\(pk1.hex):a", "wss://r.example",
-            ])
+            Event.Tag.address(
+                EventCoordinate(kind: .longFormContent, publicKey: pk1, identifier: "a"), relayURL: spelled
+            ).rawArray == ["a", "30023:\(pk1.hex):a", "wss://r.example"])
         #expect(Event.Tag.relay(spelled).rawArray == ["relay", "wss://r.example"])
     }
 
@@ -302,7 +302,7 @@ struct TagTests {
         #expect(Event.Tag.quote(id1).rawArray == ["q", id1.hex])
         #expect(Event.Tag.quote(id1, publicKey: pk1).rawArray == ["q", id1.hex, "", pk1.hex])
         #expect(
-            Event.Tag.address(kind: .longFormContent, publicKey: pk1, identifier: "post").rawArray
+            Event.Tag.address(EventCoordinate(kind: .longFormContent, publicKey: pk1, identifier: "post")).rawArray
                 == ["a", "30023:\(pk1.hex):post"])
     }
 }

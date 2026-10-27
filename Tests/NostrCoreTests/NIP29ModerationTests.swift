@@ -130,13 +130,14 @@ struct NIP29ModerationTemplateTests {
     }
 
     @Test("update-pin-list preserves the interleaved order of e and a items")
-    func pinListLayout() {
+    func pinListLayout() throws {
         let first = EventID.fixture("first")
         let second = EventID.fixture("second")
         let address = "39000:\(String(repeating: "b", count: 64)):abcdef"
+        let coordinate = try #require(EventCoordinate(address))
 
         let template = EventTemplate.groupModeration(
-            .updatePinList([.event(id: first), .address(address), .event(id: second)]), groupID: "abcdef")
+            .updatePinList([.event(id: first), .address(coordinate), .event(id: second)]), groupID: "abcdef")
 
         #expect(template.kind == .groupUpdatePinList)
         #expect(
@@ -289,8 +290,8 @@ struct NIP29ModerationParsingTests {
     func pinListRoundTrip() throws {
         let first = EventID.fixture("first")
         let second = EventID.fixture("second")
-        let address = "39000:\(String(repeating: "b", count: 64)):abcdef"
-        let items: [Groups.PinnedItem] = [.event(id: first), .address(address), .event(id: second)]
+        let coordinate = try #require(EventCoordinate("39000:\(String(repeating: "b", count: 64)):abcdef"))
+        let items: [Groups.PinnedItem] = [.event(id: first), .address(coordinate), .event(id: second)]
 
         let full = try Groups.ModerationRequest(
             event: try signedModeration(.updatePinList(items), previous: ["00000001"]))
@@ -378,20 +379,21 @@ struct NIP29ModerationParsingTests {
         }
     }
 
-    @Test("update-pin-list skips pinned events whose id is malformed")
-    func pinListSkipsMalformedIDs() throws {
+    @Test("update-pin-list skips pinned items whose id or coordinate is malformed")
+    func pinListSkipsMalformedItems() throws {
         let pinned = EventID.fixture("pinned")
+        let coordinate = EventCoordinate(kind: .groupMetadata, publicKey: .fixture("relay"), identifier: "abcdef")
         let event = makeEvent(
             kind: .groupUpdatePinList,
             tags: [
                 .group("abcdef"), Event.Tag(name: .event, values: ["not-an-id"]), .event(pinned),
-                Event.Tag(name: .address, values: ["39000:pubkey:abcdef"]),
+                Event.Tag(name: .address, values: ["39000:pubkey:abcdef"]), .address(coordinate),
             ]
         )
 
         #expect(
             try Groups.ModerationRequest(event: event).action
-                == .updatePinList([.event(id: pinned), .address("39000:pubkey:abcdef")]))
+                == .updatePinList([.event(id: pinned), .address(coordinate)]))
     }
 
     @Test("parse failures are thrown as the concrete ValidationError")

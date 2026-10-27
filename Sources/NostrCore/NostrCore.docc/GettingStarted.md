@@ -39,6 +39,14 @@ let id = try EventID(hex: "4cd665db042864ee600ee976d6cfcc7c5ce743859462f94a347cd
 print(id.note)
 ```
 
+A replaceable or addressable event is referenced by its ``EventCoordinate`` — kind, author, and `d`-tag identifier — written `<kind>:<pubkey>:<identifier>` in "a" tags and JSON:
+
+```swift
+let coordinate = EventCoordinate(kind: .longFormContent, publicKey: publicKey, identifier: "my-article")
+let tag = Tag.address(coordinate)   // ["a", "30023:<pubkey>:my-article"]
+let parsed = EventCoordinate("30023:\(publicKey.hex):my-article")   // nil when malformed
+```
+
 Times are ``Timestamp`` values: whole Unix seconds, kept exactly as on the wire and encoded to JSON as a bare number. ``Event/createdAt``, ``Filter/since``, ``Filter/until``, and NIP-40 expirations use it, converting to and from `Date` clamps an out-of-range value instead of trapping, and ``Timestamp/advanced(by:)`` and ``Timestamp/duration(to:)`` do arithmetic with `Duration`:
 
 ```swift
