@@ -197,9 +197,10 @@ public struct DirectMessageParser: Sendable {
     ) async throws -> DirectMessageFile {
         let rumor = unwrapped.event
 
-        // A file message must carry a URL plus a decodable AES-256 key (32 bytes) and GCM nonce
-        // (12 bytes); reject malformed events here rather than failing later at decrypt.
-        guard let url = URL(string: rumor.content) else {
+        // A file message must carry an http(s) URL plus a decodable AES-256 key (32 bytes) and GCM
+        // nonce (12 bytes); reject malformed events here rather than failing later at download or
+        // decrypt.
+        guard let url = URL(string: rumor.content), url.isWebURL else {
             throw DirectMessagePayload.Error.invalidFileURL
         }
         guard

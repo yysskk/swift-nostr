@@ -758,9 +758,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `postingPolicy`, and `paymentsURL`; `LNURLPayResponse.callback`; `DirectMessageFile.url` and the
   `url:` of `EventTemplate.fileMessage`, `createFileMessageWithSelfCopy`, and `sendFile`; and
   `Tag.url(_:)` and `Tag.reference(_:)`. Each is written as its `absoluteString`. A NIP-11 URL that
-  does not parse decodes as nil, an LNURL-pay response whose `callback` does not parse fails to
-  decode, and a file message whose content does not parse is rejected with
-  `DirectMessagePayload.Error.invalidFileURL`, which replaces `missingFileURL`.
+  does not parse decodes as nil. An LNURL-pay response whose `callback` is not an `http` or `https`
+  URL with a host fails to decode, and a file message whose content is not one is rejected with
+  `DirectMessagePayload.Error.invalidFileURL`, which replaces `missingFileURL`, so a third party
+  cannot point a download at a `file:`, `data:`, or custom-scheme URL.
 
 ### Fixed
 

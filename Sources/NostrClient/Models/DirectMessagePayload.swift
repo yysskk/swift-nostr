@@ -36,7 +36,8 @@ extension DirectMessagePayload {
         /// A reaction does not reference the message (`e`) and its author (`p`) by canonical hex
         /// id and key.
         case missingReactionTarget
-        /// A file message's content is not a URL, so there is no file to download.
+        /// A file message's content is not an `http` or `https` URL with a host, so there is no file
+        /// to download.
         case invalidFileURL
         /// A file message's `decryption-key` tag is missing or is not a base64 32-byte key.
         case invalidDecryptionKey
@@ -52,7 +53,7 @@ extension DirectMessagePayload {
             case .missingReactionTarget:
                 return "A direct message reaction must reference a message and its author"
             case .invalidFileURL:
-                return "A file message must carry the file's URL"
+                return "A file message must carry the file's http or https URL"
             case .invalidDecryptionKey:
                 return "A file message must carry a 32-byte decryption key"
             case .invalidDecryptionNonce:

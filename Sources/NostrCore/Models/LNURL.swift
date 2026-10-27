@@ -130,13 +130,14 @@ public struct LNURLPayResponse: Decodable, Sendable, Hashable {
     /// The response comes from a third-party endpoint, so `nostrPublicKey` is read leniently: a value
     /// that is not a canonical 64-digit lowercase hex public key decodes as nil rather than failing
     /// the whole response. Every other field is decoded strictly.
-    /// - Throws: `DecodingError` if a field has the wrong type, or `callback` is missing or not a URL.
+    /// - Throws: `DecodingError` if a field has the wrong type, or `callback` is missing or not an
+    ///   `http` or `https` URL with a host.
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let callback = try container.decode(String.self, forKey: .callback)
-        guard let callbackURL = URL(string: callback) else {
+        guard let callbackURL = URL(string: callback), callbackURL.isWebURL else {
             throw DecodingError.dataCorruptedError(
-                forKey: .callback, in: container, debugDescription: "callback is not a URL: \(callback)")
+                forKey: .callback, in: container, debugDescription: "callback is not an http(s) URL: \(callback)")
         }
         self.init(
             callback: callbackURL,

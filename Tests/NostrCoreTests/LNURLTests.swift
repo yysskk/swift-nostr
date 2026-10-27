@@ -121,8 +121,14 @@ struct LNURLTests {
     }
 
     /// Without a usable callback there is nowhere to request an invoice, so the response is rejected
-    /// as a whole rather than decoded into a value that can never be paid.
-    @Test("a callback that is not a URL fails the decode", arguments: ["", "http://[::1"])
+    /// as a whole rather than decoded into a value that can never be paid. Only `http` and `https`
+    /// URLs with a host are usable, so a third party cannot point the invoice request elsewhere.
+    @Test(
+        "a callback that is not an http(s) URL fails the decode",
+        arguments: [
+            "", "http://[::1", "file:///etc/passwd", "data:text/plain,hi", "lnurlp://example.com/cb", "https://",
+        ]
+    )
     func invalidCallbackFails(callback: String) {
         let json = #"{"callback": "\#(callback)", "minSendable": 1000, "maxSendable": 100000000}"#
 
