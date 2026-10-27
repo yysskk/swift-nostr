@@ -34,25 +34,25 @@ struct GiftWrappedRumorDeliveryTests {
             try await client.messages.sendGiftWrapped(template, to: recipient.publicKey)
         }
 
-        #expect(result.rumor.kind == customKind)
-        #expect(result.rumor.signature == nil)
-        #expect(result.rumor.id == UnsignedEvent(template, publicKey: sender.publicKey).computedID)
+        #expect(result.message.rumor.kind == customKind)
+        #expect(result.message.rumor.signature == nil)
+        #expect(result.message.rumor.id == UnsignedEvent(template, publicKey: sender.publicKey).computedID)
 
         let received = try await GiftWrap.unwrap(
-            giftWrap: result.recipientGiftWrap, recipient: EventSigner(keyPair: recipient))
+            giftWrap: result.message.recipientGiftWrap, recipient: EventSigner(keyPair: recipient))
         #expect(received.senderPublicKey == sender.publicKey)
-        #expect(received.event.id == result.rumor.id)
+        #expect(received.event.id == result.message.rumor.id)
         #expect(received.event.kind == customKind)
         #expect(received.event.content == template.content)
         #expect(received.event.tags == template.tags)
         #expect(received.event.signature == nil)
 
         let selfCopy = try await GiftWrap.unwrap(
-            giftWrap: result.selfGiftWrap, recipient: EventSigner(keyPair: sender))
-        #expect(selfCopy.event.id == result.rumor.id)
+            giftWrap: result.message.selfGiftWrap, recipient: EventSigner(keyPair: sender))
+        #expect(selfCopy.event.id == result.message.rumor.id)
 
         let poolRelay = ConnectedClientFixture.defaultRelayURL
-        #expect(result.recipientPublishResult?.acceptedRelays == [poolRelay])
+        #expect(result.recipientPublishResult.acceptedRelays == [poolRelay])
         #expect(result.selfCopyPublishResult?.acceptedRelays == [poolRelay])
         await client.relays.disconnect()
     }
@@ -89,8 +89,8 @@ struct GiftWrappedRumorDeliveryTests {
         let poolRelayIDs = try PublishAckSupport.eventFrames(in: sockets[0]).map {
             try PublishAckSupport.event(inFrame: $0).id
         }
-        #expect(poolRelayIDs == [result.selfGiftWrap.id])
-        #expect(result.recipientPublishResult?.acceptedRelays == [inboxURL])
+        #expect(poolRelayIDs == [result.message.selfGiftWrap.id])
+        #expect(result.recipientPublishResult.acceptedRelays == [inboxURL])
         await client.relays.disconnect()
     }
 
@@ -109,9 +109,9 @@ struct GiftWrappedRumorDeliveryTests {
             try await client.messages.sendGiftWrapped(template, to: recipient.publicKey, expiration: expiry)
         }
 
-        #expect(result.recipientGiftWrap.expiration == expiry)
-        #expect(result.selfGiftWrap.expiration == expiry)
-        #expect(result.rumor.expiration == nil)
+        #expect(result.message.recipientGiftWrap.expiration == expiry)
+        #expect(result.message.selfGiftWrap.expiration == expiry)
+        #expect(result.message.rumor.expiration == nil)
         await client.relays.disconnect()
     }
 
@@ -132,10 +132,10 @@ struct GiftWrappedRumorDeliveryTests {
                 makeTemplate(recipient: recipient.publicKey, createdAt: createdAt), to: recipient.publicKey)
         }
 
-        #expect(result.rumor.publicKey == sender.publicKey)
-        #expect(result.rumor.createdAt == createdAt)
+        #expect(result.message.rumor.publicKey == sender.publicKey)
+        #expect(result.message.rumor.createdAt == createdAt)
         let received = try await GiftWrap.unwrap(
-            giftWrap: result.recipientGiftWrap, recipient: EventSigner(keyPair: recipient))
+            giftWrap: result.message.recipientGiftWrap, recipient: EventSigner(keyPair: recipient))
         #expect(received.senderPublicKey == sender.publicKey)
         #expect(received.event.publicKey == sender.publicKey)
         #expect(received.event.createdAt == createdAt)

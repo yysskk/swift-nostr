@@ -186,13 +186,14 @@ struct NostrClientNamespaceTests {
         let sent = try await PublishAckSupport.acknowledgingPublishes(2, on: socket) {
             try await messaging.send("through the protocol", to: peer.publicKey)
         }
-        let echoed = try await messaging.parse(sent.selfGiftWrap)
+        let echoed = try #require(await messaging.open(sent.message.selfGiftWrap).message)
 
         let incoming = try await DirectMessageBuilder(signer: EventSigner(keyPair: peer))
             .createMessageWithSelfCopy(content: "back at you", to: user.publicKey)
-        let parsed = try await messaging.parse(incoming.recipientGiftWrap)
+        let parsed = try #require(await messaging.open(incoming.recipientGiftWrap).message)
 
-        #expect(sent.recipientPublishResult?.acceptedRelays == [ConnectedClientFixture.defaultRelayURL])
+        #expect(sent.recipientPublishResult.acceptedRelays == [ConnectedClientFixture.defaultRelayURL])
+        #expect(echoed.rumorID == sent.message.rumor.id)
         #expect(echoed.content == "through the protocol")
         #expect(echoed.recipientPublicKey == peer.publicKey)
         #expect(parsed.content == "back at you")

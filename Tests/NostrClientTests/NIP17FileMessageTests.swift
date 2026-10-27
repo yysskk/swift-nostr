@@ -114,8 +114,9 @@ struct NIP17FileMessageTests {
             url: url, mimeType: "text/plain", encryption: encrypted,
             size: encrypted.ciphertext.count, to: recipient.publicKey)
 
-        let file = try await DirectMessageParser(signer: EventSigner(keyPair: recipient)).parseFileMessage(
-            result.recipientGiftWrap)
+        let recipientParser = DirectMessageParser(signer: EventSigner(keyPair: recipient))
+
+        let file = try #require(await recipientParser.open(result.recipientGiftWrap).file)
         #expect(file.url == url)
         #expect(file.mimeType == "text/plain")
         #expect(file.senderPublicKey == sender.publicKey)
@@ -130,8 +131,8 @@ struct NIP17FileMessageTests {
 
         // The self-copy decrypts with the sender's own key and yields the same file, guarding
         // against a wrong-key regression when wrapping the self-copy.
-        let selfFile = try await DirectMessageParser(signer: EventSigner(keyPair: sender)).parseFileMessage(
-            result.selfGiftWrap)
+        let senderParser = DirectMessageParser(signer: EventSigner(keyPair: sender))
+        let selfFile = try #require(await senderParser.open(result.selfGiftWrap).file)
         #expect(selfFile.rumorID == file.rumorID)
         #expect(selfFile.url == url)
         let selfDecrypted = try EncryptedFile.decrypt(
@@ -139,8 +140,8 @@ struct NIP17FileMessageTests {
         #expect(selfDecrypted == original)
     }
 
-    @Test("parsePayload classifies a file message")
-    func parsePayloadFile() async throws {
+    @Test("open classifies a file message")
+    func openFile() async throws {
         let sender = KeyPair()
         let recipient = KeyPair()
         let encrypted = EncryptedFile.encrypt(Data("x".utf8))
@@ -152,33 +153,12 @@ struct NIP17FileMessageTests {
 
         guard
             case .file(let file) = try await DirectMessageParser(signer: EventSigner(keyPair: recipient))
-                .parsePayload(result.recipientGiftWrap)
+                .open(result.recipientGiftWrap)
         else {
             Issue.record("expected a file payload")
             return
         }
         #expect(file.url == URL(string: "https://files.example.com/1"))
-    }
-
-    @Test("parse and parseFileMessage reject the wrong inner kind")
-    func crossParseRejected() async throws {
-        let sender = KeyPair()
-        let recipient = KeyPair()
-        let builder = DirectMessageBuilder(signer: EventSigner(keyPair: sender))
-        let encrypted = EncryptedFile.encrypt(Data("x".utf8))
-
-        let message = try await builder.createMessageWithSelfCopy(content: "hi", to: recipient.publicKey)
-        let file = try await builder.createFileMessageWithSelfCopy(
-            url: URL(string: "https://example.com/u")!, mimeType: "image/png", encryption: encrypted,
-            to: recipient.publicKey)
-
-        let parser = DirectMessageParser(signer: EventSigner(keyPair: recipient))
-        await #expect(throws: DirectMessagePayload.Error.unexpectedKind(.privateDirectMessage)) {
-            try await parser.parseFileMessage(message.recipientGiftWrap)
-        }
-        await #expect(throws: DirectMessagePayload.Error.unexpectedKind(.fileMessage)) {
-            try await parser.parse(file.recipientGiftWrap)
-        }
     }
 
     @Test("a file message without a decryption key is rejected")
@@ -187,16 +167,16 @@ struct NIP17FileMessageTests {
         let recipient = KeyPair()
 
         // Hand-built kind-15 rumor missing the decryption-key/nonce tags.
-        let rumor = UnsignedEvent(
-            publicKey: sender.publicKey, kind: .fileMessage,
+        let template = EventTemplate(
+            kind: .fileMessage,
             tags: [.publicKey(recipient.publicKey), Tag(name: "file-type", values: ["image/png"])],
             content: "https://files.example.com/1"
-        ).asRumor()
+        )
         let giftWrap = try await GiftWrap.wrap(
-            event: rumor, signer: EventSigner(keyPair: sender), recipientPublicKey: recipient.publicKey)
+            template, signer: EventSigner(keyPair: sender), to: recipient.publicKey)
 
         await #expect(throws: DirectMessagePayload.Error.invalidDecryptionKey) {
-            try await DirectMessageParser(signer: EventSigner(keyPair: recipient)).parseFileMessage(giftWrap)
+            try await DirectMessageParser(signer: EventSigner(keyPair: recipient)).open(giftWrap)
         }
     }
 
@@ -211,7 +191,7 @@ struct NIP17FileMessageTests {
             key: Data(repeating: 0, count: 16), nonce: Data(repeating: 0, count: 12))
 
         await #expect(throws: DirectMessagePayload.Error.invalidDecryptionKey) {
-            try await DirectMessageParser(signer: EventSigner(keyPair: recipient)).parseFileMessage(giftWrap)
+            try await DirectMessageParser(signer: EventSigner(keyPair: recipient)).open(giftWrap)
         }
     }
 
@@ -225,7 +205,7 @@ struct NIP17FileMessageTests {
             key: Data(repeating: 0, count: 32), nonce: Data(repeating: 0, count: 16))
 
         await #expect(throws: DirectMessagePayload.Error.invalidDecryptionNonce) {
-            try await DirectMessageParser(signer: EventSigner(keyPair: recipient)).parseFileMessage(giftWrap)
+            try await DirectMessageParser(signer: EventSigner(keyPair: recipient)).open(giftWrap)
         }
     }
 
@@ -242,7 +222,7 @@ struct NIP17FileMessageTests {
             key: Data(repeating: 0, count: 32), nonce: Data(repeating: 0, count: 12))
 
         await #expect(throws: DirectMessagePayload.Error.invalidFileURL) {
-            try await DirectMessageParser(signer: EventSigner(keyPair: recipient)).parseFileMessage(giftWrap)
+            try await DirectMessageParser(signer: EventSigner(keyPair: recipient)).open(giftWrap)
         }
     }
 
@@ -251,17 +231,17 @@ struct NIP17FileMessageTests {
     private static func wrapFileRumor(
         sender: KeyPair, recipient: KeyPair, url: String, key: Data, nonce: Data
     ) async throws -> Event {
-        let rumor = UnsignedEvent(
-            publicKey: sender.publicKey, kind: .fileMessage,
+        let template = EventTemplate(
+            kind: .fileMessage,
             tags: [
                 .publicKey(recipient.publicKey),
                 Tag(name: "decryption-key", values: [key.base64EncodedString()]),
                 Tag(name: "decryption-nonce", values: [nonce.base64EncodedString()]),
             ],
             content: url
-        ).asRumor()
+        )
         return try await GiftWrap.wrap(
-            event: rumor, signer: EventSigner(keyPair: sender), recipientPublicKey: recipient.publicKey)
+            template, signer: EventSigner(keyPair: sender), to: recipient.publicKey)
     }
 
     @Test("a disappearing file message carries the expiration on the gift wrap")
@@ -277,8 +257,8 @@ struct NIP17FileMessageTests {
             to: recipient.publicKey, expiration: expiry)
 
         #expect(result.recipientGiftWrap.expiration == expiry)
-        let file = try await DirectMessageParser(signer: EventSigner(keyPair: recipient)).parseFileMessage(
-            result.recipientGiftWrap)
+        let recipientParser = DirectMessageParser(signer: EventSigner(keyPair: recipient))
+        let file = try #require(await recipientParser.open(result.recipientGiftWrap).file)
         #expect(file.expiresAt == expiry)
     }
 }

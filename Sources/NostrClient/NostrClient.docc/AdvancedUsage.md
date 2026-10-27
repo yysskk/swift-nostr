@@ -20,14 +20,15 @@ let result = try await client.messages.send(
 // The same unsigned rumor is wrapped twice: once for the recipient and once
 // for the sender (the NIP-17 self-copy for sent history / multi-device sync).
 // Match relay echoes against the rumor id:
-let echoKey = result.rumor.id
+let echoKey = result.message.rumor.id
 ```
 
 The rumor is never signed — not even transiently — because a leaked signed
 kind-14 would be cryptographic proof of authorship and destroy deniability.
 A failed self-copy publish is non-fatal; the send succeeds when the
 recipient copy is accepted. The per-relay outcomes of both publishes are
-reported on the result as `recipientPublishResult` and `selfCopyPublishResult`.
+reported on the result as `recipientPublishResult` and `selfCopyPublishResult` (nil when the
+self-copy publish failed); `message` holds the ``GiftWrappedMessage`` that was published.
 
 ### Receiving
 
@@ -46,21 +47,27 @@ for try await message in try await client.messages.subscribe().messages {
 ```
 
 For the raw gift-wrap events, use the ``DirectMessagePayloadSequence/giftWraps`` view
-and parse manually:
+and open each one manually:
 
 ```swift
 let giftWraps = try await client.messages.subscribe().giftWraps
 for await giftWrap in giftWraps.events {
-    let dm = try await client.messages.parse(giftWrap)
-    print("From: \(dm.senderPublicKey): \(dm.content)")
+    if case .message(let dm) = try await client.messages.open(giftWrap) {
+        print("From: \(dm.senderPublicKey): \(dm.content)")
+    }
 }
 ```
 
-### Parsing Received Gift Wraps
+### Opening Received Gift Wraps
+
+``NostrMessaging/open(_:)`` unwraps a gift wrap into whichever ``DirectMessagePayload`` it carries:
 
 ```swift
-let dm = try await client.messages.parse(giftWrapEvent)
-print("Message: \(dm.content)")
+switch try await client.messages.open(giftWrapEvent) {
+case .message(let dm): print("Message: \(dm.content)")
+case .reaction(let reaction): print("Reaction: \(reaction.content)")
+case .file(let file): print("File: \(file.url)")
+}
 ```
 
 ### Reactions (NIP-25)
@@ -110,9 +117,10 @@ let template = EventTemplate(
 try await client.messages.sendGiftWrapped(template, to: recipient)
 ```
 
-To build the gift wrap without publishing, use ``GiftWrap/wrap(event:signer:recipientPublicKey:expiration:)``.
-On the receiving side, read the raw stream from ``DirectMessagePayloadSequence/giftWraps`` and open each
-event with ``GiftWrap/unwrap(giftWrap:recipient:)``; the parsing helpers understand only kinds 14, 15,
+To build a gift wrap without publishing, use ``GiftWrap/wrap(_:signer:to:expiration:)``; wrapping the
+same template for each addressee yields one rumor id. On the receiving side, read the raw stream from
+``DirectMessagePayloadSequence/giftWraps`` and open each event with
+``GiftWrap/unwrap(giftWrap:recipient:)``; ``NostrMessaging/open(_:)`` understands only kinds 14, 15,
 and 7.
 
 ### Disappearing Messages (NIP-40)
@@ -195,12 +203,13 @@ let plaintext = try sealed.open(
 let groupSealed = try SealedMessage.seal("group message", conversationKey: groupKey)
 let groupPlaintext = try groupSealed.open(conversationKey: groupKey)
 
-// Gift wrap an event (NIP-59). Both sides take any NostrSigning, so a remote
-// NIP-46 signer wraps and unwraps as well as a local key does.
+// Gift wrap a template (NIP-59); the rumor is authored under the signer's key.
+// Both sides take any NostrSigning, so a remote NIP-46 signer wraps and
+// unwraps as well as a local key does.
 let wrapped = try await GiftWrap.wrap(
-    event: rumorEvent,
+    .textNote("secret"),
     signer: EventSigner(keyPair: senderKeyPair),
-    recipientPublicKey: recipientPublicKey
+    to: recipientPublicKey
 )
 
 // Unwrap

@@ -156,20 +156,12 @@ struct PublishedEventTests {
             try await client.messages.send("hi", to: recipient.publicKey)
         }
 
-        #expect(result.recipientPublishResult?.acceptedRelays == [relayURL])
+        #expect(result.recipientPublishResult.acceptedRelays == [relayURL])
         #expect(result.selfCopyPublishResult?.acceptedRelays == [relayURL])
+        // The rumor id is the key the echoed self-copy is matched by.
+        let echoed = try #require(await client.messages.open(result.message.selfGiftWrap).message)
+        #expect(echoed.rumorID == result.message.rumor.id)
         await client.relays.disconnect()
-    }
-
-    @Test("SendDirectMessageResult publish results default to nil")
-    func sendDirectMessageResultDefaultsToNilPublishResults() async throws {
-        let alice = KeyPair()
-        let bob = KeyPair()
-        let builder = DirectMessageBuilder(signer: EventSigner(keyPair: alice))
-        let result = try await builder.createMessageWithSelfCopy(content: "hi", to: bob.publicKey)
-
-        #expect(result.recipientPublishResult == nil)
-        #expect(result.selfCopyPublishResult == nil)
     }
 
     @Test("publish strategy parameter is accepted by convenience methods")
@@ -203,7 +195,7 @@ struct PublishedEventTests {
         }
     }
 
-    @Test("messages.parse without a signer throws signerNotSet")
+    @Test("messages.open without a signer throws signerNotSet")
     func parseDirectMessageWithoutSignerThrowsSignerNotSet() async throws {
         let client = NostrClient()
         let alice = KeyPair()
@@ -213,7 +205,7 @@ struct PublishedEventTests {
             .recipientGiftWrap
 
         await #expect(throws: NostrClient.Error.signerNotSet) {
-            _ = try await client.messages.parse(giftWrap)
+            _ = try await client.messages.open(giftWrap)
         }
     }
 }

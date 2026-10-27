@@ -113,7 +113,7 @@ struct DirectMessageRoutingTests {
         }
 
         let poolRelay = ConnectedClientFixture.defaultRelayURL
-        #expect(result.recipientPublishResult?.acceptedRelays == [poolRelay])
+        #expect(result.recipientPublishResult.acceptedRelays == [poolRelay])
         #expect(result.selfCopyPublishResult?.acceptedRelays == [poolRelay])
         await client.relays.disconnect()
     }

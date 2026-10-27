@@ -13,63 +13,17 @@ public struct DirectMessageParser: Sendable {
         self.signer = signer
     }
 
-    /// Parses a gift-wrapped event into a DirectMessage.
-    ///
-    /// A reply marker whose event id is not canonical hex is ignored, leaving ``DirectMessage/replyTo``
-    /// nil.
-    /// - Parameter giftWrap: The gift-wrapped event
-    /// - Returns: The parsed DirectMessage
-    /// - Throws: ``DirectMessagePayload/Error/unexpectedKind(_:)`` if the inner rumor is not a
-    ///   kind-14 message, ``DirectMessagePayload/Error/invalidRecipient`` if its `p` tag is not a
-    ///   canonical hex public key, or the errors of ``GiftWrap/unwrap(giftWrap:recipient:)``.
-    public func parse(_ giftWrap: Event) async throws -> DirectMessage {
-        let unwrapped = try await GiftWrap.unwrap(giftWrap: giftWrap, recipient: signer)
-        guard unwrapped.event.kind == .privateDirectMessage else {
-            throw DirectMessagePayload.Error.unexpectedKind(unwrapped.event.kind)
-        }
-        return try await makeMessage(from: unwrapped, giftWrap: giftWrap)
-    }
-
-    /// Parses a gift-wrapped event into a DirectMessageReaction.
-    /// - Parameter giftWrap: The gift-wrapped event
-    /// - Returns: The parsed reaction
-    /// - Throws: ``DirectMessagePayload/Error/unexpectedKind(_:)`` if the inner rumor is not a
-    ///   kind-7 reaction, ``DirectMessagePayload/Error/missingReactionTarget`` if it does not
-    ///   reference a message and its author by canonical hex id and key, or the errors of
-    ///   ``GiftWrap/unwrap(giftWrap:recipient:)``.
-    public func parseReaction(_ giftWrap: Event) async throws -> DirectMessageReaction {
-        let unwrapped = try await GiftWrap.unwrap(giftWrap: giftWrap, recipient: signer)
-        guard unwrapped.event.kind == .reaction else {
-            throw DirectMessagePayload.Error.unexpectedKind(unwrapped.event.kind)
-        }
-        return try makeReaction(from: unwrapped, giftWrap: giftWrap)
-    }
-
-    /// Parses a gift-wrapped event into a DirectMessageFile (NIP-17 kind 15).
-    /// - Parameter giftWrap: The gift-wrapped event
-    /// - Returns: The parsed file message
-    /// - Throws: ``DirectMessagePayload/Error/unexpectedKind(_:)`` if the inner rumor is not a
-    ///   kind-15 file message, ``DirectMessagePayload/Error/invalidFileURL``,
-    ///   ``DirectMessagePayload/Error/invalidDecryptionKey``, or
-    ///   ``DirectMessagePayload/Error/invalidDecryptionNonce`` if it lacks a URL or a valid
-    ///   decryption key or nonce, ``DirectMessagePayload/Error/invalidRecipient`` if its `p` tag is
-    ///   not a canonical hex public key, or the errors of ``GiftWrap/unwrap(giftWrap:recipient:)``.
-    public func parseFileMessage(_ giftWrap: Event) async throws -> DirectMessageFile {
-        let unwrapped = try await GiftWrap.unwrap(giftWrap: giftWrap, recipient: signer)
-        guard unwrapped.event.kind == .fileMessage else {
-            throw DirectMessagePayload.Error.unexpectedKind(unwrapped.event.kind)
-        }
-        return try await makeFile(from: unwrapped, giftWrap: giftWrap)
-    }
-
     /// Unwraps a gift wrap and classifies it as a message (kind 14), reaction (kind 7), or file
     /// message (kind 15).
-    /// - Parameter giftWrap: The gift-wrapped event
-    /// - Returns: The decrypted payload
+    ///
+    /// A message's reply marker whose event id is not canonical hex is ignored, leaving
+    /// ``DirectMessage/replyTo`` nil.
+    /// - Parameter giftWrap: The gift-wrapped event.
+    /// - Returns: The decrypted payload.
     /// - Throws: ``DirectMessagePayload/Error/unexpectedKind(_:)`` for any other inner kind, the
     ///   other ``DirectMessagePayload/Error`` cases for a malformed payload, or the errors of
     ///   ``GiftWrap/unwrap(giftWrap:recipient:)``.
-    public func parsePayload(_ giftWrap: Event) async throws -> DirectMessagePayload {
+    public func open(_ giftWrap: Event) async throws -> DirectMessagePayload {
         let unwrapped = try await GiftWrap.unwrap(giftWrap: giftWrap, recipient: signer)
         switch unwrapped.event.kind {
         case .privateDirectMessage:
@@ -85,20 +39,28 @@ public struct DirectMessageParser: Sendable {
 
     // MARK: - Stream parsing
 
-    /// Parses `giftWrap`, returning nil when it is simply not a readable message for this signer.
+    /// Opens `giftWrap` as a message (kind 14) only, returning nil when it is not a readable message
+    /// for this signer — including a reaction or file message, which is rejected before it is
+    /// parsed.
     ///
-    /// Used by the direct-message sequences, which walk a public relay stream where foreign and
+    /// Used by ``DirectMessageSequence``, which walks a public relay stream where foreign and
     /// malformed gift wraps are routine. See ``describesUnreadableEvent(_:)`` for what that
     /// covers — everything else propagates.
-    func parseIfReadable(_ giftWrap: Event) async throws -> DirectMessage? {
-        try await skippingUnreadableEvent { try await parse(giftWrap) }
+    func openMessageIfReadable(_ giftWrap: Event) async throws -> DirectMessage? {
+        try await skippingUnreadableEvent {
+            let unwrapped = try await GiftWrap.unwrap(giftWrap: giftWrap, recipient: signer)
+            guard unwrapped.event.kind == .privateDirectMessage else {
+                throw DirectMessagePayload.Error.unexpectedKind(unwrapped.event.kind)
+            }
+            return try await makeMessage(from: unwrapped, giftWrap: giftWrap)
+        }
     }
 
-    /// Parses `giftWrap` into a payload, returning nil when it is simply not a readable message
-    /// for this signer. The streaming counterpart of ``parsePayload(_:)``, mirroring
-    /// ``parseIfReadable(_:)``.
-    func parsePayloadIfReadable(_ giftWrap: Event) async throws -> DirectMessagePayload? {
-        try await skippingUnreadableEvent { try await parsePayload(giftWrap) }
+    /// Opens `giftWrap` into a payload, returning nil when it is simply not a readable message
+    /// for this signer. The streaming counterpart of ``open(_:)``, mirroring
+    /// ``openMessageIfReadable(_:)``.
+    func openIfReadable(_ giftWrap: Event) async throws -> DirectMessagePayload? {
+        try await skippingUnreadableEvent { try await open(giftWrap) }
     }
 
     /// Runs `parse`, turning "this event is not readable" into nil and letting every other failure

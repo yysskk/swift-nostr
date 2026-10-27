@@ -5,7 +5,7 @@ import NostrCore
 ///
 /// A single gift-wrap stream (kind 1059 addressed to the user) carries messages (kind 14),
 /// reactions (kind 7), and file messages (kind 15). Returned by
-/// ``NostrMessaging/subscribe(limit:)`` and ``NostrMessaging/parsePayload(_:)``
+/// ``NostrMessaging/subscribe(limit:)`` and ``NostrMessaging/open(_:)``
 /// so callers can handle them in one place.
 public enum DirectMessagePayload: Sendable, Hashable {
     /// A private direct message (kind 14).
@@ -17,15 +17,6 @@ public enum DirectMessagePayload: Sendable, Hashable {
 }
 
 extension DirectMessagePayload {
-    /// The kind of the rumor this payload was read from.
-    var kind: Event.Kind {
-        switch self {
-        case .message: .privateDirectMessage
-        case .reaction: .reaction
-        case .file: .fileMessage
-        }
-    }
-
     /// An error reading a NIP-17 payload out of an unwrapped gift wrap.
     public enum Error: Swift.Error, LocalizedError, Sendable, Equatable {
         /// The rumor is not the kind being read — a message (14), reaction (7), or file message

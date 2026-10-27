@@ -124,6 +124,7 @@ add NIP helpers and namespaces of your own; see <doc:ExtendingTheClient>.
 - ``DirectMessagePayloadSequence``
 - ``DirectMessageBuilder``
 - ``DirectMessageParser``
+- ``GiftWrappedMessage``
 - ``SendDirectMessageResult``
 - ``EncryptedFile``
 - ``GiftWrap``

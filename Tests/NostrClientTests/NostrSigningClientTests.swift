@@ -164,11 +164,11 @@ struct NostrSigningClientTests {
             try await client.messages.send("wrapped by my bunker", to: recipient.publicKey)
         }
 
-        #expect(result.recipientGiftWrap.kind == .giftWrap)
+        #expect(result.message.recipientGiftWrap.kind == .giftWrap)
         // The seal inside is authored by the remote signer's user key, and the recipient
         // reads the message with nothing but their own key.
-        let message = try await DirectMessageParser(signer: EventSigner(keyPair: recipient))
-            .parse(result.recipientGiftWrap)
+        let recipientParser = DirectMessageParser(signer: EventSigner(keyPair: recipient))
+        let message = try #require(await recipientParser.open(result.message.recipientGiftWrap).message)
         #expect(message.content == "wrapped by my bunker")
         #expect(message.senderPublicKey == sender.publicKey)
         await client.relays.disconnect()

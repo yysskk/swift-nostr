@@ -88,15 +88,11 @@ struct NIP17Tests {
         let alice = KeyPair()
         let bob = KeyPair()
 
-        // Create a simple event
-        let signer = EventSigner(keyPair: alice)
-        let originalEvent = signer.sign(.textNote("Secret message"))
-
-        // Alice wraps the event for Bob
+        // Alice wraps a note for Bob
         let wrapped = try await GiftWrap.wrap(
-            event: originalEvent,
-            signer: signer,
-            recipientPublicKey: bob.publicKey
+            .textNote("Secret message"),
+            signer: EventSigner(keyPair: alice),
+            to: bob.publicKey
         )
 
         // Verify it's a gift wrap event
@@ -117,17 +113,61 @@ struct NIP17Tests {
         let alice = KeyPair()
         let bob = KeyPair()
 
-        let signer = EventSigner(keyPair: alice)
-        let event = signer.sign(.textNote("Test"))
-
         let wrapped = try await GiftWrap.wrap(
-            event: event,
-            signer: signer,
-            recipientPublicKey: bob.publicKey
+            .textNote("Test"),
+            signer: EventSigner(keyPair: alice),
+            to: bob.publicKey
         )
 
         // The gift wrap public key should NOT be Alice's public key (it's ephemeral)
         #expect(wrapped.publicKey != alice.publicKey)
+    }
+
+    @Test("wrap authors the rumor under the signer's key")
+    func giftWrapAuthorsRumorUnderSigner() async throws {
+        let alice = KeyPair()
+        let bob = KeyPair()
+        let template = EventTemplate(kind: .privateDirectMessage, tags: [.publicKey(bob.publicKey)], content: "hi")
+
+        let wrapped = try await GiftWrap.wrap(template, signer: EventSigner(keyPair: alice), to: bob.publicKey)
+        let unwrapped = try await GiftWrap.unwrap(giftWrap: wrapped, recipient: EventSigner(keyPair: bob))
+
+        #expect(unwrapped.senderPublicKey == alice.publicKey)
+        #expect(unwrapped.event.publicKey == alice.publicKey)
+        #expect(unwrapped.event.id == UnsignedEvent(template, publicKey: alice.publicKey).computedID)
+        #expect(unwrapped.event.createdAt == template.createdAt)
+        #expect(unwrapped.event.signature == nil)
+    }
+
+    @Test("wrapping the same template twice yields one rumor id in distinct wraps")
+    func giftWrapSameTemplateSharesRumorID() async throws {
+        let alice = KeyPair()
+        let bob = KeyPair()
+        let signer = EventSigner(keyPair: alice)
+        let template = EventTemplate.textNote("twice")
+
+        let forBob = try await GiftWrap.wrap(template, signer: signer, to: bob.publicKey)
+        let forAlice = try await GiftWrap.wrap(template, signer: signer, to: alice.publicKey)
+        let bobRumor = try await GiftWrap.unwrap(giftWrap: forBob, recipient: EventSigner(keyPair: bob)).event
+        let aliceRumor = try await GiftWrap.unwrap(giftWrap: forAlice, recipient: signer).event
+
+        #expect(bobRumor.id == aliceRumor.id)
+        #expect(forBob.id != forAlice.id)
+        #expect(forBob.publicKey != forAlice.publicKey)
+    }
+
+    @Test("wrap sets the expiration on the outer wrap, not the rumor")
+    func giftWrapExpirationOnOuterWrap() async throws {
+        let alice = KeyPair()
+        let bob = KeyPair()
+        let expiry = Timestamp(rawValue: 2_000_000_000)
+
+        let wrapped = try await GiftWrap.wrap(
+            .textNote("fleeting"), signer: EventSigner(keyPair: alice), to: bob.publicKey, expiration: expiry)
+        let unwrapped = try await GiftWrap.unwrap(giftWrap: wrapped, recipient: EventSigner(keyPair: bob))
+
+        #expect(wrapped.expiration == expiry)
+        #expect(unwrapped.event.expiration == nil)
     }
 
     // MARK: - Direct Message Tests
@@ -149,7 +189,7 @@ struct NIP17Tests {
 
         // Bob parses the message
         let parser = DirectMessageParser(signer: EventSigner(keyPair: bob))
-        let message = try await parser.parse(giftWrap)
+        let message = try #require(await parser.open(giftWrap).message)
 
         #expect(message.content == "Hello Bob!")
         #expect(message.senderPublicKey == alice.publicKey)
@@ -170,7 +210,7 @@ struct NIP17Tests {
         ).recipientGiftWrap
 
         let parser = DirectMessageParser(signer: EventSigner(keyPair: bob))
-        let parsedFirst = try await parser.parse(firstMessage)
+        let parsedFirst = try #require(await parser.open(firstMessage).message)
 
         // Reply to first message
         let bobBuilder = DirectMessageBuilder(signer: EventSigner(keyPair: bob))
@@ -181,7 +221,7 @@ struct NIP17Tests {
         ).recipientGiftWrap
 
         let aliceParser = DirectMessageParser(signer: EventSigner(keyPair: alice))
-        let parsedReply = try await aliceParser.parse(reply)
+        let parsedReply = try #require(await aliceParser.open(reply).message)
 
         #expect(parsedReply.content == "Reply to first")
         #expect(parsedReply.replyTo == parsedFirst.rumorID)
@@ -205,17 +245,17 @@ struct NIP17Tests {
 
         // Bob can parse his copy
         let bobParser = DirectMessageParser(signer: EventSigner(keyPair: bob))
-        let bobMessage = try await bobParser.parse(giftWraps[0])
+        let bobMessage = try #require(await bobParser.open(giftWraps[0]).message)
         #expect(bobMessage.content == "Hello everyone!")
 
         // Charlie can parse his copy
         let charlieParser = DirectMessageParser(signer: EventSigner(keyPair: charlie))
-        let charlieMessage = try await charlieParser.parse(giftWraps[1])
+        let charlieMessage = try #require(await charlieParser.open(giftWraps[1]).message)
         #expect(charlieMessage.content == "Hello everyone!")
 
         // Alice can parse her copy
         let aliceParser = DirectMessageParser(signer: EventSigner(keyPair: alice))
-        let aliceMessage = try await aliceParser.parse(giftWraps[2])
+        let aliceMessage = try #require(await aliceParser.open(giftWraps[2]).message)
         #expect(aliceMessage.content == "Hello everyone!")
     }
 
@@ -259,15 +299,15 @@ struct NIP17Tests {
     func messageWithMalformedRecipientRejected() async throws {
         let alice = KeyPair()
         let bob = KeyPair()
-        let rumor = UnsignedEvent(
-            publicKey: alice.publicKey, kind: .privateDirectMessage,
+        let template = EventTemplate(
+            kind: .privateDirectMessage,
             tags: [Event.Tag(name: .publicKey, values: [bob.publicKey.hex.uppercased()])], content: "hi"
-        ).asRumor()
+        )
         let giftWrap = try await GiftWrap.wrap(
-            event: rumor, signer: EventSigner(keyPair: alice), recipientPublicKey: bob.publicKey)
+            template, signer: EventSigner(keyPair: alice), to: bob.publicKey)
 
         await #expect(throws: DirectMessagePayload.Error.invalidRecipient) {
-            try await DirectMessageParser(signer: EventSigner(keyPair: bob)).parse(giftWrap)
+            try await DirectMessageParser(signer: EventSigner(keyPair: bob)).open(giftWrap)
         }
     }
 
@@ -275,15 +315,15 @@ struct NIP17Tests {
     func messageWithMalformedReplyMarker() async throws {
         let alice = KeyPair()
         let bob = KeyPair()
-        let rumor = UnsignedEvent(
-            publicKey: alice.publicKey, kind: .privateDirectMessage,
+        let template = EventTemplate(
+            kind: .privateDirectMessage,
             tags: [.publicKey(bob.publicKey), Event.Tag(name: .event, values: ["not-an-id", "", "reply"])],
             content: "hi"
-        ).asRumor()
+        )
         let giftWrap = try await GiftWrap.wrap(
-            event: rumor, signer: EventSigner(keyPair: alice), recipientPublicKey: bob.publicKey)
+            template, signer: EventSigner(keyPair: alice), to: bob.publicKey)
 
-        let message = try await DirectMessageParser(signer: EventSigner(keyPair: bob)).parse(giftWrap)
+        let message = try #require(await DirectMessageParser(signer: EventSigner(keyPair: bob)).open(giftWrap).message)
 
         #expect(message.replyTo == nil)
         #expect(message.recipientPublicKey == bob.publicKey)
@@ -303,9 +343,10 @@ struct NIP17Tests {
             replyTo: EventID(String(repeating: "d", count: 64))!
         )
 
-        let bobMessage = try await DirectMessageParser(signer: EventSigner(keyPair: bob)).parse(
-            result.recipientGiftWrap)
-        let aliceMessage = try await DirectMessageParser(signer: EventSigner(keyPair: alice)).parse(result.selfGiftWrap)
+        let bobPayload = try await DirectMessageParser(signer: EventSigner(keyPair: bob)).open(result.recipientGiftWrap)
+        let alicePayload = try await DirectMessageParser(signer: EventSigner(keyPair: alice)).open(result.selfGiftWrap)
+        let bobMessage = try #require(bobPayload.message)
+        let aliceMessage = try #require(alicePayload.message)
 
         // The rumor id is the echo-matching key on both sides
         #expect(bobMessage.rumorID == result.rumor.id)
@@ -366,7 +407,7 @@ struct NIP17Tests {
         ).recipientGiftWrap
 
         let parser = DirectMessageParser(signer: EventSigner(keyPair: bob))
-        let message = try await parser.parse(giftWrap)
+        let message = try #require(await parser.open(giftWrap).message)
 
         #expect(message.id == message.rumorID)
         #expect(message.senderPublicKey == alice.publicKey)
@@ -384,20 +425,20 @@ struct NIP17Tests {
         let parser = DirectMessageParser(signer: EventSigner(keyPair: bob))
 
         await #expect(throws: GiftWrap.Error.unexpectedKind(.textNote)) {
-            _ = try await parser.parse(textNote)
+            _ = try await parser.open(textNote)
         }
     }
 
-    @Test("parsePayload rejects a rumor that is not a message, reaction, or file")
-    func parsePayloadRejectsOtherKinds() async throws {
+    @Test("open rejects a rumor that is not a message, reaction, or file")
+    func openRejectsOtherKinds() async throws {
         let alice = KeyPair()
         let bob = KeyPair()
-        let rumor = UnsignedEvent(publicKey: alice.publicKey, kind: .textNote, content: "hi").asRumor()
+        let template = EventTemplate(kind: .textNote, content: "hi")
         let giftWrap = try await GiftWrap.wrap(
-            event: rumor, signer: EventSigner(keyPair: alice), recipientPublicKey: bob.publicKey)
+            template, signer: EventSigner(keyPair: alice), to: bob.publicKey)
 
         await #expect(throws: DirectMessagePayload.Error.unexpectedKind(.textNote)) {
-            try await DirectMessageParser(signer: EventSigner(keyPair: bob)).parsePayload(giftWrap)
+            try await DirectMessageParser(signer: EventSigner(keyPair: bob)).open(giftWrap)
         }
     }
 }

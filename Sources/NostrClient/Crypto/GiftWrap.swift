@@ -18,32 +18,52 @@ public struct GiftWrap: Sendable {
         public let event: Event
     }
 
-    /// Creates a gift-wrapped event
+    /// Authors `template` as an unsigned rumor under `signer`'s public key and gift-wraps it for
+    /// `recipientPublicKey`.
     ///
-    /// Everything the sender's identity is needed for — sealing the rumor and signing the seal —
-    /// goes through ``NostrSigning``, so a remote NIP-46 signer wraps as well as a local
-    /// key does. The outer wrap key is ephemeral by design and is generated here.
+    /// Everything the sender's identity is needed for — authoring the rumor, sealing it, and signing
+    /// the seal — goes through ``NostrSigning``, so a remote NIP-46 signer wraps as well as a local
+    /// key does, and the rumor's author always matches the seal that ``unwrap(giftWrap:recipient:)``
+    /// checks it against. The outer wrap key is ephemeral by design and is generated here.
+    ///
+    /// The rumor's id is the hash of the template's contents under the signer's key, so wrapping the
+    /// same template twice — once per addressee — yields the same rumor id in two distinct wraps.
     /// - Parameters:
-    ///   - event: The event to wrap (will be converted to rumor if signed)
-    ///   - signer: The sender's signer, local or remote
-    ///   - recipientPublicKey: The recipient's public key
+    ///   - template: The rumor's kind, tags, content, and creation time. The rumor is never signed.
+    ///   - signer: The sender's signer, local or remote.
+    ///   - recipientPublicKey: The recipient's public key.
     ///   - expiration: Optional NIP-40 expiration. Applied to the outer gift wrap (the stored
     ///     kind-1059 event relays act on) so the message disappears after the given time. The
     ///     inner rumor is unaffected, keeping the plaintext content private until then.
-    /// - Returns: The gift-wrapped event ready for publishing
+    /// - Returns: The gift-wrapped event ready for publishing.
+    /// - Throws: Anything `signer` throws while resolving its public key, encrypting, or signing.
     public static func wrap(
-        event: Event,
+        _ template: EventTemplate,
         signer: any NostrSigning,
-        recipientPublicKey: PublicKey,
+        to recipientPublicKey: PublicKey,
         expiration: Timestamp? = nil
     ) async throws -> Event {
-        // 1. Create rumor (unsigned event JSON)
-        let rumor = createRumor(from: event)
+        let rumor = UnsignedEvent(template, publicKey: try await signer.publicKey).asRumor()
+        return try await wrap(rumor: rumor, signer: signer, to: recipientPublicKey, expiration: expiration)
+    }
+
+    /// Gift-wraps an already-built `rumor` for `recipientPublicKey`.
+    ///
+    /// Internal so callers that wrap one rumor for several addressees share it — and its id —
+    /// without resolving the signer's public key per wrap. The seal is authored under
+    /// `rumor.publicKey`, which must be `signer`'s key: a local signer refuses to sign another key's
+    /// seal.
+    static func wrap(
+        rumor: Event,
+        signer: any NostrSigning,
+        to recipientPublicKey: PublicKey,
+        expiration: Timestamp?
+    ) async throws -> Event {
         let rumorJSON = try encodeRumor(rumor)
 
-        // 2. Create seal (encrypt rumor to recipient, signed by the sender)
+        // Seal: the rumor encrypted to the recipient and signed by the sender.
         let sealUnsigned = UnsignedEvent(
-            publicKey: try await signer.publicKey,
+            publicKey: rumor.publicKey,
             createdAt: randomizedTimestamp(),
             kind: .seal,
             tags: [],
@@ -53,7 +73,7 @@ public struct GiftWrap: Sendable {
         let seal = try await signer.sign(sealUnsigned)
         let sealJSON = try encodeSeal(seal)
 
-        // 3. Create gift wrap (encrypt seal with an ephemeral key, which hides the sender)
+        // Gift wrap: the seal encrypted with an ephemeral key, which hides the sender.
         let ephemeralSigner = EventSigner(keyPair: KeyPair())
 
         var wrapTags: [Tag] = [.publicKey(recipientPublicKey)]
@@ -133,9 +153,9 @@ public struct GiftWrap: Sendable {
 
     // MARK: - Private Helpers
 
-    /// Creates a rumor from an event (removing signature)
-    private static func createRumor(from event: Event) -> Rumor {
-        Rumor(
+    /// Encodes a rumor to JSON string, without a signature field.
+    private static func encodeRumor(_ event: Event) throws -> String {
+        let rumor = Rumor(
             id: event.id,
             publicKey: event.publicKey,
             createdAt: event.createdAt,
@@ -143,10 +163,6 @@ public struct GiftWrap: Sendable {
             tags: event.tags,
             content: event.content
         )
-    }
-
-    /// Encodes a rumor to JSON string
-    private static func encodeRumor(_ rumor: Rumor) throws -> String {
         let data = try JSONEncoder().encode(rumor)
         return String(decoding: data, as: UTF8.self)
     }

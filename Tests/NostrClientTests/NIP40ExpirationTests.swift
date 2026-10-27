@@ -91,7 +91,7 @@ struct NIP40ExpirationTests {
             content: "self-destructs", to: recipient.publicKey, expiration: expiry)
 
         let parser = DirectMessageParser(signer: EventSigner(keyPair: recipient))
-        let message = try await parser.parse(result.recipientGiftWrap)
+        let message = try #require(await parser.open(result.recipientGiftWrap).message)
         #expect(message.expiresAt == expiry)
         #expect(message.content == "self-destructs")
     }
@@ -108,7 +108,7 @@ struct NIP40ExpirationTests {
         #expect(result.recipientGiftWrap.firstTagValue(named: "expiration") == "9223372036854775807")
 
         let parser = DirectMessageParser(signer: EventSigner(keyPair: recipient))
-        let message = try await parser.parse(result.recipientGiftWrap)
+        let message = try #require(await parser.open(result.recipientGiftWrap).message)
         #expect(message.expiresAt == expiry)
         // The gift wrap's own created_at is randomized; the message reports the rumor's.
         #expect(message.createdAt == result.rumor.createdAt)
@@ -125,7 +125,7 @@ struct NIP40ExpirationTests {
         #expect(result.recipientGiftWrap.expiration == nil)
 
         let parser = DirectMessageParser(signer: EventSigner(keyPair: recipient))
-        let message = try await parser.parse(result.recipientGiftWrap)
+        let message = try #require(await parser.open(result.recipientGiftWrap).message)
         #expect(message.expiresAt == nil)
     }
 }

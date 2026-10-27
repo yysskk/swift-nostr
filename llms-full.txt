@@ -112,9 +112,9 @@ as one through `client.events`. `NostrSubscribing` (`subscribe(filters:route:buf
 `connect(to:)`, `relayCount`, `setPrivateKey(_:)`, `setNsec(_:)`, and the short forms come from their
 extensions; a stub returns a `SubscriptionSequence(id:expectedRelays:stream:onClose:)` over its own
 `AsyncStream`. `NostrMessaging` requires `sendGiftWrapped(_:to:expiration:strategy:)` for an
-`EventTemplate`, `parsePayload(_:)`, and `subscribe(limit:)`; `send`, `react`, `sendFile`, `parse`,
-`parseReaction`, `parseFile`, and the short forms (`sendGiftWrapped(_:to:expiration:)`, `subscribe()`)
-come from its extension, and a stub returns a `DirectMessagePayloadSequence(subscription:parser:)`.
+`EventTemplate`, `open(_:)`, and `subscribe(limit:)`; `send`, `react`, `sendFile`, and the short
+forms (`sendGiftWrapped(_:to:expiration:)`, `subscribe()`) come from its extension, and a stub
+returns a `DirectMessagePayloadSequence(subscription:parser:)`.
 `NostrRelayRouting` requires the list fetches, caches, and publishes, and
 `connectDirectMessageInboxRelays()`; `publishRelayList(read:write:strategy:)`,
 `publishDirectMessageRelayList(relays:strategy:)`, and the short forms come from its extension.
@@ -380,8 +380,11 @@ let byRelay = try await client.relays.pool.countEvents(matching: [filter])  // [
 ### Direct Messages (NIP-17)
 
 ```swift
-// Send
-try await client.messages.send("Hello!", to: recipient)   // PublicKey
+// Send. The result's `message` is the published GiftWrappedMessage (rumor + both wraps);
+// `recipientPublishResult` is the recipient copy's PublishResult, `selfCopyPublishResult` is nil
+// when the best-effort self-copy failed.
+let sent = try await client.messages.send("Hello!", to: recipient)   // PublicKey
+let echoKey = sent.message.rumor.id   // match relay echoes against the rumor id
 
 // Send a rumor of any kind, gift-wrapped and routed like a DM (authored under the signer's key)
 try await client.messages.sendGiftWrapped(EventTemplate(kind: Event.Kind(rawValue: 30_999), content: payload), to: recipient)
@@ -394,15 +397,20 @@ for try await message in try await client.messages.subscribe().messages {
     print("From: \(message.senderPublicKey), Content: \(message.content)")
 }
 
-// Or receive raw gift wraps and parse manually
+// Or receive raw gift wraps and open each one
 let giftWraps = try await client.messages.subscribe().giftWraps
 for await giftWrap in giftWraps.events {
-    let dm = try await client.messages.parse(giftWrap)
-    print("From: \(dm.senderPublicKey): \(dm.content)")
+    if case .message(let dm) = try await client.messages.open(giftWrap) {
+        print("From: \(dm.senderPublicKey): \(dm.content)")
+    }
 }
 
-// Parse a received gift wrap event
-let dm = try await client.messages.parse(giftWrapEvent)
+// Open a received gift wrap event: a message (14), reaction (7), or file (15)
+switch try await client.messages.open(giftWrapEvent) {
+case .message(let dm): print(dm.content)
+case .reaction(let reaction): print(reaction.content)
+case .file(let file): print(file.url)
+}
 ```
 
 ### Relay-based Groups (NIP-29)
@@ -1135,16 +1143,19 @@ on secp256k1), `malformedPayload` (bad base64, length out of range, non-UTF-8 pl
 
 NIP-59 Gift Wrap for sender anonymity (struct: Sendable).
 
-Wraps events through rumor > seal > gift wrap layers with randomized timestamps for privacy.
+Wraps an `EventTemplate` through rumor > seal > gift wrap layers with randomized timestamps for
+privacy. The rumor is authored under the signer's public key, so it always matches the seal; wrapping
+the same template twice (it carries `createdAt`) yields the same rumor id in two distinct wraps.
 
 Both sides take any `NostrSigning`, so a remote NIP-46 signer wraps and unwraps as well as a local key does; the outer wrap key is ephemeral and always generated locally.
 
 ```swift
 // Wrap
 let wrapped = try await GiftWrap.wrap(
-    event: rumorEvent,
+    .textNote("secret"),
     signer: EventSigner(keyPair: senderKeyPair),
-    recipientPublicKey: recipientPublicKey
+    to: recipientPublicKey,
+    expiration: nil   // optional NIP-40 expiration on the outer wrap
 )
 
 // Unwrap
@@ -1189,8 +1200,10 @@ Takes any `NostrSigning` — a local key or a remote NIP-46 signer.
 ```swift
 let builder = DirectMessageBuilder(signer: EventSigner(keyPair: keyPair))
 
-// Single recipient (the recipient gift wrap plus the sender's self-copy)
-let result = try await builder.createMessageWithSelfCopy(
+// Single recipient: a GiftWrappedMessage with `rumor`, `recipientGiftWrap`, and `selfGiftWrap`
+// (the sender's self-copy). Nothing is published. Reactions and file messages have
+// createReactionWithSelfCopy and createFileMessageWithSelfCopy.
+let wrapped = try await builder.createMessageWithSelfCopy(
     content: "Hello!",
     to: recipientPublicKey,
     subject: "Greetings",
@@ -1213,15 +1226,15 @@ Takes any `NostrSigning`; opening a gift wrap needs only NIP-44 decryption.
 
 ```swift
 let parser = DirectMessageParser(signer: EventSigner(keyPair: recipientKeyPair))
-let dm = try await parser.parse(giftWrapEvent)
-print(dm.content)
+if case .message(let dm) = try await parser.open(giftWrapEvent) {   // DirectMessagePayload
+    print(dm.content)
+}
 ```
 
-A rumor that is not the payload being read, or is malformed, throws `DirectMessagePayload.Error`:
-`unexpectedKind(Event.Kind)`, `invalidRecipient` (a `p` tag that is not a hex key),
-`missingReactionTarget`, `invalidFileURL`, `invalidDecryptionKey`, or `invalidDecryptionNonce`.
-The `client.messages` `parse`, `parseReaction`, and `parseFile` helpers throw `unexpectedKind` when
-the gift wrap carries another payload.
+`open(_:)` (also `client.messages.open(_:)`) returns `.message`, `.reaction`, or `.file`. A rumor of
+another kind, or a malformed one, throws `DirectMessagePayload.Error`: `unexpectedKind(Event.Kind)`,
+`invalidRecipient` (a `p` tag that is not a hex key), `missingReactionTarget`, `invalidFileURL`,
+`invalidDecryptionKey`, or `invalidDecryptionNonce`.
 
 ## Contact
 

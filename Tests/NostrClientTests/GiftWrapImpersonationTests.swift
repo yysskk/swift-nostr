@@ -236,15 +236,14 @@ struct GiftWrapImpersonationTests {
         let bob = KeyPair()
         let signer = EventSigner(keyPair: alice)
 
-        let original = signer.sign(.textNote("Secret message"))
-        let giftWrap = try await GiftWrap.wrap(
-            event: original, signer: signer, recipientPublicKey: bob.publicKey)
+        let template = EventTemplate.textNote("Secret message")
+        let giftWrap = try await GiftWrap.wrap(template, signer: signer, to: bob.publicKey)
         let unwrapped = try await GiftWrap.unwrap(
             giftWrap: giftWrap, recipient: EventSigner(keyPair: bob))
 
         #expect(unwrapped.senderPublicKey == alice.publicKey)
         #expect(unwrapped.event.publicKey == alice.publicKey)
-        #expect(unwrapped.event.id == original.id)
+        #expect(unwrapped.event.id == UnsignedEvent(template, publicKey: alice.publicKey).computedID)
         #expect(unwrapped.event.content == "Secret message")
     }
 }
