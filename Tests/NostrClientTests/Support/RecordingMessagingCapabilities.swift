@@ -44,7 +44,7 @@ actor RecordingMessagingCapabilities: NostrMessaging {
             Send(
                 template: template, recipientPublicKey: recipientPublicKey, expiration: expiration, strategy: strategy
             ))
-        let rumor = try UnsignedEvent(template, publicKey: signer.publicKey).asRumor()
+        let rumor = UnsignedEvent(template, publicKey: signer.publicKey).asRumor()
         return SendDirectMessageResult(
             rumor: rumor,
             recipientGiftWrap: try await GiftWrap.wrap(

@@ -8,7 +8,7 @@ import Testing
 @Suite("EventTemplate NostrClient Factory Tests")
 struct EventTemplateClientTests {
     private func note() throws -> Event {
-        try EventSigner(keyPair: try KeyPair()).sign(.textNote("reported"))
+        EventSigner(keyPair: KeyPair()).sign(.textNote("reported"))
     }
 
     // MARK: - Profiles and contacts
@@ -196,7 +196,7 @@ struct EventTemplateClientTests {
 
     @Test("fileMessage is kind 15 with the URL as content and the file's keys and hashes as tags")
     func fileMessage() throws {
-        let file = try EncryptedFile.encrypt(Data("file bytes".utf8))
+        let file = EncryptedFile.encrypt(Data("file bytes".utf8))
 
         let template = EventTemplate.fileMessage(
             url: "https://files.example.com/blob", mimeType: "image/jpeg", encryption: file, to: .fixture("bob"))
@@ -219,7 +219,7 @@ struct EventTemplateClientTests {
     func fileMessageOptionalTags() throws {
         let template = EventTemplate.fileMessage(
             url: "https://files.example.com/blob", mimeType: "image/png",
-            encryption: try EncryptedFile.encrypt(Data("file bytes".utf8)), size: 1024, dimensions: "640x480",
+            encryption: EncryptedFile.encrypt(Data("file bytes".utf8)), size: 1024, dimensions: "640x480",
             blurhash: "LEHV6nWB2yk8", to: .fixture("bob"))
 
         #expect(template.tags.count == 10)
@@ -233,9 +233,9 @@ struct EventTemplateClientTests {
 
     @Test("DirectMessageBuilder's rumors are the factories' templates under the sender's key")
     func builderRumorsMatchFactories() async throws {
-        let alice = try KeyPair()
+        let alice = KeyPair()
         let builder = DirectMessageBuilder(signer: EventSigner(keyPair: alice))
-        let file = try EncryptedFile.encrypt(Data("file bytes".utf8))
+        let file = EncryptedFile.encrypt(Data("file bytes".utf8))
         let expected: [EventTemplate] = [
             .directMessage("hi", to: .fixture("bob"), subject: "s", replyTo: .fixture("parent")),
             .directMessageReaction(to: .fixture("message"), author: .fixture("bob"), content: "-"),

@@ -199,7 +199,7 @@ struct NIP51SimpleGroupListTests {
 
     @Test("Private entries and additional private tags survive sign and open")
     func privateEntriesRoundTrip() async throws {
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
         let typed = SimpleGroupList(
             publicEntries: [GroupListEntry(groupID: groupID, relayURL: groupRelay)],
             privateEntries: [
@@ -362,7 +362,7 @@ struct NIP51SimpleGroupListClientTests {
         try await firstConnection.connect()
         let secondConnection = await client.relays.pool.addRelay(secondRelayURL)
         try await secondConnection.connect()
-        await client.identity.setSigner(EventSigner(keyPair: try KeyPair()))
+        await client.identity.setSigner(EventSigner(keyPair: KeyPair()))
 
         let typed = SimpleGroupList(
             publicEntries: [GroupListEntry(groupID: groupID, relayURL: groupRelay, name: "Cooking")],
@@ -395,7 +395,7 @@ struct NIP51SimpleGroupListClientTests {
     func fetchPicksNewest() async throws {
         let (client, socket) = makeClient()
         try await client.relays.connect(to: [firstRelayURL])
-        let author = EventSigner(keyPair: try KeyPair())
+        let author = EventSigner(keyPair: KeyPair())
         let stale = try listEvent(
             entries: [GroupListEntry(groupID: "oldgrp", relayURL: RelayURL("wss://old.example.com")!)],
             relayURLs: [RelayURL("wss://old.example.com")!],
@@ -433,7 +433,7 @@ struct NIP51SimpleGroupListClientTests {
     func fetchOwnListDecryptsPrivateEntries() async throws {
         let (client, socket) = makeClient()
         try await client.relays.connect(to: [firstRelayURL])
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
         await client.identity.setSigner(signer)
         let typed = SimpleGroupList(
             publicEntries: [GroupListEntry(groupID: groupID, relayURL: groupRelay)],

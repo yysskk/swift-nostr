@@ -19,20 +19,18 @@ public enum ClientMessage: Sendable {
     case count(subscriptionID: String, filters: [Filter])
 
     /// Serializes the message to JSON array format
-    /// - Throws: The error `JSONEncoder` or `JSONSerialization` throws for an event or filter that
-    ///   does not encode.
-    public func serialize() throws -> String {
+    public func serialize() -> String {
         let array: [Any]
 
         switch self {
         case .event(let event):
-            let eventDict = try event.jsonObject()
+            let eventDict = event.jsonObject()
             array = ["EVENT", eventDict]
 
         case .request(let subscriptionID, let filters):
             var arr: [Any] = ["REQ", subscriptionID]
             for filter in filters {
-                let filterDict = try filter.jsonObject()
+                let filterDict = filter.jsonObject()
                 arr.append(filterDict)
             }
             array = arr
@@ -41,21 +39,25 @@ public enum ClientMessage: Sendable {
             array = ["CLOSE", subscriptionID]
 
         case .auth(let event):
-            let eventDict = try event.jsonObject()
+            let eventDict = event.jsonObject()
             array = ["AUTH", eventDict]
 
         case .count(let subscriptionID, let filters):
             var arr: [Any] = ["COUNT", subscriptionID]
             for filter in filters {
-                let filterDict = try filter.jsonObject()
+                let filterDict = filter.jsonObject()
                 arr.append(filterDict)
             }
             array = arr
         }
 
-        // `JSONSerialization` always writes UTF-8.
-        let data = try JSONSerialization.data(withJSONObject: array, options: [.withoutEscapingSlashes])
-        return String(decoding: data, as: UTF8.self)
+        // Strings and decoded JSON objects always serialize, and `JSONSerialization` writes UTF-8.
+        do {
+            let data = try JSONSerialization.data(withJSONObject: array, options: [.withoutEscapingSlashes])
+            return String(decoding: data, as: UTF8.self)
+        } catch {
+            preconditionFailure("A client message did not serialize as JSON: \(error)")
+        }
     }
 }
 
@@ -193,17 +195,22 @@ public enum RelayMessage: Sendable {
 // MARK: - Codable Helpers
 extension Encodable {
     /// Encodes the value and reads it back as a JSON object for `JSONSerialization`.
-    fileprivate func jsonObject() throws -> [String: Any] {
+    fileprivate func jsonObject() -> [String: Any] {
         // No key strategy: every declared key already carries its NIP-01 wire spelling
         // (`created_at`, `#e`, `#p`), so converting would be a no-op for them — while corrupting
         // the dynamic keys `Filter` emits for generic tag queries. Converting to snake case turns
         // the uppercase tags NIP-22 uses for root scope (`#A`, `#E`, `#I`, `#K`, `#P`) into `#_a`
         // and friends, which a relay does not recognize: it drops the unknown key and answers the
         // rest of the filter, silently returning more than was asked for.
-        let encoder = JSONEncoder()
-        let data = try encoder.encode(self)
-        // Only `Event` and `Filter` come through here, and both encode as keyed containers.
-        guard let dict = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+        // Only `Event` and `Filter` come through here: keyed containers of strings, integers, and
+        // arrays of them, which always encode.
+        let object: Any
+        do {
+            object = try JSONSerialization.jsonObject(with: JSONEncoder().encode(self))
+        } catch {
+            preconditionFailure("\(Self.self) did not encode as JSON: \(error)")
+        }
+        guard let dict = object as? [String: Any] else {
             preconditionFailure("\(Self.self) did not encode as a JSON object")
         }
         return dict

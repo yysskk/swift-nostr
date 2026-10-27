@@ -12,7 +12,7 @@ struct NIP17FileMessageTests {
     @Test("encrypt produces a 256-bit key and 96-bit nonce and round-trips")
     func encryptDecryptRoundTrip() throws {
         let data = Data("attack at dawn".utf8)
-        let encrypted = try EncryptedFile.encrypt(data)
+        let encrypted = EncryptedFile.encrypt(data)
 
         #expect(encrypted.key.count == 32)
         #expect(encrypted.nonce.count == 12)
@@ -27,7 +27,7 @@ struct NIP17FileMessageTests {
 
     @Test("decrypt with the wrong key fails authentication")
     func decryptWrongKeyFails() throws {
-        let encrypted = try EncryptedFile.encrypt(Data("secret".utf8))
+        let encrypted = EncryptedFile.encrypt(Data("secret".utf8))
         #expect(throws: EncryptedFile.Error.authenticationFailed) {
             _ = try EncryptedFile.decrypt(
                 encrypted.ciphertext, key: Data(repeating: 0, count: 32), nonce: encrypted.nonce)
@@ -36,7 +36,7 @@ struct NIP17FileMessageTests {
 
     @Test("decrypt of a tampered blob fails authentication")
     func decryptTamperedFails() throws {
-        let encrypted = try EncryptedFile.encrypt(Data("secret".utf8))
+        let encrypted = EncryptedFile.encrypt(Data("secret".utf8))
         var tampered = encrypted.ciphertext
         tampered[tampered.startIndex] ^= 0x01
         #expect(throws: EncryptedFile.Error.authenticationFailed) {
@@ -54,7 +54,7 @@ struct NIP17FileMessageTests {
 
     @Test("decrypt rejects a key that is not 32 bytes")
     func decryptWrongKeyLengthFails() throws {
-        let encrypted = try EncryptedFile.encrypt(Data("secret".utf8))
+        let encrypted = EncryptedFile.encrypt(Data("secret".utf8))
         #expect(throws: EncryptedFile.Error.invalidKeyLength(16)) {
             _ = try EncryptedFile.decrypt(
                 encrypted.ciphertext, key: encrypted.key.prefix(16), nonce: encrypted.nonce)
@@ -63,7 +63,7 @@ struct NIP17FileMessageTests {
 
     @Test("decrypt rejects a nonce that is not 12 bytes")
     func decryptWrongNonceLengthFails() throws {
-        let encrypted = try EncryptedFile.encrypt(Data("secret".utf8))
+        let encrypted = EncryptedFile.encrypt(Data("secret".utf8))
         #expect(throws: EncryptedFile.Error.invalidNonceLength(16)) {
             _ = try EncryptedFile.decrypt(
                 encrypted.ciphertext, key: encrypted.key, nonce: Data(repeating: 0, count: 16))
@@ -74,9 +74,9 @@ struct NIP17FileMessageTests {
 
     @Test("a built file message carries the NIP-17 file tags")
     func fileMessageTags() async throws {
-        let sender = try KeyPair()
-        let recipient = try KeyPair()
-        let encrypted = try EncryptedFile.encrypt(Data("x".utf8))
+        let sender = KeyPair()
+        let recipient = KeyPair()
+        let encrypted = EncryptedFile.encrypt(Data("x".utf8))
 
         let builder = DirectMessageBuilder(signer: EventSigner(keyPair: sender))
         let result = try await builder.createFileMessageWithSelfCopy(
@@ -103,10 +103,10 @@ struct NIP17FileMessageTests {
 
     @Test("a file message round-trips: encrypt, send, parse, decrypt")
     func fileRoundTrip() async throws {
-        let sender = try KeyPair()
-        let recipient = try KeyPair()
+        let sender = KeyPair()
+        let recipient = KeyPair()
         let original = Data("hello, this is a secret file".utf8)
-        let encrypted = try EncryptedFile.encrypt(original)
+        let encrypted = EncryptedFile.encrypt(original)
         let url = "https://files.example.com/abc"
 
         let builder = DirectMessageBuilder(signer: EventSigner(keyPair: sender))
@@ -141,9 +141,9 @@ struct NIP17FileMessageTests {
 
     @Test("parsePayload classifies a file message")
     func parsePayloadFile() async throws {
-        let sender = try KeyPair()
-        let recipient = try KeyPair()
-        let encrypted = try EncryptedFile.encrypt(Data("x".utf8))
+        let sender = KeyPair()
+        let recipient = KeyPair()
+        let encrypted = EncryptedFile.encrypt(Data("x".utf8))
 
         let builder = DirectMessageBuilder(signer: EventSigner(keyPair: sender))
         let result = try await builder.createFileMessageWithSelfCopy(
@@ -162,10 +162,10 @@ struct NIP17FileMessageTests {
 
     @Test("parse and parseFileMessage reject the wrong inner kind")
     func crossParseRejected() async throws {
-        let sender = try KeyPair()
-        let recipient = try KeyPair()
+        let sender = KeyPair()
+        let recipient = KeyPair()
         let builder = DirectMessageBuilder(signer: EventSigner(keyPair: sender))
-        let encrypted = try EncryptedFile.encrypt(Data("x".utf8))
+        let encrypted = EncryptedFile.encrypt(Data("x".utf8))
 
         let message = try await builder.createMessageWithSelfCopy(content: "hi", to: recipient.publicKey)
         let file = try await builder.createFileMessageWithSelfCopy(
@@ -182,11 +182,11 @@ struct NIP17FileMessageTests {
 
     @Test("a file message without a decryption key is rejected")
     func fileWithoutKeyRejected() async throws {
-        let sender = try KeyPair()
-        let recipient = try KeyPair()
+        let sender = KeyPair()
+        let recipient = KeyPair()
 
         // Hand-built kind-15 rumor missing the decryption-key/nonce tags.
-        let rumor = try UnsignedEvent(
+        let rumor = UnsignedEvent(
             publicKey: sender.publicKey, kind: .fileMessage,
             tags: [.publicKey(recipient.publicKey), Tag(name: "file-type", values: ["image/png"])],
             content: "https://files.example.com/1"
@@ -201,8 +201,8 @@ struct NIP17FileMessageTests {
 
     @Test("a file message with a wrong-length key is rejected")
     func fileWithBadKeyLengthRejected() async throws {
-        let sender = try KeyPair()
-        let recipient = try KeyPair()
+        let sender = KeyPair()
+        let recipient = KeyPair()
 
         // A 16-byte key is valid base64 but not a 256-bit AES key.
         let giftWrap = try await Self.wrapFileRumor(
@@ -216,8 +216,8 @@ struct NIP17FileMessageTests {
 
     @Test("a file message with a wrong-length nonce is rejected")
     func fileWithBadNonceLengthRejected() async throws {
-        let sender = try KeyPair()
-        let recipient = try KeyPair()
+        let sender = KeyPair()
+        let recipient = KeyPair()
 
         let giftWrap = try await Self.wrapFileRumor(
             sender: sender, recipient: recipient, url: "https://files.example.com/1",
@@ -230,8 +230,8 @@ struct NIP17FileMessageTests {
 
     @Test("a file message with an empty URL is rejected")
     func fileWithEmptyURLRejected() async throws {
-        let sender = try KeyPair()
-        let recipient = try KeyPair()
+        let sender = KeyPair()
+        let recipient = KeyPair()
 
         let giftWrap = try await Self.wrapFileRumor(
             sender: sender, recipient: recipient, url: "",
@@ -247,7 +247,7 @@ struct NIP17FileMessageTests {
     private static func wrapFileRumor(
         sender: KeyPair, recipient: KeyPair, url: String, key: Data, nonce: Data
     ) async throws -> Event {
-        let rumor = try UnsignedEvent(
+        let rumor = UnsignedEvent(
             publicKey: sender.publicKey, kind: .fileMessage,
             tags: [
                 .publicKey(recipient.publicKey),
@@ -262,9 +262,9 @@ struct NIP17FileMessageTests {
 
     @Test("a disappearing file message carries the expiration on the gift wrap")
     func fileWithExpiration() async throws {
-        let sender = try KeyPair()
-        let recipient = try KeyPair()
-        let encrypted = try EncryptedFile.encrypt(Data("x".utf8))
+        let sender = KeyPair()
+        let recipient = KeyPair()
+        let encrypted = EncryptedFile.encrypt(Data("x".utf8))
         let expiry = Timestamp(rawValue: 1_700_000_000)
 
         let builder = DirectMessageBuilder(signer: EventSigner(keyPair: sender))

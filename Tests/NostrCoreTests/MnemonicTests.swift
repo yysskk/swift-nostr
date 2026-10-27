@@ -146,6 +146,21 @@ struct MnemonicTests {
         }
     }
 
+    @Test("A keypair from an invalid phrase throws the mnemonic error")
+    func keyPairFromInvalidPhrase() {
+        let invalidPhrase = "leader monkey parrot ring guide accident before fence cannon height naive notaword"
+        #expect(throws: KeyPair.Error.invalidMnemonic(.unknownWord("notaword"))) {
+            _ = try KeyPair(mnemonicPhrase: invalidPhrase)
+        }
+    }
+
+    @Test("Generating a keypair with an unsupported word count throws the mnemonic error")
+    func generateKeyPairWithInvalidWordCount() {
+        #expect(throws: KeyPair.Error.invalidMnemonic(.invalidWordCount(13))) {
+            _ = try KeyPair.generate(wordCount: 13)
+        }
+    }
+
     // MARK: - Account Derivation
 
     @Test("Different accounts derive different keys")

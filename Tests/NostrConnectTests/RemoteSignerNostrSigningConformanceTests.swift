@@ -11,8 +11,8 @@ struct RemoteSignerNostrSigningConformanceTests {
     private let signer: KeyPair
 
     init() throws {
-        self.client = try KeyPair()
-        self.signer = try KeyPair()
+        self.client = KeyPair()
+        self.signer = KeyPair()
     }
 
     /// A connected ``RemoteSigner`` with its fake transport, ready for command tests.

@@ -15,7 +15,7 @@ struct NIP23LongFormTests {
     private let relayURL = RelayURL("wss://relay.example.com")!
 
     private func makeSigner() throws -> EventSigner {
-        EventSigner(keyPair: try KeyPair())
+        EventSigner(keyPair: KeyPair())
     }
 
     // MARK: - Tag mapping
@@ -169,7 +169,7 @@ struct NIP23LongFormTests {
     func naddrRoundTrips() throws {
         let signer = try makeSigner()
         let article = LongFormContent(identifier: "addressable-id")
-        let event = try signer.sign(.longFormContent(article, draft: false))
+        let event = signer.sign(.longFormContent(article, draft: false))
 
         let naddr = try article.naddr(author: signer.publicKey)
         let decoded = try NAddr(bech32String: naddr.encoded)
@@ -188,10 +188,10 @@ struct NIP23LongFormTests {
     @Test("Event.longFormContent is non-nil for an article and nil for a text note")
     func eventLongFormContentProperty() throws {
         let signer = try makeSigner()
-        let article = try signer.sign(.longFormContent(LongFormContent(identifier: "d", title: "T")))
+        let article = signer.sign(.longFormContent(LongFormContent(identifier: "d", title: "T")))
         #expect(article.longFormContent?.title == "T")
 
-        let note = try signer.sign(.textNote("hi"))
+        let note = signer.sign(.textNote("hi"))
         #expect(note.longFormContent == nil)
     }
 
@@ -242,7 +242,7 @@ struct NIP23LongFormTests {
     @Test("fetchLongFormContent(author:identifier:) keeps the newest version across relays")
     func fetchNewestWins() async throws {
         let signer = try makeSigner()
-        let older = try signer.sign(
+        let older = signer.sign(
             .longFormContent(
                 LongFormContent(
                     identifier: "same-d",
@@ -299,7 +299,7 @@ struct NIP23LongFormTests {
     func fetchByNAddr() async throws {
         let signer = try makeSigner()
         let article = LongFormContent(identifier: "coord-d", title: "Coordinated")
-        let event = try signer.sign(.longFormContent(article, draft: false))
+        let event = signer.sign(.longFormContent(article, draft: false))
 
         let mock = MockWebSocketSession()
         let pool = RelayPool(
@@ -337,7 +337,7 @@ struct NIP23LongFormTests {
     func fetchByNAddrFallsBackToThePool() async throws {
         let signer = try makeSigner()
         let article = LongFormContent(identifier: "fallback-d", title: "Fallback")
-        let event = try signer.sign(.longFormContent(article, draft: false))
+        let event = signer.sign(.longFormContent(article, draft: false))
         let (client, mock) = try await ConnectedClientFixture.make(relayURL: relayURL)
         let naddr = try article.naddr(author: signer.publicKey, relays: [RelayURL("wss://elsewhere.example.com")!])
 

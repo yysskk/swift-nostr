@@ -25,7 +25,7 @@ struct IdentityCapabilityTests {
     func setPrivateKeyInstallsALocalSigner() async throws {
         let stub = RecordingIdentityCapabilities()
         let identity: any NostrIdentityProviding = stub
-        let keyPair = try KeyPair()
+        let keyPair = KeyPair()
 
         try await identity.setPrivateKey(keyPair.privateKeyHex)
 
@@ -39,7 +39,7 @@ struct IdentityCapabilityTests {
     func setNsecInstallsALocalSigner() async throws {
         let stub = RecordingIdentityCapabilities()
         let identity: any NostrIdentityProviding = stub
-        let keyPair = try KeyPair()
+        let keyPair = KeyPair()
 
         try await identity.setNsec(keyPair.nsec)
 
@@ -56,7 +56,7 @@ struct IdentityCapabilityTests {
     func setPrivateKeyRejectsMalformedKeys(_ privateKeyHex: String, expected: KeyPair.Error) async throws {
         let stub = RecordingIdentityCapabilities()
         let identity: any NostrIdentityProviding = stub
-        let current = try KeyPair()
+        let current = KeyPair()
         try await identity.setPrivateKey(current.privateKeyHex)
 
         await #expect(throws: expected) {
@@ -71,7 +71,7 @@ struct IdentityCapabilityTests {
     func setNsecRejectsMalformedInput() async throws {
         let stub = RecordingIdentityCapabilities()
         let identity: any NostrIdentityProviding = stub
-        let current = try KeyPair()
+        let current = KeyPair()
         try await identity.setNsec(current.nsec)
         let npub = current.publicKey.npub
 

@@ -56,7 +56,7 @@ actor RecordingGroupCapabilities: NostrGroupManaging {
         -> PublishedEvent
     {
         publishes.append(Publish(template: template, group: group, strategy: strategy))
-        return PublishedEvent(event: try signer.sign(template), result: PublishResult(statuses: [:]))
+        return PublishedEvent(event: signer.sign(template), result: PublishResult(statuses: [:]))
     }
 
     func fetchMetadata(
@@ -98,6 +98,6 @@ actor RecordingGroupCapabilities: NostrGroupManaging {
     func publishSimpleGroupList(_ list: SimpleGroupList, strategy: PublishStrategy?) async throws -> PublishedEvent {
         listPublishes.append(ListPublish(list: list, strategy: strategy))
         let template = try await EventTemplate.list(list.list, encryptingWith: signer)
-        return PublishedEvent(event: try signer.sign(template), result: PublishResult(statuses: [:]))
+        return PublishedEvent(event: signer.sign(template), result: PublishResult(statuses: [:]))
     }
 }

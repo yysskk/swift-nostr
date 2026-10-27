@@ -55,8 +55,8 @@ struct NIP04Tests {
 
     @Test("encrypt then decrypt round-trips")
     func roundTrip() throws {
-        let alice = try KeyPair()
-        let bob = try KeyPair()
+        let alice = KeyPair()
+        let bob = KeyPair()
         let message = "the quick brown fox 🦊"
 
         let content = try NIP04.encrypt(message, privateKey: alice.privateKey, peerPublicKeyXOnly: bob.publicKey.data)
@@ -67,8 +67,8 @@ struct NIP04Tests {
 
     @Test("the shared key is the same from both sides")
     func sharedKeyIsSymmetric() throws {
-        let alice = try KeyPair()
-        let bob = try KeyPair()
+        let alice = KeyPair()
+        let bob = KeyPair()
 
         let aliceToBob = try NIP04.sharedKey(privateKey: alice.privateKey, peerPublicKeyXOnly: bob.publicKey.data)
         let bobToAlice = try NIP04.sharedKey(privateKey: bob.privateKey, peerPublicKeyXOnly: alice.publicKey.data)
@@ -78,8 +78,8 @@ struct NIP04Tests {
 
     @Test("the IV is 16 bytes")
     func ivIsSixteenBytes() throws {
-        let alice = try KeyPair()
-        let bob = try KeyPair()
+        let alice = KeyPair()
+        let bob = KeyPair()
 
         let content = try NIP04.encrypt("hi", privateKey: alice.privateKey, peerPublicKeyXOnly: bob.publicKey.data)
         let ivPart = try #require(content.components(separatedBy: "?iv=").last)
@@ -89,8 +89,8 @@ struct NIP04Tests {
 
     @Test("rejects content without an iv separator")
     func rejectsMissingIV() throws {
-        let alice = try KeyPair()
-        let bob = try KeyPair()
+        let alice = KeyPair()
+        let bob = KeyPair()
 
         #expect(throws: NIP04.DecodingError.malformedContent) {
             try NIP04.decrypt(
@@ -100,8 +100,8 @@ struct NIP04Tests {
 
     @Test("rejects non-base64 ciphertext")
     func rejectsBadBase64() throws {
-        let alice = try KeyPair()
-        let bob = try KeyPair()
+        let alice = KeyPair()
+        let bob = KeyPair()
 
         #expect(throws: NIP04.DecodingError.invalidBase64) {
             try NIP04.decrypt(
@@ -111,8 +111,8 @@ struct NIP04Tests {
 
     @Test("rejects a base64 IV of the wrong length as malformed content")
     func rejectsWrongLengthIV() throws {
-        let alice = try KeyPair()
-        let bob = try KeyPair()
+        let alice = KeyPair()
+        let bob = KeyPair()
         // A valid-base64 ciphertext block paired with a base64 IV that decodes to 8 bytes, not 16.
         let content = "zJxfaJ32rN5Dg1ODjOlEew==?iv=AAAAAAAAAAA="
 

@@ -90,12 +90,12 @@ struct ExtendingTheClientTests {
     /// A kind-9735 receipt paying `recipient`, signed by a provider key, whose embedded zap request
     /// carries `amountMillisats`.
     private func makeReceipt(paying recipient: PublicKey, amountMillisats: Int64) throws -> Event {
-        let sender = EventSigner(keyPair: try KeyPair())
+        let sender = EventSigner(keyPair: KeyPair())
         let request = try sender.sign(
             .zapRequest(to: recipient, relays: [relayURL], amountMillisats: amountMillisats))
         let description = String(decoding: try JSONEncoder().encode(request), as: UTF8.self)
-        let provider = EventSigner(keyPair: try KeyPair())
-        return try provider.sign(
+        let provider = EventSigner(keyPair: KeyPair())
+        return provider.sign(
             EventTemplate(
                 kind: .zap,
                 tags: [
@@ -125,7 +125,7 @@ struct ExtendingTheClientTests {
     @Test("a helper on NostrEventPublishing signs and publishes through client.events")
     func capabilityHelperOnClient() async throws {
         let (client, socket) = try await ConnectedClientFixture.make(relayURL: relayURL)
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
         await client.identity.setSigner(signer)
         let expiration = Timestamp.now.advanced(by: .seconds(3600))
 
@@ -146,7 +146,7 @@ struct ExtendingTheClientTests {
 
     @Test("a helper on NostrEventPublishing reaches a primitives-only stub through the existential")
     func capabilityHelperOnStub() async throws {
-        let stub = RecordingEventCapabilities(signer: EventSigner(keyPair: try KeyPair()))
+        let stub = RecordingEventCapabilities(signer: EventSigner(keyPair: KeyPair()))
         let publishing: any NostrEventPublishing = stub
 
         try await publishing.publishStatus("Away")
@@ -168,9 +168,9 @@ struct ExtendingTheClientTests {
     @Test("a composed namespace signs through client.identity")
     func namespaceSignsThroughClient() async throws {
         let client = NostrClient()
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
         await client.identity.setSigner(signer)
-        let recipient = try KeyPair().publicKey
+        let recipient = KeyPair().publicKey
 
         let request = try await client.zaps.signRequest(
             to: recipient, amountMillisats: 21_000, relays: [relayURL], comment: "thanks")
@@ -186,7 +186,7 @@ struct ExtendingTheClientTests {
     @Test("a composed namespace fetches through client.events for client.identity's key")
     func namespaceFetchesThroughClient() async throws {
         let (client, socket) = try await ConnectedClientFixture.make(relayURL: relayURL)
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
         await client.identity.setSigner(signer)
         let receipt = try makeReceipt(paying: signer.publicKey, amountMillisats: 21_000)
 
@@ -208,7 +208,7 @@ struct ExtendingTheClientTests {
 
     @Test("a composed namespace runs against primitives-only stubs")
     func namespaceAgainstStubs() async throws {
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
         let receipt = try makeReceipt(paying: signer.publicKey, amountMillisats: 5_000)
         let events = RecordingEventCapabilities(signer: signer, cannedEvents: [receipt])
         let identity = RecordingIdentityCapabilities()
@@ -228,7 +228,7 @@ struct ExtendingTheClientTests {
     @Test("a composed namespace mixes a minimal stub with the client's own identity")
     func namespaceWithMinimalStubAndClientIdentity() async throws {
         let client = NostrClient()
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
         await client.identity.setSigner(signer)
         let receipt = try makeReceipt(paying: signer.publicKey, amountMillisats: 21_000)
         let events = CannedEvents([receipt])

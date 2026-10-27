@@ -88,7 +88,7 @@ struct EventVerificationValidationTests {
     @Test("an event with a signature from another key does not verify")
     func foreignSignatureDoesNotVerify() throws {
         let event = try EventSigner(privateKeyHex: Self.secretKeyHex).sign(.textNote("gm"))
-        let other = try EventSigner(keyPair: try KeyPair()).sign(.textNote("gm"))
+        let other = EventSigner(keyPair: KeyPair()).sign(.textNote("gm"))
         let forged = Event(
             id: event.id, publicKey: event.publicKey, createdAt: event.createdAt, kind: event.kind,
             tags: event.tags, content: event.content, signature: other.signature)
@@ -98,7 +98,7 @@ struct EventVerificationValidationTests {
 
     @Test("an unsigned rumor does not verify")
     func rumorDoesNotVerify() throws {
-        let rumor = try UnsignedEvent(publicKey: try KeyPair().publicKey, kind: .textNote, content: "gm").asRumor()
+        let rumor = UnsignedEvent(publicKey: KeyPair().publicKey, kind: .textNote, content: "gm").asRumor()
 
         #expect(rumor.signature == nil)
         #expect(throws: Event.VerificationError.missingSignature) {

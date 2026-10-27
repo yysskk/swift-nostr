@@ -154,7 +154,7 @@ struct NIP29GroupEventTests {
         ]
     )
     func extremeTimestamps(createdAt: Timestamp) throws {
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
         let templates: [EventTemplate] = [
             .groupJoinRequest(groupID: "abcdef"),
             .groupLeaveRequest(groupID: "abcdef"),
@@ -163,7 +163,7 @@ struct NIP29GroupEventTests {
 
         for var template in templates {
             template.createdAt = createdAt
-            let signed = try signer.sign(template)
+            let signed = signer.sign(template)
             #expect(signed.createdAt == createdAt)
             #expect(try signed.verify())
         }
@@ -171,7 +171,7 @@ struct NIP29GroupEventTests {
 
     @Test("a join request signed by a remote signer verifies and keeps the template layout")
     func signedGroupJoinRequest() async throws {
-        let signer = StubRemoteSigner(keyPair: try KeyPair())
+        let signer = StubRemoteSigner(keyPair: KeyPair())
         var template = EventTemplate.groupJoinRequest(groupID: "abcdef", inviteCode: "invite123", reason: "let me in")
         template.createdAt = createdAt
 
@@ -199,7 +199,7 @@ struct NIP29GroupEventTests {
 
     @Test("a leave request signed by a remote signer verifies with kind 9022 and no code tag")
     func signedGroupLeaveRequest() async throws {
-        let signer = StubRemoteSigner(keyPair: try KeyPair())
+        let signer = StubRemoteSigner(keyPair: KeyPair())
 
         let event = try await signer.sign(.groupLeaveRequest(groupID: "abcdef"))
 
@@ -250,7 +250,7 @@ struct NIP29GroupEventTests {
 
     @Test("a content event signed by a remote signer verifies and keeps the template layout")
     func signedContent() async throws {
-        let signer = StubRemoteSigner(keyPair: try KeyPair())
+        let signer = StubRemoteSigner(keyPair: KeyPair())
         var template = EventTemplate.groupContent(
             groupID: "abcdef", kind: .chatMessage, content: "hello", previous: ["00000001"])
         template.createdAt = createdAt

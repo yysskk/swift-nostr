@@ -80,16 +80,11 @@ extension EventTemplate {
     ///   - event: The event being reposted; it is embedded in the content and referenced by an `e` tag.
     ///   - relayURL: The relay where the reposted event can be found, recorded in the `e` tag.
     /// - Returns: The template for the repost.
-    /// - Throws: `EncodingError` if `event` cannot be encoded as JSON.
-    public static func repost(of event: Event, relayURL: RelayURL? = nil) throws -> EventTemplate {
-        let encoder = JSONEncoder()
-        encoder.keyEncodingStrategy = .convertToSnakeCase
-        let eventJSON = try encoder.encode(event)
-
-        return EventTemplate(
+    public static func repost(of event: Event, relayURL: RelayURL? = nil) -> EventTemplate {
+        EventTemplate(
             kind: .repost,
             tags: [.event(event.id, relayURL: relayURL), .publicKey(event.publicKey)],
-            content: String(decoding: eventJSON, as: UTF8.self)
+            content: String(decoding: event.jsonData, as: UTF8.self)
         )
     }
 

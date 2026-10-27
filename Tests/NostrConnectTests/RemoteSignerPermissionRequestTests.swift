@@ -14,8 +14,8 @@ struct RemoteSignerPermissionRequestTests {
     private let signer: KeyPair
 
     init() throws {
-        self.client = try KeyPair()
-        self.signer = try KeyPair()
+        self.client = KeyPair()
+        self.signer = KeyPair()
     }
 
     private func makeSigner(

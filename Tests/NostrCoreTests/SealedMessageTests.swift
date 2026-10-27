@@ -9,8 +9,8 @@ struct SealedMessageTests {
 
     @Test("Alice seals to Bob and Bob opens the original plaintext")
     func roundTrip() throws {
-        let alice = try KeyPair()
-        let bob = try KeyPair()
+        let alice = KeyPair()
+        let bob = KeyPair()
         let plaintext = "gm from Alice"
 
         let sealed = try SealedMessage.seal(plaintext, for: bob.publicKey, using: alice)
@@ -21,8 +21,8 @@ struct SealedMessageTests {
 
     @Test("Round trip preserves unicode and emoji")
     func roundTripUnicode() throws {
-        let alice = try KeyPair()
-        let bob = try KeyPair()
+        let alice = KeyPair()
+        let bob = KeyPair()
         let plaintext = "こんにちは 🍕🫃 café naïve"
 
         let sealed = try SealedMessage.seal(plaintext, for: bob.publicKey, using: alice)
@@ -33,8 +33,8 @@ struct SealedMessageTests {
 
     @Test("Round trip preserves a long message")
     func roundTripLongMessage() throws {
-        let alice = try KeyPair()
-        let bob = try KeyPair()
+        let alice = KeyPair()
+        let bob = KeyPair()
         let plaintext = String(repeating: "The quick brown fox. ", count: 500)
 
         let sealed = try SealedMessage.seal(plaintext, for: bob.publicKey, using: alice)
@@ -47,8 +47,8 @@ struct SealedMessageTests {
 
     @Test("Payload is non-empty base64 with a version-2 first byte")
     func payloadShape() throws {
-        let alice = try KeyPair()
-        let bob = try KeyPair()
+        let alice = KeyPair()
+        let bob = KeyPair()
 
         let sealed = try SealedMessage.seal("hello", for: bob.publicKey, using: alice)
 
@@ -62,9 +62,9 @@ struct SealedMessageTests {
 
     @Test("Opening with the wrong recipient key throws")
     func wrongRecipientFails() throws {
-        let alice = try KeyPair()
-        let bob = try KeyPair()
-        let mallory = try KeyPair()
+        let alice = KeyPair()
+        let bob = KeyPair()
+        let mallory = KeyPair()
 
         let sealed = try SealedMessage.seal("secret", for: bob.publicKey, using: alice)
 
@@ -76,8 +76,8 @@ struct SealedMessageTests {
 
     @Test("Tampering with the payload makes open fail the HMAC check")
     func tamperingFails() throws {
-        let alice = try KeyPair()
-        let bob = try KeyPair()
+        let alice = KeyPair()
+        let bob = KeyPair()
 
         let sealed = try SealedMessage.seal("secret", for: bob.publicKey, using: alice)
 
@@ -96,7 +96,7 @@ struct SealedMessageTests {
 
     @Test("Sealing to a public key that is not on the curve throws")
     func sealToOffCurveKeyFails() throws {
-        let alice = try KeyPair()
+        let alice = KeyPair()
 
         #expect(throws: SealedMessage.Error.invalidPublicKey) {
             _ = try SealedMessage.seal("secret", for: Self.offCurvePublicKey, using: alice)
@@ -105,8 +105,8 @@ struct SealedMessageTests {
 
     @Test("Opening from a public key that is not on the curve throws")
     func openFromOffCurveKeyFails() throws {
-        let alice = try KeyPair()
-        let bob = try KeyPair()
+        let alice = KeyPair()
+        let bob = KeyPair()
         let sealed = try SealedMessage.seal("secret", for: bob.publicKey, using: alice)
 
         #expect(throws: SealedMessage.Error.invalidPublicKey) {
@@ -116,8 +116,8 @@ struct SealedMessageTests {
 
     @Test("A payload that is not base64 is malformed")
     func nonBase64PayloadIsMalformed() throws {
-        let alice = try KeyPair()
-        let bob = try KeyPair()
+        let alice = KeyPair()
+        let bob = KeyPair()
 
         #expect(throws: SealedMessage.Error.malformedPayload) {
             _ = try SealedMessage(payload: "not base64!").open(from: alice.publicKey, using: bob)

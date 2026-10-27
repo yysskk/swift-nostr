@@ -44,48 +44,53 @@ public struct EventSigner: Sendable {
     ///   ``publicKey``.
     /// - Returns: The signed ``Event``.
     /// - Throws: ``EventSigner/Error/publicKeyMismatch`` if `unsignedEvent` is keyed to another
-    ///   public key; an error if the event cannot be serialized for hashing or signed.
-    public func sign(_ unsignedEvent: UnsignedEvent) throws -> Event {
+    ///   public key.
+    public func sign(_ unsignedEvent: UnsignedEvent) throws(EventSigner.Error) -> Event {
         // The id commits to the public key, so signing another key's event would produce one whose
         // signature cannot verify.
         guard unsignedEvent.publicKey == publicKey else {
-            throw Error.publicKeyMismatch
+            throw .publicKeyMismatch
+        }
+        return signed(unsignedEvent)
+    }
+
+    /// Signs `template` as this signer's ``publicKey``, returning the complete signed event.
+    ///
+    /// This method satisfies ``NostrSigning/sign(_:)-(EventTemplate)`` synchronously and without
+    /// throwing, so an ``EventSigner`` signs a template without `try` or `await`, in synchronous and
+    /// async code alike:
+    ///
+    /// ```swift
+    /// let note = signer.sign(.textNote("gm"))
+    /// ```
+    /// - Parameter template: The event to sign.
+    /// - Returns: The signed ``Event``.
+    public func sign(_ template: EventTemplate) -> Event {
+        signed(UnsignedEvent(template, publicKey: publicKey))
+    }
+
+    /// Signs `unsignedEvent`, which the caller guarantees is keyed to this signer's ``publicKey``.
+    private func signed(_ unsignedEvent: UnsignedEvent) -> Event {
+        let hash = SHA256.hash(data: unsignedEvent.serializedForHashing())
+
+        // A KeyPair only ever holds a valid scalar, and libsecp256k1 rejects nothing else: signing
+        // with one fails only on a zero nonce, which is cryptographically unreachable.
+        let signature: P256K.Schnorr.SchnorrSignature
+        do {
+            signature = try P256K.Schnorr.PrivateKey(dataRepresentation: keyPair.privateKey).signature(for: hash)
+        } catch {
+            preconditionFailure("Schnorr signing failed with a valid secp256k1 scalar: \(error)")
         }
 
-        // Serialize the event for hashing
-        let serialized = try unsignedEvent.serializedForHashing()
-
-        // Calculate the event ID (SHA256 hash of serialized event)
-        let hash = SHA256.hash(data: serialized)
-
-        // Sign the hash with the private key using Schnorr
-        let privateKey = try P256K.Schnorr.PrivateKey(dataRepresentation: keyPair.privateKey)
-        let signature = try privateKey.signature(for: hash)
-
         return Event(
-            id: try EventID(data: Data(hash)),
+            id: EventID(validatedData: Data(hash)),
             publicKey: unsignedEvent.publicKey,
             createdAt: unsignedEvent.createdAt,
             kind: unsignedEvent.kind,
             tags: unsignedEvent.tags,
             content: unsignedEvent.content,
-            signature: try Signature(data: Data(signature.dataRepresentation))
+            signature: Signature(validatedData: signature.dataRepresentation)
         )
-    }
-
-    /// Signs `template` as this signer's ``publicKey``, returning the complete signed event.
-    ///
-    /// This method satisfies ``NostrSigning/sign(_:)-(EventTemplate)`` synchronously, so an
-    /// ``EventSigner`` signs a template without `await`, in synchronous and async code alike:
-    ///
-    /// ```swift
-    /// let note = try signer.sign(.textNote("gm"))
-    /// ```
-    /// - Parameter template: The event to sign.
-    /// - Returns: The signed ``Event``.
-    /// - Throws: An error if the event cannot be serialized for hashing or signed.
-    public func sign(_ template: EventTemplate) throws -> Event {
-        try sign(UnsignedEvent(template, publicKey: publicKey))
     }
 
     /// Encrypts `plaintext` to `recipientPublicKey` with NIP-44 v2, as this signer's identity.
@@ -143,12 +148,7 @@ extension Event {
             content: content
         )
 
-        // Serialize and hash. Strings and integers always serialize; were that ever to fail, the
-        // id could not be shown to commit to these fields, which is what a mismatch means.
-        guard let serialized = try? unsigned.serializedForHashing() else {
-            throw .idMismatch
-        }
-        let hash = SHA256.hash(data: serialized)
+        let hash = SHA256.hash(data: unsigned.serializedForHashing())
 
         // Verify the event ID
         guard Data(hash) == id.data else {

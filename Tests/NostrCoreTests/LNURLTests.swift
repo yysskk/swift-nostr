@@ -40,7 +40,7 @@ struct LNURLTests {
 
     @Test("Decoding reports why a string is not an lnurl")
     func decodeFailureReasons() throws {
-        let npub = try KeyPair().publicKey.npub
+        let npub = KeyPair().publicKey.npub
         let notUTF8 = try Bech32.encode(hrp: "lnurl", data: Data([0xff, 0xfe]))
 
         #expect(throws: LNURL.Error.invalidBech32(.missingSeparator)) {
@@ -130,8 +130,8 @@ struct LNURLTests {
             nostrPublicKey: .fixture("provider")
         )
 
-        let recipient = try KeyPair()
-        let signer = EventSigner(keyPair: try KeyPair())
+        let recipient = KeyPair()
+        let signer = EventSigner(keyPair: KeyPair())
         let zapRequest = try signer.sign(
             .zapRequest(
                 to: recipient.publicKey,

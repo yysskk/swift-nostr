@@ -16,8 +16,8 @@ struct MessagingCapabilityTests {
     private let bob: KeyPair
 
     init() throws {
-        alice = try KeyPair()
-        bob = try KeyPair()
+        alice = KeyPair()
+        bob = KeyPair()
     }
 
     /// A stub whose signer is Bob, so gift wraps sealed to Bob open.
@@ -32,7 +32,7 @@ struct MessagingCapabilityTests {
     }
 
     private func encryptedFile() throws -> EncryptedFile {
-        try EncryptedFile.encrypt(Data("file bytes".utf8))
+        EncryptedFile.encrypt(Data("file bytes".utf8))
     }
 
     /// The one send the stub recorded.
@@ -267,7 +267,7 @@ struct MessagingCapabilityTests {
     @Test("a gift wrap that does not open throws what the dedicated parser throws")
     func parseHelpersPassUnwrapFailuresThrough() async throws {
         let messaging: any NostrMessaging = makeStub()
-        let carol = try KeyPair()
+        let carol = KeyPair()
         // Sealed to Carol, so Bob's decryption fails.
         let foreign = try await fromAlice.createMessageWithSelfCopy(content: "hi", to: carol.publicKey)
         let parser = DirectMessageParser(signer: EventSigner(keyPair: bob))

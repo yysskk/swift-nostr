@@ -11,8 +11,8 @@ struct RemoteSignerSessionTests {
     private let signer: KeyPair
 
     init() throws {
-        self.client = try KeyPair()
-        self.signer = try KeyPair()
+        self.client = KeyPair()
+        self.signer = KeyPair()
     }
 
     private func makeSigner(
@@ -168,7 +168,7 @@ struct RemoteSignerSessionTests {
         let request = try RemoteSignerFixtures.decryptRequest(sent[1], client: client, signer: signer)
 
         // A response encrypted by a different keypair, authored by an impostor, must be dropped.
-        let impostor = try KeyPair()
+        let impostor = KeyPair()
         let json = "{\"id\":\"\(request.id)\",\"result\":\"pong\"}"
         let sealed = try SealedMessage.seal(json, for: client.publicKey, using: impostor)
         let forged = Event(

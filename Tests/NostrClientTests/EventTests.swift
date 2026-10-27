@@ -9,7 +9,7 @@ struct EventTests {
 
     @Test("Create unsigned event")
     func createUnsignedEvent() throws {
-        let keyPair = try KeyPair()
+        let keyPair = KeyPair()
         let unsigned = UnsignedEvent(
             publicKey: keyPair.publicKey,
             kind: .textNote,
@@ -33,7 +33,7 @@ struct EventTests {
             content: "test content"
         )
 
-        let serialized = try unsigned.serializedForHashing()
+        let serialized = unsigned.serializedForHashing()
 
         // Pinned to the exact canonical bytes: substring checks would pass for a serializer that
         // computes ids no other client agrees with. The full escaping, ordering, and signature
@@ -43,12 +43,12 @@ struct EventTests {
             + #"1234567890,1,[["p","test"]],"test content"]"#
 
         #expect(String(decoding: serialized, as: UTF8.self) == expectedSerialization)
-        #expect(try unsigned.computedID.hex == "50898905ac2070fd2d2bc67553e0379ccdb2cc964be4e93c98409c2c3be32c3d")
+        #expect(unsigned.computedID.hex == "50898905ac2070fd2d2bc67553e0379ccdb2cc964be4e93c98409c2c3be32c3d")
     }
 
     @Test("Sign and verify event")
     func signAndVerifyEvent() throws {
-        let keyPair = try KeyPair()
+        let keyPair = KeyPair()
         let signer = EventSigner(keyPair: keyPair)
 
         let unsigned = UnsignedEvent(
@@ -73,7 +73,7 @@ struct EventTests {
     func signedTextNote() throws {
         let signer = try EventSigner(privateKeyHex: "e8f32e723decf4051aefac8e2c93c9c5b214313817cdb01a1494b917c8436b35")
 
-        let event = try signer.sign(.textNote("Hello!"))
+        let event = signer.sign(.textNote("Hello!"))
 
         #expect(event.kind == 1)
         #expect(event.content == "Hello!")
@@ -82,7 +82,7 @@ struct EventTests {
 
     @Test("Sign metadata event")
     func metadataEvent() throws {
-        let keyPair = try KeyPair()
+        let keyPair = KeyPair()
         let signer = EventSigner(keyPair: keyPair)
 
         let metadata = UserMetadata(
@@ -100,13 +100,13 @@ struct EventTests {
 
     @Test("Sign reaction event")
     func signedReaction() throws {
-        let keyPair = try KeyPair()
+        let keyPair = KeyPair()
         let signer = EventSigner(keyPair: keyPair)
 
         // Create a target event to react to
-        let targetEvent = try signer.sign(.textNote("Original post"))
+        let targetEvent = signer.sign(.textNote("Original post"))
 
-        let reaction = try signer.sign(.reaction(to: targetEvent, content: "🤙"))
+        let reaction = signer.sign(.reaction(to: targetEvent, content: "🤙"))
 
         #expect(reaction.kind == 7)
         #expect(reaction.content == "🤙")
@@ -129,9 +129,9 @@ struct EventTests {
 
     @Test("Event JSON encoding/decoding")
     func eventJSONCoding() throws {
-        let keyPair = try KeyPair()
+        let keyPair = KeyPair()
         let signer = EventSigner(keyPair: keyPair)
-        let event = try signer.sign(.textNote("JSON test"))
+        let event = signer.sign(.textNote("JSON test"))
 
         let encoder = JSONEncoder()
         let data = try encoder.encode(event)

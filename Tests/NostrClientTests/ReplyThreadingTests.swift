@@ -25,7 +25,7 @@ struct ReplyThreadingTests {
         let (client, socket) = try await makeClient()
         defer { Task { await client.relays.disconnect() } }
 
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
         let parent = try signer.sign(
             UnsignedEvent(
                 publicKey: signer.publicKey,

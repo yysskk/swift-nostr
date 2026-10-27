@@ -42,8 +42,8 @@ struct RelayConnectionTeardownTests {
         let connection = makeConnection(socket: socket)
         try await connection.connect()
 
-        let signer = EventSigner(keyPair: try KeyPair())
-        let event = try signer.sign(.textNote("hello"))
+        let signer = EventSigner(keyPair: KeyPair())
+        let event = signer.sign(.textNote("hello"))
 
         let publish = Task { try await connection.publish(event) }
         // Wait for the EVENT to reach the socket, so the waiter is registered before the drop.
@@ -80,7 +80,7 @@ struct RelayConnectionTeardownTests {
         let connection = makeConnection(socket: socket)
         try await connection.connect()
 
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
         socket.deliver(.string(#"["AUTH","challenge"]"#))
         try await pollUntil { await connection.authenticationChallenge != nil }
 

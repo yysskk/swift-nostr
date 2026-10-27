@@ -80,7 +80,7 @@ struct Bech32Tests {
 
     @Test("Round trip encoding")
     func roundTripEncoding() throws {
-        let keyPair = try KeyPair()
+        let keyPair = KeyPair()
 
         // Test nsec round trip
         let nsec = keyPair.nsec

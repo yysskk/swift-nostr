@@ -47,7 +47,7 @@ struct HTTPAuthTests {
 
     @Test("an authorization event signed by a remote signer keeps the template and verifies")
     func remoteSignedEvent() async throws {
-        let signer = StubRemoteSigner(keyPair: try KeyPair())
+        let signer = StubRemoteSigner(keyPair: KeyPair())
         var template = EventTemplate.httpAuthorization(url: url, method: "get")
         template.createdAt = Timestamp(rawValue: 1_682_327_852)
 
@@ -62,8 +62,8 @@ struct HTTPAuthTests {
 
     @Test("the header value is the Nostr scheme plus the base64 event JSON")
     func headerValueRoundTrips() throws {
-        let signer = EventSigner(keyPair: try KeyPair())
-        let event = try signer.sign(.httpAuthorization(url: url, method: "GET"))
+        let signer = EventSigner(keyPair: KeyPair())
+        let event = signer.sign(.httpAuthorization(url: url, method: "GET"))
 
         let value = try HTTPAuth.authorizationHeaderValue(for: event)
 
@@ -77,7 +77,7 @@ struct HTTPAuthTests {
 
     @Test("encoding a non-27235 event as a header is rejected")
     func headerValueRejectsWrongKind() throws {
-        let note = try EventSigner(keyPair: try KeyPair()).sign(.textNote("hi"))
+        let note = EventSigner(keyPair: KeyPair()).sign(.textNote("hi"))
 
         #expect(throws: HTTPAuth.AuthorizationError.invalidEventKind(.textNote)) {
             try HTTPAuth.authorizationHeaderValue(for: note)
@@ -86,7 +86,7 @@ struct HTTPAuthTests {
 
     @Test("URLRequest convenience signs the URL, method, and body into a header that validates")
     func urlRequestConvenience() async throws {
-        let signer = StubRemoteSigner(keyPair: try KeyPair())
+        let signer = StubRemoteSigner(keyPair: KeyPair())
         let body = Data("payload".utf8)
         var request = URLRequest(url: url)
         request.httpMethod = "post"
@@ -108,7 +108,7 @@ struct HTTPAuthTests {
 
     @Test("URLRequest convenience defaults the method to GET")
     func urlRequestDefaultsToGET() async throws {
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
         var request = URLRequest(url: url)
 
         try await request.setNostrAuthorization(signer: signer)
@@ -121,7 +121,7 @@ struct HTTPAuthTests {
 
     @Test("URLRequest convenience rejects a request without a URL")
     func urlRequestWithoutURL() async throws {
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
         var request = URLRequest(url: url)
         request.url = nil
 

@@ -174,7 +174,7 @@ struct ProofOfWorkTests {
 
     @Test("sign(_:proofOfWork:) works with a signer that is not an EventSigner")
     func signWithProofOfWorkThroughRemoteSigner() async throws {
-        let keyPair = try KeyPair()
+        let keyPair = KeyPair()
         let signer = StubRemoteSigner(keyPair: keyPair)
 
         let signed = try await signer.sign(.textNote("mined remotely"), proofOfWork: 8)
@@ -197,7 +197,7 @@ struct ProofOfWorkTests {
     @Test("a zero or negative minimum difficulty accepts any event")
     func validateAcceptsZeroMinimum() throws {
         let signer = try testSigner()
-        let note = try signer.sign(.textNote("no work"))
+        let note = signer.sign(.textNote("no work"))
         #expect(ProofOfWork.validate(event: note, minimumDifficulty: 0))
     }
 

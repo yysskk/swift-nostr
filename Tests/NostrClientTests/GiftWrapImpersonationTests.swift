@@ -58,7 +58,7 @@ struct GiftWrapImpersonationTests {
         )
 
         let sealJSON = String(decoding: try JSONEncoder().encode(seal), as: UTF8.self)
-        let ephemeral = EventSigner(keyPair: try KeyPair())
+        let ephemeral = EventSigner(keyPair: KeyPair())
         return try ephemeral.sign(
             UnsignedEvent(
                 publicKey: ephemeral.publicKey,
@@ -76,9 +76,9 @@ struct GiftWrapImpersonationTests {
     /// does not catch it either.
     @Test("a rumor attributed to someone other than the sealer is rejected")
     func rumorFromAnotherAuthorIsRejected() async throws {
-        let mallory = try KeyPair()
-        let alice = try KeyPair()
-        let bob = try KeyPair()
+        let mallory = KeyPair()
+        let alice = KeyPair()
+        let bob = KeyPair()
 
         let forged = UnsignedEvent(
             publicKey: alice.publicKey,
@@ -88,7 +88,7 @@ struct GiftWrapImpersonationTests {
             content: "I approve this transfer"
         )
         let rumor = try rumorJSON(
-            id: try forged.computedID.hex,
+            id: forged.computedID.hex,
             publicKey: alice.publicKey.hex,
             createdAt: forged.createdAt.rawValue,
             kind: forged.kind,
@@ -108,8 +108,8 @@ struct GiftWrapImpersonationTests {
     /// that collides with another conversation's message or overwrites a stored one.
     @Test("a rumor whose id is not the hash of its contents is rejected")
     func rumorWithForgedIDIsRejected() async throws {
-        let alice = try KeyPair()
-        let bob = try KeyPair()
+        let alice = KeyPair()
+        let bob = KeyPair()
 
         let rumor = try rumorJSON(
             id: try EventID(hex: String(repeating: "11", count: 32)).hex,
@@ -131,9 +131,9 @@ struct GiftWrapImpersonationTests {
     /// kind it claims to be, since gift wrapping carries reactions and file messages too.
     @Test("the author check applies to any wrapped kind")
     func mismatchIsRejectedForOtherKinds() async throws {
-        let mallory = try KeyPair()
-        let alice = try KeyPair()
-        let bob = try KeyPair()
+        let mallory = KeyPair()
+        let alice = KeyPair()
+        let bob = KeyPair()
 
         let forged = UnsignedEvent(
             publicKey: alice.publicKey,
@@ -143,7 +143,7 @@ struct GiftWrapImpersonationTests {
             content: "+"
         )
         let rumor = try rumorJSON(
-            id: try forged.computedID.hex,
+            id: forged.computedID.hex,
             publicKey: alice.publicKey.hex,
             createdAt: forged.createdAt.rawValue,
             kind: forged.kind,
@@ -160,8 +160,8 @@ struct GiftWrapImpersonationTests {
 
     @Test("an event that is not a gift wrap is rejected with its kind")
     func nonGiftWrapIsRejected() async throws {
-        let bob = try KeyPair()
-        let note = try EventSigner(keyPair: try KeyPair()).sign(.textNote("hello"))
+        let bob = KeyPair()
+        let note = EventSigner(keyPair: KeyPair()).sign(.textNote("hello"))
 
         await #expect(throws: GiftWrap.Error.unexpectedKind(.textNote)) {
             try await GiftWrap.unwrap(giftWrap: note, recipient: EventSigner(keyPair: bob))
@@ -170,8 +170,8 @@ struct GiftWrapImpersonationTests {
 
     @Test("a gift wrap whose seal is not kind 13 is rejected with the seal's kind")
     func nonSealLayerIsRejected() async throws {
-        let alice = try KeyPair()
-        let bob = try KeyPair()
+        let alice = KeyPair()
+        let bob = KeyPair()
         let giftWrap = try wrap(
             rumorJSON: "{}", sender: alice, recipientPublicKey: bob.publicKey, sealKind: .textNote)
 
@@ -182,10 +182,10 @@ struct GiftWrapImpersonationTests {
 
     @Test("a seal whose signature does not verify is rejected")
     func sealWithForeignSignatureIsRejected() async throws {
-        let alice = try KeyPair()
-        let bob = try KeyPair()
+        let alice = KeyPair()
+        let bob = KeyPair()
         // A valid signature, but over another event's id.
-        let foreignSignature = try EventSigner(keyPair: alice).sign(.textNote("other")).signature
+        let foreignSignature = EventSigner(keyPair: alice).sign(.textNote("other")).signature
         let giftWrap = try wrap(rumorJSON: "{}", sender: alice, recipientPublicKey: bob.publicKey) { seal in
             Event(
                 id: seal.id, publicKey: seal.publicKey, createdAt: seal.createdAt, kind: seal.kind,
@@ -201,8 +201,8 @@ struct GiftWrapImpersonationTests {
     /// message only in the public key and id — and that the new checks do not reject honest traffic.
     @Test("a rumor sealed by its own author still unwraps")
     func genuineMessageStillUnwraps() async throws {
-        let alice = try KeyPair()
-        let bob = try KeyPair()
+        let alice = KeyPair()
+        let bob = KeyPair()
 
         let event = UnsignedEvent(
             publicKey: alice.publicKey,
@@ -212,7 +212,7 @@ struct GiftWrapImpersonationTests {
             content: "hello"
         )
         let rumor = try rumorJSON(
-            id: try event.computedID.hex,
+            id: event.computedID.hex,
             publicKey: alice.publicKey.hex,
             createdAt: event.createdAt.rawValue,
             kind: event.kind,
@@ -232,11 +232,11 @@ struct GiftWrapImpersonationTests {
     /// `GiftWrap.wrap` must keep producing messages `unwrap` accepts.
     @Test("a message built by wrap round-trips through unwrap")
     func wrapUnwrapRoundTrip() async throws {
-        let alice = try KeyPair()
-        let bob = try KeyPair()
+        let alice = KeyPair()
+        let bob = KeyPair()
         let signer = EventSigner(keyPair: alice)
 
-        let original = try signer.sign(.textNote("Secret message"))
+        let original = signer.sign(.textNote("Secret message"))
         let giftWrap = try await GiftWrap.wrap(
             event: original, signer: signer, recipientPublicKey: bob.publicKey)
         let unwrapped = try await GiftWrap.unwrap(

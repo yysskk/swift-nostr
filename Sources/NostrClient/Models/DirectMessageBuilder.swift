@@ -127,7 +127,7 @@ public struct DirectMessageBuilder: Sendable {
 
         let senderPublicKey = try await signer.publicKey
         // Never signed, like every NIP-17 rumor.
-        let rumor = try UnsignedEvent(
+        let rumor = UnsignedEvent(
             EventTemplate(kind: .privateDirectMessage, tags: tags, content: content), publicKey: senderPublicKey
         ).asRumor()
 
@@ -181,7 +181,7 @@ public struct DirectMessageBuilder: Sendable {
         to recipientPublicKey: PublicKey,
         expiration: Timestamp?
     ) async throws -> SendDirectMessageResult {
-        let rumor = try UnsignedEvent(template, publicKey: senderPublicKey).asRumor()
+        let rumor = UnsignedEvent(template, publicKey: senderPublicKey).asRumor()
         async let recipientGiftWrap = GiftWrap.wrap(
             event: rumor,
             signer: signer,

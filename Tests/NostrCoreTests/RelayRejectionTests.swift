@@ -110,7 +110,7 @@ struct RelayRejectionSurfacingTests {
         let connection = makeConnection(socket: socket)
         try await connection.connect()
 
-        let event = try EventSigner(keyPair: try KeyPair()).sign(.textNote("hello"))
+        let event = EventSigner(keyPair: KeyPair()).sign(.textNote("hello"))
         let publish = Task { try await connection.publish(event) }
         try await pollUntil { socket.sentTextFrames.contains { $0.contains(event.id.hex) } }
         socket.deliver(.string("[\"OK\",\"\(event.id)\",false,\"\(status)\"]"))
@@ -159,7 +159,7 @@ struct RelayRejectionSurfacingTests {
         let connection = makeConnection(socket: socket, publishAckTimeout: .milliseconds(50))
         try await connection.connect()
 
-        let event = try EventSigner(keyPair: try KeyPair()).sign(.textNote("hello"))
+        let event = EventSigner(keyPair: KeyPair()).sign(.textNote("hello"))
         await #expect(throws: RelayConnection.Error.timedOut) {
             try await connection.publish(event)
         }

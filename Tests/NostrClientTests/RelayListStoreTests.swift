@@ -90,10 +90,10 @@ struct RelayListStoreTests {
     @Test("Ingest a kind 10002 event")
     func ingestEvent() async throws {
         let store = makeStore()
-        let keyPair = try KeyPair()
+        let keyPair = KeyPair()
         let signer = EventSigner(keyPair: keyPair)
 
-        let event = try signer.sign(
+        let event = signer.sign(
             .relayListMetadata(
                 RelayListMetadata(entries: [RelayListEntry(url: RelayURL("wss://a.example.com")!, usage: .write)]))
         )
@@ -107,10 +107,10 @@ struct RelayListStoreTests {
     @Test("Ingest ignores non-10002 event")
     func ingestIgnoresOtherKind() async throws {
         let store = makeStore()
-        let keyPair = try KeyPair()
+        let keyPair = KeyPair()
         let signer = EventSigner(keyPair: keyPair)
 
-        let textNote = try signer.sign(.textNote("Hello"))
+        let textNote = signer.sign(.textNote("Hello"))
         let ingested = await store.ingest(textNote)
         #expect(ingested == nil)
     }

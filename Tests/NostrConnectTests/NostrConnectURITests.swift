@@ -10,7 +10,7 @@ struct NostrConnectURITests {
 
     @Test("invitation adopts the key pair's public key and mints a hex secret")
     func invitationSetsPublicKeyAndSecret() throws {
-        let keyPair = try KeyPair()
+        let keyPair = KeyPair()
         let invitation = try NostrConnectURI.invitation(
             clientKeyPair: keyPair,
             relays: relays,
@@ -24,7 +24,7 @@ struct NostrConnectURITests {
 
     @Test("two invitations get distinct secrets")
     func invitationsGetDistinctSecrets() throws {
-        let keyPair = try KeyPair()
+        let keyPair = KeyPair()
         let first = try NostrConnectURI.invitation(clientKeyPair: keyPair, relays: relays)
         let second = try NostrConnectURI.invitation(clientKeyPair: keyPair, relays: relays)
 
@@ -33,7 +33,7 @@ struct NostrConnectURITests {
 
     @Test("round-trips with all metadata set")
     func roundTripsWithMetadata() throws {
-        let keyPair = try KeyPair()
+        let keyPair = KeyPair()
         let invitation = try NostrConnectURI(
             clientPublicKey: keyPair.publicKey,
             relays: relays,
@@ -49,7 +49,7 @@ struct NostrConnectURITests {
 
     @Test("round-trips with metadata absent")
     func roundTripsWithoutMetadata() throws {
-        let keyPair = try KeyPair()
+        let keyPair = KeyPair()
         let invitation = try NostrConnectURI.invitation(clientKeyPair: keyPair, relays: relays)
 
         let parsed = try NostrConnectURI(string: invitation.stringValue)
@@ -62,7 +62,7 @@ struct NostrConnectURITests {
 
     @Test("percent-encoded metadata survives the round-trip")
     func encodedMetadataSurvivesRoundTrip() throws {
-        let keyPair = try KeyPair()
+        let keyPair = KeyPair()
         let invitation = try NostrConnectURI(
             clientPublicKey: keyPair.publicKey,
             relays: relays,
@@ -80,7 +80,7 @@ struct NostrConnectURITests {
 
     @Test("rejects a token with no secret")
     func rejectsMissingSecret() throws {
-        let keyPair = try KeyPair()
+        let keyPair = KeyPair()
         #expect(throws: RemoteSignerError.self) {
             try NostrConnectURI(string: "nostrconnect://\(keyPair.publicKey.hex)?relay=wss%3A%2F%2Frelay.example")
         }
@@ -96,7 +96,7 @@ struct NostrConnectURITests {
     /// A key has one spelling, so an uppercase host is rejected rather than folded to lowercase.
     @Test("rejects an uppercase public key")
     func rejectsUppercasePublicKey() throws {
-        let publicKey = try KeyPair().publicKey.hex.uppercased()
+        let publicKey = KeyPair().publicKey.hex.uppercased()
         #expect(throws: RemoteSignerError.invalidURI(reason: "client public key must be lowercase 32-byte hex")) {
             try NostrConnectURI(string: "nostrconnect://\(publicKey)?relay=wss%3A%2F%2Frelay.example&secret=s")
         }
@@ -104,7 +104,7 @@ struct NostrConnectURITests {
 
     @Test("serializes the typed client key as the lowercase hex host and parses it back")
     func serializesTypedKeyAsHost() throws {
-        let keyPair = try KeyPair()
+        let keyPair = KeyPair()
         let invitation = try NostrConnectURI(clientPublicKey: keyPair.publicKey, relays: relays, secret: "s")
 
         let expected = "nostrconnect://\(keyPair.publicKey.hex)?relay=wss%3A%2F%2Frelay.example&secret=s"
@@ -121,7 +121,7 @@ struct NostrConnectURITests {
             "wss%3A%2F%2F",  // empty host
         ])
     func rejectsMalformedRelay(relay: String) throws {
-        let publicKey = try KeyPair().publicKey.hex
+        let publicKey = KeyPair().publicKey.hex
         let error = RemoteSignerError.invalidURI(reason: "missing or malformed relay")
         #expect(throws: error) {
             try NostrConnectURI(string: "nostrconnect://\(publicKey)?relay=\(relay)&secret=s")
@@ -134,7 +134,7 @@ struct NostrConnectURITests {
 
     @Test("normalizes relays and writes them back in canonical form")
     func canonicalizesRelays() throws {
-        let publicKey = try KeyPair().publicKey.hex
+        let publicKey = KeyPair().publicKey.hex
         let uri = try NostrConnectURI(string: "nostrconnect://\(publicKey)?relay=WSS%3A%2F%2FRelay.Example%2F&secret=s")
 
         #expect(uri.relays == [RelayURL("wss://relay.example")!])
@@ -143,7 +143,7 @@ struct NostrConnectURITests {
 
     @Test("parses a comma-separated permission list")
     func parsesPermissionList() throws {
-        let keyPair = try KeyPair()
+        let keyPair = KeyPair()
         let uri = try NostrConnectURI(
             string:
                 "nostrconnect://\(keyPair.publicKey.hex)?relay=wss%3A%2F%2Frelay.example&secret=s&perms=sign_event%3A1%2Cnip44_encrypt"

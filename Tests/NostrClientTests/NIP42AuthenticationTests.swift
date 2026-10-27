@@ -27,10 +27,10 @@ struct NIP42AuthenticationEventTests {
 
     @Test("a signed client authentication event is a valid kind-22242 event")
     func signedClientAuthentication() throws {
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
         let relayURL = RelayURL("wss://relay.example.com")!
 
-        let event = try signer.sign(.clientAuthentication(relayURL: relayURL, challenge: "challengestringhere"))
+        let event = signer.sign(.clientAuthentication(relayURL: relayURL, challenge: "challengestringhere"))
 
         #expect(event.kind == .clientAuthentication)
         #expect(event.publicKey == signer.publicKey)
@@ -42,9 +42,9 @@ struct NIP42AuthenticationEventTests {
 
     @Test("clientAuthentication timestamps the event with the current time")
     func clientAuthenticationTimestamp() throws {
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
 
-        let event = try signer.sign(
+        let event = signer.sign(
             .clientAuthentication(
                 relayURL: RelayURL("wss://relay.example.com")!,
                 challenge: "abc"
@@ -58,12 +58,12 @@ struct NIP42AuthenticationEventTests {
 
     @Test("the relay tag is the URL the connection opens")
     func relayTagMatchesConnectionURL() throws {
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
 
         // NIP-42 says the relay tag is the URL "as used to connect". A connection opens its
         // relay URL's canonical form, so every spelling of the relay yields that same tag.
         let connection = RelayConnection(url: try RelayURL(string: "WSS://Relay.Example.com/"))
-        let event = try signer.sign(.clientAuthentication(relayURL: connection.url, challenge: "abc"))
+        let event = signer.sign(.clientAuthentication(relayURL: connection.url, challenge: "abc"))
         #expect(event.firstTagValue(named: "relay") == connection.url.url.absoluteString)
         #expect(event.firstTagValue(named: "relay") == "wss://relay.example.com")
     }
@@ -72,8 +72,8 @@ struct NIP42AuthenticationEventTests {
     func authenticationEventCannotBePublished() async throws {
         let pool = RelayPool()
         await pool.addRelay(RelayURL("wss://relay.example.com")!)
-        let signer = EventSigner(keyPair: try KeyPair())
-        let authEvent = try signer.sign(
+        let signer = EventSigner(keyPair: KeyPair())
+        let authEvent = signer.sign(
             .clientAuthentication(
                 relayURL: RelayURL("wss://relay.example.com")!, challenge: "abc"))
 
@@ -115,7 +115,7 @@ struct NIP42RelayConnectionTests {
     }
 
     private func signedAuthEvent(signer: EventSigner, challenge: String = "challengestringhere") throws -> Event {
-        try signer.sign(.clientAuthentication(relayURL: relayURL, challenge: challenge))
+        signer.sign(.clientAuthentication(relayURL: relayURL, challenge: challenge))
     }
 
     /// Extracts the event from the first AUTH frame the connection sent.
@@ -171,7 +171,7 @@ struct NIP42RelayConnectionTests {
         let (connection, mock) = makeConnection()
         try await connection.connect()
 
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
         let event = try signedAuthEvent(signer: signer)
 
         let authTask = Task { try await connection.authenticate(with: event) }
@@ -192,7 +192,7 @@ struct NIP42RelayConnectionTests {
         let (connection, mock) = makeConnection()
         try await connection.connect()
 
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
         let event = try signedAuthEvent(signer: signer)
 
         let authTask = Task { try await connection.authenticate(with: event) }
@@ -215,8 +215,8 @@ struct NIP42RelayConnectionTests {
         let (connection, mock) = makeConnection()
         try await connection.connect()
 
-        let signer = EventSigner(keyPair: try KeyPair())
-        let note = try signer.sign(.textNote("not an auth event"))
+        let signer = EventSigner(keyPair: KeyPair())
+        let note = signer.sign(.textNote("not an auth event"))
 
         await #expect(throws: RelayConnection.Error.invalidAuthenticationEventKind(.textNote)) {
             try await connection.authenticate(with: note)
@@ -229,7 +229,7 @@ struct NIP42RelayConnectionTests {
     func authenticateRequiresConnection() async throws {
         let (connection, _) = makeConnection()
 
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
         let event = try signedAuthEvent(signer: signer)
 
         await #expect(throws: RelayConnection.Error.notConnected) {
@@ -245,7 +245,7 @@ struct NIP42RelayConnectionTests {
         mock.deliver(.string(#"["AUTH","challengestringhere"]"#))
         try await pollUntil { await connection.authenticationChallenge != nil }
 
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
         let authTask = Task { try await connection.authenticate(using: signer) }
 
         try await pollUntil { mock.sentTextFrames.contains { $0.contains("\"AUTH\"") } }
@@ -271,7 +271,7 @@ struct NIP42RelayConnectionTests {
         mock.deliver(.string(#"["AUTH","challengestringhere"]"#))
         try await pollUntil { await connection.authenticationChallenge != nil }
 
-        let keyPair = try KeyPair()
+        let keyPair = KeyPair()
         let authTask = Task { try await connection.authenticate(using: StubRemoteSigner(keyPair: keyPair)) }
 
         try await pollUntil { mock.sentTextFrames.contains { $0.contains("\"AUTH\"") } }
@@ -292,7 +292,7 @@ struct NIP42RelayConnectionTests {
         let (connection, mock) = makeConnection()
         try await connection.connect()
 
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
 
         await #expect(throws: RelayConnection.Error.missingAuthenticationChallenge) {
             try await connection.authenticate(using: signer)
@@ -306,8 +306,8 @@ struct NIP42RelayConnectionTests {
         let (connection, mock) = makeConnection()
         try await connection.connect()
 
-        let alice = EventSigner(keyPair: try KeyPair())
-        let bob = EventSigner(keyPair: try KeyPair())
+        let alice = EventSigner(keyPair: KeyPair())
+        let bob = EventSigner(keyPair: KeyPair())
 
         for signer in [alice, bob] {
             let event = try signedAuthEvent(signer: signer)
@@ -326,7 +326,7 @@ struct NIP42RelayConnectionTests {
         let (connection, mock) = makeConnection(publishAckTimeout: .milliseconds(50))
         try await connection.connect()
 
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
         let event = try signedAuthEvent(signer: signer)
 
         await #expect(throws: RelayConnection.Error.timedOut) {
@@ -349,7 +349,7 @@ struct NIP42RelayConnectionTests {
         mock.deliver(.string(#"["AUTH","challengestringhere"]"#))
         try await pollUntil { await connection.authenticationChallenge != nil }
 
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
         let event = try signedAuthEvent(signer: signer)
         let authTask = Task { try await connection.authenticate(with: event) }
         try await pollUntil { mock.sentTextFrames.contains { $0.contains(event.id.hex) } }
@@ -368,8 +368,8 @@ struct NIP42RelayConnectionTests {
         let (connection, mock) = makeConnection()
         try await connection.connect()
 
-        let signer = EventSigner(keyPair: try KeyPair())
-        let event = try signer.sign(.textNote("gm"))
+        let signer = EventSigner(keyPair: KeyPair())
+        let event = signer.sign(.textNote("gm"))
 
         let publishTask = Task { try await connection.publish(event) }
 

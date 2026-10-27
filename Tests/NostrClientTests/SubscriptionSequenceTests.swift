@@ -11,9 +11,9 @@ struct SubscriptionSequenceTests {
     private let relayURL = RelayURL("wss://relay.example.com")!
 
     private func makeEvent(content: String) throws -> Event {
-        let keyPair = try KeyPair()
+        let keyPair = KeyPair()
         let signer = EventSigner(keyPair: keyPair)
-        return try signer.sign(.textNote(content))
+        return signer.sign(.textNote(content))
     }
 
     private func makeSequence(

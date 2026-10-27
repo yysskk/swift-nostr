@@ -36,12 +36,12 @@ struct OpenTimestampsTests {
 
     @Test("A template's attestation is signed into the event and read back")
     func eventWithOTS() throws {
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
         let otsData = "dGVzdCBvdHMgZGF0YQ=="
 
         var template = EventTemplate.textNote("Test with OTS", tags: [.hashtag("test")])
         template.openTimestamps = OpenTimestamps(base64EncodedOTS: otsData)
-        let event = try signer.sign(template)
+        let event = signer.sign(template)
 
         #expect(event.tags == [["t", "test"], ["ots", otsData]])
         #expect(event.hasOpenTimestampsAttestation)
@@ -51,10 +51,10 @@ struct OpenTimestampsTests {
 
     @Test("Event without OpenTimestamps attestation")
     func eventWithoutOTS() throws {
-        let keyPair = try KeyPair()
+        let keyPair = KeyPair()
         let signer = EventSigner(keyPair: keyPair)
 
-        let event = try signer.sign(.textNote("No OTS here"))
+        let event = signer.sign(.textNote("No OTS here"))
 
         #expect(!event.hasOpenTimestampsAttestation)
         #expect(event.openTimestamps == nil)

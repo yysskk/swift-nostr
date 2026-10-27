@@ -8,8 +8,8 @@ import Testing
 struct WalletConnectNotificationTests {
     @Test("notifications stream decrypts NIP-44 and NIP-04 events")
     func notificationsStream() async throws {
-        let wallet = try KeyPair()
-        let client = try KeyPair()
+        let wallet = KeyPair()
+        let client = KeyPair()
         let transport = FakeWalletConnectTransport()
         let connection = WalletConnection(
             uri: try NWCFixtures.uri(wallet: wallet, client: client), transport: transport)
@@ -38,8 +38,8 @@ struct WalletConnectNotificationTests {
 
     @Test("fetchInfo returns and caches the parsed wallet info")
     func fetchInfoCaches() async throws {
-        let wallet = try KeyPair()
-        let client = try KeyPair()
+        let wallet = KeyPair()
+        let client = KeyPair()
         let transport = FakeWalletConnectTransport()
         let connection = WalletConnection(
             uri: try NWCFixtures.uri(wallet: wallet, client: client), transport: transport)
@@ -119,8 +119,8 @@ struct WalletConnectNotificationTests {
 
     @Test("notifications() after the event stream ended reconnects and returns a live stream", .timeLimit(.minutes(1)))
     func notificationsAfterEventStreamEndedReconnects() async throws {
-        let wallet = try KeyPair()
-        let client = try KeyPair()
+        let wallet = KeyPair()
+        let client = KeyPair()
         let transport = FakeWalletConnectTransport()
         let connection = WalletConnection(
             uri: try NWCFixtures.uri(wallet: wallet, client: client), transport: transport)
@@ -140,8 +140,8 @@ struct WalletConnectNotificationTests {
 
     @Test("disconnect finishes notification streams, and one opened afterwards stays live", .timeLimit(.minutes(1)))
     func disconnectFinishesNotificationStreams() async throws {
-        let wallet = try KeyPair()
-        let client = try KeyPair()
+        let wallet = KeyPair()
+        let client = KeyPair()
         let transport = FakeWalletConnectTransport()
         let connection = WalletConnection(
             uri: try NWCFixtures.uri(wallet: wallet, client: client), transport: transport)

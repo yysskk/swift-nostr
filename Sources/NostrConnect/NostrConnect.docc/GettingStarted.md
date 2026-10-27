@@ -73,7 +73,7 @@ signer's public key is unknown until it scans the invitation and replies, so wai
 ``RemoteSigner/awaitConnection()``:
 
 ```swift
-let clientKeyPair = try KeyPair()
+let clientKeyPair = KeyPair()
 let invitation = try NostrConnectURI.invitation(
     clientKeyPair: clientKeyPair, relays: [try RelayURL(string: "wss://relay.example")])
 displayQRCode(invitation.stringValue)

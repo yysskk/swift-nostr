@@ -10,8 +10,8 @@ import Testing
 @Suite("Wallet Connect URI Scheme Tests")
 struct WalletConnectURISchemeTests {
     private func uriString(relay: String) throws -> String {
-        let wallet = try KeyPair()
-        let secret = try KeyPair()
+        let wallet = KeyPair()
+        let secret = KeyPair()
         let encoded =
             relay.addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? relay
         return "nostr+walletconnect://\(wallet.publicKey.hex)?relay=\(encoded)&secret=\(secret.privateKeyHex)"

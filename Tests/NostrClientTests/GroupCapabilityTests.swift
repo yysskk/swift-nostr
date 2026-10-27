@@ -17,7 +17,7 @@ struct GroupCapabilityTests {
     private let signer: EventSigner
 
     init() throws {
-        signer = EventSigner(keyPair: try KeyPair())
+        signer = EventSigner(keyPair: KeyPair())
     }
 
     private func makeStub() -> RecordingGroupCapabilities {

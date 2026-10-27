@@ -489,7 +489,7 @@ public actor RelayConnection {
         }
         let generation = socketGeneration
 
-        let text = try message.serialize()
+        let text = message.serialize()
 
         // Track subscription state before the frame goes out: the send suspends, and an
         // unsubscribe arriving meanwhile must find the subscription to forget and CLOSE — tracked

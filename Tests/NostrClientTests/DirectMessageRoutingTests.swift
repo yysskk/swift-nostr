@@ -89,7 +89,7 @@ struct DirectMessageRoutingTests {
     func sendOnEmptyPoolThrows() async throws {
         let client = NostrClient()
         try await client.identity.setPrivateKey(String(repeating: "1", count: 64))
-        let recipient = try KeyPair()
+        let recipient = KeyPair()
 
         // Empty pool, no cached lists: the recipient copy's pool fallback finds nothing.
         await #expect(throws: RelayPool.Error.emptyPool) {
@@ -101,7 +101,7 @@ struct DirectMessageRoutingTests {
     func sendFallsBackToPool() async throws {
         let (client, socket) = try await ConnectedClientFixture.make()
         try await client.identity.setPrivateKey(String(repeating: "1", count: 64))
-        let recipient = try KeyPair()
+        let recipient = KeyPair()
         let sender = await client.identity.publicKey!
         // Confirmed-absent DM relay lists: both copies fall back to the pool's relay
         // without a discovery fetch.

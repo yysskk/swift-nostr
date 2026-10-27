@@ -50,14 +50,11 @@ struct SealedMessageConversationKeyTests {
 
     @Test("A key-pair seal opens under that pair's conversation key")
     func keyPairSealOpensUnderConversationKey() throws {
-        let alice = try KeyPair()
-        let bob = try KeyPair()
+        let alice = KeyPair()
+        let bob = KeyPair()
         let key = try #require(
             Data(
-                hexString: SealedMessage.conversationKeyHex(
-                    privateKeyHex: alice.privateKeyHex,
-                    publicKeyHex: bob.publicKey.hex
-                )
+                hexString: SealedMessage.conversationKeyHex(keyPair: alice, publicKey: bob.publicKey)
             )
         )
 
@@ -68,14 +65,11 @@ struct SealedMessageConversationKeyTests {
 
     @Test("A conversation-key seal opens with the matching key pair")
     func conversationKeySealOpensWithKeyPair() throws {
-        let alice = try KeyPair()
-        let bob = try KeyPair()
+        let alice = KeyPair()
+        let bob = KeyPair()
         let key = try #require(
             Data(
-                hexString: SealedMessage.conversationKeyHex(
-                    privateKeyHex: alice.privateKeyHex,
-                    publicKeyHex: bob.publicKey.hex
-                )
+                hexString: SealedMessage.conversationKeyHex(keyPair: alice, publicKey: bob.publicKey)
             )
         )
 

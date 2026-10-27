@@ -23,7 +23,7 @@ struct EventSignerTests {
     @Test("sign rejects an unsigned event keyed to another public key")
     func signRejectsForeignPublicKey() throws {
         let signer = try makeSigner()
-        let unsigned = UnsignedEvent(publicKey: try KeyPair().publicKey, kind: .textNote, content: "hello")
+        let unsigned = UnsignedEvent(publicKey: KeyPair().publicKey, kind: .textNote, content: "hello")
 
         #expect(throws: EventSigner.Error.publicKeyMismatch) { try signer.sign(unsigned) }
     }
@@ -38,7 +38,7 @@ struct EventSignerTests {
             createdAt: Timestamp(rawValue: 1_700_000_000)
         )
 
-        let event = try signer.sign(template)
+        let event = signer.sign(template)
 
         #expect(event.publicKey == signer.publicKey)
         #expect(event.kind == .textNote)
@@ -50,7 +50,7 @@ struct EventSignerTests {
 
     @Test("publicKey is the key pair's typed public key")
     func publicKeyIsTyped() throws {
-        let keyPair = try KeyPair()
+        let keyPair = KeyPair()
         let signer = EventSigner(keyPair: keyPair)
 
         #expect(signer.publicKey == keyPair.publicKey)
@@ -60,7 +60,7 @@ struct EventSignerTests {
     @Test("verify rejects an event whose content was tampered with")
     func verifyRejectsTampering() throws {
         let signer = try makeSigner()
-        let event = try signer.sign(.textNote("original"))
+        let event = signer.sign(.textNote("original"))
         let tampered = Event(
             id: event.id,
             publicKey: event.publicKey,

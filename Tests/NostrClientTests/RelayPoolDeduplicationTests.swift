@@ -42,7 +42,7 @@ struct RelayPoolDeduplicationTests {
     }
 
     private func makeEvent(content: String) throws -> Event {
-        try EventSigner(keyPair: try KeyPair()).sign(.textNote(content))
+        EventSigner(keyPair: KeyPair()).sign(.textNote(content))
     }
 
     /// A canned `["EVENT", subscriptionID, {...}]` relay frame for `event`.

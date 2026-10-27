@@ -79,7 +79,7 @@ then send the URL and keys with
 ``NostrMessaging/sendFile(url:mimeType:encryption:size:dimensions:blurhash:to:expiration:strategy:)``:
 
 ```swift
-let encrypted = try EncryptedFile.encrypt(imageData)
+let encrypted = EncryptedFile.encrypt(imageData)
 let url = try await upload(encrypted.ciphertext)  // your transport
 try await client.messages.sendFile(
     url: url, mimeType: "image/jpeg", encryption: encrypted, to: recipient
@@ -173,7 +173,7 @@ to the recipient's, the sender's self-copy to the sender's own — discovered fr
 For lower-level access to encryption primitives:
 
 ```swift
-let senderKeyPair = try KeyPair()
+let senderKeyPair = KeyPair()
 let recipientPublicKey = try PublicKey(npub: "npub1...")
 
 // Seal a message (NIP-44)
@@ -311,7 +311,7 @@ let contacts = [
     Contact(publicKey: bob)
 ]
 // A contact list is an EventTemplate: sign it, then publish it like any event.
-let signed = try signer.sign(.contactList(contacts))
+let signed = signer.sign(.contactList(contacts))
 try await client.events.publish(signed)
 
 // Extract contacts from a kind-3 event; a `p` tag that is not a canonical hex key is skipped
@@ -328,7 +328,7 @@ if let contacts = event.contacts {
 // Attach an OTS attestation to an event before signing it
 var note = EventTemplate.textNote("Timestamped")
 note.openTimestamps = OpenTimestamps(base64EncodedOTS: "...")
-let event = try signer.sign(note)
+let event = signer.sign(note)
 
 // Check for OTS on received events
 if let ots = event.openTimestamps {
@@ -649,7 +649,7 @@ every public key it mentions in `p` tags, with ``NostrRoutingAPI/publishGossip(_
 ```swift
 let signer = EventSigner(keyPair: keyPair)
 let alice = try PublicKey(npub: "npub1...")
-let note = try signer.sign(.textNote("gm!", tags: [.publicKey(alice)]))
+let note = signer.sign(.textNote("gm!", tags: [.publicKey(alice)]))
 try await client.routing.publishGossip(note)
 ```
 
@@ -836,7 +836,7 @@ for await message in await connection.messages() {
 ### Manual Event Signing
 
 ```swift
-let keyPair = try KeyPair()
+let keyPair = KeyPair()
 let signer = EventSigner(keyPair: keyPair)
 
 let template = EventTemplate(
@@ -845,7 +845,7 @@ let template = EventTemplate(
     content: "Manually signed"
 )
 
-let signed = try signer.sign(template)
+let signed = signer.sign(template)
 let isValid = try signed.verify()
 ```
 

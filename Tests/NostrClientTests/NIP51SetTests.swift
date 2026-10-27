@@ -57,7 +57,7 @@ struct NIP51SetTests {
         arguments: [false, true]
     )
     func signOpenRoundTrip(remote: Bool) async throws {
-        let keyPair = try KeyPair()
+        let keyPair = KeyPair()
         let signer: any NostrSigning = remote ? StubRemoteSigner(keyPair: keyPair) : EventSigner(keyPair: keyPair)
         let publicItems: [Event.Tag] = [.event(EventID.fixture("public-note-id")), .hashtag("nostr")]
         let privateItems: [Event.Tag] = [.event(EventID.fixture("private-note-id")), .word("secret-word")]
@@ -116,7 +116,7 @@ struct NIP51SetTests {
 
     @Test("Signed event starts with a d tag and includes metadata only when set")
     func tagOrdering() async throws {
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
         let set = try NostrListSet(
             kind: .bookmarkSet,
             identifier: "reading",
@@ -141,7 +141,7 @@ struct NIP51SetTests {
         #expect(template.content == "")
 
         // Reading empty content back needs no decryption either.
-        let event = try EventSigner(keyPair: try KeyPair()).sign(template)
+        let event = EventSigner(keyPair: KeyPair()).sign(template)
         let opened = try await NostrListSet(event: event, decryptingWith: FailingSigner())
         #expect(opened.privateItems.isEmpty)
         #expect(opened.publicItems == [.hashtag("nostr")])
@@ -149,7 +149,7 @@ struct NIP51SetTests {
 
     @Test("Non-empty private items produce a base64 payload without the plaintext")
     func encryptedContentHidesPlaintext() async throws {
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
         let set = try NostrListSet(
             kind: .bookmarkSet,
             identifier: "reading",
@@ -167,8 +167,8 @@ struct NIP51SetTests {
 
     @Test("A different signer cannot decrypt the set")
     func differentSignerCannotOpen() async throws {
-        let author = EventSigner(keyPair: try KeyPair())
-        let other = EventSigner(keyPair: try KeyPair())
+        let author = EventSigner(keyPair: KeyPair())
+        let other = EventSigner(keyPair: KeyPair())
         let set = try NostrListSet(kind: .bookmarkSet, identifier: "reading", privateItems: [.word("secret-word")])
 
         let event = try await sign(set, with: author)
@@ -179,9 +179,9 @@ struct NIP51SetTests {
 
     @Test("init(event:decryptingWith:) throws missingIdentifier when there is no d tag, before decrypting")
     func decryptingInitRequiresIdentifier() async throws {
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
         let content = try signer.nip44Encrypt(#"[["t","secret"]]"#, to: signer.publicKey)
-        let event = try signer.sign(
+        let event = signer.sign(
             EventTemplate(kind: .bookmarkSet, tags: [.hashtag("nostr")], content: content))
 
         await #expect(throws: NostrListSet.Error.missingIdentifier) {
@@ -191,9 +191,9 @@ struct NIP51SetTests {
 
     @Test("Content that decrypts to something other than a tag array throws malformedPrivateItems")
     func nonTagArrayContentThrows() async throws {
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
         let content = try signer.nip44Encrypt(#"{"not":"a tag array"}"#, to: signer.publicKey)
-        let event = try signer.sign(
+        let event = signer.sign(
             EventTemplate(kind: .bookmarkSet, tags: [.identifier("reading")], content: content))
 
         await #expect(throws: NostrListSet.Error.malformedPrivateItems) {
@@ -205,7 +205,7 @@ struct NIP51SetTests {
 
     @Test("init(event:) throws missingIdentifier when there is no d tag")
     func eventInitRequiresIdentifier() throws {
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
         let event = try signer.sign(
             UnsignedEvent(
                 publicKey: signer.publicKey, kind: .bookmarkSet, tags: [.hashtag("nostr")], content: ""
@@ -218,7 +218,7 @@ struct NIP51SetTests {
 
     @Test("init(event:) separates metadata from public items")
     func eventInitSeparatesMetadata() async throws {
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
         let topic = Event.Tag(name: "t", values: ["topic"])
         let set = try NostrListSet(
             kind: .bookmarkSet,
@@ -251,7 +251,7 @@ struct NIP51SetTests {
 
     @Test("naddr round-trips and matches NAddr(event:)")
     func naddrRoundTrip() async throws {
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
         let set = try NostrListSet(kind: .bookmarkSet, identifier: "reading")
         let event = try await sign(set, with: signer)
 
@@ -275,7 +275,7 @@ struct NIP51SetTests {
 
     @Test("An unmodeled public tag survives init(event:) and set(_:encryptingWith:)")
     func losslessPublicItems() async throws {
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
         let unusual = Event.Tag(name: "client", values: ["x"])
         let set = try NostrListSet(
             kind: .bookmarkSet,
@@ -293,7 +293,7 @@ struct NIP51SetTests {
 
     @Test("set(_:encryptingWith:) drops reserved metadata tags left in publicItems, avoiding duplicates")
     func setTemplateDeduplicatesReservedTags() async throws {
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
         // A caller stuffs reserved metadata tags into publicItems; the dedicated properties
         // must remain the single source of truth so the event has no duplicate reserved tags.
         var set = try NostrListSet(

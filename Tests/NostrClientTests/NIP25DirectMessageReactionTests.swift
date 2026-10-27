@@ -18,8 +18,8 @@ struct NIP25DirectMessageReactionTests {
 
     @Test("a built reaction is an unsigned kind-7 rumor referencing the message")
     func buildReaction() async throws {
-        let sender = try KeyPair()
-        let recipient = try KeyPair()
+        let sender = KeyPair()
+        let recipient = KeyPair()
         let builder = DirectMessageBuilder(signer: EventSigner(keyPair: sender))
 
         let result = try await builder.createReactionWithSelfCopy(
@@ -36,8 +36,8 @@ struct NIP25DirectMessageReactionTests {
 
     @Test("a reaction round-trips through gift wrap to the recipient")
     func reactionRoundTrip() async throws {
-        let sender = try KeyPair()
-        let recipient = try KeyPair()
+        let sender = KeyPair()
+        let recipient = KeyPair()
         let builder = DirectMessageBuilder(signer: EventSigner(keyPair: sender))
 
         let result = try await builder.createReactionWithSelfCopy(
@@ -63,8 +63,8 @@ struct NIP25DirectMessageReactionTests {
 
     @Test("parsePayload classifies messages and reactions")
     func parsePayloadDispatch() async throws {
-        let sender = try KeyPair()
-        let recipient = try KeyPair()
+        let sender = KeyPair()
+        let recipient = KeyPair()
         let builder = DirectMessageBuilder(signer: EventSigner(keyPair: sender))
         let parser = DirectMessageParser(signer: EventSigner(keyPair: recipient))
 
@@ -88,8 +88,8 @@ struct NIP25DirectMessageReactionTests {
 
     @Test("parse and parseReaction reject the wrong inner kind")
     func crossParsingRejected() async throws {
-        let sender = try KeyPair()
-        let recipient = try KeyPair()
+        let sender = KeyPair()
+        let recipient = KeyPair()
         let builder = DirectMessageBuilder(signer: EventSigner(keyPair: sender))
         let parser = DirectMessageParser(signer: EventSigner(keyPair: recipient))
 
@@ -107,11 +107,11 @@ struct NIP25DirectMessageReactionTests {
 
     @Test("a reaction without an e tag is rejected")
     func reactionWithoutEventTagRejected() async throws {
-        let sender = try KeyPair()
-        let recipient = try KeyPair()
+        let sender = KeyPair()
+        let recipient = KeyPair()
 
         // Hand-built kind-7 rumor with no "e" tag — not a valid reaction.
-        let rumor = try UnsignedEvent(
+        let rumor = UnsignedEvent(
             publicKey: sender.publicKey, kind: .reaction,
             tags: [.publicKey(sender.publicKey)], content: "+"
         ).asRumor()
@@ -126,11 +126,11 @@ struct NIP25DirectMessageReactionTests {
 
     @Test("a reaction without a p tag is rejected")
     func reactionWithoutAuthorTagRejected() async throws {
-        let sender = try KeyPair()
-        let recipient = try KeyPair()
+        let sender = KeyPair()
+        let recipient = KeyPair()
 
         // Hand-built kind-7 rumor with an "e" tag but no "p" tag — author is unknown.
-        let rumor = try UnsignedEvent(
+        let rumor = UnsignedEvent(
             publicKey: sender.publicKey, kind: .reaction,
             tags: [.event(messageID)], content: "+"
         ).asRumor()
@@ -149,10 +149,10 @@ struct NIP25DirectMessageReactionTests {
             [["e", messageID.hex], ["p", authorKey.hex.uppercased()]],
         ])
     func reactionWithMalformedReferencesRejected(rawTags: [[String]]) async throws {
-        let sender = try KeyPair()
-        let recipient = try KeyPair()
+        let sender = KeyPair()
+        let recipient = KeyPair()
 
-        let rumor = try UnsignedEvent(
+        let rumor = UnsignedEvent(
             publicKey: sender.publicKey, kind: .reaction, rawTags: rawTags, content: "+"
         ).asRumor()
         let giftWrap = try await GiftWrap.wrap(
@@ -165,8 +165,8 @@ struct NIP25DirectMessageReactionTests {
 
     @Test("a disappearing reaction carries the expiration on the gift wrap")
     func reactionWithExpiration() async throws {
-        let sender = try KeyPair()
-        let recipient = try KeyPair()
+        let sender = KeyPair()
+        let recipient = KeyPair()
         let builder = DirectMessageBuilder(signer: EventSigner(keyPair: sender))
         let expiry = Timestamp(rawValue: 1_700_000_000)
 
@@ -184,7 +184,7 @@ struct NIP25DirectMessageReactionTests {
     func reactRoutingFallsBackToPool() async throws {
         let (client, socket) = try await ConnectedClientFixture.make()
         try await client.identity.setPrivateKey(String(repeating: "1", count: 64))
-        let author = try KeyPair()
+        let author = KeyPair()
 
         let myPublicKey = try #require(await client.identity.publicKey)
         let message = DirectMessage(

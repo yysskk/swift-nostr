@@ -12,7 +12,7 @@ struct NIP57ZapRequestTests {
 
     @Test("a signed zap request is a valid kind-9734 event")
     func signedZapRequest() throws {
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
         let event = try signer.sign(
             .zapRequest(
                 to: .fixture("recipient"),
@@ -35,7 +35,7 @@ struct NIP57ZapRequestTests {
 
     @Test("zapRequest tags the event when zapping a note")
     func zapRequestWithEvent() throws {
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
         let event = try signer.sign(
             .zapRequest(
                 to: .fixture("recipient"), relays: [RelayURL("wss://r.example.com")!],
@@ -45,7 +45,7 @@ struct NIP57ZapRequestTests {
 
     @Test("zapRequest omits optional tags when not provided")
     func zapRequestMinimal() throws {
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
         let event = try signer.sign(.zapRequest(to: .fixture("recipient"), relays: [RelayURL("wss://r.example.com")!]))
 
         #expect(event.firstTagValue(named: "amount") == nil)
@@ -56,7 +56,7 @@ struct NIP57ZapRequestTests {
 
     @Test("zapRequest writes the relays tag in canonical form")
     func zapRequestRelaysAreCanonical() throws {
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
         let event = try signer.sign(
             .zapRequest(
                 to: .fixture("recipient"), relays: [try RelayURL(string: "WSS://R.Example.com:443/")]))
@@ -66,7 +66,7 @@ struct NIP57ZapRequestTests {
 
     @Test("zapRequest requires at least one relay")
     func zapRequestRequiresRelay() throws {
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
         #expect(throws: EventTemplate.ZapRequestError.missingRelays) {
             _ = try signer.sign(.zapRequest(to: .fixture("recipient"), relays: []))
         }
@@ -74,7 +74,7 @@ struct NIP57ZapRequestTests {
 
     @Test("zapRequest tags an addressable event coordinate")
     func zapRequestWithCoordinate() throws {
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
         let event = try signer.sign(
             .zapRequest(
                 to: .fixture("recipient"), relays: [RelayURL("wss://r.example.com")!],
@@ -167,7 +167,7 @@ struct NIP57ZapRequestTests {
 
     @Test("builds the invoice request URL with amount, nostr, and lnurl params")
     func invoiceRequestURL() throws {
-        let signer = EventSigner(keyPair: try KeyPair())
+        let signer = EventSigner(keyPair: KeyPair())
         // A "+" in the comment exercises the strict query-value encoding.
         let zap = try signer.sign(
             .zapRequest(
