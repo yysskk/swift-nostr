@@ -197,14 +197,17 @@ package actor RequestResponseSession<Key: Hashable & Sendable, State: Sendable, 
     /// - Parameters:
     ///   - event: The request event to publish.
     ///   - key: What the response will be correlated by.
-    ///   - state: The owner's per-request state, readable from its handler through ``state(for:)``.
+    ///   - state: The owner's per-request state, which its handler folds responses into through
+    ///     ``withPendingRequest(_:_:)``.
     ///   - timeout: How long to wait before the request fails (or resolves, see `partialResult`).
     ///   - partialResult: When non-`nil`, a timeout resolves the waiter with what the request has
     ///     collected so far instead of failing it — NIP-47's `multi_pay_*` returns the responses
     ///     that did arrive.
-    /// - Returns: The response the owner delivered with ``complete(_:with:)``.
-    /// - Throws: The session's `timedOut` error if no response arrives in time, the error passed to
-    ///   ``fail(_:with:)``, a transport error from the send, or
+    /// - Returns: The response the owner resolved the request with, as
+    ///   ``RequestResolution/resolved(_:)``.
+    /// - Throws: The session's `timedOut` error if no response arrives in time, the error the owner
+    ///   failed the request with through ``RequestResolution/failed(_:)``, a transport error from the
+    ///   send, or
     ///   ``RequestResponseSessionError/duplicateRequestKey`` when `key` is already in flight.
     package func perform(
         _ event: Event,
@@ -309,8 +312,8 @@ package actor RequestResponseSession<Key: Hashable & Sendable, State: Sendable, 
         /// The owner's per-request state, read back by its handler when a response arrives.
         var state: State
         let continuation: AsyncThrowingStream<Response, any Error>.Continuation
-        /// The task that resolves the request on timeout; replaced by ``extendTimeout(for:to:)``,
-        /// and cancelled once the request resolves.
+        /// The task that resolves the request on timeout; replaced when the handler returns
+        /// ``RequestResolution/pendingFor(_:)``, and cancelled once the request resolves.
         var timeoutTask: Task<Void, Never>?
         /// When non-`nil`, a timeout resolves the waiter with this instead of failing it.
         let partialResult: PartialResult?

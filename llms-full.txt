@@ -562,7 +562,7 @@ EventTemplate.groupJoinRequest(groupID: "abcdef")           // NIP-29 group fact
 var note = EventTemplate.textNote("expiring")
 note.tags.append(.expiration(.now.advanced(by: .seconds(3600))))
 note.createdAt = Timestamp(rawValue: 1_700_000_000)
-let event = try signer.sign(note)                            // EventSigner: synchronous
+let event = try await signer.sign(note)                      // EventSigner: synchronous outside async code
 let remote = try await bunker.sign(.textNote("gm"))         // any NostrSigning: async
 let unsigned = UnsignedEvent(note, publicKey: pk)            // the template under an explicit key
 ```
@@ -600,7 +600,7 @@ let unsigned = UnsignedEvent(
     tags: [.hashtag("test")],
     content: "Hello"
 )
-let serialized = unsigned.serializedForHashing()  // NIP-01 serialization
+let serialized = try unsigned.serializedForHashing()  // NIP-01 serialization
 ```
 
 ## Filter
@@ -711,7 +711,7 @@ Messages sent to relay (NIP-01) (enum: Sendable).
 - `.count(subscriptionID: String, filters: [Filter])` -- event count request (NIP-45)
 
 ```swift
-let json = clientMessage.serialize()  // JSON array string
+let json = try clientMessage.serialize()  // JSON array string
 ```
 
 ## EventCount
@@ -909,12 +909,13 @@ let signer = try EventSigner(nsec: "nsec1...")
 ### Signing Methods
 
 ```swift
-let note = try signer.sign(.textNote("Hello"))     // any EventTemplate (see EventTemplate)
-let signed = try signer.sign(unsignedEvent)        // a pre-keyed UnsignedEvent
-let meta = try signer.sign(.metadata(UserMetadata(name: "Alice")))
-let contacts = try signer.sign(.contactList([Contact(publicKey: alice)]))
+// Synchronous outside async code; inside it Swift picks the async NostrSigning overload, so add await.
+let note = try await signer.sign(.textNote("Hello"))     // any EventTemplate (see EventTemplate)
+let signed = try await signer.sign(unsignedEvent)        // a pre-keyed UnsignedEvent
+let meta = try await signer.sign(.metadata(UserMetadata(name: "Alice")))
+let contacts = try await signer.sign(.contactList([Contact(publicKey: alice)]))
 let pow = try await signer.sign(.textNote("Hello"), proofOfWork: 20)  // mine to 20 leading zero bits, then sign (NIP-13)
-let report = try signer.sign(.report(author, type: .impersonation))  // kind 1984, NIP-56
+let report = try await signer.sign(.report(author, type: .impersonation))  // kind 1984, NIP-56
 ```
 
 ### NIP-44 Encryption
@@ -1292,7 +1293,7 @@ let naddr = try article.naddr(author: publicKey, relays: [try RelayURL(string: "
 let byCoord = try await client.events.fetchLongFormContent(naddr: naddr)
 
 // Sign without publishing
-let event = try signer.sign(.longFormContent(article, draft: false))
+let event = try await signer.sign(.longFormContent(article, draft: false))
 ```
 
 ## Groups (NIP-29)
@@ -1458,11 +1459,11 @@ The reason category of a NIP-56 report, kind 1984 (enum: String, Sendable, Hasha
 
 ```swift
 // Report a public key: the type rides on the "p" tag.
-let report = try signer.sign(.report(author, type: .impersonation, reason: ""))   // PublicKey
+let report = try await signer.sign(.report(author, type: .impersonation, reason: ""))   // PublicKey
 try await client.events.publishReport(publicKey: author, type: .impersonation)
 
 // Report an event: the type rides on the "e" tag, plus a bare "p" tag naming the author.
-let eventReport = try signer.sign(.report(note, type: .illegal, reason: "against the law"))
+let eventReport = try await signer.sign(.report(note, type: .illegal, reason: "against the law"))
 try await client.events.publishReport(event: note, type: .spam, reason: "unsolicited")
 ```
 
@@ -1589,7 +1590,7 @@ await pool.unsubscribe(subscriptionID: "sub1")    // CLOSE only to connected rel
 try await pool.publish(signedEvent)
 try await pool.publish(signedEvent, to: [relay])  // targeted; PublishResult keyed by RelayURL
 try await pool.countEvents(matching: [filter])   // [RelayURL: EventCount], per relay (NIP-45)
-await pool.setAuthenticationResponder { url, challenge in /* signed kind-22242 event or nil */ }
+await pool.setAuthenticationResponder { url, challenge in nil }  // a signed kind-22242 event, or nil
 await pool.clearDeduplicationCache()
 ```
 
@@ -1646,7 +1647,7 @@ Every period is a `Duration`.
 ### Methods
 
 ```swift
-await connection.connect()
+try await connection.connect()
 await connection.disconnect()
 try await connection.subscribe(subscriptionID: "sub1", filters: [filter])  // connects first if needed
 await connection.unsubscribe(subscriptionID: "sub1")  // no-op unless connected and holding it
@@ -1655,7 +1656,7 @@ try await connection.publish(signedEvent)
 try await connection.countEvents(matching: [filter])         // EventCount from this relay (NIP-45)
 try await connection.authenticate(using: signer)      // answer the stored challenge with any NostrSigning (NIP-42)
 try await connection.authenticate(with: signedAuthEvent)  // pre-signed kind-22242 event
-await connection.setAuthenticationResponder { url, challenge in /* event or nil */ }
+await connection.setAuthenticationResponder { url, challenge in nil }  // a signed kind-22242 event, or nil
 for await message in await connection.messages() { }  // AsyncStream<RelayMessage>
 ```
 
