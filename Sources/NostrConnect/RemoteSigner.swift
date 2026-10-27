@@ -240,10 +240,8 @@ public actor RemoteSigner {
         didConnect = false
         bufferedDiscovery = nil
 
-        // Fail a pending awaitConnection() waiter, if any.
-        failConnection(with: .notConnected)
+        sessionEnded()
 
-        finishAuthChallengeStreams()
         // Every in-flight request is failed below, so no deadline is still owed an answer. Left
         // behind, these accumulate one entry per request that ended any way other than the signer
         // eventually replying — an abandoned `auth_url` prompt, a timeout, a teardown.
@@ -260,9 +258,17 @@ public actor RemoteSigner {
         ) { [weak self] event in
             await self?.handle(event: event)
         } onEnded: { [weak self] in
-            // The relays' streams ended: no challenge can arrive on this session any more.
-            await self?.finishAuthChallengeStreams()
+            // The relays' streams ended. A restart waits for this handler, so the waiter and streams
+            // it ends are never a newer session's.
+            await self?.sessionEnded()
         }
+    }
+
+    /// Fails a pending ``awaitConnection()`` and ends the auth-challenge streams: nothing can answer
+    /// either once the session has ended.
+    private func sessionEnded() {
+        failConnection(with: .notConnected)
+        finishAuthChallengeStreams()
     }
 
     // MARK: - Auth challenges
@@ -481,7 +487,7 @@ public actor RemoteSigner {
         waiter?.resume(returning: signerPublicKey)
     }
 
-    /// Fails the pending ``discoverSigner()`` waiter (e.g. on timeout).
+    /// Fails the pending ``discoverSigner()`` waiter (on timeout, or when the session ends).
     private func failConnection(with error: RemoteSignerError) {
         connectionTimeoutTask?.cancel()
         connectionTimeoutTask = nil

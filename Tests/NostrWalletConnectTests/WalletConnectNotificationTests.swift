@@ -61,6 +61,37 @@ struct WalletConnectNotificationTests {
         #expect(await connection.info?.methods.contains(.getBalance) == true)
     }
 
+    /// No info event can arrive once the relays' streams have ended, so the wait fails then rather
+    /// than when its timeout elapses.
+    /// The timeout is long enough to tell the two apart, yet bounds the run if this regresses.
+    @Test("fetchInfo fails when the relays' event stream ends", .timeLimit(.minutes(1)))
+    func fetchInfoFailsWhenEventStreamEnds() async throws {
+        let transport = FakeWalletConnectTransport()
+        let connection = WalletConnection(
+            uri: try NWCFixtures.uri(wallet: KeyPair(), client: KeyPair()), transport: transport,
+            config: .init(requestTimeout: .seconds(20)))
+
+        let info = Task { try await connection.fetchInfo() }
+        try await waitForInfoSubscription(transport)
+        await transport.endEvents()
+
+        await #expect(throws: WalletConnectError.notConnected) { try await info.value }
+    }
+
+    @Test("fetchInfo fails when the connection disconnects", .timeLimit(.minutes(1)))
+    func fetchInfoFailsOnDisconnect() async throws {
+        let transport = FakeWalletConnectTransport()
+        let connection = WalletConnection(
+            uri: try NWCFixtures.uri(wallet: KeyPair(), client: KeyPair()), transport: transport,
+            config: .init(requestTimeout: .seconds(20)))
+
+        let info = Task { try await connection.fetchInfo() }
+        try await waitForInfoSubscription(transport)
+        await connection.disconnect()
+
+        await #expect(throws: WalletConnectError.notConnected) { try await info.value }
+    }
+
     // MARK: - Stream lifetime
 
     /// The merged event stream ends when every relay's has — automatic reconnection gave up, or the
@@ -127,5 +158,17 @@ struct WalletConnectNotificationTests {
                 notificationJSON: #"{"notification_type":"payment_sent","notification":{"amount":2000}}"#,
                 kind: .walletConnectNotification, client: client, wallet: wallet, scheme: .nip44))
         #expect(await iterator.next()?.type == "payment_sent")
+    }
+
+    // MARK: - Helpers
+
+    /// Polls until ``WalletConnection/fetchInfo()`` has subscribed for the info event, by which point
+    /// its waiter is registered.
+    private func waitForInfoSubscription(_ transport: FakeWalletConnectTransport) async throws {
+        for _ in 0..<400 {
+            if await transport.subscriptions["nwc-info"] != nil { return }
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        throw WalletConnectError.timedOut
     }
 }
