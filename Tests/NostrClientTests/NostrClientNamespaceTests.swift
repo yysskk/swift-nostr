@@ -129,7 +129,7 @@ struct NostrClientNamespaceTests {
         await subscriptions.unsubscribe(id: subscription.id)
         #expect(await client.activeSubscriptionCount == 0)
 
-        _ = try await subscriptions.globalFeed(limit: 1)
+        _ = try await subscriptions.subscribe(filters: [.globalFeed(limit: 1)])
         await subscriptions.unsubscribeAll()
         #expect(await client.activeSubscriptionCount == 0)
 
@@ -245,9 +245,6 @@ struct NostrClientNamespaceTests {
 
         await #expect(throws: RelayPool.Error.emptyPool) {
             try await subscriptions.subscribe(filters: [Filter(kinds: [.textNote])])
-        }
-        await #expect(throws: RelayPool.Error.emptyPool) {
-            try await subscriptions.globalFeed()
         }
     }
 

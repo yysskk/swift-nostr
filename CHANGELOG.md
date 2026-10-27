@@ -114,6 +114,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Every live stream opens with `subscribe`, and each primitive has one short form** (breaking):
+  a namespace's stream-opening method is `subscribe(...)`, with arguments naming what to receive.
+  - `client.subscriptions`: `events(filters:)` and `events(filters:to:)` are removed; read
+    `subscribe(filters:).events`. The feeds `userTimeline(publicKey:limit:)`, `globalFeed(limit:)`,
+    `mentions(publicKey:limit:)`, and `metadata(publicKeys:)` are removed in favor of the `Filter`
+    presets: `subscribe(filters: [.globalFeed(limit: 50)])`.
+  - `client.messages`: the `NostrMessaging` requirement `payloads(limit:)` is `subscribe(limit:)`,
+    still returning a `DirectMessagePayloadSequence`, and `payloads()` is `subscribe()`. The
+    message-only stream that `subscribe(limit:)` returned is its `messages` view
+    (`subscribe().messages`, a `DirectMessageSequence`), and the `giftWraps(limit:)` requirement and
+    `giftWraps()` are its `giftWraps` view (`subscribe().giftWraps`, a `SubscriptionSequence`).
+  - `client.groups`: the `NostrGroupManaging` requirement `timeline(_:kinds:since:limit:)` is
+    `subscribe(to:filters:)`, which scopes each filter to the group by its "h" tag; its four short
+    forms are one, `subscribe(to:kinds:since:limit:)`, with every argument after the group
+    defaulting to nil.
+  - Each primitive keeps at most one short form, with other argument labels, so none needs a
+    disambiguated documentation link. Outside relay targeting, the short form drops the trailing
+    `timeout` or `strategy`; to pass one, spell out the primitive. `lists.fetch(kind:timeout:)`,
+    `fetchSet(kind:identifier:timeout:)`, `fetchSets(kind:timeout:)`, and
+    `groups.fetchSimpleGroupList(timeout:)` are the primitives with `for: nil`
+    (`fetch(kind: .muteList, for: nil, timeout: .seconds(2))`), `groups.fetchMetadata(for:timeout:)`
+    and `fetchState(for:timeout:)` take `authorPublicKey: nil`, and
+    `messages.sendGiftWrapped(_:to:strategy:)` takes `expiration: nil`. The short forms are
+    `fetch(kind:for:)`, `fetchSet(kind:identifier:for:)`, `fetchSets(kind:for:)`,
+    `fetchSimpleGroupList(for:)`, `fetchMetadata(for:authorPublicKey:)`,
+    `fetchState(for:authorPublicKey:)`, and `sendGiftWrapped(_:to:expiration:)`, each defaulting its
+    optional arguments to nil.
+
 - **`KeyPair` holds a `PrivateKey`** (breaking): `privateKey` is a `PrivateKey` instead of `Data`,
   and `KeyPair(privateKey:)` takes one and no longer throws. `KeyPair(privateKey: Data)`,
   `KeyPair(privateKeyHex:)`, `privateKeyHex`, and `nsec` are removed in favor of `PrivateKey(data:)`,
@@ -672,27 +700,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `unsubscribe(id:)`, and `unsubscribeAll()`; `NostrRelayManaging` requires
   `add(_:config:)`, `remove(_:)`, `connect()`, `disconnect()`, `connections`,
   `connectedRelayCount()`, `relay(for:)`, and `clearDeduplicationCache()`; `NostrIdentityProviding`
-  keeps every requirement but `setPrivateKey(_:)` and `setNsec(_:)`. Both `events(filters:…)`
-  shapes, `userTimeline`, `globalFeed`, `mentions`, `metadata(publicKeys:)`, `add(_:)` for one relay
-  and for a sequence, `connect(to:)`, `relayCount`, `setPrivateKey(_:)`, and `setNsec(_:)` move to
-  protocol extensions built on those primitives, with the same filters, defaults, and errors, as do
-  the short forms `subscribe(filters:bufferingPolicy:)` and `subscribe(filters:to:bufferingPolicy:)`
-  for a non-optional `Set<RelayURL>`, so `subscribe(filters:to: nil)` without a `bufferingPolicy:`
-  and `events(filters:to: nil)` no longer compile: omit `to:` to subscribe on the whole pool.
+  keeps every requirement but `setPrivateKey(_:)` and `setNsec(_:)`. `add(_:)` for one relay and for
+  a sequence, `connect(to:)`, `relayCount`, `setPrivateKey(_:)`, and `setNsec(_:)` move to protocol
+  extensions built on those primitives, with the same defaults and errors, as do the short forms
+  `subscribe(filters:bufferingPolicy:)` and `subscribe(filters:to:bufferingPolicy:)` for a
+  non-optional `Set<RelayURL>`, so `subscribe(filters:to: nil)` without a `bufferingPolicy:` no
+  longer compiles: omit `to:` to subscribe on the whole pool.
 
 - **`NostrMessaging` requires only its primitives, and `sendGiftWrapped` takes an `EventTemplate`**
   (breaking): the requirements are `sendGiftWrapped(_:to:expiration:strategy:)`,
-  `parsePayload(_:)`, `payloads(limit:)`, and `giftWraps(limit:)`. `sendGiftWrapped` now authors the
+  `parsePayload(_:)`, and `subscribe(limit:)`. `sendGiftWrapped` now authors the
   rumor from a template under the configured signer's public key, so the `UnsignedEvent` overload and
   its `invalidPublicKey` check for a rumor authored under another key are gone. `send`, `react`, and
   `sendFile` move to a protocol extension that gift-wraps the matching `EventTemplate` factory
   through `sendGiftWrapped`, with the same tags, routing, defaults, and errors; `parse`,
   `parseReaction`, and `parseFile` unwrap the matching case of `parsePayload(_:)`, throwing
-  `DirectMessagePayload.Error.unexpectedKind` for any other payload; and `subscribe(limit:)`
-  delivers the messages of `payloads(limit:)`. The extension also adds the short forms `sendGiftWrapped(_:to:strategy:)`,
-  `sendGiftWrapped(_:to:expiration:strategy:)` for a non-optional `Timestamp`, `payloads()`, and
-  `giftWraps()`, so an optional `expiration:` without a `strategy:` no longer compiles: pass
-  `strategy: nil` as well, or omit a nil `expiration:`.
+  `DirectMessagePayload.Error.unexpectedKind` for any other payload. The extension also adds the
+  short forms `sendGiftWrapped(_:to:expiration:)` and `subscribe()`, so a `strategy:` needs every
+  argument spelled out.
 
 - **`NostrRelayRouting` and `NostrListManaging` require only their primitives** (breaking):
   `publishRelayList(read:write:strategy:)` and `publishDirectMessageRelayList(relays:strategy:)` move
@@ -704,10 +729,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the old defaults: `fetchRelayList(for:)`, `fetchDirectMessageRelayList(for:)`,
   `publishRelayList(_:)`, `publishDirectMessageRelayList(_:)`, `publishGossip(_:)`,
   `subscribeOutbox(authors:kinds:)` and `subscribeOutbox(authors:kinds:limit:)` for a non-optional
-  `Int`, `publish(_:)`, `publishSet(_:)`, and, for `fetch`, `fetchSet`, and `fetchSets`, a form
-  without `for:` (the current user) and one taking a non-optional `PublicKey`. An optional
-  `publicKey`, `limit`, or `timeout` therefore needs every argument spelled out: `for: nil` alone no
-  longer compiles — omit it.
+  `Int`, `publish(_:)`, `publishSet(_:)`, `fetch(kind:for:)`, `fetchSet(kind:identifier:for:)`, and
+  `fetchSets(kind:for:)`, whose `for:` defaults to nil (the current user). An optional `limit` or a
+  `timeout` therefore needs every argument spelled out.
 
 - **`NostrGroupManaging` publishes through one primitive** (breaking):
   `publish(_:in:strategy:)` signs any `EventTemplate` and publishes it to the group's relay only,
@@ -716,12 +740,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `groupJoinRequest`, `groupLeaveRequest`, `groupContent`, and `groupModeration` templates through
   it, with the same tags, defaults, and errors. The reads and the kind-10009 list stay requirements,
   and the extension adds short forms with the old defaults: `publish(_:in:)`,
-  `fetchMetadata(for:timeout:)` and `fetchState(for:timeout:)` plus forms taking a non-optional
-  `authorPublicKey`, `timeline(_:)`, `timeline(_:kinds:since:limit:)` for non-optional `kinds`,
-  `timeline(_:since:limit:)`, `timeline(_:limit:)`, `fetchSimpleGroupList(timeout:)`,
-  `fetchSimpleGroupList(for:timeout:)` for a non-optional `PublicKey`, and
-  `publishSimpleGroupList(_:)`. An optional `authorPublicKey`, `kinds`, `since`, or `publicKey`
-  therefore needs every argument spelled out.
+  `fetchMetadata(for:authorPublicKey:)`, `fetchState(for:authorPublicKey:)`,
+  `subscribe(to:kinds:since:limit:)`, `fetchSimpleGroupList(for:)`, and
+  `publishSimpleGroupList(_:)`. A `timeout` therefore needs every argument spelled out.
 - **`WalletConnectMethod` and `WalletConnectErrorCode` are open types** (breaking): NIP-47 adds
   methods and error codes over time, so both are `RawRepresentable` structs with a non-failable
   `init(rawValue:)`, the current methods and codes as static constants under the same names, and a

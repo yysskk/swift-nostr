@@ -23,8 +23,7 @@ actor RecordingMessagingCapabilities: NostrMessaging {
 
     private(set) var sends: [Send] = []
     private(set) var parsedGiftWraps: [Event] = []
-    private(set) var payloadLimits: [Int] = []
-    private(set) var giftWrapLimits: [Int] = []
+    private(set) var subscribeLimits: [Int] = []
 
     init(signer: EventSigner, relayURL: RelayURL, cannedGiftWraps: [Event] = []) {
         self.signer = signer
@@ -59,17 +58,12 @@ actor RecordingMessagingCapabilities: NostrMessaging {
         return try await DirectMessageParser(signer: signer).parsePayload(giftWrap)
     }
 
-    func payloads(limit: Int) async throws -> DirectMessagePayloadSequence {
-        payloadLimits.append(limit)
+    func subscribe(limit: Int) async throws -> DirectMessagePayloadSequence {
+        subscribeLimits.append(limit)
         return DirectMessagePayloadSequence(
-            subscription: cannedSubscription(id: SubscriptionID(rawValue: "payloads_\(payloadLimits.count)")),
+            subscription: cannedSubscription(id: SubscriptionID(rawValue: "payloads_\(subscribeLimits.count)")),
             parser: DirectMessageParser(signer: signer)
         )
-    }
-
-    func giftWraps(limit: Int) async throws -> SubscriptionSequence {
-        giftWrapLimits.append(limit)
-        return cannedSubscription(id: SubscriptionID(rawValue: "gift_wraps_\(giftWrapLimits.count)"))
     }
 
     // MARK: - Private

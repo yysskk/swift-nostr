@@ -5,62 +5,37 @@ import NostrCore
 
 extension NostrMessaging {
     /// Sends `template` gift-wrapped, authored under the configured signer's public key and
-    /// delivered like a NIP-17 direct message, with no expiration.
+    /// delivered like a NIP-17 direct message, waiting for the pool config's
+    /// ``RelayPoolConfig/defaultPublishStrategy``.
     ///
     /// Use it for private payloads other than kinds 14, 15, and 7. To build the gift wraps without
     /// publishing, use ``GiftWrap/wrap(event:signer:recipientPublicKey:expiration:)``.
     /// - Parameters:
     ///   - template: The rumor's kind, tags, content, and creation time.
     ///   - recipientPublicKey: The recipient's public key.
-    ///   - strategy: How many relay acknowledgments to wait for on the recipient gift wrap before
-    ///     returning (default: the pool config's ``RelayPoolConfig/defaultPublishStrategy``).
+    ///   - expiration: A NIP-40 expiration set on both gift wraps, if any.
     /// - Returns: The shared rumor, both gift wraps, and the per-relay publish outcomes.
-    /// - Throws: The errors of
-    ///   ``NostrMessaging/sendGiftWrapped(_:to:expiration:strategy:)-(_,_,Timestamp?,_)``.
+    /// - Throws: The errors of ``NostrMessaging/sendGiftWrapped(_:to:expiration:strategy:)``.
     @discardableResult
     public func sendGiftWrapped(
         _ template: EventTemplate,
         to recipientPublicKey: PublicKey,
-        strategy: PublishStrategy? = nil
+        expiration: Timestamp? = nil
     ) async throws -> SendDirectMessageResult {
-        try await sendGiftWrapped(template, to: recipientPublicKey, expiration: nil, strategy: strategy)
+        try await sendGiftWrapped(template, to: recipientPublicKey, expiration: expiration, strategy: nil)
     }
 
-    /// Sends `template` gift-wrapped, authored under the configured signer's public key and
-    /// delivered like a NIP-17 direct message, with a NIP-40 expiration on both gift wraps.
-    /// - Parameters:
-    ///   - template: The rumor's kind, tags, content, and creation time.
-    ///   - recipientPublicKey: The recipient's public key.
-    ///   - expiration: When relays stop serving both gift wraps.
-    ///   - strategy: How many relay acknowledgments to wait for on the recipient gift wrap before
-    ///     returning (default: the pool config's ``RelayPoolConfig/defaultPublishStrategy``).
-    /// - Returns: The shared rumor, both gift wraps, and the per-relay publish outcomes.
-    /// - Throws: The errors of
-    ///   ``NostrMessaging/sendGiftWrapped(_:to:expiration:strategy:)-(_,_,Timestamp?,_)``.
-    @discardableResult
-    public func sendGiftWrapped(
-        _ template: EventTemplate,
-        to recipientPublicKey: PublicKey,
-        expiration: Timestamp,
-        strategy: PublishStrategy? = nil
-    ) async throws -> SendDirectMessageResult {
-        try await sendGiftWrapped(
-            template, to: recipientPublicKey, expiration: Optional(expiration), strategy: strategy)
-    }
-
-    /// Subscribes to the current user's messages, reactions, and file messages on the whole pool,
-    /// with each relay sending up to 100 stored gift wraps. See
-    /// ``NostrMessaging/payloads(limit:)``.
+    /// Subscribes to the current user's gift wraps on the whole pool, with each relay sending up to
+    /// 100 stored ones. See ``NostrMessaging/subscribe(limit:)``.
+    ///
+    /// ```swift
+    /// for try await message in try await client.messages.subscribe().messages {
+    ///     print("\(message.senderPublicKey): \(message.content)")
+    /// }
+    /// ```
     /// - Returns: The payload sequence.
-    public func payloads() async throws -> DirectMessagePayloadSequence {
-        try await payloads(limit: 100)
-    }
-
-    /// Subscribes to the raw gift wraps addressed to the current user on the whole pool, with each
-    /// relay sending up to 100 stored ones. See ``NostrMessaging/giftWraps(limit:)``.
-    /// - Returns: The subscription; open each event with ``NostrMessaging/parsePayload(_:)``.
-    public func giftWraps() async throws -> SubscriptionSequence {
-        try await giftWraps(limit: 100)
+    public func subscribe() async throws -> DirectMessagePayloadSequence {
+        try await subscribe(limit: 100)
     }
 }
 
@@ -73,7 +48,7 @@ extension NostrMessaging {
     /// One unsigned rumor is wrapped twice: once for the recipient and once for the sender (the
     /// NIP-17 self-copy that provides sent history and multi-device sync), each routed to its
     /// addressee's DM relays — see
-    /// ``NostrMessaging/sendGiftWrapped(_:to:expiration:strategy:)-(_,_,Timestamp?,_)``.
+    /// ``NostrMessaging/sendGiftWrapped(_:to:expiration:strategy:)``.
     /// - Parameters:
     ///   - content: The message text.
     ///   - recipientPublicKey: The recipient's public key.
@@ -207,20 +182,5 @@ extension NostrMessaging {
             throw DirectMessagePayload.Error.unexpectedKind(payload.kind)
         }
         return file
-    }
-
-    /// Subscribes to the current user's private direct messages (kind 14) on the whole pool,
-    /// delivering each message already unwrapped and parsed.
-    ///
-    /// The messages of ``NostrMessaging/payloads(limit:)``: reactions and file messages on the same
-    /// stream are skipped, as are gift wraps that are not readable messages for the signer, while a
-    /// signer that could not attempt the read throws out of the iteration — see
-    /// ``DirectMessageSequence``. Use ``NostrMessaging/giftWraps(limit:)`` for the raw gift-wrap
-    /// events.
-    /// - Parameter limit: How many stored gift wraps each relay sends before live ones.
-    /// - Returns: The message sequence.
-    /// - Throws: The errors of ``NostrMessaging/payloads(limit:)``.
-    public func subscribe(limit: Int = 100) async throws -> DirectMessageSequence {
-        DirectMessageSequence(messagesOf: try await payloads(limit: limit))
     }
 }

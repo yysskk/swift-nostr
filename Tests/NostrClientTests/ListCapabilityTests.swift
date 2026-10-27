@@ -47,58 +47,52 @@ struct ListCapabilityTests {
 
     // MARK: - Fetching
 
-    @Test("fetch(kind:) asks for the current user's list, and fetch(kind:for:) for the given author")
-    func fetchShortForms() async throws {
+    @Test("fetch(kind:for:) asks for the current user's list by default, with no timeout")
+    func fetchShortForm() async throws {
         let stub = makeStub()
         let lists: any NostrListManaging = stub
 
         _ = try await lists.fetch(kind: .muteList)
-        _ = try await lists.fetch(kind: .muteList, timeout: .seconds(3))
         _ = try await lists.fetch(kind: .muteList, for: other)
         _ = try await lists.fetch(kind: .muteList, for: other, timeout: .seconds(4))
 
         #expect(
             await stub.listFetches == [
                 .init(kind: .muteList, identifier: nil, publicKey: nil, timeout: nil),
-                .init(kind: .muteList, identifier: nil, publicKey: nil, timeout: .seconds(3)),
                 .init(kind: .muteList, identifier: nil, publicKey: other, timeout: nil),
                 .init(kind: .muteList, identifier: nil, publicKey: other, timeout: .seconds(4)),
             ])
     }
 
-    @Test("fetchSet(kind:identifier:) asks for the current user's set, and with for: for the given author")
-    func fetchSetShortForms() async throws {
+    @Test("fetchSet(kind:identifier:for:) asks for the current user's set by default, with no timeout")
+    func fetchSetShortForm() async throws {
         let stub = makeStub()
         let lists: any NostrListManaging = stub
 
         _ = try await lists.fetchSet(kind: .bookmarkSet, identifier: "reading")
-        _ = try await lists.fetchSet(kind: .bookmarkSet, identifier: "reading", timeout: .seconds(3))
         _ = try await lists.fetchSet(kind: .bookmarkSet, identifier: "reading", for: other)
         _ = try await lists.fetchSet(kind: .bookmarkSet, identifier: "reading", for: other, timeout: .seconds(4))
 
         #expect(
             await stub.setFetches == [
                 .init(kind: .bookmarkSet, identifier: "reading", publicKey: nil, timeout: nil),
-                .init(kind: .bookmarkSet, identifier: "reading", publicKey: nil, timeout: .seconds(3)),
                 .init(kind: .bookmarkSet, identifier: "reading", publicKey: other, timeout: nil),
                 .init(kind: .bookmarkSet, identifier: "reading", publicKey: other, timeout: .seconds(4)),
             ])
     }
 
-    @Test("fetchSets(kind:) asks for the current user's sets, and with for: for the given author")
-    func fetchSetsShortForms() async throws {
+    @Test("fetchSets(kind:for:) asks for the current user's sets by default, with no timeout")
+    func fetchSetsShortForm() async throws {
         let stub = makeStub()
         let lists: any NostrListManaging = stub
 
         _ = try await lists.fetchSets(kind: .followSet)
-        _ = try await lists.fetchSets(kind: .followSet, timeout: .seconds(3))
         _ = try await lists.fetchSets(kind: .followSet, for: other)
         _ = try await lists.fetchSets(kind: .followSet, for: other, timeout: .seconds(4))
 
         #expect(
             await stub.setsFetches == [
                 .init(kind: .followSet, identifier: nil, publicKey: nil, timeout: nil),
-                .init(kind: .followSet, identifier: nil, publicKey: nil, timeout: .seconds(3)),
                 .init(kind: .followSet, identifier: nil, publicKey: other, timeout: nil),
                 .init(kind: .followSet, identifier: nil, publicKey: other, timeout: .seconds(4)),
             ])

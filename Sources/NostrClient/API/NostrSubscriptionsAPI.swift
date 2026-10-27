@@ -4,9 +4,9 @@ import NostrCore
 /// Live subscriptions delivered as async sequences.
 /// Reached as ``NostrClient/subscriptions``.
 ///
-/// Implements the ``NostrSubscribing`` primitives; ``NostrSubscribing/events(filters:bufferingPolicy:)``,
-/// the feeds (``NostrSubscribing/userTimeline(publicKey:limit:)``, …), and the short forms of
-/// ``subscribe(filters:to:bufferingPolicy:)`` come from the protocol's extension.
+/// Implements the ``NostrSubscribing`` primitives; the short forms of
+/// ``subscribe(filters:to:bufferingPolicy:)`` come from the protocol's extension. Read only the
+/// event payloads through ``SubscriptionSequence/events``.
 ///
 /// Iteration termination — breaking out of the loop, task cancellation, or discarding the
 /// sequence — sends CLOSE to the relays, so most call sites never need ``unsubscribe(id:)``.

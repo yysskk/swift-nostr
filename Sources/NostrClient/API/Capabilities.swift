@@ -21,6 +21,13 @@ import NostrCore
 // the primitives and a call through `any NostrEventPublishing` is as short as one through
 // `client.events`.
 //
+// A primitive has at most one short form, and its argument labels differ from the primitive's:
+// usually it drops the trailing `timeout` or `strategy`, whose nil already means the pool default,
+// and defaults the rest. The two never need disambiguating, and the short form can never turn into
+// the primitive's default implementation; to set the dropped parameter, call the primitive. The
+// relay-targeting primitives (`to:` or `from:` a relay set) are the exception, with a pool-wide and
+// a targeted short form each.
+//
 // The protocols are also the public extension points: a helper added to one in an extension works on
 // the namespace, on any conformer, and on stubs, and a namespace of your own composes the protocols
 // it needs. The "Extending the Client" article (NostrClient.docc/ExtendingTheClient.md) covers both.
@@ -205,10 +212,15 @@ public protocol NostrEventFetching: Sendable {
 
 /// Opening live subscriptions. Implemented by ``NostrSubscriptionsAPI``.
 ///
-/// The requirements are the subscribe and unsubscribe primitives; ``events(filters:bufferingPolicy:)``,
-/// the feeds (``userTimeline(publicKey:limit:)``, ``globalFeed(limit:)``, …), and the short forms of
+/// The requirements are the subscribe and unsubscribe primitives; the short forms of
 /// ``subscribe(filters:to:bufferingPolicy:)-(_,Set<RelayURL>?,_)`` are provided by an extension
-/// built on them.
+/// built on them. For a feed, pass one of the `Filter` presets and read ``SubscriptionSequence/events``:
+///
+/// ```swift
+/// for await note in try await client.subscriptions.subscribe(filters: [.globalFeed(limit: 50)]).events {
+///     print(note.content)
+/// }
+/// ```
 public protocol NostrSubscribing: Sendable {
     /// Opens a subscription on the whole pool (nil) or the given relays, as an async sequence of
     /// relay-aware events.
@@ -330,8 +342,8 @@ public protocol NostrRelayRouting: Sendable {
     /// connected, so gift-wrapped messages addressed there arrive; the list is fetched first when
     /// not cached.
     ///
-    /// Call this before subscribing with ``NostrMessaging/subscribe(limit:)`` or
-    /// ``NostrMessaging/giftWraps(limit:)`` so the subscription covers the relays you advertised.
+    /// Call this before subscribing with ``NostrMessaging/subscribe(limit:)`` so the subscription
+    /// covers the relays you advertised.
     /// - Returns: The connected inbox relay URLs (empty if you have advertised no DM relay list).
     /// - Throws: ``NostrClient/Error/signerNotSet`` if no signer is configured.
     @discardableResult
@@ -342,11 +354,11 @@ public protocol NostrRelayRouting: Sendable {
 /// Sending and receiving NIP-17 private direct messages. Implemented by ``NostrMessagesAPI``.
 ///
 /// The requirements are the primitives — gift-wrapping a template, unwrapping a gift wrap, and the
-/// two gift-wrap streams; ``send(_:to:subject:replyTo:expiration:strategy:)``,
+/// gift-wrap stream; ``send(_:to:subject:replyTo:expiration:strategy:)``,
 /// ``react(to:reaction:expiration:strategy:)``,
 /// ``sendFile(url:mimeType:encryption:size:dimensions:blurhash:to:expiration:strategy:)``,
-/// ``parse(_:)``, ``parseReaction(_:)``, ``parseFile(_:)``, ``subscribe(limit:)``, and the short
-/// forms of the primitives are provided by an extension built on them.
+/// ``parse(_:)``, ``parseReaction(_:)``, ``parseFile(_:)``, and the short forms of the primitives
+/// are provided by an extension built on them.
 public protocol NostrMessaging: Sendable {
     /// Authors `template` as an unsigned rumor under the configured signer's public key and sends it
     /// gift-wrapped (NIP-59), delivered like a NIP-17 direct message.
@@ -388,23 +400,18 @@ public protocol NostrMessaging: Sendable {
     ///   ``GiftWrap/unwrap(giftWrap:recipient:)`` throws for a gift wrap that does not open.
     func parsePayload(_ giftWrap: Event) async throws -> DirectMessagePayload
 
-    /// Subscribes to the current user's gift-wrap stream on the whole pool, delivering each
-    /// readable gift wrap unwrapped as a ``DirectMessagePayload`` — a message, a reaction, or a file.
+    /// Subscribes to the gift wraps (kind 1059) addressed to the current user on the whole pool,
+    /// delivering each readable one unwrapped as a ``DirectMessagePayload`` — a message, a reaction,
+    /// or a file.
     ///
     /// Unreadable gift wraps are skipped and signer failures throw out of the iteration — see
-    /// ``DirectMessagePayloadSequence``.
+    /// ``DirectMessagePayloadSequence``. Its ``DirectMessagePayloadSequence/messages`` view keeps the
+    /// messages only, and ``DirectMessagePayloadSequence/giftWraps`` yields the raw gift wraps.
     /// - Parameter limit: How many stored gift wraps each relay sends before live ones.
     /// - Returns: The payload sequence.
     /// - Throws: ``NostrClient/Error/signerNotSet`` if no signer is set, or the errors of opening a
     ///   subscription on the whole pool.
-    func payloads(limit: Int) async throws -> DirectMessagePayloadSequence
-
-    /// Subscribes to the raw gift wraps (kind 1059) addressed to the current user, on the whole pool.
-    /// - Parameter limit: How many stored gift wraps each relay sends before live ones.
-    /// - Returns: The subscription; open each event with ``parsePayload(_:)``.
-    /// - Throws: ``NostrClient/Error/signerNotSet`` if no signer is set, or the errors of opening a
-    ///   subscription on the whole pool.
-    func giftWraps(limit: Int) async throws -> SubscriptionSequence
+    func subscribe(limit: Int) async throws -> DirectMessagePayloadSequence
 }
 
 // MARK: - Groups
@@ -413,7 +420,8 @@ public protocol NostrMessaging: Sendable {
 /// Implemented by ``NostrGroupsAPI``.
 ///
 /// The requirements are the primitives — publishing a template to a group's relay, the reads that
-/// target it, and the kind-10009 group list; ``join(_:inviteCode:reason:strategy:)``,
+/// target it, and the kind-10009 group list; ``subscribe(to:kinds:since:limit:)``,
+/// ``join(_:inviteCode:reason:strategy:)``,
 /// ``leave(_:reason:strategy:)``, ``publishMessage(_:kind:in:tags:previous:strategy:)``,
 /// ``publishModeration(_:in:previous:reason:strategy:)``, and the short forms of the primitives are
 /// provided by an extension built on them.
@@ -459,7 +467,7 @@ public protocol NostrGroupManaging: Sendable {
     /// and pins — from its relay in one round trip (``Filter/groupState(groupID:kinds:)``).
     ///
     /// The newest event per kind wins, with the same author validation as
-    /// ``fetchMetadata(for:authorPublicKey:timeout:)-(_,PublicKey?,_)``. Fields stay nil when the
+    /// ``fetchMetadata(for:authorPublicKey:timeout:)``. Fields stay nil when the
     /// relay published nothing for that kind — for example the member list of a private group.
     /// - Parameters:
     ///   - group: The group to query; its relay is added to the pool and connected on demand.
@@ -473,21 +481,18 @@ public protocol NostrGroupManaging: Sendable {
     func fetchState(
         for group: GroupReference, authorPublicKey: PublicKey?, timeout: Duration?
     ) async throws -> GroupState
-    /// Subscribes to the live timeline of the group's content — events carrying its "h" tag — from
-    /// its relay only.
+    /// Subscribes to the group's live content — events carrying its "h" tag — matching `filters`,
+    /// from its relay only.
     ///
-    /// Iteration termination sends CLOSE, like every subscription from
+    /// Each filter is scoped to the group by setting its "h" tag to the group's id, replacing any
+    /// "h" values it had. Iteration termination sends CLOSE, like every subscription from
     /// ``NostrSubscribing/subscribe(filters:to:bufferingPolicy:)-(_,Set<RelayURL>?,_)``.
     /// - Parameters:
     ///   - group: The group to follow; its relay is added to the pool and connected on demand.
-    ///   - kinds: The content kinds to receive, or nil for all kinds.
-    ///   - since: Only events whose `created_at` is at or after this time, or nil for no bound.
-    ///   - limit: The maximum number of stored events the relay should send, or nil for no limit.
+    ///   - filters: The NIP-01 filters the relay matches the group's events against.
     /// - Returns: The subscription as an async sequence of relay-aware events.
     /// - Throws: Anything the connection or subscribe throws.
-    func timeline(
-        _ group: GroupReference, kinds: [Event.Kind]?, since: Timestamp?, limit: Int?
-    ) async throws -> SubscriptionSequence
+    func subscribe(to group: GroupReference, filters: [Filter]) async throws -> SubscriptionSequence
 
     /// Fetches the newest kind-10009 simple group list — the NIP-29 groups a user is in.
     ///

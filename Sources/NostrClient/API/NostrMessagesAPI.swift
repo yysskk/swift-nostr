@@ -9,9 +9,9 @@ import NostrCore
 /// ``NostrMessaging/send(_:to:subject:replyTo:expiration:strategy:)``,
 /// ``NostrMessaging/react(to:reaction:expiration:strategy:)``, and
 /// ``NostrMessaging/sendFile(url:mimeType:encryption:size:dimensions:blurhash:to:expiration:strategy:)``
-/// gift-wrap a template through ``sendGiftWrapped(_:to:expiration:strategy:)-(_,_,Timestamp?,_)``; the parse helpers
-/// unwrap through ``parsePayload(_:)``; and ``NostrMessaging/subscribe(limit:)`` keeps the messages
-/// of ``payloads(limit:)``.
+/// gift-wrap a template through ``sendGiftWrapped(_:to:expiration:strategy:)``; and the parse
+/// helpers unwrap through ``parsePayload(_:)``. ``subscribe(limit:)`` delivers every payload, with
+/// ``DirectMessagePayloadSequence/messages`` and ``DirectMessagePayloadSequence/giftWraps`` as views.
 ///
 /// Every send is routed by the addressee's NIP-17 DM relay list (kind 10050) via
 /// ``NostrClient/routing``, discovering and caching the list as needed and falling back to the
@@ -48,15 +48,10 @@ public struct NostrMessagesAPI: NostrMessaging {
 
     /// Subscribes to the current user's gift wraps on the whole pool, delivering each readable one
     /// unwrapped.
-    public func payloads(limit: Int) async throws -> DirectMessagePayloadSequence {
+    public func subscribe(limit: Int) async throws -> DirectMessagePayloadSequence {
         let parser = try await parser()
         let subscription = try await client.pool.subscribe(filters: [try await giftWrapFilter(limit: limit)])
         return DirectMessagePayloadSequence(subscription: subscription, parser: parser)
-    }
-
-    /// Subscribes to the raw gift wraps addressed to the current user, on the whole pool.
-    public func giftWraps(limit: Int) async throws -> SubscriptionSequence {
-        try await client.pool.subscribe(filters: [try await giftWrapFilter(limit: limit)])
     }
 
     // MARK: - Private
@@ -122,7 +117,7 @@ public struct NostrMessagesAPI: NostrMessaging {
         )
     }
 
-    /// A parser bound to the active signer, for the sequences that keep unwrapping messages as
+    /// A parser bound to the active signer, for the sequence that keeps unwrapping payloads as
     /// they arrive. Deliberately lets the signer outlive the call: a live sequence needs it for
     /// the subscription's whole lifetime.
     private func parser() async throws -> DirectMessageParser {

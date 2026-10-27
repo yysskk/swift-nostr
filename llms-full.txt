@@ -49,7 +49,7 @@ let note = try await client.events.publishTextNote(content: "Hello, Nostr!")
 print("Accepted by \(note.result.acceptedRelays.count) relay(s)")
 
 // Subscribe to events (async sequence)
-let feed = try await client.subscriptions.globalFeed(limit: 50)
+let feed = try await client.subscriptions.subscribe(filters: [.globalFeed(limit: 50)])
 for await item in feed {
     switch item {
     case .event(let relayURL, let event):
@@ -79,7 +79,7 @@ stored or passed to a view model.
 - `client.identity` -- signer setup, `publicKey` (`PublicKey?`; `.npub` for display), `sign(_:)`, NIP-44 `nip44Encrypt(_:to:)`/`nip44Decrypt(_:from:)`, NIP-42 authentication
 - `client.relays` -- `add`, `remove`, `connect`, `disconnect`, pool inspection, and `pool: RelayPool`
 - `client.events` -- the `publish*` helpers, `publish(_:)`, `fetch`, `count`, NIP-23 long-form content
-- `client.subscriptions` -- `subscribe`, `events`, `unsubscribe`, and the convenience feeds
+- `client.subscriptions` -- `subscribe(filters:)` (feeds are `Filter` presets) and `unsubscribe`
 - `client.routing` -- NIP-65 relay lists with outbox/gossip, NIP-17 DM relay lists
 - `client.messages` -- NIP-17 private direct messages
 - `client.groups` -- NIP-29 groups and the kind-10009 simple group list
@@ -108,28 +108,34 @@ as one through `client.events`. `NostrSubscribing` (`subscribe(filters:to:buffer
 `unsubscribe(id:)`, `unsubscribeAll()`), `NostrRelayManaging` (`add(_:config:)`,
 `remove(_:)`, `connect()`, `disconnect()`, `connections`, `connectedRelayCount()`, `relay(for:)`,
 `clearDeduplicationCache()`), and `NostrIdentityProviding` (both `setSigner(_:)` overloads,
-`publicKey`, `sign(_:)`, NIP-44, and NIP-42 authentication) follow the same pattern: `events(filters:)`,
-the feeds, `add(_:)`, `connect(to:)`, `relayCount`, `setPrivateKey(_:)`, `setNsec(_:)`, and the short
-forms come from their extensions; a stub returns a `SubscriptionSequence(id:expectedRelays:stream:onClose:)`
-over its own `AsyncStream`. `NostrMessaging` requires `sendGiftWrapped(_:to:expiration:strategy:)`
-for an `EventTemplate`, `parsePayload(_:)`, `payloads(limit:)`, and `giftWraps(limit:)`; `send`,
-`react`, `sendFile`, `parse`, `parseReaction`, `parseFile`, `subscribe(limit:)`, and the short forms
-(`sendGiftWrapped(_:to:)`, `payloads()`, `giftWraps()`) come from its extension, and a stub returns a
-`DirectMessagePayloadSequence(subscription:parser:)`. `NostrRelayRouting` requires the list
-fetches, caches, and publishes, `subscribeOutbox(authors:kinds:limit:)`, `publishGossip(_:strategy:)`,
+`publicKey`, `sign(_:)`, NIP-44, and NIP-42 authentication) follow the same pattern: `add(_:)`,
+`connect(to:)`, `relayCount`, `setPrivateKey(_:)`, `setNsec(_:)`, and the short forms come from their
+extensions; a stub returns a `SubscriptionSequence(id:expectedRelays:stream:onClose:)` over its own
+`AsyncStream`. `NostrMessaging` requires `sendGiftWrapped(_:to:expiration:strategy:)` for an
+`EventTemplate`, `parsePayload(_:)`, and `subscribe(limit:)`; `send`, `react`, `sendFile`, `parse`,
+`parseReaction`, `parseFile`, and the short forms (`sendGiftWrapped(_:to:expiration:)`, `subscribe()`)
+come from its extension, and a stub returns a `DirectMessagePayloadSequence(subscription:parser:)`.
+`NostrRelayRouting` requires the list fetches, caches, and publishes,
+`subscribeOutbox(authors:kinds:limit:)`, `publishGossip(_:strategy:)`,
 and `connectDirectMessageInboxRelays()`; `publishRelayList(read:write:strategy:)`,
 `publishDirectMessageRelayList(relays:strategy:)`, and the short forms come from its extension.
 `NostrListManaging` requires `publish`, `fetch`, `publishSet`, `fetchSet(kind:identifier:for:timeout:)`,
 and `fetchSets`; `fetchSet(naddr:timeout:)` and the short forms (omit `for:` for the current user)
 come from its extension. `NostrGroupManaging` requires `publish(_:in:strategy:)` for an
-`EventTemplate`, the reads (`fetchMetadata`, `fetchState`, `timeline`), and the kind-10009 list;
-`join`, `leave`, `publishMessage`, and `publishModeration` come from its extension, built on the
+`EventTemplate`, the reads (`fetchMetadata`, `fetchState`, `subscribe(to:filters:)`), and the
+kind-10009 list; `subscribe(to:kinds:since:limit:)`, `join`, `leave`, `publishMessage`, and
+`publishModeration` come from its extension, built on the `Filter.groupTimeline` and
 `EventTemplate.group*` factories. Every protocol follows this rule, so a stub implements only the
-primitives. `NostrRelayManaging` deliberately omits `pool`: the pool carries publish,
-subscribe, and count too, so it stays on the concrete `NostrRelaysAPI`. A requirement whose errors
-come from one type declares it: `connect()`, `subscribe(filters:to:bufferingPolicy:)`, and
-`subscribeOutbox(authors:kinds:limit:)` (with their short forms and the feeds) are
-`throws(RelayPool.Error)`, and `connectDirectMessageInboxRelays()` is `throws(NostrClient.Error)`.
+primitives. A primitive has at most one short form, with other argument labels: it drops the trailing
+`timeout` or `strategy` (nil means the pool default) and defaults the rest, so
+`fetch(kind: .muteList, for: alice)` is a short form and
+`fetch(kind: .muteList, for: nil, timeout: .seconds(2))` calls the primitive. Only the
+relay-targeting primitives (`to:` / `from:` a relay set) keep both a pool-wide and a targeted short
+form. `NostrRelayManaging` deliberately omits `pool`: the pool carries publish, subscribe, and
+count too, so it stays on the concrete `NostrRelaysAPI`. A requirement whose errors come from one
+type declares it: `connect()`, `subscribe(filters:to:bufferingPolicy:)`, and
+`subscribeOutbox(authors:kinds:limit:)` (with their short forms) are `throws(RelayPool.Error)`, and
+`connectDirectMessageInboxRelays()` is `throws(NostrClient.Error)`.
 The rest stay untyped: they forward the signer's errors, or mix pool, relay, and cancellation errors.
 
 `NostrClient` itself exposes only its initializers and these namespaces.
@@ -294,17 +300,17 @@ Iterate the sequence itself for relay-aware items (event/eose/closed/notice/auth
 or calling `close()` sends CLOSE to the relays automatically.
 
 ```swift
-// Convenience subscriptions
-let timeline = try await client.subscriptions.userTimeline(publicKey: alice)  // SubscriptionSequence
+// Feeds are Filter presets
+let timeline = try await client.subscriptions.subscribe(filters: [.userNotes(publicKey: alice, limit: 100)])
 for await event in timeline.events { print(event.content) }
 
-let feed = try await client.subscriptions.globalFeed(limit: 50)
-let mentions = try await client.subscriptions.mentions(publicKey: alice)
-let metadata = try await client.subscriptions.metadata(publicKeys: [alice, bob])  // [PublicKey]
+let feed = try await client.subscriptions.subscribe(filters: [.globalFeed(limit: 50)])
+let mentions = try await client.subscriptions.subscribe(filters: [.mentions(publicKey: alice, limit: 100)])
+let metadata = try await client.subscriptions.subscribe(filters: [.metadata(publicKeys: [alice, bob])])
 
 // Custom filter subscription, events only
 let filter = Filter(authors: [alice, bob], kinds: [1], limit: 100)  // [PublicKey]
-for await event in try await client.subscriptions.events(filters: [filter]) { print(event.id) }
+for await event in try await client.subscriptions.subscribe(filters: [filter]).events { print(event.id) }
 
 // Relay-aware iteration
 let subscription = try await client.subscriptions.subscribe(filters: [filter])
@@ -364,12 +370,13 @@ try await client.messages.sendGiftWrapped(EventTemplate(kind: Event.Kind(rawValu
 // Subscribe to incoming DMs, parsed automatically. Wraps sealed to someone else and malformed
 // ones are skipped; a signer that cannot be reached (a remote NIP-46 timeout/disconnect) throws,
 // so a transient failure never passes for an empty inbox. Resubscribe to resume.
-for try await message in try await client.messages.subscribe() {
+// subscribe(limit:) (default 100) yields every DirectMessagePayload; .messages keeps messages only.
+for try await message in try await client.messages.subscribe().messages {
     print("From: \(message.senderPublicKey), Content: \(message.content)")
 }
 
 // Or receive raw gift wraps and parse manually
-let giftWraps = try await client.messages.giftWraps()
+let giftWraps = try await client.messages.subscribe().giftWraps
 for await giftWrap in giftWraps.events {
     let dm = try await client.messages.parse(giftWrap)
     print("From: \(dm.senderPublicKey): \(dm.content)")
@@ -394,7 +401,7 @@ try await client.groups.leave(group)             // kind 9022; relay answers wit
 
 // Live timeline of the group's content (events carrying its "h" tag).
 var recent: [Event] = []
-let timeline = try await client.groups.timeline(group)
+let timeline = try await client.groups.subscribe(to: group)  // kinds:since:limit: narrow it
 for await event in timeline.events { recent.append(event) }
 
 // Chat (kind 9, NIP-C7, by default; any kind allowed) with "previous" timeline references.
@@ -668,7 +675,8 @@ All cases expose `relayURL` property to identify the source relay.
 ## SubscriptionSequence
 
 A live subscription as an `AsyncSequence` of `SubscriptionEvent` (struct: Sendable).
-Returned by `subscribe(filters:to:bufferingPolicy:)` and the convenience subscriptions.
+Returned by `subscribe(filters:to:bufferingPolicy:)`, `groups.subscribe(to:filters:)`, and
+`routing.subscribeOutbox(authors:kinds:limit:)`.
 
 - `id: SubscriptionID` -- generated by the pool (usable with `unsubscribe(id:)`)
 - `expectedRelays: Set<RelayURL>` -- relays that accepted the REQ
@@ -678,12 +686,20 @@ Returned by `subscribe(filters:to:bufferingPolicy:)` and the convenience subscri
 Single-consumer. Iteration end, task cancellation, `close()`, or discarding the
 sequence automatically sends CLOSE to the relays.
 
+## DirectMessagePayloadSequence
+
+A live subscription to the current user's NIP-17 gift wraps, delivered already unwrapped as
+`DirectMessagePayload` values (struct: Sendable). Returned by `messages.subscribe(limit:)`
+(`subscribe()` asks for 100). Gift wraps that fail to unwrap or parse are skipped.
+Same lifecycle surface as `SubscriptionSequence` (`id`, `expectedRelays`, `close()`), plus views:
+
+- `messages: DirectMessageSequence` -- the `DirectMessage` values only
+- `giftWraps: SubscriptionSequence` -- the raw, still-sealed gift wraps
+
 ## DirectMessageSequence
 
-A live subscription to the current user's NIP-17 DMs, delivered already unwrapped
-and parsed as `DirectMessage` values (struct: Sendable). Returned by
-`messages.subscribe(limit:)`. Gift wraps that fail to unwrap or parse are skipped.
-Same lifecycle surface as `SubscriptionSequence` (`id`, `expectedRelays`, `close()`).
+The `messages` view of a `DirectMessagePayloadSequence`: the current user's NIP-17 DMs as
+`DirectMessage` values (struct: Sendable), with the same lifecycle surface.
 
 ## RelayMessage
 
@@ -888,7 +904,7 @@ non-integer fails. `description` is the decimal seconds. Used by `Event.createdA
 (default `.now`, checked against a `Duration` `tolerance:`),
 `DirectMessage`/`DirectMessageReaction`/`DirectMessageFile` `createdAt` and `expiresAt`, the
 `expiration:` parameters of `client.messages`, `DirectMessageBuilder`, and `GiftWrap.wrap`,
-`LongFormContent.publishedAt`, `client.groups.timeline(_:kinds:since:limit:)`,
+`LongFormContent.publishedAt`, `client.groups.subscribe(to:kinds:since:limit:)`,
 `Bolt11Invoice.timestamp`, and the NIP-47 `WalletConnectTransaction` times and
 `ListTransactionsRequest` `from`/`until`. Periods, by contrast, are `Duration`: `Bolt11Invoice.expiry`,
 `MakeInvoiceRequest.expiry` (whole seconds on the wire, truncated toward zero), and the NIP-11

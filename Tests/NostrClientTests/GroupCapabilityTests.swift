@@ -160,69 +160,65 @@ struct GroupCapabilityTests {
 
     // MARK: - Read short forms
 
-    @Test("fetchMetadata and fetchState forward no author by default, or the given one")
+    @Test("fetchMetadata and fetchState forward the author, nil by default, and no timeout")
     func stateFetchShortForms() async throws {
         let stub = makeStub()
         let groups: any NostrGroupManaging = stub
         let relayKey = PublicKey.fixture("relay")
 
         _ = try await groups.fetchMetadata(for: group)
-        _ = try await groups.fetchMetadata(for: group, timeout: .seconds(3))
         _ = try await groups.fetchMetadata(for: group, authorPublicKey: relayKey)
         _ = try await groups.fetchState(for: group)
-        _ = try await groups.fetchState(for: group, authorPublicKey: relayKey, timeout: .seconds(4))
+        _ = try await groups.fetchState(for: group, authorPublicKey: relayKey)
 
         #expect(
             await stub.metadataFetches == [
                 .init(group: group, authorPublicKey: nil, timeout: nil),
-                .init(group: group, authorPublicKey: nil, timeout: .seconds(3)),
                 .init(group: group, authorPublicKey: relayKey, timeout: nil),
             ])
         #expect(
             await stub.stateFetches == [
                 .init(group: group, authorPublicKey: nil, timeout: nil),
-                .init(group: group, authorPublicKey: relayKey, timeout: .seconds(4)),
+                .init(group: group, authorPublicKey: relayKey, timeout: nil),
             ])
     }
 
-    @Test("each timeline short form forwards only what it is given")
-    func timelineShortForms() async throws {
+    @Test("subscribe(to:) forwards one group-timeline filter of only what it is given")
+    func subscribeShortForm() async throws {
         let stub = makeStub()
         let groups: any NostrGroupManaging = stub
         let since = Timestamp(rawValue: 1_700_000_000)
 
-        _ = try await groups.timeline(group)
-        _ = try await groups.timeline(group, kinds: [.chatMessage])
-        _ = try await groups.timeline(group, kinds: [.thread], since: since, limit: 10)
-        _ = try await groups.timeline(group, since: since)
-        _ = try await groups.timeline(group, since: since, limit: 5)
-        _ = try await groups.timeline(group, limit: 50)
+        _ = try await groups.subscribe(to: group)
+        _ = try await groups.subscribe(to: group, kinds: [.chatMessage])
+        _ = try await groups.subscribe(to: group, kinds: [.thread], since: since, limit: 10)
+        _ = try await groups.subscribe(to: group, since: since)
+        _ = try await groups.subscribe(to: group, limit: 50)
 
         #expect(
-            await stub.timelines == [
-                .init(group: group, kinds: nil, since: nil, limit: nil),
-                .init(group: group, kinds: [.chatMessage], since: nil, limit: nil),
-                .init(group: group, kinds: [.thread], since: since, limit: 10),
-                .init(group: group, kinds: nil, since: since, limit: nil),
-                .init(group: group, kinds: nil, since: since, limit: 5),
-                .init(group: group, kinds: nil, since: nil, limit: 50),
+            await stub.subscribes == [
+                .init(group: group, filters: [.groupTimeline(groupID: group.id)]),
+                .init(group: group, filters: [.groupTimeline(groupID: group.id, kinds: [.chatMessage])]),
+                .init(
+                    group: group,
+                    filters: [.groupTimeline(groupID: group.id, kinds: [.thread], since: since, limit: 10)]),
+                .init(group: group, filters: [.groupTimeline(groupID: group.id, since: since)]),
+                .init(group: group, filters: [.groupTimeline(groupID: group.id, limit: 50)]),
             ])
     }
 
-    @Test("fetchSimpleGroupList asks for the current user's list, or the given author's")
-    func fetchSimpleGroupListShortForms() async throws {
+    @Test("fetchSimpleGroupList asks for the current user's list, or the given author's, with no timeout")
+    func fetchSimpleGroupListShortForm() async throws {
         let stub = makeStub()
         let groups: any NostrGroupManaging = stub
         let other = PublicKey.fixture("other")
 
         _ = try await groups.fetchSimpleGroupList()
-        _ = try await groups.fetchSimpleGroupList(timeout: .seconds(3))
         _ = try await groups.fetchSimpleGroupList(for: other)
 
         #expect(
             await stub.listFetches == [
                 .init(publicKey: nil, timeout: nil),
-                .init(publicKey: nil, timeout: .seconds(3)),
                 .init(publicKey: other, timeout: nil),
             ])
     }

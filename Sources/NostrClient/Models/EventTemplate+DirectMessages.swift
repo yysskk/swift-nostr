@@ -4,7 +4,7 @@ import NostrCore
 extension EventTemplate {
     /// A private direct message (kind 14) to `recipientPublicKey`, the rumor a NIP-17 send
     /// gift-wraps. Never sign it: deliver it with
-    /// ``NostrMessaging/sendGiftWrapped(_:to:expiration:strategy:)-(_,_,Timestamp?,_)``.
+    /// ``NostrMessaging/sendGiftWrapped(_:to:expiration:strategy:)``.
     /// https://github.com/nostr-protocol/nips/blob/master/17.md
     /// - Parameters:
     ///   - content: The message text.
