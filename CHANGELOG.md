@@ -86,7 +86,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   count, or subscription reaches the WRITE relays of the filters' authors; relay lists are fetched
   when not cached and connected per the `GossipRelayPolicy`, and the route falls back to the whole
   pool when they do not resolve — for a read, also when a filter names no authors or any author has
-  no known list.
+  no known list. The lists not yet cached are discovered together in one kind-10002 query, and a
+  key that query returns no list for is not looked up again until a list for it arrives. A publish
+  whose author has no available WRITE relay goes to the whole pool as well as the recipients' READ
+  relays.
 - **`events.publish(_:route:strategy:)` signs and publishes an `EventTemplate`**: the template is
   signed by the configured signer, local or remote, then sent along the route with the same rules as
   publishing a signed event; `.outbox` resolves from the signed event. It returns a
@@ -841,6 +844,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A fetch that times out no longer drops relay connections**: the timeout closed the subscription,
+  which let the fetch return and cancel the close while its `CLOSE` frames were still being sent;
+  a cancelled send counts as a failed one, so the relay was marked failed and a later publish or
+  fetch on it failed or waited out its timeout. The close now runs to completion on its own.
 - **A subscription or fetch whose targets are not in the pool no longer sends a stray CLOSE**:
   when none of the targeted relays was in the pool (`noMatchingRelays`), the client still sent `CLOSE`
   for the never-opened subscription to every relay in the pool. Nothing is sent now, so `fetchLongFormContent(naddr:)` falling back from relay

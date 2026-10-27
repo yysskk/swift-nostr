@@ -18,19 +18,23 @@ struct RelayRouteTests {
     // MARK: - Fixtures
 
     /// A client whose pool holds connected relays A, B, and C, paired with the sockets driving them
-    /// in that order. A relay-list lookup the cache cannot answer gives up after 100 ms.
-    private func makeClient() async throws -> (client: NostrClient, sockets: [MockWebSocketSession]) {
+    /// in that order. A relay-list lookup the cache cannot answer gives up after 100 ms. `extra`, when
+    /// given, drives the next relay the outbox adds to the pool under ``GossipRelayPolicy/addAndConnect``.
+    private func makeClient(
+        gossipPolicy: GossipRelayPolicy = .requirePresent, extra: MockWebSocketSession? = nil
+    ) async throws -> (client: NostrClient, sockets: [MockWebSocketSession]) {
         let sockets = [MockWebSocketSession(), MockWebSocketSession(), MockWebSocketSession()]
+        let factorySockets = sockets + [extra].compactMap { $0 }
         let counter = SocketCounter()
         let pool = RelayPool(
             config: RelayPoolConfig(
                 defaultRelayConfig: ConnectedClientFixture.noReconnectConfig, queryTimeout: .milliseconds(100)),
-            webSocketFactory: MockWebSocketSessionFactory(makeSession: { sockets[counter.next()] })
+            webSocketFactory: MockWebSocketSessionFactory(makeSession: { factorySockets[counter.next()] })
         )
         for url in [urlA, urlB, urlC] {
             try await pool.addRelay(url).connect()
         }
-        return (NostrClient(relayPool: pool, gossipPolicy: .requirePresent), sockets)
+        return (NostrClient(relayPool: pool, gossipPolicy: gossipPolicy), sockets)
     }
 
     /// Caches `publicKey`'s NIP-65 relay list as if it had been fetched.
@@ -53,6 +57,27 @@ struct RelayRouteTests {
             }
         }
         return Set(indexes)
+    }
+
+    /// The relay-list lookups (kind-10002 REQ frames) `socket` sent.
+    private func relayListRequests(on socket: MockWebSocketSession) -> [String] {
+        socket.sentTextFrames.filter {
+            $0.hasPrefix("[\"REQ\"") && $0.contains("\"kinds\":[\(Event.Kind.relayListMetadata.rawValue)]")
+        }
+    }
+
+    /// Publishes a note mentioning `mentions` along `.outbox` while acknowledging it on every socket.
+    private func publishMentioning(
+        _ mentions: [PublicKey], with client: NostrClient, sockets: [MockWebSocketSession], frame: Int
+    ) async throws -> PublishResult {
+        let task = Task {
+            try await client.events.publish(
+                .textNote("hi", tags: mentions.map { .publicKey($0) }), route: .outbox, strategy: .allSettled)
+        }
+        for socket in sockets {
+            try await PublishAckSupport.acknowledgePublish(on: socket, frame: frame)
+        }
+        return try await task.value.result
     }
 
     /// The subscription id of the first COUNT frame `socket` sent.
@@ -113,6 +138,52 @@ struct RelayRouteTests {
         }
 
         #expect(try await task.value.acceptedRelays == [urlA, urlB, urlC])
+        await client.relays.disconnect()
+    }
+
+    @Test("publishing along .outbox discovers every cold relay list in one lookup")
+    func publishOutboxBatchesDiscovery() async throws {
+        let (client, sockets) = try await makeClient()
+        let author = KeyPair()
+        let mentions = ["one", "two", "three"].map { PublicKey.fixture($0) }
+        try await client.identity.setPrivateKey(author.privateKey.hex)
+
+        _ = try await publishMentioning(mentions, with: client, sockets: sockets, frame: 0)
+
+        let lookups = relayListRequests(on: sockets[0])
+        try #require(lookups.count == 1)
+        for publicKey in mentions + [author.publicKey] {
+            #expect(lookups[0].contains("\"\(publicKey)\""))
+        }
+        await client.relays.disconnect()
+    }
+
+    @Test("publishing along .outbox does not look up again keys confirmed to have no relay list")
+    func publishOutboxCachesMissingLists() async throws {
+        let (client, sockets) = try await makeClient()
+        let mentions = [PublicKey.fixture("one"), PublicKey.fixture("two")]
+        try await client.identity.setPrivateKey(KeyPair().privateKey.hex)
+
+        _ = try await publishMentioning(mentions, with: client, sockets: sockets, frame: 0)
+        _ = try await publishMentioning(mentions, with: client, sockets: sockets, frame: 1)
+
+        #expect(sockets.allSatisfy { relayListRequests(on: $0).count == 1 })
+        await client.relays.disconnect()
+    }
+
+    @Test("publishing along .outbox adds the pool when the author has no WRITE relays")
+    func publishOutboxWithoutAuthorWriteRelays() async throws {
+        let extra = MockWebSocketSession()
+        let (client, sockets) = try await makeClient(gossipPolicy: .addAndConnect, extra: extra)
+        let author = KeyPair()
+        let mention = PublicKey.fixture("mention")
+        try await client.identity.setPrivateKey(author.privateKey.hex)
+        await seedRelayList(client, for: author.publicKey, read: [urlA])
+        await seedRelayList(client, for: mention, read: [unknown])
+
+        let result = try await publishMentioning([mention], with: client, sockets: sockets + [extra], frame: 0)
+
+        #expect(result.acceptedRelays == [urlA, urlB, urlC, unknown])
         await client.relays.disconnect()
     }
 
@@ -197,6 +268,27 @@ struct RelayRouteTests {
         #expect(authorless.expectedRelays == [urlA, urlB, urlC])
         await unresolvedAuthor.close()
         await authorless.close()
+        await client.relays.disconnect()
+    }
+
+    @Test("a read along .outbox discovers every cold author's relay list in one lookup")
+    func readOutboxBatchesDiscovery() async throws {
+        let (client, sockets) = try await makeClient()
+        let authors = ["one", "two", "three"].map { PublicKey.fixture($0) }
+
+        let first = try await client.subscriptions.subscribe(filters: [Filter(authors: authors)], route: .outbox)
+        let second = try await client.subscriptions.subscribe(filters: [Filter(authors: authors)], route: .outbox)
+
+        let lookups = relayListRequests(on: sockets[0])
+        try #require(lookups.count == 1)
+        for author in authors {
+            #expect(lookups[0].contains("\"\(author)\""))
+        }
+        // The lookup confirmed none of them has a list, so the second read neither waits nor asks.
+        #expect(sockets.allSatisfy { relayListRequests(on: $0).count == 1 })
+        #expect(second.expectedRelays == [urlA, urlB, urlC])
+        await first.close()
+        await second.close()
         await client.relays.disconnect()
     }
 

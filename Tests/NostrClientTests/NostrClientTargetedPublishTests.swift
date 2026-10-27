@@ -112,7 +112,8 @@ struct NostrClientTargetedPublishTests {
         try await client.identity.setPrivateKey(keyPair.privateKey.hex)
 
         let task = Task {
-            try await client.events.publish(.textNote("templated"), route: .relays([urlA, urlC]), strategy: .allSettled)
+            try await client.events.publish(
+                .textNote("templated"), route: .relays([urlA, urlC]), strategy: .allSettled)
         }
         let sentToA = try await PublishAckSupport.acknowledgePublish(on: sockets[0])
         let sentToC = try await PublishAckSupport.acknowledgePublish(on: sockets[2])

@@ -14,6 +14,9 @@ public enum GossipRelayPolicy: Sendable, Equatable {
 /// Owned by `NostrClient`; routes through the shared `RelayPool` via a ``RelayConnector``.
 actor RelayListStore {
     private var cache = ReplaceableCache<RelayListMetadata>()
+    /// Public keys a lookup confirmed have no kind 10002 event. This negative cache lets outbox
+    /// routing skip a repeat network fetch on every publish or read involving such a key.
+    private var resolvedWithoutList: Set<PublicKey> = []
     private let connector: RelayConnector
 
     init(pool: RelayPool, policy: GossipRelayPolicy = .addAndConnect, maximumRelaysPerResolve: Int = 8) {
@@ -25,7 +28,22 @@ actor RelayListStore {
     /// - Returns: The effective (possibly pre-existing) list.
     @discardableResult
     func store(_ list: RelayListMetadata, createdAt: Timestamp, for publicKey: PublicKey) -> RelayListMetadata {
-        cache.store(list, createdAt: createdAt, for: publicKey)
+        // A real list supersedes any earlier "no list" result for this public key.
+        resolvedWithoutList.remove(publicKey)
+        return cache.store(list, createdAt: createdAt, for: publicKey)
+    }
+
+    /// Records that a network lookup found no relay list for `publicKey`, so repeated
+    /// resolutions can skip the fetch. A later kind 10002 (via ``store(_:createdAt:for:)``
+    /// or ``ingest(_:)``) clears the mark.
+    func markNoList(for publicKey: PublicKey) {
+        resolvedWithoutList.insert(publicKey)
+    }
+
+    /// Whether this public key's relay list has already been resolved — either a list is
+    /// cached, or a lookup confirmed there is none — so another network fetch can be skipped.
+    func isResolved(for publicKey: PublicKey) -> Bool {
+        cache.value(for: publicKey) != nil || resolvedWithoutList.contains(publicKey)
     }
 
     /// Ingests a kind 10002 event into the cache.

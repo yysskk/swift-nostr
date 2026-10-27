@@ -23,10 +23,14 @@ extension NostrClient {
         let timeoutTask = Task {
             do {
                 try await Task.sleep(for: timeout)
-                await subscription.close()
             } catch {
                 // Cancelled because fetch finished first: nothing to do.
+                return
             }
+            // Closing ends the stream, so fetch returns and cancels this task while the CLOSE frames
+            // are still being sent — and a cancelled send counts as a failed one, which drops the
+            // connection. The close therefore runs in a task of its own.
+            await Task { await subscription.close() }.value
         }
         defer { timeoutTask.cancel() }
 

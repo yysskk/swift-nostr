@@ -109,22 +109,26 @@ public struct NostrRoutingAPI: NostrRelayRouting {
     /// The relays a publish of `event` along `route` targets, or nil for the whole pool.
     ///
     /// For ``RelayRoute/outbox``: the author's WRITE relays plus the READ relays of every public key
-    /// in its "p" tags, connected per the ``GossipRelayPolicy``, or nil when nothing resolves.
+    /// in its "p" tags, connected per the ``GossipRelayPolicy``, or nil when nothing resolves. When
+    /// none of the author's WRITE relays is available, the whole pool is targeted alongside the
+    /// recipients' READ relays, so the event still reaches relays the author's readers can find.
     func relayURLs(publishing event: Event, along route: RelayRoute) async -> Set<RelayURL>? {
         switch route {
         case .pool: return nil
         case .relays(let relayURLs): return relayURLs
         case .outbox: break
         }
-        var targets = await writeRelays(for: event.publicKey)
-        for publicKey in Set(event.referencedPublicKeys) {
-            if await cachedRelayList(for: publicKey) == nil {
-                _ = try? await fetchRelayList(for: publicKey)
-            }
+        let recipients = Set(event.referencedPublicKeys)
+        await discoverRelayLists(for: recipients.union([event.publicKey]))
+        let authorURLs = await client.relayListStore.writeRelayURLs(for: event.publicKey)
+        var targets = authorURLs
+        for publicKey in recipients {
             targets.formUnion(await client.relayListStore.readRelayURLs(for: publicKey))
         }
         let available = await client.relayListStore.ensureConnected(targets)
-        return available.isEmpty ? nil : available
+        guard !available.isEmpty else { return nil }
+        guard available.isDisjoint(with: authorURLs) else { return available }
+        return available.union(await client.pool.connections.map(\.url))
     }
 
     /// The relays a read of `filters` along `route` targets, or nil for the whole pool.
@@ -138,6 +142,7 @@ public struct NostrRoutingAPI: NostrRelayRouting {
         case .relays(let relayURLs): return relayURLs
         case .outbox: break
         }
+        await discoverRelayLists(for: Set(filters.flatMap { $0.authors ?? [] }))
         // A filter without authors can match anyone's events, and an author with no known relay list
         // would be silently dropped, so either falls back to the whole pool — after connecting the
         // relays that did resolve, which the pool then covers too.
@@ -149,7 +154,7 @@ public struct NostrRoutingAPI: NostrRelayRouting {
                 continue
             }
             for author in authors {
-                let writeURLs = await writeRelays(for: author)
+                let writeURLs = await client.relayListStore.writeRelayURLs(for: author)
                 if writeURLs.isEmpty {
                     fallsBackToPool = true
                 } else {
@@ -189,11 +194,33 @@ public struct NostrRoutingAPI: NostrRelayRouting {
 
     // MARK: - Private
 
-    /// A public key's WRITE relays, discovering its relay list first when nothing is cached.
-    private func writeRelays(for publicKey: PublicKey) async -> Set<RelayURL> {
-        if await cachedRelayList(for: publicKey) == nil {
-            _ = try? await fetchRelayList(for: publicKey)
+    /// Discovers the NIP-65 relay lists of the public keys not yet resolved in one kind-10002 query,
+    /// when at least one relay is connected to ask.
+    ///
+    /// Each list is validated as in ``fetchRelayList(for:timeout:)`` (newest list the key signed),
+    /// and a key the completed query returned no list for is marked as having none, so later routes
+    /// skip it; as in ``connectedInboxRelays(for:)``, a query that times out counts as completed. A
+    /// failed query leaves every key unresolved for a later retry.
+    private func discoverRelayLists(for publicKeys: Set<PublicKey>) async {
+        var missing: [PublicKey] = []
+        for publicKey in publicKeys where await client.relayListStore.isResolved(for: publicKey) == false {
+            missing.append(publicKey)
         }
-        return await client.relayListStore.writeRelayURLs(for: publicKey)
+        guard !missing.isEmpty, await client.pool.connectedRelayCount() > 0 else { return }
+        guard
+            let events = try? await client.fetch(
+                filters: [.relayListMetadata(publicKeys: missing)], fromURLs: nil, timeout: nil)
+        else {
+            return
+        }
+        for publicKey in missing {
+            if let newest = VerifiedEventSelection.newest(in: events, kind: .relayListMetadata, author: publicKey),
+                let list = newest.relayListMetadata
+            {
+                await client.relayListStore.store(list, createdAt: newest.createdAt, for: publicKey)
+            } else {
+                await client.relayListStore.markNoList(for: publicKey)
+            }
+        }
     }
 }
