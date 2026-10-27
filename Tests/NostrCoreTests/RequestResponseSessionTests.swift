@@ -14,18 +14,18 @@ import Testing
 @Suite("RequestResponseSession Tests")
 struct RequestResponseSessionTests {
     /// Keys are strings; a request accumulates the response parts it has seen.
-    private typealias Session = RequestResponseSession<String, [String], [String]>
+    private typealias Session = RequestResponseSession<String, [String], [String], TestError>
 
+    /// Stands in for an owner's error type: the session's own failures arrive wrapped in it.
     private enum TestError: Error, Equatable {
-        case timedOut
-        case notConnected
+        case session(RequestResponseSessionError)
         case rejected
     }
 
     private static let subscriptionID = "test-responses"
 
     private func makeSession(_ transport: FakeTransport) -> Session {
-        Session(transport: transport, timedOut: TestError.timedOut, notConnected: TestError.notConnected)
+        Session(transport: transport, mapError: TestError.session)
     }
 
     /// Starts `session`, resolving each incoming event's request — keyed by its `e` tag — with the
@@ -103,7 +103,7 @@ struct RequestResponseSessionTests {
         await transport.failNextConnect(with: .connectionFailed)
         let session = makeSession(transport)
 
-        await #expect(throws: RelayConnection.Error.connectionFailed) {
+        await #expect(throws: TestError.session(.transportFailed(.connectionFailed))) {
             try await self.start(session)
         }
 
@@ -122,9 +122,55 @@ struct RequestResponseSessionTests {
         try await transport.waitForSends(1)
         await session.disconnect()
 
-        await #expect(throws: TestError.notConnected) { try await pending.value }
+        await #expect(throws: TestError.session(.notConnected)) { try await pending.value }
         #expect(await transport.isConnected == false)
         #expect(await session.isStarted == false)
+    }
+
+    @Test("a failed send surfaces the transport's error through the owner's type")
+    func failedSendIsMapped() async throws {
+        let transport = FakeTransport()
+        let session = makeSession(transport)
+        try await start(session)
+        await transport.failNextSend(with: .notConnected)
+
+        await #expect(throws: TestError.session(.transportFailed(.notConnected))) {
+            try await session.perform(self.request("a"), key: "a", state: [], timeout: .seconds(5))
+        }
+    }
+
+    // MARK: - Cancellation
+
+    @Test("cancelling a waiting request fails it with cancelled at once")
+    func cancellingWaiterFailsIt() async throws {
+        let transport = FakeTransport()
+        let session = makeSession(transport)
+        try await start(session)
+
+        let pending = Task { try await session.perform(self.request("a"), key: "a", state: [], timeout: .seconds(60)) }
+        try await transport.waitForSend("a")
+        pending.cancel()
+
+        await #expect(throws: TestError.session(.cancelled)) { try await pending.value }
+        // The waiter is deregistered, so the key is free for the next request.
+        #expect(await session.withPendingRequest("a") { _ in .pending } == nil)
+    }
+
+    /// Once sent, a request may be acted on with nobody waiting for the answer, so a caller that is
+    /// already cancelled must not send it at all.
+    @Test("a request from a cancelled task is not sent")
+    func cancelledCallerSendsNothing() async throws {
+        let transport = FakeTransport()
+        let session = makeSession(transport)
+        try await start(session)
+
+        let pending = Task {
+            withUnsafeCurrentTask { $0?.cancel() }
+            return try await session.perform(self.request("a"), key: "a", state: [], timeout: .seconds(60))
+        }
+
+        await #expect(throws: TestError.session(.cancelled)) { try await pending.value }
+        #expect(await transport.sendCount(of: "a") == 0)
     }
 
     // MARK: - Correlation
@@ -158,7 +204,7 @@ struct RequestResponseSessionTests {
         try await transport.waitForSends(1)
         await transport.deliver(response(for: "unknown", content: "stray"))
 
-        await #expect(throws: TestError.timedOut) { try await pending.value }
+        await #expect(throws: TestError.session(.timedOut)) { try await pending.value }
     }
 
     @Test("a request left pending keeps the state it accumulated for the next response")
@@ -221,7 +267,7 @@ struct RequestResponseSessionTests {
         let session = makeSession(transport)
         try await start(session)
 
-        await #expect(throws: TestError.timedOut) {
+        await #expect(throws: TestError.session(.timedOut)) {
             _ = try await session.perform(self.request("a"), key: "a", state: [], timeout: .milliseconds(200))
         }
     }
@@ -284,7 +330,7 @@ struct RequestResponseSessionTests {
 
         await transport.endEvents()
 
-        await #expect(throws: TestError.notConnected) { try await pending.value }
+        await #expect(throws: TestError.session(.notConnected)) { try await pending.value }
     }
 
     @Test("the session restarts after its event stream ends")
@@ -384,7 +430,7 @@ struct RequestResponseSessionTests {
             if await condition() { return }
             try await Task.sleep(for: .milliseconds(5))
         }
-        throw TestError.timedOut
+        throw PollTimeout()
     }
 
     // MARK: - Duplicate keys
@@ -401,7 +447,7 @@ struct RequestResponseSessionTests {
         let first = Task { try await session.perform(self.request("a"), key: "a", state: [], timeout: .seconds(5)) }
         try await transport.waitForSend("a")
 
-        await #expect(throws: RequestResponseSessionError.duplicateRequestKey) {
+        await #expect(throws: TestError.session(.duplicateRequestKey)) {
             try await session.perform(self.request("a"), key: "a", state: [], timeout: .seconds(5))
         }
 
@@ -462,6 +508,7 @@ private actor FakeTransport: RelayTransport {
     private var isGateOpen = true
     private var gate: CheckedContinuation<Void, Never>?
     private var nextConnectError: RelayConnection.Error?
+    private var nextSendError: RelayConnection.Error?
 
     func connect() async throws(RelayConnection.Error) {
         log.append(.connect)
@@ -485,6 +532,10 @@ private actor FakeTransport: RelayTransport {
     }
 
     func send(_ event: Event) async throws(RelayConnection.Error) {
+        if let error = nextSendError {
+            nextSendError = nil
+            throw error
+        }
         log.append(.send(event.content))
     }
 
@@ -529,6 +580,11 @@ private actor FakeTransport: RelayTransport {
     /// Fails the next `connect()` with `error`, once.
     func failNextConnect(with error: RelayConnection.Error) {
         nextConnectError = error
+    }
+
+    /// Fails the next `send(_:)` with `error`, once.
+    func failNextSend(with error: RelayConnection.Error) {
+        nextSendError = error
     }
 
     /// Polls until at least `count` events have been sent.

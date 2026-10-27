@@ -40,7 +40,7 @@ public actor WalletConnection {
 
     /// The shared relay session, correlating each request by its event id (which responses echo in
     /// their `e` tag) and holding the parts collected for it so far.
-    private typealias Session = RequestResponseSession<EventID, RequestState, [ResponsePart]>
+    private typealias Session = RequestResponseSession<EventID, RequestState, [ResponsePart], WalletConnectError>
 
     private let session: Session
     private let config: Config
@@ -52,7 +52,7 @@ public actor WalletConnection {
     /// Open notification streams, keyed so each can deregister on termination.
     private var notificationStreams: [UUID: AsyncStream<WalletConnectNotification>.Continuation] = [:]
     /// The current ``fetchInfo()`` waiter, if any.
-    private var pendingInfo: AsyncThrowingStream<WalletInfo, any Error>.Continuation?
+    private var pendingInfo: AsyncStream<Result<WalletInfo, WalletConnectError>>.Continuation?
 
     /// The last fetched wallet info, if any.
     public private(set) var info: WalletInfo?
@@ -73,15 +73,16 @@ public actor WalletConnection {
         self.session = Session(
             transport: transport
                 ?? RelayConnectionTransport(relayURLs: uri.relays),
-            timedOut: WalletConnectError.timedOut,
-            notConnected: WalletConnectError.notConnected)
+            mapError: WalletConnectError.init)
     }
 
     // MARK: - Lifecycle
 
     /// Connects to the relay and starts listening for responses and notifications. Commands call
     /// this automatically; call it explicitly to surface connection errors up front.
-    public func connect() async throws {
+    /// - Throws: ``WalletConnectError/transportFailed(_:)`` if the relay cannot be connected to or
+    ///   subscribed on.
+    public func connect() async throws(WalletConnectError) {
         try await ensureStarted()
     }
 
@@ -93,7 +94,7 @@ public actor WalletConnection {
 
     /// Connects, subscribes for responses and notifications, and starts reading them — once per
     /// connection.
-    private func ensureStarted() async throws {
+    private func ensureStarted() async throws(WalletConnectError) {
         try await session.ensureStarted(
             subscriptionID: Self.responseSubscriptionID,
             filters: [responseFilter]
@@ -120,17 +121,19 @@ public actor WalletConnection {
     /// - Returns: The parsed ``WalletInfo``.
     /// - Throws: ``WalletConnectError/timedOut`` if no info event arrives within the request timeout,
     ///   ``WalletConnectError/notConnected`` if the connection ends first — on ``disconnect()``, or
-    ///   when the relays' streams end — or ``WalletConnectError/superseded`` if a later call replaces
-    ///   this one.
+    ///   when the relays' streams end — ``WalletConnectError/superseded`` if a later call replaces
+    ///   this one, ``WalletConnectError/cancelled`` if the calling task is cancelled, or
+    ///   ``WalletConnectError/transportFailed(_:)`` if the relay cannot be connected to or
+    ///   subscribed on.
     @discardableResult
-    public func fetchInfo() async throws -> WalletInfo {
+    public func fetchInfo() async throws(WalletConnectError) -> WalletInfo {
         try await ensureStarted()
 
         // Register the waiter before subscribing so an info event delivered during the subscribe
         // round-trip is buffered into this stream rather than dropped.
-        let (stream, continuation) = AsyncThrowingStream<WalletInfo, any Error>.makeStream()
+        let (stream, continuation) = AsyncStream<Result<WalletInfo, WalletConnectError>>.makeStream()
         // A prior in-flight fetchInfo is superseded by this one (the connection stays active).
-        pendingInfo?.finish(throwing: WalletConnectError.superseded)
+        failPendingInfo(with: .superseded)
         pendingInfo = continuation
 
         try await session.subscribe(id: Self.infoSubscriptionID, filters: [infoFilter])
@@ -153,15 +156,17 @@ public actor WalletConnection {
         }
         defer { timeoutTask.cancel() }
 
-        for try await walletInfo in stream {
-            return walletInfo
+        // Every outcome yields a result, so the stream ends without one only on cancellation.
+        for await result in stream {
+            return try result.get()
         }
-        throw WalletConnectError.timedOut
+        throw .cancelled
     }
 
     /// Fails the current ``fetchInfo()`` waiter, if any, with `error`.
     private func failPendingInfo(with error: WalletConnectError) {
-        pendingInfo?.finish(throwing: error)
+        pendingInfo?.yield(.failure(error))
+        pendingInfo?.finish()
         pendingInfo = nil
     }
 
@@ -180,7 +185,9 @@ public actor WalletConnection {
     /// The stream finishes when the connection ends — on ``disconnect()``, or when the relays'
     /// streams end because automatic reconnection gave up. Call this again for a fresh stream: it
     /// reconnects first.
-    public func notifications() async throws -> AsyncStream<WalletConnectNotification> {
+    /// - Throws: ``WalletConnectError/transportFailed(_:)`` if the relay cannot be connected to or
+    ///   subscribed on.
+    public func notifications() async throws(WalletConnectError) -> AsyncStream<WalletConnectNotification> {
         try await ensureStarted()
         let id = UUID()
         let (stream, continuation) = AsyncStream<WalletConnectNotification>.makeStream()
@@ -221,10 +228,13 @@ public actor WalletConnection {
     ///   cannot be decrypted or its `result` does not decode as `Request.Response`;
     ///   ``WalletConnectError/unsupportedEncryption(_:)`` when it uses a scheme this package does not
     ///   implement; ``WalletConnectError/requestEncodingFailed`` when the request cannot be encoded,
-    ///   encrypted, or signed; and ``WalletConnectError/notConnected`` when the connection is torn
-    ///   down while waiting. Connecting to or sending through the relay transport throws its own
-    ///   errors.
-    public func send<Request: WalletConnectRequest>(_ request: Request) async throws -> Request.Response {
+    ///   encrypted, or signed; ``WalletConnectError/notConnected`` when the connection is torn down
+    ///   while waiting; ``WalletConnectError/cancelled`` when the calling task is cancelled — before
+    ///   the send, nothing is sent; and ``WalletConnectError/transportFailed(_:)`` when the relay
+    ///   cannot be connected to or the request cannot be sent.
+    public func send<Request: WalletConnectRequest>(
+        _ request: Request
+    ) async throws(WalletConnectError) -> Request.Response {
         let content = try await performSingle(method: Request.method, params: request)
         return try decodeResult(content, as: Request.Response.self)
     }
@@ -245,7 +255,7 @@ public actor WalletConnection {
         params: some Encodable,
         expectedResponses: Int = 1,
         partialOnTimeout: Bool = false
-    ) async throws -> [ResponsePart] {
+    ) async throws(WalletConnectError) -> [ResponsePart] {
         try await ensureStarted()
 
         let scheme = activeEncryption
@@ -261,15 +271,19 @@ public actor WalletConnection {
     }
 
     /// Sends a request expecting exactly one response and returns its decrypted content.
-    func performSingle(method: WalletConnectMethod, params: some Encodable) async throws -> String {
+    func performSingle(
+        method: WalletConnectMethod, params: some Encodable
+    ) async throws(WalletConnectError) -> String {
         let parts = try await performRequest(method: method, params: params)
-        guard let first = parts.first else { throw WalletConnectError.timedOut }
+        guard let first = parts.first else { throw .timedOut }
         return first.content
     }
 
     /// Decodes a decrypted response content string into `Result`, mapping a wallet `error` object to
     /// ``WalletConnectError/walletError(code:message:)``.
-    func decodeResult<Result: Decodable>(_ content: String, as _: Result.Type) throws -> Result {
+    func decodeResult<Result: Decodable>(
+        _ content: String, as _: Result.Type
+    ) throws(WalletConnectError) -> Result {
         let response: WalletConnectResponse<Result>
         do {
             response = try JSONDecoder().decode(WalletConnectResponse<Result>.self, from: Data(content.utf8))
@@ -291,7 +305,7 @@ public actor WalletConnection {
 
     private func buildRequestEvent(
         method: WalletConnectMethod, params: some Encodable, scheme: WalletConnectEncryption
-    ) throws -> Event {
+    ) throws(WalletConnectError) -> Event {
         let request = RequestEnvelope(method: method, params: params)
         let content: String
         do {
@@ -370,7 +384,7 @@ public actor WalletConnection {
             guard let scheme = responseScheme ?? request.scheme else {
                 if request.expected == 1 {
                     return .failed(
-                        WalletConnectError.unsupportedEncryption(declaredScheme ?? ""))
+                        .unsupportedEncryption(declaredScheme ?? ""))
                 }
                 return request.receivedCount >= request.expected ? .resolved(request.collected) : .pending
             }
@@ -381,7 +395,7 @@ public actor WalletConnection {
             else {
                 // Nothing to preserve for a single-response request, so fail fast.
                 if request.expected == 1 {
-                    return .failed(WalletConnectError.responseDecodingFailed)
+                    return .failed(.responseDecodingFailed)
                 }
                 // Count undecryptable responses toward completion so a multi-response request
                 // finishes as soon as every response has arrived, rather than waiting out the
@@ -394,7 +408,7 @@ public actor WalletConnection {
             if let received = Self.resultType(of: content), received != request.method {
                 if request.expected == 1 {
                     return .failed(
-                        WalletConnectError.unexpectedResultType(expected: request.method, received: received))
+                        .unexpectedResultType(expected: request.method, received: received))
                 }
                 return request.receivedCount >= request.expected ? .resolved(request.collected) : .pending
             }
@@ -437,7 +451,7 @@ public actor WalletConnection {
     private func handleInfo(_ event: Event) {
         guard let walletInfo = WalletInfo(infoEvent: event) else { return }
         info = walletInfo
-        pendingInfo?.yield(walletInfo)
+        pendingInfo?.yield(.success(walletInfo))
         pendingInfo?.finish()
         pendingInfo = nil
     }
@@ -453,6 +467,26 @@ public actor WalletConnection {
 
     private var infoFilter: Filter {
         Filter(authors: [walletPublicKey], kinds: [.walletConnectInfo], limit: 1)
+    }
+}
+
+extension WalletConnectError {
+    /// The error a failure of the shared relay session surfaces as.
+    init(_ failure: RequestResponseSessionError) {
+        switch failure {
+        case .timedOut:
+            self = .timedOut
+        case .notConnected:
+            self = .notConnected
+        case .cancelled:
+            self = .cancelled
+        case .transportFailed(let error):
+            self = .transportFailed(error)
+        case .duplicateRequestKey:
+            // Requests are keyed by their event id, which covers a randomly encrypted payload, so a
+            // collision means the request event was built wrong.
+            self = .requestEncodingFailed
+        }
     }
 }
 

@@ -47,7 +47,9 @@ public struct WalletConnectURI: Sendable, Hashable {
     ///   - secret: The 32-byte client secret key (must be a valid secp256k1 private key).
     ///   - lud16: An optional lightning address.
     /// - Throws: ``WalletConnectError/invalidURI(reason:)`` if any field fails validation.
-    public init(walletPublicKey: PublicKey, relays: [RelayURL], secret: Data, lud16: String? = nil) throws {
+    public init(
+        walletPublicKey: PublicKey, relays: [RelayURL], secret: Data, lud16: String? = nil
+    ) throws(WalletConnectError) {
         guard !relays.isEmpty else {
             throw WalletConnectError.invalidURI(reason: "at least one relay is required")
         }
@@ -73,7 +75,7 @@ public struct WalletConnectURI: Sendable, Hashable {
     /// - Throws: ``WalletConnectError/invalidURI(reason:)`` if the string is malformed or missing
     ///   required fields, including a host that is not a canonical lowercase hex public key or a
     ///   `relay` value that is not a valid relay URL.
-    public init(string: String) throws {
+    public init(string: String) throws(WalletConnectError) {
         guard let components = URLComponents(string: string),
             components.scheme?.lowercased() == Self.scheme
         else {

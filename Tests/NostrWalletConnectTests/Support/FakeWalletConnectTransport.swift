@@ -18,6 +18,8 @@ actor FakeWalletConnectTransport: RelayTransport {
     private var continuation: AsyncStream<Event>.Continuation?
     private var isGateOpen = true
     private var gate: CheckedContinuation<Void, Never>?
+    private var nextConnectError: RelayConnection.Error?
+    private var nextSendError: RelayConnection.Error?
 
     init() {}
 
@@ -25,6 +27,10 @@ actor FakeWalletConnectTransport: RelayTransport {
         connectCount += 1
         if !isGateOpen {
             await withCheckedContinuation { gate = $0 }
+        }
+        if let error = nextConnectError {
+            nextConnectError = nil
+            throw error
         }
         isConnected = true
     }
@@ -38,6 +44,10 @@ actor FakeWalletConnectTransport: RelayTransport {
     }
 
     func send(_ event: Event) async throws(RelayConnection.Error) {
+        if let error = nextSendError {
+            nextSendError = nil
+            throw error
+        }
         if subscriptions.isEmpty {
             sendsBeforeSubscribe += 1
         }
@@ -82,6 +92,16 @@ actor FakeWalletConnectTransport: RelayTransport {
         isGateOpen = true
         gate?.resume()
         gate = nil
+    }
+
+    /// Fails the next `connect()` with `error`, once.
+    func failNextConnect(with error: RelayConnection.Error) {
+        nextConnectError = error
+    }
+
+    /// Fails the next `send(_:)` with `error`, once.
+    func failNextSend(with error: RelayConnection.Error) {
+        nextSendError = error
     }
 
     /// The most recently sent event, if any.

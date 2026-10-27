@@ -49,7 +49,9 @@ public actor RemoteSigner {
 
     /// The shared relay session, correlating each request by the `id` in its JSON body and holding
     /// the request's method so an `auth_url` challenge can be labeled with it.
-    private typealias Session = RequestResponseSession<String, RemoteSignerMethod, RemoteSignerResponse>
+    private typealias Session = RequestResponseSession<
+        String, RemoteSignerMethod, RemoteSignerResponse, RemoteSignerError
+    >
 
     private let session: Session
     private let config: Config
@@ -95,7 +97,7 @@ public actor RemoteSigner {
 
     /// The waiter suspended in ``awaitConnection()``, resolved once a valid connect response
     /// (echoing the invitation secret) arrives, or the wait times out. `nil` when not awaiting.
-    private var connectionWaiter: CheckedContinuation<PublicKey, any Error>?
+    private var connectionWaiter: ConnectionWaiter?
     /// A discovered signer public key from a valid connect response that arrived before
     /// ``discoverSigner()`` registered its waiter (the response can be delivered as soon as the
     /// subscription exists, which is before the waiter is set). Consumed when the waiter registers so
@@ -116,14 +118,13 @@ public actor RemoteSigner {
     ///   - transport: The relay transport. Defaults to a `RelayConnectionTransport` over the
     ///     token's relays; inject a custom one (e.g. for tests).
     ///   - config: Session behavior.
-    /// - Throws: An error if `clientKeyPair` is `nil` and a fresh keypair cannot be generated.
     public init(
         bunker: BunkerURI,
         clientKeyPair: KeyPair? = nil,
         requesting permissions: [RemoteSignerPermission] = [],
         transport: (any RelayTransport)? = nil,
         config: Config = Config()
-    ) throws {
+    ) {
         let keyPair = clientKeyPair ?? KeyPair()
         self.clientKeyPair = keyPair
         self.signer = EventSigner(keyPair: keyPair)
@@ -136,8 +137,7 @@ public actor RemoteSigner {
         self.session = Session(
             transport: transport
                 ?? RelayConnectionTransport(relayURLs: bunker.relays),
-            timedOut: RemoteSignerError.timedOut,
-            notConnected: RemoteSignerError.notConnected)
+            mapError: RemoteSignerError.init)
     }
 
     /// Creates a client-initiated session, without validating anything at this layer.
@@ -162,8 +162,7 @@ public actor RemoteSigner {
         self.config = config
         self.session = Session(
             transport: transport,
-            timedOut: RemoteSignerError.timedOut,
-            notConnected: RemoteSignerError.notConnected)
+            mapError: RemoteSignerError.init)
     }
 
     /// The remote signer's public key, or `nil` for a client-initiated `nostrconnect://` session
@@ -180,9 +179,8 @@ public actor RemoteSigner {
     /// explicitly to surface connection errors up front. Calling it again after a successful
     /// handshake is a no-op.
     /// - Throws: ``RemoteSignerError/connectionRejected(message:)`` if the signer declines or
-    ///   returns a secret other than the one sent, ``RemoteSignerError/timedOut`` if it does not
-    ///   answer in time, or a transport error.
-    public func connect() async throws {
+    ///   returns a secret other than the one sent, or what ``send(_:params:)`` throws.
+    public func connect() async throws(RemoteSignerError) {
         try await ensureStarted()
         guard !didConnect else { return }
 
@@ -204,7 +202,7 @@ public actor RemoteSigner {
         let result = response.result
         guard result == "ack" || (secret != nil && result.map({ Self.constantTimeEquals($0, secret!) }) == true)
         else {
-            throw RemoteSignerError.connectionRejected(message: result ?? "")
+            throw .connectionRejected(message: result ?? "")
         }
         didConnect = true
     }
@@ -251,7 +249,7 @@ public actor RemoteSigner {
     }
 
     /// Connects, subscribes for responses, and starts reading them — once per session.
-    private func ensureStarted() async throws {
+    private func ensureStarted() async throws(RemoteSignerError) {
         try await session.ensureStarted(
             subscriptionID: Self.responseSubscriptionID,
             filters: [responseFilter]
@@ -311,9 +309,11 @@ public actor RemoteSigner {
     /// returns the matching response. An `auth_url` challenge does not resolve the request: its
     /// timeout is extended to ``Config/authChallengeTimeout`` and the real response arrives later
     /// with the same id.
-    /// - Throws: ``RemoteSignerError/signerError(message:)`` if the response carries an error,
-    ///   ``RemoteSignerError/timedOut`` on timeout, or an encoding/transport error.
-    func sendRequest(method: RemoteSignerMethod, params: [String]) async throws -> RemoteSignerResponse {
+    /// - Throws: What ``send(_:params:)`` throws, except ``RemoteSignerError/responseDecodingFailed``
+    ///   for a response without a result.
+    func sendRequest(
+        method: RemoteSignerMethod, params: [String]
+    ) async throws(RemoteSignerError) -> RemoteSignerResponse {
         try await ensureStarted()
 
         let request = RemoteSignerRequest(method: method, params: params)
@@ -328,12 +328,12 @@ public actor RemoteSigner {
             event, key: request.id, state: method, timeout: config.requestTimeout)
 
         if let message = response.error, !response.isAuthChallenge {
-            throw RemoteSignerError.signerError(message: message)
+            throw .signerError(message: message)
         }
         return response
     }
 
-    private func buildRequestEvent(_ request: RemoteSignerRequest) throws -> Event {
+    private func buildRequestEvent(_ request: RemoteSignerRequest) throws(RemoteSignerError) -> Event {
         // The signer's public key must be known before any request can be addressed to it — always true
         // for a bunker session, and true for a nostrconnect session once awaitConnection() resolves.
         let signerPublicKey = try requireSignerPublicKey()
@@ -347,7 +347,7 @@ public actor RemoteSigner {
                 content: sealed.payload)
             return try signer.sign(unsigned)
         } catch {
-            throw RemoteSignerError.requestEncodingFailed
+            throw .requestEncodingFailed
         }
     }
 
@@ -391,7 +391,7 @@ public actor RemoteSigner {
         let method = await session.withPendingRequest(response.id) { _ in
             guard challengeURL != nil else { return .resolved(response) }
             guard remainingAfterChallenge > .zero else {
-                return .failed(RemoteSignerError.timedOut)
+                return .failed(.timedOut)
             }
             return .pendingFor(remainingAfterChallenge)
         }
@@ -419,7 +419,7 @@ public actor RemoteSigner {
 
     /// Waits for the signer to accept a `nostrconnect://` invitation and returns its discovered
     /// public key. Backs ``awaitConnection()``; see that method for the full contract.
-    func discoverSigner() async throws -> PublicKey {
+    func discoverSigner() async throws(RemoteSignerError) -> PublicKey {
         try await ensureStarted()
 
         // Already discovered (e.g. a second call, or a bunker session): nothing to wait for.
@@ -427,7 +427,7 @@ public actor RemoteSigner {
 
         // Only one waiter at a time; a concurrent caller would clobber the continuation.
         guard connectionWaiter == nil else {
-            throw RemoteSignerError.connectionInProgress
+            throw .connectionInProgress
         }
 
         let signerPublicKey: PublicKey
@@ -436,15 +436,7 @@ public actor RemoteSigner {
             bufferedDiscovery = nil
             signerPublicKey = buffered
         } else {
-            let timeout = config.requestTimeout
-            signerPublicKey = try await withCheckedThrowingContinuation { continuation in
-                connectionWaiter = continuation
-                connectionTimeoutTask = Task { [weak self] in
-                    try? await Task.sleep(for: timeout)
-                    guard !Task.isCancelled else { return }
-                    await self?.failConnection(with: .timedOut)
-                }
-            }
+            signerPublicKey = try await waitForSigner()
         }
 
         // Pin subsequent traffic to the now-known signer (defense in depth) and mark connected.
@@ -452,6 +444,31 @@ public actor RemoteSigner {
         didConnect = true
         try? await session.subscribe(id: Self.responseSubscriptionID, filters: [responseFilter])
         return signerPublicKey
+    }
+
+    /// Registers the connection waiter and suspends until the signer's connect response resolves it,
+    /// the wait times out, the session ends, or the calling task is cancelled.
+    private func waitForSigner() async throws(RemoteSignerError) -> PublicKey {
+        let (stream, continuation) = AsyncStream<Result<PublicKey, RemoteSignerError>>.makeStream()
+        let waiter = ConnectionWaiter(continuation: continuation)
+        connectionWaiter = waiter
+        let timeout = config.requestTimeout
+        connectionTimeoutTask = Task { [weak self] in
+            try? await Task.sleep(for: timeout)
+            guard !Task.isCancelled else { return }
+            await self?.failConnection(with: .timedOut)
+        }
+
+        // Every outcome yields a result, so the stream ends without one only on cancellation.
+        for await result in stream {
+            return try result.get()
+        }
+        // Withdraw the wait so a later call can start another — unless it has already been
+        // settled, and the slot may hold that later call's waiter.
+        if connectionWaiter?.id == waiter.id {
+            failConnection(with: .cancelled)
+        }
+        throw .cancelled
     }
 
     /// Inspects an event received before the signer is known: if it decrypts to a response whose
@@ -484,7 +501,8 @@ public actor RemoteSigner {
         connectionTimeoutTask = nil
         let waiter = connectionWaiter
         connectionWaiter = nil
-        waiter?.resume(returning: signerPublicKey)
+        waiter?.continuation.yield(.success(signerPublicKey))
+        waiter?.continuation.finish()
     }
 
     /// Fails the pending ``discoverSigner()`` waiter (on timeout, or when the session ends).
@@ -493,13 +511,14 @@ public actor RemoteSigner {
         connectionTimeoutTask = nil
         let waiter = connectionWaiter
         connectionWaiter = nil
-        waiter?.resume(throwing: error)
+        waiter?.continuation.yield(.failure(error))
+        waiter?.continuation.finish()
     }
 
     /// The signer's public key, or throws ``RemoteSignerError/notConnected`` if it is not yet known (a
     /// nostrconnect session before ``awaitConnection()`` resolves).
-    private func requireSignerPublicKey() throws -> PublicKey {
-        guard let signerPublicKey else { throw RemoteSignerError.notConnected }
+    private func requireSignerPublicKey() throws(RemoteSignerError) -> PublicKey {
+        guard let signerPublicKey else { throw .notConnected }
         return signerPublicKey
     }
 
@@ -524,11 +543,13 @@ public actor RemoteSigner {
     ///   ``RemoteSignerError/notConnected`` if the signer is not yet known (a `nostrconnect://`
     ///   session before ``awaitConnection()``) or the session disconnects while the request is
     ///   pending, ``RemoteSignerError/requestEncodingFailed`` if the request cannot be encrypted or
-    ///   signed, or a transport error.
-    public func send(_ method: RemoteSignerMethod, params: [String] = []) async throws -> String {
+    ///   signed, ``RemoteSignerError/cancelled`` if the calling task is cancelled — before the send,
+    ///   nothing is sent — or ``RemoteSignerError/transportFailed(_:)`` if the relay cannot be
+    ///   connected to or the request cannot be sent.
+    public func send(_ method: RemoteSignerMethod, params: [String] = []) async throws(RemoteSignerError) -> String {
         let response = try await sendRequest(method: method, params: params)
         guard let result = response.result else {
-            throw RemoteSignerError.responseDecodingFailed
+            throw .responseDecodingFailed
         }
         return result
     }
@@ -566,5 +587,32 @@ public actor RemoteSigner {
     /// Whether an ``awaitConnection()`` wait is currently suspended. Exposed for tests.
     var isAwaitingConnectionForTesting: Bool {
         connectionWaiter != nil
+    }
+}
+
+/// The waiter suspended in ``RemoteSigner/awaitConnection()``, identified so a cancelled wait
+/// withdraws only itself.
+private struct ConnectionWaiter {
+    let id = UUID()
+    let continuation: AsyncStream<Result<PublicKey, RemoteSignerError>>.Continuation
+}
+
+extension RemoteSignerError {
+    /// The error a failure of the shared relay session surfaces as.
+    init(_ failure: RequestResponseSessionError) {
+        switch failure {
+        case .timedOut:
+            self = .timedOut
+        case .notConnected:
+            self = .notConnected
+        case .cancelled:
+            self = .cancelled
+        case .transportFailed(let error):
+            self = .transportFailed(error)
+        case .duplicateRequestKey:
+            // Requests are keyed by 16 random bytes, so a collision means the request was built
+            // wrong.
+            self = .requestEncodingFailed
+        }
     }
 }

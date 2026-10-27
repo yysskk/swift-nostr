@@ -254,6 +254,50 @@ struct RemoteSignerSessionTests {
         #expect(resolved == PublicKey.fixture("user"))
     }
 
+    // MARK: - failures
+
+    @Test("a relay that cannot be connected to surfaces as transportFailed")
+    func connectFailureIsTyped() async throws {
+        let transport = FakeRemoteSignerTransport()
+        let remote = try makeSigner(transport: transport)
+        await transport.failNextConnect(with: .connectionFailed)
+
+        do {
+            try await remote.ping()
+            Issue.record("ping succeeded without a relay")
+        } catch {
+            #expect(error == .transportFailed(.connectionFailed))
+        }
+        // The failed setup is not cached: the next call connects again.
+        try await connectHandshake(remote, transport: transport)
+        #expect(await transport.connectCount == 2)
+    }
+
+    @Test("a request the relay cannot take surfaces as transportFailed")
+    func sendFailureIsTyped() async throws {
+        let transport = FakeRemoteSignerTransport()
+        let remote = try makeSigner(transport: transport)
+        try await connectHandshake(remote, transport: transport)
+        await transport.failNextSend(with: .notConnected)
+
+        await #expect(throws: RemoteSignerError.transportFailed(.notConnected)) {
+            try await remote.ping()
+        }
+    }
+
+    @Test("cancelling a request waiting for its response fails it with cancelled at once")
+    func cancelledRequestIsTyped() async throws {
+        let transport = FakeRemoteSignerTransport()
+        let remote = try makeSigner(transport: transport, requestTimeout: .seconds(60))
+        try await connectHandshake(remote, transport: transport)
+
+        let ping = Task { try await remote.ping() }
+        _ = try await RemoteSignerFixtures.waitForSentEvents(transport, count: 2)
+        ping.cancel()
+
+        await #expect(throws: RemoteSignerError.cancelled) { try await ping.value }
+    }
+
     // MARK: - disconnect / logout
 
     @Test("disconnect fails in-flight requests with notConnected")

@@ -135,14 +135,16 @@ Commands throw ``WalletConnectError``. A wallet that rejects a request reports i
 do {
     let payment = try await connection.payInvoice("lnbc...")
     print(payment.preimage)
-} catch let WalletConnectError.walletError(code, message) {
+} catch .walletError(let code, let message) {
     switch code {
     case .insufficientBalance: print("Not enough balance: \(message)")
     case .paymentFailed: print("Payment failed: \(message)")
     default: print("Wallet error \(code.rawValue): \(message)")
     }
-} catch WalletConnectError.timedOut {
+} catch .timedOut {
     print("The wallet did not respond in time")
+} catch {
+    print(error.localizedDescription)  // any other WalletConnectError
 }
 ```
 

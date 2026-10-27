@@ -8,7 +8,10 @@ extension WalletConnection {
     ///   - invoice: The BOLT-11 invoice to pay.
     ///   - amount: An optional amount in millisatoshis, for amountless invoices.
     /// - Returns: The payment preimage and fees paid.
-    public func payInvoice(_ invoice: String, amount: Int64? = nil) async throws -> PayInvoiceResult {
+    /// - Throws: What ``send(_:)`` throws.
+    public func payInvoice(
+        _ invoice: String, amount: Int64? = nil
+    ) async throws(WalletConnectError) -> PayInvoiceResult {
         try await send(PayInvoiceRequest(invoice: invoice, amount: amount))
     }
 
@@ -22,9 +25,11 @@ extension WalletConnection {
     /// - Parameter invoices: The invoices to pay.
     /// - Returns: One outcome per invoice, in the order requested, plus any responses that could
     ///   not be tied back. Invoices with no response — on timeout, say — are ``MultiPayOutcome/noResponse``.
+    /// - Throws: What ``send(_:)`` throws for the request as a whole. A timeout returns the outcomes
+    ///   so far instead, and an item the wallet failed is reported in its outcome.
     public func multiPayInvoice(
         _ invoices: [MultiPayInvoiceItem]
-    ) async throws -> MultiPayResults<MultiPayInvoiceItemResult> {
+    ) async throws(WalletConnectError) -> MultiPayResults<MultiPayInvoiceItemResult> {
         // Nothing to wait for, and a waiter no response can satisfy would sit out the whole timeout.
         guard !invoices.isEmpty else { return MultiPayResults(outcomes: []) }
 
@@ -38,7 +43,8 @@ extension WalletConnection {
 
     /// Sends a spontaneous (keysend) payment (`pay_keysend`).
     /// - Returns: The payment preimage and fees paid.
-    public func payKeysend(_ request: PayKeysendRequest) async throws -> PayKeysendResult {
+    /// - Throws: What ``send(_:)`` throws.
+    public func payKeysend(_ request: PayKeysendRequest) async throws(WalletConnectError) -> PayKeysendResult {
         try await send(request)
     }
 
@@ -48,9 +54,10 @@ extension WalletConnection {
     /// ``multiPayInvoice(_:)`` for why.
     /// - Returns: One outcome per keysend, in the order requested, plus any responses that could
     ///   not be tied back.
+    /// - Throws: What ``multiPayInvoice(_:)`` throws.
     public func multiPayKeysend(
         _ keysends: [MultiPayKeysendItem]
-    ) async throws -> MultiPayResults<MultiPayKeysendItemResult> {
+    ) async throws(WalletConnectError) -> MultiPayResults<MultiPayKeysendItemResult> {
         guard !keysends.isEmpty else { return MultiPayResults(outcomes: []) }
 
         let parts = try await performRequest(
@@ -62,32 +69,37 @@ extension WalletConnection {
     }
 
     /// Creates an invoice (`make_invoice`).
-    public func makeInvoice(_ request: MakeInvoiceRequest) async throws -> MakeInvoiceResult {
+    /// - Throws: What ``send(_:)`` throws.
+    public func makeInvoice(_ request: MakeInvoiceRequest) async throws(WalletConnectError) -> MakeInvoiceResult {
         try await send(request)
     }
 
     /// Looks up an invoice by payment hash or BOLT-11 string (`lookup_invoice`).
-    public func lookupInvoice(_ request: LookupInvoiceRequest) async throws -> LookupInvoiceResult {
+    /// - Throws: What ``send(_:)`` throws.
+    public func lookupInvoice(_ request: LookupInvoiceRequest) async throws(WalletConnectError) -> LookupInvoiceResult {
         try await send(request)
     }
 
     /// Lists transactions (`list_transactions`).
     /// - Returns: The matching transactions, newest first.
+    /// - Throws: What ``send(_:)`` throws.
     public func listTransactions(
         _ request: ListTransactionsRequest = ListTransactionsRequest()
-    ) async throws -> [WalletConnectTransaction] {
+    ) async throws(WalletConnectError) -> [WalletConnectTransaction] {
         try await send(request).transactions
     }
 
     /// Fetches the wallet balance in millisatoshis (`get_balance`).
-    public func fetchBalance() async throws -> GetBalanceResult {
+    /// - Throws: What ``send(_:)`` throws.
+    public func fetchBalance() async throws(WalletConnectError) -> GetBalanceResult {
         try await send(GetBalanceRequest())
     }
 
     /// Fetches the wallet's Lightning node info (`get_info`).
     ///
     /// Distinct from ``fetchInfo()``, which reads the wallet's kind-13194 info event.
-    public func fetchNodeInfo() async throws -> GetInfoResult {
+    /// - Throws: What ``send(_:)`` throws.
+    public func fetchNodeInfo() async throws(WalletConnectError) -> GetInfoResult {
         try await send(GetInfoRequest())
     }
 
@@ -112,12 +124,10 @@ extension WalletConnection {
 
         for part in parts {
             let result: Result<Item, WalletConnectError>
-            do {
+            do throws(WalletConnectError) {
                 result = .success(try decodeResult(part.content, as: Item.self))
-            } catch let error as WalletConnectError {
-                result = .failure(error)
             } catch {
-                result = .failure(.responseDecodingFailed)
+                result = .failure(error)
             }
 
             guard let dTag = part.dTag, var candidates = indexByIdentifier[dTag],

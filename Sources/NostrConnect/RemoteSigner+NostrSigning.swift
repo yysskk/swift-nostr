@@ -11,17 +11,16 @@ extension RemoteSigner: NostrSigning {
     ///
     /// This is the user key the signer authors events under, not the client/session key. The value
     /// is cached after the first fetch, shared with ``userPublicKey()``.
-    /// - Throws: ``RemoteSignerError/responseValidationFailed`` if the signer replies with anything
-    ///   but a canonical hex public key.
+    /// - Throws: What ``userPublicKey()`` throws.
     public var publicKey: PublicKey {
-        get async throws { try await userPublicKey() }
+        get async throws(RemoteSignerError) { try await userPublicKey() }
     }
 
     /// Signs `template` as the user's public key (via `sign_event`).
     /// - Parameter template: The event to sign.
     /// - Returns: The signed ``Event``.
     /// - Throws: What ``publicKey`` or ``sign(_:)-(UnsignedEvent)`` throws.
-    public func sign(_ template: EventTemplate) async throws -> Event {
+    public func sign(_ template: EventTemplate) async throws(RemoteSignerError) -> Event {
         try await sign(UnsignedEvent(template, publicKey: publicKey))
     }
 }

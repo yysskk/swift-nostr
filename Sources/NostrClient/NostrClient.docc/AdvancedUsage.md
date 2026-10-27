@@ -450,7 +450,7 @@ unchanged. Set the signer and use the same API you would with an `nsec`:
 ```swift
 import NostrConnect
 
-let signer = try RemoteSigner(bunker: try BunkerURI(string: "bunker://..."))
+let signer = RemoteSigner(bunker: try BunkerURI(string: "bunker://..."))
 try await client.identity.setSigner(signer)   // any NostrSigning
 
 try await client.events.publishTextNote(content: "Signed by my bunker")

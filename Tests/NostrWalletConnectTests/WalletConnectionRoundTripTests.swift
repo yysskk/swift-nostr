@@ -220,6 +220,46 @@ struct WalletConnectionRoundTripTests {
         }
     }
 
+    // MARK: - Failures
+
+    @Test("a relay that cannot be connected to surfaces as transportFailed")
+    func connectFailureIsTyped() async throws {
+        let (connection, transport, _, _) = try makeConnection()
+        await transport.failNextConnect(with: .connectionFailed)
+
+        do {
+            _ = try await connection.payInvoice("lnbc1")
+            Issue.record("payInvoice succeeded without a relay")
+        } catch {
+            #expect(error == .transportFailed(.connectionFailed))
+        }
+        // The failed setup is not cached: the next call connects again.
+        try await connection.connect()
+        #expect(await transport.connectCount == 2)
+    }
+
+    @Test("a request the relay cannot take surfaces as transportFailed")
+    func sendFailureIsTyped() async throws {
+        let (connection, transport, _, _) = try makeConnection()
+        try await connection.connect()
+        await transport.failNextSend(with: .notConnected)
+
+        await #expect(throws: WalletConnectError.transportFailed(.notConnected)) {
+            _ = try await connection.fetchBalance()
+        }
+    }
+
+    @Test("cancelling a command waiting for its response fails it with cancelled at once")
+    func cancelledCommandIsTyped() async throws {
+        let (connection, transport, _, _) = try makeConnection(timeout: .seconds(60))
+
+        let payment = Task { try await connection.payInvoice("lnbc1") }
+        _ = try await NWCFixtures.waitForSentEvents(transport, count: 1)
+        payment.cancel()
+
+        await #expect(throws: WalletConnectError.cancelled) { _ = try await payment.value }
+    }
+
     @Test("multi_pay_invoice correlates by d tag and surfaces partial completion")
     func multiPayPartial() async throws {
         let (connection, transport, client, wallet) = try makeConnection(timeout: .seconds(2))

@@ -197,6 +197,30 @@ struct RemoteSignerNostrConnectFlowTests {
         #expect(await remote.isAwaitingConnectionForTesting == false)
     }
 
+    // MARK: - cancellation
+
+    @Test("cancelling awaitConnection fails it with cancelled and frees the session for another wait")
+    func awaitConnectionCancellation() async throws {
+        let invitation = try makeInvitation()
+        let transport = FakeRemoteSignerTransport()
+        let remote = try makeSigner(invitation: invitation, transport: transport, requestTimeout: .seconds(20))
+
+        let cancelled = Task { try await remote.awaitConnection() }
+        try await waitForConnectionWaiter(remote)
+        cancelled.cancel()
+
+        await #expect(throws: RemoteSignerError.cancelled) { try await cancelled.value }
+        #expect(await remote.isAwaitingConnectionForTesting == false)
+
+        // A later wait is not refused as connectionInProgress, and resolves normally.
+        let connection = Task { try await remote.awaitConnection() }
+        try await waitForConnectionWaiter(remote)
+        try await transport.deliver(
+            RemoteSignerFixtures.response(
+                requestID: "connect-ack", result: invitation.secret, client: client, signer: signer))
+        #expect(try await connection.value == signer.publicKey)
+    }
+
     // MARK: - concurrent calls
 
     @Test("a concurrent awaitConnection throws connectionInProgress, distinct from notConnected")

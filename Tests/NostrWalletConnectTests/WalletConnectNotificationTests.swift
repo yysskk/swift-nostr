@@ -92,6 +92,20 @@ struct WalletConnectNotificationTests {
         await #expect(throws: WalletConnectError.notConnected) { try await info.value }
     }
 
+    @Test("cancelling fetchInfo fails it with cancelled at once", .timeLimit(.minutes(1)))
+    func fetchInfoCancellation() async throws {
+        let transport = FakeWalletConnectTransport()
+        let connection = WalletConnection(
+            uri: try NWCFixtures.uri(wallet: KeyPair(), client: KeyPair()), transport: transport,
+            config: .init(requestTimeout: .seconds(20)))
+
+        let info = Task { try await connection.fetchInfo() }
+        try await waitForInfoSubscription(transport)
+        info.cancel()
+
+        await #expect(throws: WalletConnectError.cancelled) { try await info.value }
+    }
+
     // MARK: - Stream lifetime
 
     /// The merged event stream ends when every relay's has — automatic reconnection gave up, or the
