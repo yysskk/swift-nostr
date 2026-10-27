@@ -53,7 +53,7 @@ struct RequestResponseSessionTests {
     private func response(for key: String, content: String) -> Event {
         Event(
             id: .fixture("resp-\(key)"), publicKey: .fixture("peer"), createdAt: Timestamp(rawValue: 0), kind: 1,
-            tags: [["e", key]], content: content, signature: nil)
+            tags: [Event.Tag(name: .event, values: [key])], content: content, signature: nil)
     }
 
     // MARK: - Lifecycle

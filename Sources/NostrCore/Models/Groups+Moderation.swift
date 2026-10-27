@@ -142,7 +142,7 @@ extension Groups {
                 action = .editMetadata(
                     Metadata(
                         groupID: groupID,
-                        fieldTags: event.structuredTags.filter { ![.group, .previous].contains($0.name) }
+                        fieldTags: event.tags.filter { ![.group, .previous].contains($0.name) }
                     )
                 )
             case .groupDeleteEvent:
@@ -161,7 +161,7 @@ extension Groups {
                 action = .createInvite(code: code)
             case .groupUpdatePinList:
                 action = .updatePinList(
-                    event.structuredTags.compactMap { tag in
+                    event.tags.compactMap { tag in
                         switch tag.name {
                         case .event:
                             return tag.primaryValue.flatMap(EventID.init).map { PinnedItem.event(id: $0) }

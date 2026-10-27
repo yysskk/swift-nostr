@@ -174,7 +174,7 @@ struct RemoteSignerSessionTests {
         let forged = Event(
             id: .fixture("forged"), publicKey: impostor.publicKey, createdAt: Timestamp(rawValue: 0),
             kind: .nostrConnect,
-            tags: [["p", client.publicKey.hex]], content: sealed.payload, signature: nil)
+            tags: [.publicKey(client.publicKey)], content: sealed.payload, signature: nil)
         await transport.deliver(forged)
 
         await #expect(throws: RemoteSignerError.timedOut) { try await ping.value }

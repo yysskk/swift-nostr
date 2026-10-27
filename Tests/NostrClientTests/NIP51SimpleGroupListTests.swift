@@ -49,7 +49,7 @@ struct NIP51SimpleGroupListTests {
 
     @Test("A present-but-empty name is treated as nil")
     func emptyNameBecomesNil() throws {
-        let tag = try #require(Event.Tag.raw(["group", groupID, groupRelay.description, ""]))
+        let tag = Event.Tag(rawArray: ["group", groupID, groupRelay.description, ""])
         let entry = try #require(GroupListEntry(tag: tag))
         #expect(entry.name == nil)
         #expect(entry.tag.rawArray == ["group", groupID, groupRelay.description])
@@ -78,7 +78,7 @@ struct NIP51SimpleGroupListTests {
         ]
     )
     func outOfShapeTagsDoNotParse(rawArray: [String]) throws {
-        let tag = try #require(Event.Tag.raw(rawArray))
+        let tag = Event.Tag(rawArray: rawArray)
         #expect(GroupListEntry(tag: tag) == nil)
     }
 
@@ -109,7 +109,7 @@ struct NIP51SimpleGroupListTests {
     @Test("The typed view partitions group, r, and other tags in order")
     func typedViewPartitionsTags() throws {
         let unknown = Event.Tag(name: "client", values: ["nostrapp"])
-        let malformedGroup = try #require(Event.Tag.raw(["group", ""]))
+        let malformedGroup = Event.Tag(rawArray: ["group", ""])
         let markedRelay = Event.Tag(name: "r", values: ["wss://marked.example.com", "read"])
         let malformedRelay = Event.Tag.reference("https://not-a-relay.example.com")
         let list = NostrList(
@@ -141,7 +141,7 @@ struct NIP51SimpleGroupListTests {
 
     @Test("Back-conversion normalizes grouping but preserves every tag's content")
     func backConversionIsContentLossless() throws {
-        let malformedGroup = try #require(Event.Tag.raw(["group", "", "wss://broken.example.com"]))
+        let malformedGroup = Event.Tag(rawArray: ["group", "", "wss://broken.example.com"])
         let original = NostrList(
             kind: .simpleGroupList,
             publicItems: [
@@ -377,7 +377,7 @@ struct NIP51SimpleGroupListClientTests {
         #expect(sentFirst == sentSecond)
         #expect(sentFirst.kind == .simpleGroupList)
         #expect(
-            sentFirst.structuredTags == [
+            sentFirst.tags == [
                 .simpleGroup(id: groupID, relayURL: groupRelay, name: "Cooking"),
                 .reference(groupRelay.description),
             ]

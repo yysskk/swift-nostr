@@ -31,7 +31,7 @@ struct ReplyThreadingTests {
                 publicKey: signer.publicKey,
                 createdAt: Timestamp(rawValue: 1_700_000_000),
                 kind: .textNote,
-                rawTags: parentTags,
+                tags: parentTags.map(Event.Tag.init(rawArray:)),
                 content: "parent"
             )
         )
@@ -40,7 +40,7 @@ struct ReplyThreadingTests {
             try await client.events.publishReply(to: parent, content: "a reply")
         }
 
-        return reply.event.tags.filter { $0.first == "e" }
+        return reply.event.tags(named: .event).map(\.rawArray)
     }
 
     @Test("the marked root is carried over")

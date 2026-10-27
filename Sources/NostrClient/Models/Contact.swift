@@ -63,7 +63,7 @@ extension Event {
             return nil
         }
 
-        return structuredTags.compactMap(Contact.init(tag:))
+        return tags.compactMap(Contact.init(tag:))
     }
 
     /// Checks if this is a contact list event

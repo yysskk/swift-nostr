@@ -26,7 +26,8 @@ struct NIP57ZapReceiptTests {
     private func makeReceipt(signedBy payee: KeyPair, tags: [[String]]) throws -> Event {
         let signer = EventSigner(keyPair: payee)
         return try signer.sign(
-            UnsignedEvent(publicKey: signer.publicKey, kind: .zap, rawTags: tags, content: ""))
+            UnsignedEvent(
+                publicKey: signer.publicKey, kind: .zap, tags: tags.map(Event.Tag.init(rawArray:)), content: ""))
     }
 
     /// Builds a JSON-encoded kind-9734 zap request with the given amount and, optionally, zapped event.
@@ -199,7 +200,10 @@ struct NIP57ZapReceiptTests {
             UnsignedEvent(
                 publicKey: sender.publicKey,
                 kind: .zapRequest,
-                rawTags: [["p", recipient], ["amount", "not-a-number"]],
+                tags: [
+                    Event.Tag(name: .publicKey, values: [recipient]),
+                    Event.Tag(name: "amount", values: ["not-a-number"]),
+                ],
                 content: ""
             ))
         let description = String(decoding: try JSONEncoder().encode(request), as: UTF8.self)

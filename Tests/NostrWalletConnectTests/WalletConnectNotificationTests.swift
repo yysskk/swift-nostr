@@ -52,7 +52,10 @@ struct WalletConnectNotificationTests {
         await transport.emit(
             try NWCFixtures.info(
                 content: "pay_invoice get_balance",
-                tags: [["encryption", "nip44_v2 nip04"], ["notifications", "payment_received"]],
+                tags: [
+                    Event.Tag(name: "encryption", values: ["nip44_v2 nip04"]),
+                    Event.Tag(name: "notifications", values: ["payment_received"]),
+                ],
                 wallet: wallet))
 
         let info = try await infoTask

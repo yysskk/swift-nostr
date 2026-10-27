@@ -56,7 +56,7 @@ struct HTTPAuthTests {
         #expect(event.kind == .httpAuth)
         #expect(event.publicKey == signer.keyPair.publicKey)
         #expect(event.createdAt.rawValue == 1_682_327_852)
-        #expect(event.tags == [["u", url.absoluteString], ["method", "GET"]])
+        #expect(event.tags.map(\.rawArray) == [["u", url.absoluteString], ["method", "GET"]])
         #expect(try event.verify())
     }
 
@@ -99,7 +99,7 @@ struct HTTPAuthTests {
         let event = try HTTPAuth.validate(authorization: value, url: url, method: "POST", payload: body)
         #expect(event.publicKey == signer.keyPair.publicKey)
         #expect(
-            event.tags == [
+            event.tags.map(\.rawArray) == [
                 ["u", url.absoluteString],
                 ["method", "POST"],
                 ["payload", Data(SHA256.hash(data: body)).hexEncodedString()],

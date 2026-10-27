@@ -17,8 +17,8 @@ public struct Event: Codable, Identifiable, Hashable, Sendable {
     /// directly, e.g. `kind: 1`.
     public let kind: Kind
 
-    /// Array of arrays of strings (tags)
-    public let tags: [[String]]
+    /// The event's tags, each encoded as its raw NIP-01 string array.
+    public let tags: [Tag]
 
     /// Arbitrary string content
     public let content: String
@@ -50,7 +50,7 @@ public struct Event: Codable, Identifiable, Hashable, Sendable {
         publicKey: PublicKey,
         createdAt: Timestamp,
         kind: Kind,
-        tags: [[String]],
+        tags: [Tag],
         content: String,
         signature: Signature?
     ) {
@@ -75,7 +75,7 @@ public struct Event: Codable, Identifiable, Hashable, Sendable {
         self.publicKey = try container.decode(PublicKey.self, forKey: .publicKey)
         self.createdAt = try container.decode(Timestamp.self, forKey: .createdAt)
         self.kind = try container.decode(Kind.self, forKey: .kind)
-        self.tags = try container.decode([[String]].self, forKey: .tags)
+        self.tags = try container.decode([Tag].self, forKey: .tags)
         self.content = try container.decode(String.self, forKey: .content)
         if let sig = try container.decodeIfPresent(String.self, forKey: .signature), !sig.isEmpty {
             guard let signature = Signature(sig) else {
@@ -315,12 +315,12 @@ public struct UnsignedEvent: Sendable {
     public let createdAt: Timestamp
     /// The event kind (NIP-01).
     public let kind: Event.Kind
-    /// Tags in their raw NIP-01 wire form (what is hashed and signed).
-    public let tags: [[String]]
+    /// The event's tags; their raw NIP-01 arrays are what is hashed and signed.
+    public let tags: [Tag]
     /// The event's content; its meaning depends on ``kind``.
     public let content: String
 
-    /// Builds an unsigned event from typed ``Tag``s.
+    /// Creates an unsigned event from its fields.
     public init(
         publicKey: PublicKey,
         createdAt: Timestamp = .now,
@@ -328,24 +328,10 @@ public struct UnsignedEvent: Sendable {
         tags: [Tag] = [],
         content: String
     ) {
-        self.init(
-            publicKey: publicKey, createdAt: createdAt, kind: kind, rawTags: tags.map(\.rawArray), content: content)
-    }
-
-    /// Builds an unsigned event from raw NIP-01 tag arrays, e.g. tags copied
-    /// from another event. Prefer the ``Tag``-based initializer when
-    /// constructing tags yourself.
-    public init(
-        publicKey: PublicKey,
-        createdAt: Timestamp = .now,
-        kind: Event.Kind,
-        rawTags: [[String]],
-        content: String
-    ) {
         self.publicKey = publicKey
         self.createdAt = createdAt
         self.kind = kind
-        self.tags = rawTags
+        self.tags = tags
         self.content = content
     }
 
@@ -353,7 +339,7 @@ public struct UnsignedEvent: Sendable {
     /// `[0,pubkey,created_at,kind,tags,content]` in UTF-8.
     public func serializedForHashing() -> Data {
         var json = #"[0,""# + publicKey.hex + #"",\#(createdAt.rawValue),\#(kind.rawValue),["#
-        json += tags.map { "[" + $0.map(Self.jsonString).joined(separator: ",") + "]" }.joined(separator: ",")
+        json += tags.map { "[" + $0.rawArray.map(Self.jsonString).joined(separator: ",") + "]" }.joined(separator: ",")
         json += "]," + Self.jsonString(content) + "]"
         return Data(json.utf8)
     }

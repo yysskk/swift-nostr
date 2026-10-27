@@ -114,7 +114,7 @@ struct TimestampTests {
             publicKey: try PublicKey(hex: String(repeating: "bb", count: 32)),
             createdAt: Timestamp(rawValue: 1_700_000_000),
             kind: .textNote,
-            tags: [["expiration", "9223372036854775807"]],
+            tags: [Event.Tag(name: .expiration, values: ["9223372036854775807"])],
             content: "",
             signature: try Signature(hex: String(repeating: "cc", count: 64)))
 

@@ -427,16 +427,16 @@ NIP-01 Nostr Event (struct: Codable, Identifiable, Hashable, Sendable).
 - `publicKey: PublicKey` -- author's public key, `pubkey` on the wire
 - `createdAt: Timestamp` -- creation time in whole Unix seconds, `created_at` on the wire
 - `kind: Event.Kind` -- event kind (RawRepresentable struct, encodes as bare integer)
-- `tags: [[String]]` -- array of tag arrays (raw NIP-01 wire form)
+- `tags: [Tag]` -- the event's tags, each encoded as its raw NIP-01 string array
 - `content: String` -- arbitrary string content
 - `signature: Signature?` -- Schnorr signature, the `sig` field on the wire; `nil` for an unsigned NIP-59 rumor, which encodes without `sig` (decoding treats a missing or empty `sig` as `nil`). A malformed `id`, `pubkey`, or `sig` fails decoding, so a relay frame carrying one is dropped. `verify()` throws `Event.VerificationError`: `idMismatch` when the id is not the hash of the other fields, `missingSignature` for a rumor.
 
 ### Tag
 
-Typed tag value (`Event.Tag`, top-level alias `Tag`). Event-construction APIs
-(`EventTemplate`, `UnsignedEvent`, `events.publishTextNote`) take `[Tag]`; `Event.tags`
-stays `[[String]]` (the hashed wire form). `Tag` is array-literal expressible, so
-`tags: [["t", "nostr"]]` still compiles. Builders that reference an event or a key take an
+Typed tag value (`Event.Tag`, top-level alias `Tag`). `Event`, `UnsignedEvent`, and
+`EventTemplate` all hold `tags: [Tag]`. A tag keeps the exact string array it was built or
+decoded from, so any tag a relay sends (unknown names, extra values, even `[]`) round-trips
+unchanged and still hashes to the event id. Builders that reference an event or a key take an
 `EventID` (`id`) or `PublicKey` (`pk`) and write its hex form; relay hints are `RelayURL?`
 (`relay`) and written in canonical form.
 
@@ -458,11 +458,11 @@ Tag.role("mod", description: "kicks")  // ["role", name, description?] (NIP-29 k
 Tag.publicKey(pk, roles: ["admin"]) // ["p", pk, role...] (NIP-29; index 1 is a role, not a relay hint)
 Tag.simpleGroup(id: "abcdef", relayURL: try RelayURL(string: "wss://g"), name: "Cool")  // ["group", ...] (NIP-51 kind 10009)
 Tag.expiration(Timestamp(rawValue: 1_700_000_000))  // ["expiration", "1700000000"] (NIP-40)
-Tag(rawArray: ["custom", "x"])   // failable, nil for []
+Tag(rawArray: ["custom", "x"])   // any [String]; [] has an empty name and no values
 tag.rawArray                     // [String] wire form
 tag.name                         // Tag.Name
-// Raw escape hatch when you hold [[String]]:
-UnsignedEvent(publicKey: pk, kind: 1, rawTags: rawArrays, content: "...")
+tag.values                       // [String] after the name
+tag.primaryValue                 // String? (values.first)
 ```
 
 `Tag.name` is a `Tag.Name`, a `RawRepresentable` struct over `String` (tag names are
@@ -482,7 +482,7 @@ Tag.Name.hashtag.rawValue        // "t"
 Read accessors on `Event`:
 
 ```swift
-event.structuredTags            // [Tag]
+event.tags            // [Tag]
 event.tags(named: .event)       // [Tag]; takes a Tag.Name, so "e" works too
 event.firstTagValue(named: .subject)  // String?
 event.referencedEventIDs        // [EventID] from "e" tags; malformed values are skipped

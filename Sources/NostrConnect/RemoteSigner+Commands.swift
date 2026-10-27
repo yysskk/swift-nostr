@@ -145,7 +145,7 @@ extension RemoteSigner {
         let object: [String: Any] = [
             "kind": event.kind.rawValue,
             "content": event.content,
-            "tags": event.tags,
+            "tags": event.tags.map(\.rawArray),
             "created_at": event.createdAt.rawValue,
         ]
         guard

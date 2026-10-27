@@ -51,12 +51,12 @@ struct FetchVerificationTests {
         _ signer: EventSigner,
         kind: Event.Kind,
         createdAt: Timestamp,
-        tags: [[String]] = [],
+        tags: [Event.Tag] = [],
         content: String = ""
     ) throws -> Event {
         try signer.sign(
             UnsignedEvent(
-                publicKey: signer.publicKey, createdAt: createdAt, kind: kind, rawTags: tags,
+                publicKey: signer.publicKey, createdAt: createdAt, kind: kind, tags: tags,
                 content: content))
     }
 
@@ -66,11 +66,11 @@ struct FetchVerificationTests {
         claiming publicKey: PublicKey,
         kind: Event.Kind,
         createdAt: Timestamp,
-        tags: [[String]] = [],
+        tags: [Event.Tag] = [],
         content: String = ""
     ) throws -> Event {
         let unsigned = UnsignedEvent(
-            publicKey: publicKey, createdAt: createdAt, kind: kind, rawTags: tags, content: content)
+            publicKey: publicKey, createdAt: createdAt, kind: kind, tags: tags, content: content)
         return Event(
             id: unsigned.computedID,
             publicKey: publicKey,
@@ -94,11 +94,11 @@ struct FetchVerificationTests {
 
         let real = try signed(
             victim, kind: .directMessageRelayList, createdAt: Timestamp(rawValue: 1_700_000_000),
-            tags: [["relay", "wss://real.example.com"]])
+            tags: [Event.Tag(name: .relay, values: ["wss://real.example.com"])])
         let forgery = try forged(
             claiming: victim.publicKey, kind: .directMessageRelayList,
             createdAt: Timestamp(rawValue: 2_000_000_000),  // far ahead, so "newest wins" would pick it
-            tags: [["relay", "wss://attacker.example.com"]])
+            tags: [Event.Tag(name: .relay, values: ["wss://attacker.example.com"])])
 
         let list = try await answering(socket, with: [real, forgery]) {
             try await client.routing.fetchDirectMessageRelayList(for: victim.publicKey)
@@ -117,7 +117,7 @@ struct FetchVerificationTests {
         // Genuinely signed — but by somebody else.
         let strangersList = try signed(
             stranger, kind: .directMessageRelayList, createdAt: Timestamp(rawValue: 2_000_000_000),
-            tags: [["relay", "wss://attacker.example.com"]])
+            tags: [Event.Tag(name: .relay, values: ["wss://attacker.example.com"])])
 
         let list = try await answering(socket, with: [strangersList]) {
             try await client.routing.fetchDirectMessageRelayList(for: victim.publicKey)
@@ -136,10 +136,10 @@ struct FetchVerificationTests {
 
         let real = try signed(
             victim, kind: .relayListMetadata, createdAt: Timestamp(rawValue: 1_700_000_000),
-            tags: [["r", "wss://real.example.com"]])
+            tags: [.reference("wss://real.example.com")])
         let forgery = try forged(
             claiming: victim.publicKey, kind: .relayListMetadata, createdAt: Timestamp(rawValue: 2_000_000_000),
-            tags: [["r", "wss://attacker.example.com"]])
+            tags: [.reference("wss://attacker.example.com")])
 
         let list = try await answering(socket, with: [real, forgery]) {
             try await client.routing.fetchRelayList(for: victim.publicKey)
@@ -236,9 +236,10 @@ struct FetchVerificationTests {
     func addressableSelectionMatchesIdentifier() throws {
         let signer = EventSigner(keyPair: KeyPair())
         let wanted = try signed(
-            signer, kind: .longFormContent, createdAt: Timestamp(rawValue: 1_700_000_000), tags: [["d", "wanted"]])
+            signer, kind: .longFormContent, createdAt: Timestamp(rawValue: 1_700_000_000), tags: [.identifier("wanted")]
+        )
         let other = try signed(
-            signer, kind: .longFormContent, createdAt: Timestamp(rawValue: 2_000_000_000), tags: [["d", "other"]])
+            signer, kind: .longFormContent, createdAt: Timestamp(rawValue: 2_000_000_000), tags: [.identifier("other")])
 
         let picked = VerifiedEventSelection.newest(
             in: [other, wanted], kind: .longFormContent, author: signer.publicKey,

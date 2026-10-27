@@ -76,7 +76,7 @@ struct MultiPayMatchingTests {
         await transport.emit(
             try NWCFixtures.signed(
                 kind: .walletConnectResponse,
-                tags: [["e", request.id.hex], ["p", client.publicKey.hex], ["d", "a"]],
+                tags: [.event(request.id), .publicKey(client.publicKey), .identifier("a")],
                 content: try NWCFixtures.encrypt(
                     #"{"result_type":"multi_pay_invoice","result":{"preimage":"second"}}"#,
                     to: client, from: wallet, scheme: .nip44),

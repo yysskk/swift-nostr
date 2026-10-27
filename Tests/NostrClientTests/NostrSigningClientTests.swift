@@ -58,7 +58,7 @@ struct NostrSigningClientTests {
         #expect(signed.publicKey == keyPair.publicKey)
         #expect(signed.kind == .textNote)
         #expect(signed.content == "hello")
-        #expect(signed.tags == [["t", "nostr"]])
+        #expect(signed.tags.map(\.rawArray) == [["t", "nostr"]])
         #expect(signed.createdAt == template.createdAt)
         #expect(try signed.verify())
     }

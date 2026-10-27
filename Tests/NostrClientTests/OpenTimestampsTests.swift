@@ -31,7 +31,7 @@ struct OpenTimestampsTests {
         let ots = OpenTimestamps(base64EncodedOTS: base64Data)
         let tag = ots.tag
 
-        #expect(tag == ["ots", base64Data])
+        #expect(tag.rawArray == ["ots", base64Data])
     }
 
     @Test("A template's attestation is signed into the event and read back")
@@ -43,7 +43,7 @@ struct OpenTimestampsTests {
         template.openTimestamps = OpenTimestamps(base64EncodedOTS: otsData)
         let event = signer.sign(template)
 
-        #expect(event.tags == [["t", "test"], ["ots", otsData]])
+        #expect(event.tags.map(\.rawArray) == [["t", "test"], ["ots", otsData]])
         #expect(event.hasOpenTimestampsAttestation)
         #expect(event.openTimestamps?.otsData == otsData)
         #expect(try event.verify())

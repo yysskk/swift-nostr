@@ -165,7 +165,7 @@ public struct GiftWrap: Sendable {
             publicKey: rumor.publicKey,
             createdAt: rumor.createdAt,
             kind: rumor.kind,
-            rawTags: rumor.tags,
+            tags: rumor.tags,
             content: rumor.content
         )
 
@@ -239,7 +239,7 @@ private struct Rumor: Codable {
     let publicKey: PublicKey
     let createdAt: Timestamp
     let kind: Event.Kind
-    let tags: [[String]]
+    let tags: [Tag]
     let content: String
 
     enum CodingKeys: String, CodingKey {

@@ -19,7 +19,7 @@ struct GiftWrapImpersonationTests {
         publicKey: String,
         createdAt: Int64,
         kind: Event.Kind,
-        tags: [[String]],
+        tags: [Event.Tag],
         content: String
     ) throws -> String {
         let object: [String: Any] = [
@@ -27,7 +27,7 @@ struct GiftWrapImpersonationTests {
             "pubkey": publicKey,
             "created_at": createdAt,
             "kind": kind.rawValue,
-            "tags": tags,
+            "tags": tags.map(\.rawArray),
             "content": content,
         ]
         let data = try JSONSerialization.data(withJSONObject: object)
@@ -84,7 +84,7 @@ struct GiftWrapImpersonationTests {
             publicKey: alice.publicKey,
             createdAt: Timestamp(rawValue: 1_700_000_000),
             kind: .privateDirectMessage,
-            rawTags: [["p", bob.publicKey.hex]],
+            tags: [.publicKey(bob.publicKey)],
             content: "I approve this transfer"
         )
         let rumor = try rumorJSON(
@@ -116,7 +116,7 @@ struct GiftWrapImpersonationTests {
             publicKey: alice.publicKey.hex,
             createdAt: 1_700_000_000,
             kind: .privateDirectMessage,
-            tags: [["p", bob.publicKey.hex]],
+            tags: [.publicKey(bob.publicKey)],
             content: "hello"
         )
 
@@ -139,7 +139,7 @@ struct GiftWrapImpersonationTests {
             publicKey: alice.publicKey,
             createdAt: Timestamp(rawValue: 1_700_000_000),
             kind: .reaction,
-            rawTags: [["p", bob.publicKey.hex]],
+            tags: [.publicKey(bob.publicKey)],
             content: "+"
         )
         let rumor = try rumorJSON(
@@ -208,7 +208,7 @@ struct GiftWrapImpersonationTests {
             publicKey: alice.publicKey,
             createdAt: Timestamp(rawValue: 1_700_000_000),
             kind: .privateDirectMessage,
-            rawTags: [["p", bob.publicKey.hex]],
+            tags: [.publicKey(bob.publicKey)],
             content: "hello"
         )
         let rumor = try rumorJSON(

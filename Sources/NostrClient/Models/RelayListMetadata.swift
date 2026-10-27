@@ -61,7 +61,7 @@ public struct RelayListMetadata: Codable, Hashable, Sendable {
         guard event.kind == .relayListMetadata else {
             return nil
         }
-        self.init(tags: event.structuredTags)
+        self.init(tags: event.tags)
     }
 
     /// Parses a relay list from tags (kind-agnostic). A tag whose URL is not a valid relay

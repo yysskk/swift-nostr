@@ -234,7 +234,7 @@ struct NIP01VectorTests {
                     publicKey: try PublicKey(hex: publicKey),
                     createdAt: createdAt,
                     kind: kind,
-                    rawTags: rawTags,
+                    tags: rawTags.map(Event.Tag.init(rawArray:)),
                     content: content
                 )
             }
@@ -248,7 +248,7 @@ struct NIP01VectorTests {
                 publicKey: try PublicKey(hex: publicKey),
                 createdAt: createdAt,
                 kind: kind,
-                tags: rawTags,
+                tags: rawTags.map(Event.Tag.init(rawArray:)),
                 content: overriddenContent ?? content,
                 signature: try Signature(hex: overriddenSig ?? sig)
             )
@@ -310,7 +310,7 @@ struct NIP01VectorTests {
             publicKey: try PublicKey(hex: vector.publicKey),
             createdAt: vector.createdAt,
             kind: vector.kind,
-            rawTags: vector.rawTags,
+            tags: vector.rawTags.map(Event.Tag.init(rawArray:)),
             content: vector.content
         )
 
@@ -340,7 +340,7 @@ struct NIP01VectorTests {
             publicKey: try PublicKey(hex: Self.publicKey1),
             createdAt: Self.timestamp,
             kind: 1,
-            rawTags: [["t", hashtag]],
+            tags: [.hashtag(hashtag)],
             content: content
         )
 
@@ -369,7 +369,6 @@ struct NIP01VectorTests {
             publicKey: try PublicKey(hex: Self.publicKey1),
             createdAt: Self.timestamp,
             kind: 1,
-            rawTags: [],
             content: "ctrl:\u{01}\u{1B}!"
         )
 
@@ -391,7 +390,7 @@ struct NIP01VectorTests {
             publicKey: try PublicKey(hex: Self.publicKey1),
             createdAt: Self.timestamp,
             kind: 1,
-            rawTags: [["t", "a\u{2028}b"]],
+            tags: [.hashtag("a\u{2028}b")],
             content: "del:\u{7F} ls:\u{2028} ps:\u{2029} /"
         )
 
@@ -433,7 +432,7 @@ struct NIP01VectorTests {
             publicKey: try PublicKey(hex: vector.publicKey),
             createdAt: vector.createdAt,
             kind: vector.kind,
-            rawTags: vector.rawTags,
+            tags: vector.rawTags.map(Event.Tag.init(rawArray:)),
             content: tamperedContent
         )
 

@@ -303,7 +303,7 @@ struct WalletConnectionRoundTripTests {
         await transport.emit(
             try NWCFixtures.signed(
                 kind: .walletConnectResponse,
-                tags: [["e", request.id.hex], ["p", client.publicKey.hex], ["d", "b"]],
+                tags: [.event(request.id), .publicKey(client.publicKey), .identifier("b")],
                 content: "not-decryptable",
                 wallet: wallet))
 

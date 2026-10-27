@@ -105,7 +105,8 @@ struct ResponseSchemeTests {
             try NWCFixtures.signed(
                 kind: .walletConnectResponse,
                 tags: [
-                    ["e", request.id.hex], ["p", client.publicKey.hex], ["encryption", "nip77_quantum"],
+                    .event(request.id), .publicKey(client.publicKey),
+                    Event.Tag(name: "encryption", values: ["nip77_quantum"]),
                 ],
                 content: try NWCFixtures.encrypt(
                     #"{"result_type":"pay_invoice","result":{"preimage":"x"}}"#,
@@ -176,7 +177,7 @@ struct ResponseSchemeTests {
         await transport.emit(
             try NWCFixtures.signed(
                 kind: .walletConnectResponse,
-                tags: [["e", request.id.hex.uppercased()], ["p", client.publicKey.hex]],
+                tags: [Event.Tag(name: .event, values: [request.id.hex.uppercased()]), .publicKey(client.publicKey)],
                 content: try NWCFixtures.encrypt(
                     #"{"result_type":"pay_invoice","result":{"preimage":"misaddressed"}}"#,
                     to: client, from: wallet),

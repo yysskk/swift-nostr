@@ -23,7 +23,7 @@ struct DirectMessageRelayDiscoveryTests {
         }
 
         #expect(published.event.kind == .directMessageRelayList)
-        #expect(published.event.tags == [["relay", "wss://inbox.example.com"]])
+        #expect(published.event.tags.map(\.rawArray) == [["relay", "wss://inbox.example.com"]])
         #expect(try published.event.verify())
         #expect(published.result.acceptedRelays == [ConnectedClientFixture.defaultRelayURL])
 

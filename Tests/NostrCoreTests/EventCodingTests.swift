@@ -1,5 +1,6 @@
 import Foundation
 import NostrCore
+import NostrTestSupport
 import Testing
 
 @Suite("Event Coding Tests")
@@ -114,5 +115,44 @@ struct EventCodingTests {
 
         #expect(rumor.id == unsigned.computedID)
         #expect(rumor.publicKey == unsigned.publicKey)
+    }
+
+    /// The tag shapes a relay may send beyond what the typed constructors write: an unknown name,
+    /// extra values, empty-string placeholders, a bare name, an empty name, and an empty array.
+    private let unusualRawTags = [
+        ["e", EventID.fixture("note").hex, "", "reply"], ["x-custom", "a", "b", "c"], ["t"], [""], [],
+        ["p", PublicKey.fixture("alice").hex, "", ""],
+    ]
+
+    /// A signed event carrying ``unusualRawTags``, written out as a relay would send it, keys sorted.
+    private func receivedEventJSON() throws -> String {
+        let signer = EventSigner(keyPair: KeyPair())
+        let event = try signer.sign(
+            UnsignedEvent(
+                publicKey: signer.publicKey, createdAt: Timestamp(rawValue: 1_700_000_000), kind: .textNote,
+                tags: unusualRawTags.map(Event.Tag.init(rawArray:)), content: "odd tags"))
+        let signature = try #require(event.signature)
+        return #"{"content":"odd tags","created_at":1700000000,"id":"\#(event.id.hex)","kind":1,"#
+            + #""pubkey":"\#(event.publicKey.hex)","sig":"\#(signature.hex)","tags":[["e","#
+            + #""\#(EventID.fixture("note").hex)","","reply"],["x-custom","a","b","c"],["t"],[""],[],"#
+            + #"["p","\#(PublicKey.fixture("alice").hex)","",""]]}"#
+    }
+
+    /// Each tag must survive decoding and re-encoding unchanged, or the id no longer matches.
+    @Test("an event with unusual tags round-trips through JSON byte for byte")
+    func unusualTagsRoundTripByteForByte() throws {
+        let json = try receivedEventJSON()
+        let event = try JSONDecoder().decode(Event.self, from: Data(json.utf8))
+        #expect(event.tags.map(\.rawArray) == unusualRawTags)
+
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .sortedKeys
+        #expect(String(decoding: try encoder.encode(event), as: UTF8.self) == json)
+    }
+
+    @Test("a received event with unusual tags verifies")
+    func receivedEventWithUnusualTagsVerifies() throws {
+        let event = try JSONDecoder().decode(Event.self, from: Data(try receivedEventJSON().utf8))
+        #expect(try event.verify())
     }
 }

@@ -125,8 +125,8 @@ struct NIP51SetTests {
         )
 
         let event = try await sign(set, with: signer)
-        #expect(event.structuredTags.first?.name == "d")
-        #expect(event.structuredTags.first?.primaryValue == "reading")
+        #expect(event.tags.first?.name == "d")
+        #expect(event.tags.first?.primaryValue == "reading")
         #expect(event.tags(named: "title").first?.primaryValue == "Reading list")
         // image / description were not set, so no such tags appear.
         #expect(event.tags(named: "image").isEmpty)
@@ -312,10 +312,10 @@ struct NIP51SetTests {
         ]
 
         let event = try await sign(set, with: signer)
-        #expect(event.structuredTags.filter { $0.name == "d" }.count == 1)
-        #expect(event.structuredTags.filter { $0.name == "title" }.count == 1)
-        #expect(event.structuredTags.filter { $0.name == "image" }.count == 1)
-        #expect(event.structuredTags.filter { $0.name == "description" }.count == 1)
+        #expect(event.tags.filter { $0.name == "d" }.count == 1)
+        #expect(event.tags.filter { $0.name == "title" }.count == 1)
+        #expect(event.tags.filter { $0.name == "image" }.count == 1)
+        #expect(event.tags.filter { $0.name == "description" }.count == 1)
         // The dedicated properties win; the injected reserved tags are discarded.
         let reread = try NostrListSet(event: event)
         #expect(reread.identifier == "reading")

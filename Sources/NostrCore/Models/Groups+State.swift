@@ -159,7 +159,7 @@ extension Groups {
         public init(event: Event, relayPublicKey: PublicKey? = nil) throws(ValidationError) {
             let groupID = try Groups.validatedGroupID(
                 of: event, expecting: .groupMetadata, relayPublicKey: relayPublicKey)
-            self.init(groupID: groupID, fieldTags: event.structuredTags)
+            self.init(groupID: groupID, fieldTags: event.tags)
         }
 
         /// Interprets metadata field tags — the tag layout of a kind-39000 event without its
@@ -472,7 +472,7 @@ extension Groups {
         public init(event: Event, relayPublicKey: PublicKey? = nil) throws(ValidationError) {
             groupID = try Groups.validatedGroupID(
                 of: event, expecting: .groupPinList, relayPublicKey: relayPublicKey)
-            items = event.structuredTags.compactMap { tag in
+            items = event.tags.compactMap { tag in
                 switch tag.name {
                 case .event:
                     return tag.primaryValue.flatMap(EventID.init).map { PinnedItem.event(id: $0) }

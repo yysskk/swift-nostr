@@ -42,7 +42,7 @@ struct EventSignerTests {
 
         #expect(event.publicKey == signer.publicKey)
         #expect(event.kind == .textNote)
-        #expect(event.tags == [["t", "nostr"]])
+        #expect(event.tags.map(\.rawArray) == [["t", "nostr"]])
         #expect(event.content == "gm")
         #expect(event.createdAt == template.createdAt)
         #expect(try event.verify())

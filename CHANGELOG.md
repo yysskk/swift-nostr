@@ -133,6 +133,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Filter.tagQuery(_:)`, and `Groups.ValidationError.missingTag(name:kind:)` take a `Tag.Name`;
   the filter methods still ignore a leading `#`. Passing a `String` variable now needs
   `Tag.Name(rawValue:)`.
+- **`Event.tags` and `UnsignedEvent.tags` are `[Tag]`** (breaking), like `EventTemplate.tags`.
+  A tag keeps the exact string array it was built or decoded from, so the JSON encoding and the
+  NIP-01 id are unchanged and any tag a relay sends still decodes and verifies. An empty array is
+  a tag too (an empty `name`, no `values`): decoding one no longer fails, `Event.tags` and
+  private list items keep it, and `Tag(rawArray:)` is no longer failable. `Tag.raw(_:)`,
+  `Tag`'s array-literal conformance, `Event.structuredTags` (read `tags`), and
+  `UnsignedEvent.init(publicKey:createdAt:kind:rawTags:content:)` (pass `tags:`) are removed.
 - **APIs that throw a single error type use typed throws** (breaking): callers now get the
   concrete error type without casting, so `catch .invalidBase64` or `error == .publicKeyMismatch`
   works directly. `HTTPAuth.validate(authorization:url:method:payload:tolerance:now:)` and

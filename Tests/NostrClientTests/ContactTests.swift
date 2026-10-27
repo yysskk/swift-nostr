@@ -40,33 +40,33 @@ struct ContactTests {
         )
 
         let tag = contact.tag
-        #expect(tag == ["p", alice.hex, "wss://relay.example.com", "alice"])
+        #expect(tag.rawArray == ["p", alice.hex, "wss://relay.example.com", "alice"])
     }
 
     @Test("Contact tag - public key only")
     func contactTagPublicKeyOnly() {
         let contact = Contact(publicKey: alice)
         let tag = contact.tag
-        #expect(tag == ["p", alice.hex])
+        #expect(tag.rawArray == ["p", alice.hex])
     }
 
     @Test("Contact tag - with relay only")
     func contactTagWithRelayOnly() {
         let contact = Contact(publicKey: alice, relayURL: RelayURL("wss://relay.example.com")!)
         let tag = contact.tag
-        #expect(tag == ["p", alice.hex, "wss://relay.example.com"])
+        #expect(tag.rawArray == ["p", alice.hex, "wss://relay.example.com"])
     }
 
     @Test("Contact tag - with petname only")
     func contactTagWithPetnameOnly() {
         let contact = Contact(publicKey: alice, petname: "alice")
         let tag = contact.tag
-        #expect(tag == ["p", alice.hex, "", "alice"])
+        #expect(tag.rawArray == ["p", alice.hex, "", "alice"])
     }
 
     @Test("Contact init(tag:) - all fields")
     func contactInitTagAllFields() {
-        let tag: Event.Tag = ["p", alice.hex, "wss://relay.example.com", "alice"]
+        let tag = Event.Tag(rawArray: ["p", alice.hex, "wss://relay.example.com", "alice"])
         let contact = Contact(tag: tag)
 
         #expect(contact != nil)
@@ -77,7 +77,7 @@ struct ContactTests {
 
     @Test("Contact init(tag:) - public key only")
     func contactInitTagPublicKeyOnly() {
-        let tag: Event.Tag = ["p", alice.hex]
+        let tag = Event.Tag(rawArray: ["p", alice.hex])
         let contact = Contact(tag: tag)
 
         #expect(contact != nil)
@@ -88,7 +88,7 @@ struct ContactTests {
 
     @Test("Contact init(tag:) - with empty relay")
     func contactInitTagWithEmptyRelay() {
-        let tag: Event.Tag = ["p", alice.hex, "", "alice"]
+        let tag = Event.Tag(rawArray: ["p", alice.hex, "", "alice"])
         let contact = Contact(tag: tag)
 
         #expect(contact != nil)
@@ -101,7 +101,7 @@ struct ContactTests {
         "Contact init(tag:) - reads a malformed relay hint as absent",
         arguments: ["not a relay", "https://relay.example.com", "wss://relay.example.com/#frag"])
     func contactInitTagWithMalformedRelay(relay: String) {
-        let contact = Contact(tag: ["p", alice.hex, relay, "alice"])
+        let contact = Contact(tag: Event.Tag(rawArray: ["p", alice.hex, relay, "alice"]))
 
         #expect(contact?.publicKey == alice)
         #expect(contact?.relayURL == nil)
@@ -110,22 +110,22 @@ struct ContactTests {
 
     @Test("Contact init(tag:) - writes the relay hint back in canonical form")
     func contactInitTagCanonicalizesRelay() {
-        let contact = Contact(tag: ["p", alice.hex, "WSS://Relay.Example.com/"])
+        let contact = Contact(tag: Event.Tag(rawArray: ["p", alice.hex, "WSS://Relay.Example.com/"]))
 
         #expect(contact?.relayURL == RelayURL("wss://relay.example.com"))
-        #expect(contact?.tag == ["p", alice.hex, "wss://relay.example.com"])
+        #expect(contact?.tag.rawArray == ["p", alice.hex, "wss://relay.example.com"])
     }
 
     @Test("Contact init(tag:) - invalid tag type")
     func contactInitTagInvalidType() {
-        let tag: Event.Tag = ["e", alice.hex]
+        let tag = Event.Tag(rawArray: ["e", alice.hex])
         let contact = Contact(tag: tag)
         #expect(contact == nil)
     }
 
     @Test("Contact init(tag:) - too short")
     func contactInitTagTooShort() {
-        let tag: Event.Tag = ["p"]
+        let tag = Event.Tag(rawArray: ["p"])
         let contact = Contact(tag: tag)
         #expect(contact == nil)
     }
@@ -134,7 +134,7 @@ struct ContactTests {
         "Contact init(tag:) - rejects a public key that is not canonical hex",
         arguments: ["abc123", String(repeating: "A", count: 64), "", String(repeating: "a", count: 66)])
     func contactInitTagRejectsMalformedPublicKey(publicKey: String) {
-        #expect(Contact(tag: ["p", publicKey, "wss://relay.example.com", "alice"]) == nil)
+        #expect(Contact(tag: Event.Tag(rawArray: ["p", publicKey, "wss://relay.example.com", "alice"])) == nil)
     }
 
     @Test("Contact round-trips through tag and init(tag:)")
@@ -215,9 +215,9 @@ struct ContactListEventTests {
         #expect(event.kind == 3)
         #expect(event.content == "")
         #expect(event.tags.count == 3)
-        #expect(event.tags[0] == ["p", publicKey1.hex, "wss://relay1.com", "alice"])
-        #expect(event.tags[1] == ["p", publicKey2.hex, "wss://relay2.com"])
-        #expect(event.tags[2] == ["p", publicKey3.hex])
+        #expect(event.tags[0].rawArray == ["p", publicKey1.hex, "wss://relay1.com", "alice"])
+        #expect(event.tags[1].rawArray == ["p", publicKey2.hex, "wss://relay2.com"])
+        #expect(event.tags[2].rawArray == ["p", publicKey3.hex])
         #expect(try event.verify())
     }
 
@@ -231,9 +231,9 @@ struct ContactListEventTests {
 
         #expect(event.kind == 3)
         #expect(event.tags.count == 3)
-        #expect(event.tags[0] == ["p", publicKey1.hex])
-        #expect(event.tags[1] == ["p", publicKey2.hex])
-        #expect(event.tags[2] == ["p", publicKey3.hex])
+        #expect(event.tags[0].rawArray == ["p", publicKey1.hex])
+        #expect(event.tags[1].rawArray == ["p", publicKey2.hex])
+        #expect(event.tags[2].rawArray == ["p", publicKey3.hex])
     }
 
     @Test("Extract contacts from event")
@@ -265,12 +265,12 @@ struct ContactListEventTests {
             UnsignedEvent(
                 publicKey: signer.publicKey,
                 kind: .contacts,
-                rawTags: [
+                tags: [
                     ["p", publicKey1.hex],
                     ["p", "publicKey2"],
                     ["p", publicKey3.hex.uppercased()],
                     ["p", publicKey3.hex, "", "carol"],
-                ],
+                ].map(Event.Tag.init(rawArray:)),
                 content: ""
             ))
 
