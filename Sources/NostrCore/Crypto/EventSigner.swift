@@ -17,10 +17,9 @@ public struct EventSigner: Sendable {
         self.keyPair = keyPair
     }
 
-    /// Creates a signer from a hex-encoded private key.
-    /// - Throws: What ``KeyPair/init(privateKeyHex:)`` throws for a malformed key.
-    public init(privateKeyHex: String) throws(KeyPair.Error) {
-        self.keyPair = try KeyPair(privateKeyHex: privateKeyHex)
+    /// Creates a signer for a private key.
+    public init(privateKey: PrivateKey) {
+        self.keyPair = KeyPair(privateKey: privateKey)
     }
 
     /// Creates a signer from a NIP-19 `nsec`.
@@ -77,7 +76,7 @@ public struct EventSigner: Sendable {
         // with one fails only on a zero nonce, which is cryptographically unreachable.
         let signature: P256K.Schnorr.SchnorrSignature
         do {
-            signature = try P256K.Schnorr.PrivateKey(dataRepresentation: keyPair.privateKey).signature(for: hash)
+            signature = try P256K.Schnorr.PrivateKey(dataRepresentation: keyPair.privateKey.data).signature(for: hash)
         } catch {
             preconditionFailure("Schnorr signing failed with a valid secp256k1 scalar: \(error)")
         }

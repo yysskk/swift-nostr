@@ -83,9 +83,9 @@ struct Bech32Tests {
         let keyPair = KeyPair()
 
         // Test nsec round trip
-        let nsec = keyPair.nsec
+        let nsec = keyPair.privateKey.nsec
         let recreatedFromNsec = try KeyPair(nsec: nsec)
-        #expect(recreatedFromNsec.privateKeyHex == keyPair.privateKeyHex)
+        #expect(recreatedFromNsec.privateKey.hex == keyPair.privateKey.hex)
 
         // Test npub round trip
         let npub = keyPair.publicKey.npub

@@ -37,6 +37,7 @@ try event.verify()
 ### Keys and Identity
 
 - ``KeyPair``
+- ``PrivateKey``
 - ``PublicKey``
 - ``Mnemonic``
 - ``KeyDerivation``

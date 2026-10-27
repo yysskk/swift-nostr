@@ -31,7 +31,7 @@ struct EncryptedPrivateKeyTests {
     func keyPairDecryptsOfficialVector() throws {
         let keyPair = try KeyPair(ncryptsec: Self.officialNcryptsec, password: "nostr")
 
-        #expect(keyPair.privateKeyHex == Self.officialPrivateKeyHex)
+        #expect(keyPair.privateKey.hex == Self.officialPrivateKeyHex)
     }
 
     // MARK: - NFKC normalization
@@ -178,7 +178,7 @@ struct EncryptedPrivateKeyTests {
     @Test("Parsing rejects a non-ncryptsec prefix")
     func rejectsWrongPrefix() throws {
         // A valid nsec bech32 string carries the wrong HRP.
-        let nsec = KeyPair().nsec
+        let nsec = KeyPair().privateKey.nsec
 
         #expect(throws: EncryptedPrivateKey.Error.malformedPayload) {
             try EncryptedPrivateKey(ncryptsec: nsec)

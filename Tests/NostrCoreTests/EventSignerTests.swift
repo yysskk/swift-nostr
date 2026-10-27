@@ -5,7 +5,7 @@ import Testing
 @Suite("EventSigner Tests")
 struct EventSignerTests {
     private func makeSigner() throws -> EventSigner {
-        try EventSigner(privateKeyHex: "5566778899aabbccddeeff00112233445566778899aabbccddeeff0011223344")
+        try EventSigner(privateKey: PrivateKey(hex: "5566778899aabbccddeeff00112233445566778899aabbccddeeff0011223344"))
     }
 
     @Test("signs an unsigned event into a verifiable event")

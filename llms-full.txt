@@ -781,16 +781,14 @@ Nostr keypair (struct: Sendable).
 
 ### Properties
 
-- `privateKey: Data` -- 32-byte private key
+- `privateKey: PrivateKey` -- the private key (`privateKey.hex`, `privateKey.data`, `privateKey.nsec`)
 - `publicKey: PublicKey` -- x-only public key (`publicKey.hex`, `publicKey.npub`)
-- `privateKeyHex: String`
-- `nsec: String` -- bech32 `nsec`
 
 ### Initialization
 
 ```swift
 let random = KeyPair()                           // random keypair
-let fromHex = try KeyPair(privateKeyHex: "hex...")    // from hex
+let fromKey = KeyPair(privateKey: privateKey)         // from a PrivateKey; cannot fail
 let fromNsec = try KeyPair(nsec: "nsec1...")          // from bech32 nsec
 let fromMnemonic = try KeyPair(                       // from BIP-39 (NIP-06)
     mnemonicPhrase: "word1 word2 ...",
@@ -800,10 +798,24 @@ let fromMnemonic = try KeyPair(                       // from BIP-39 (NIP-06)
 let (mnemonic, kp) = try KeyPair.generate(wordCount: 12)  // random mnemonic
 ```
 
-The hex, data, nsec, and mnemonic initializers and `generate` throw `KeyPair.Error`: `invalidHex` (not 64
+The nsec and mnemonic initializers and `generate` throw `KeyPair.Error`: `invalidHex` (not 64
 hex digits), `invalidLength(Int)` (not 32 bytes), `invalidBech32(Bech32.Error)` or `unexpectedPrefix(String)`
 for an nsec, `invalidMnemonic(Mnemonic.Error)` for a bad phrase or word count, and `invalidPrivateKey` for
 bytes that are not a valid secp256k1 scalar.
+
+## PrivateKey
+
+A secp256k1 private key, validated at construction: 32 bytes, non-zero, below the curve order (struct:
+Sendable, Hashable). Not `Codable`; `description`, `debugDescription`, and its mirror are redacted
+(`PrivateKey(<redacted>)`), so `print`, interpolation, and `dump` never show the key. Equality compares
+every byte in constant time. The initializers throw `KeyPair.Error` (the cases above).
+
+```swift
+let key = try PrivateKey(hex: "...")      // 64 hex digits, either case
+let key = try PrivateKey(data: data)      // 32 bytes
+let key = try PrivateKey(nsec: "nsec1...")
+key.hex; key.data; key.nsec               // export deliberately
+```
 
 ## PublicKey / EventID / Signature
 
@@ -876,7 +888,7 @@ Passwords are NFKC-normalized before key derivation. scrypt allocates 2^logN KiB
 ```swift
 // Encrypt raw private-key bytes.
 let encrypted = try EncryptedPrivateKey.encrypt(
-    privateKey: keyPair.privateKey,
+    privateKey: keyPair.privateKey.data,
     password: "hunter2",
     logN: 16,                 // optional, default 16
     keySecurity: .unknown,    // optional, default .unknown
@@ -905,7 +917,7 @@ Handles signing and verification of Nostr events (struct: Sendable).
 
 ```swift
 let signer = EventSigner(keyPair: keyPair)
-let signer = try EventSigner(privateKeyHex: "hex...")
+let signer = EventSigner(privateKey: privateKey)
 let signer = try EventSigner(nsec: "nsec1...")
 ```
 
@@ -1021,7 +1033,7 @@ BIP-32/BIP-39 key derivation for NIP-06 (enum).
 ### Derivation
 
 ```swift
-// Derives key using path m/44'/1237'/<account>'/0/0
+// Derives key using path m/44'/1237'/<account>'/0/0; returns a PrivateKey
 let privateKey = try KeyDerivation.deriveNostrKey(seed: seed, account: 0)
 ```
 

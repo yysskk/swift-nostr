@@ -301,7 +301,7 @@ extension KeyPair {
         maximumLogN: UInt8 = EncryptedPrivateKey.defaultMaximumLogN
     ) throws(EncryptedPrivateKey.Error) -> EncryptedPrivateKey {
         try EncryptedPrivateKey.encrypt(
-            privateKey: privateKey,
+            privateKey: privateKey.data,
             password: password,
             logN: logN,
             keySecurity: keySecurity,
@@ -326,13 +326,13 @@ extension KeyPair {
         password: String,
         maximumLogN: UInt8 = EncryptedPrivateKey.defaultMaximumLogN
     ) throws(EncryptedPrivateKey.Error) {
-        let privateKey = try EncryptedPrivateKey(ncryptsec: ncryptsec)
+        let decrypted = try EncryptedPrivateKey(ncryptsec: ncryptsec)
             .decrypt(password: password, maximumLogN: maximumLogN)
         // Decryption authenticated the payload and so yields 32 bytes; only their value can be
         // wrong.
-        guard let keyPair = try? KeyPair(privateKey: privateKey) else {
+        guard let privateKey = try? PrivateKey(data: decrypted) else {
             throw .invalidPrivateKey
         }
-        self = keyPair
+        self.init(privateKey: privateKey)
     }
 }

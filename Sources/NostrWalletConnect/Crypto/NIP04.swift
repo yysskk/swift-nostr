@@ -1,5 +1,6 @@
 import Crypto
 import Foundation
+import NostrCore
 import P256K
 import _CryptoExtras
 
@@ -27,10 +28,10 @@ enum NIP04 {
     /// shared point. NIP-04 uses this raw value as the key (no HKDF), which is what distinguishes it
     /// from NIP-44.
     /// - Parameters:
-    ///   - privateKey: The local 32-byte private key.
+    ///   - privateKey: The local private key.
     ///   - peerPublicKeyXOnly: The peer's 32-byte x-only public key.
-    static func sharedKey(privateKey: Data, peerPublicKeyXOnly: Data) throws -> SymmetricKey {
-        let agreementKey = try P256K.KeyAgreement.PrivateKey(dataRepresentation: privateKey)
+    static func sharedKey(privateKey: PrivateKey, peerPublicKeyXOnly: Data) throws -> SymmetricKey {
+        let agreementKey = try P256K.KeyAgreement.PrivateKey(dataRepresentation: privateKey.data)
         let publicKey = try liftXOnly(peerPublicKeyXOnly)
         let sharedSecret = agreementKey.sharedSecretFromKeyAgreement(with: publicKey, format: .compressed)
         // The compressed shared point is `parity (1 byte) || X (32 bytes)`; NIP-04 keys on the bare X.
@@ -40,7 +41,7 @@ enum NIP04 {
 
     /// Encrypts `plaintext` for `peerPublicKeyXOnly`.
     /// - Returns: NIP-04 content `"<base64 ciphertext>?iv=<base64 iv>"` with a random IV.
-    static func encrypt(_ plaintext: String, privateKey: Data, peerPublicKeyXOnly: Data) throws -> String {
+    static func encrypt(_ plaintext: String, privateKey: PrivateKey, peerPublicKeyXOnly: Data) throws -> String {
         let key = try sharedKey(privateKey: privateKey, peerPublicKeyXOnly: peerPublicKeyXOnly)
         let iv = AES._CBC.IV()
         let ciphertext = try AES._CBC.encrypt(Array(plaintext.utf8), using: key, iv: iv)
@@ -50,7 +51,7 @@ enum NIP04 {
     /// Decrypts NIP-04 content of the form `"<base64 ciphertext>?iv=<base64 iv>"`.
     /// - Throws: ``DecodingError`` if the content is malformed, or a crypto error if the key/IV are
     ///   rejected.
-    static func decrypt(_ content: String, privateKey: Data, peerPublicKeyXOnly: Data) throws -> String {
+    static func decrypt(_ content: String, privateKey: PrivateKey, peerPublicKeyXOnly: Data) throws -> String {
         let parts = content.components(separatedBy: "?iv=")
         guard parts.count == 2 else {
             throw DecodingError.malformedContent

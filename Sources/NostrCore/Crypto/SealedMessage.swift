@@ -289,17 +289,16 @@ public struct SealedMessage: Sendable {
 
     /// Computes the conversation key using ECDH + HKDF.
     /// - Parameters:
-    ///   - privateKey: The caller's 32-byte private key, taken from a ``KeyPair`` and so a valid
-    ///     secp256k1 scalar.
+    ///   - privateKey: The caller's private key.
     ///   - publicKey: The peer's 32-byte x-only public key.
-    private static func conversationKey(privateKey: Data, publicKey: Data) throws(SealedMessage.Error) -> Data {
-        // Get the private key for ECDH (use KeyAgreement, not Signing). A KeyPair only ever holds a
-        // valid scalar, so this cannot fail.
+    private static func conversationKey(privateKey: PrivateKey, publicKey: Data) throws(SealedMessage.Error) -> Data {
+        // Get the private key for ECDH (use KeyAgreement, not Signing). A PrivateKey only ever holds
+        // a valid scalar, so this cannot fail.
         let agreementKey: P256K.KeyAgreement.PrivateKey
         do {
-            agreementKey = try P256K.KeyAgreement.PrivateKey(dataRepresentation: privateKey)
+            agreementKey = try P256K.KeyAgreement.PrivateKey(dataRepresentation: privateKey.data)
         } catch {
-            preconditionFailure("A KeyPair holds a valid secp256k1 scalar: \(error)")
+            preconditionFailure("A PrivateKey holds a valid secp256k1 scalar: \(error)")
         }
 
         // Lift the x-only public key to a full point. Either parity yields the same shared x, so

@@ -18,10 +18,10 @@ public enum KeyDerivation {
     /// - Parameters:
     ///   - seed: The 64-byte BIP-39 seed
     ///   - account: The account index (default 0)
-    /// - Returns: 32-byte private key
+    /// - Returns: The derived private key
     /// - Throws: ``KeyPair/Error/invalidPrivateKey`` in the vanishingly rare case (BIP-32) that a
     ///   derived key is not a valid secp256k1 scalar.
-    public static func deriveNostrKey(seed: Data, account: UInt32 = 0) throws(KeyPair.Error) -> Data {
+    public static func deriveNostrKey(seed: Data, account: UInt32 = 0) throws(KeyPair.Error) -> PrivateKey {
         // Generate master key from seed
         let (masterKey, masterChainCode) = try masterKeyFromSeed(seed)
 
@@ -64,7 +64,7 @@ public enum KeyDerivation {
             index: 0
         )
 
-        return key
+        return try PrivateKey(data: key)
     }
 
     /// Generates the master key and chain code from a seed using HMAC-SHA512

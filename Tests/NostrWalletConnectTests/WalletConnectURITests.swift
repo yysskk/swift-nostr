@@ -19,7 +19,7 @@ struct WalletConnectURITests {
         let uri = try WalletConnectURI(string: canonical)
         #expect(uri.walletPublicKey == (try PublicKey(hex: walletKeyHex)))
         #expect(uri.relays == [RelayURL("wss://relay.damus.io")!])
-        #expect(uri.secret.hexEncodedString() == secretHex)
+        #expect(uri.secret.hex == secretHex)
         #expect(uri.lud16 == nil)
     }
 
@@ -53,7 +53,7 @@ struct WalletConnectURITests {
     @Test("derives the client identity from the secret")
     func clientIdentity() throws {
         let uri = try WalletConnectURI(string: canonical)
-        let expected = try KeyPair(privateKeyHex: secretHex)
+        let expected = try KeyPair(privateKey: PrivateKey(hex: secretHex))
         #expect(uri.clientKeyPair().publicKey == expected.publicKey)
         #expect(uri.clientPublicKey == expected.publicKey)
         #expect(uri.clientSigner().publicKey == expected.publicKey)
@@ -90,7 +90,7 @@ struct WalletConnectURITests {
         let uri = try WalletConnectURI(
             walletPublicKey: walletPublicKey,
             relays: [RelayURL("wss://relay.damus.io")!],
-            secret: try #require(Data(hexString: secretHex)))
+            secret: try PrivateKey(hex: secretHex))
         #expect(uri.stringValue.hasPrefix("nostr+walletconnect://\(walletKeyHex)?"))
         #expect(try WalletConnectURI(string: uri.stringValue).walletPublicKey == walletPublicKey)
     }
@@ -145,9 +145,8 @@ struct WalletConnectURITests {
     func rejectsShortSecret() {
         #expect(throws: WalletConnectError.self) {
             try WalletConnectURI(
-                walletPublicKey: try PublicKey(hex: walletKeyHex),
-                relays: [RelayURL("wss://r.example")!],
-                secret: Data(repeating: 1, count: 16))
+                string: "nostr+walletconnect://\(walletKeyHex)?relay=wss%3A%2F%2Fr.example"
+                    + "&secret=\(secretHex.prefix(32))")
         }
     }
 }

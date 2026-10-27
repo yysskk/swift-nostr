@@ -25,8 +25,8 @@ public struct WalletConnectURI: Sendable, Hashable {
     /// The relays the wallet service listens on. Always at least one.
     public let relays: [RelayURL]
 
-    /// The 32-byte client secret key. The client signs and encrypts with this key.
-    public let secret: Data
+    /// The client secret key. The client signs and encrypts with this key.
+    public let secret: PrivateKey
 
     /// An optional lightning address (lud16) the wallet advertised.
     public let lud16: String?
@@ -39,42 +39,35 @@ public struct WalletConnectURI: Sendable, Hashable {
     /// The URI scheme, without the `://` separator.
     public static let scheme = "nostr+walletconnect"
 
-    /// Creates a connection from its components, validating the relay list and secret.
+    /// Creates a connection from its components, validating the relay list.
     ///
     /// - Parameters:
     ///   - walletPublicKey: The wallet service's public key.
     ///   - relays: The relays the wallet listens on (must contain at least one).
-    ///   - secret: The 32-byte client secret key (must be a valid secp256k1 private key).
+    ///   - secret: The client secret key.
     ///   - lud16: An optional lightning address.
-    /// - Throws: ``WalletConnectError/invalidURI(reason:)`` if any field fails validation.
+    /// - Throws: ``WalletConnectError/invalidURI(reason:)`` if `relays` is empty.
     public init(
-        walletPublicKey: PublicKey, relays: [RelayURL], secret: Data, lud16: String? = nil
+        walletPublicKey: PublicKey, relays: [RelayURL], secret: PrivateKey, lud16: String? = nil
     ) throws(WalletConnectError) {
         guard !relays.isEmpty else {
             throw WalletConnectError.invalidURI(reason: "at least one relay is required")
-        }
-        guard secret.count == 32 else {
-            throw WalletConnectError.invalidURI(reason: "secret must be 32 bytes")
-        }
-        // Reject a secret that is not a usable secp256k1 private key now, rather than at first use,
-        // and cache the derived identity so later signing/encryption reuses it.
-        guard let clientKeyPair = try? KeyPair(privateKey: secret) else {
-            throw WalletConnectError.invalidURI(reason: "secret is not a valid private key")
         }
 
         self.walletPublicKey = walletPublicKey
         self.relays = relays
         self.secret = secret
         self.lud16 = lud16
-        self.cachedClientKeyPair = clientKeyPair
+        // Derived once so later signing/encryption never repeats the point multiplication.
+        self.cachedClientKeyPair = KeyPair(privateKey: secret)
     }
 
     /// Parses a `nostr+walletconnect://` connection string.
     ///
     /// - Parameter string: The connection string issued by the wallet service.
     /// - Throws: ``WalletConnectError/invalidURI(reason:)`` if the string is malformed or missing
-    ///   required fields, including a host that is not a canonical lowercase hex public key or a
-    ///   `relay` value that is not a valid relay URL.
+    ///   required fields, including a host that is not a canonical lowercase hex public key, a
+    ///   `relay` value that is not a valid relay URL, or a `secret` that is not a valid private key.
     public init(string: String) throws(WalletConnectError) {
         guard let components = URLComponents(string: string),
             components.scheme?.lowercased() == Self.scheme
@@ -100,7 +93,7 @@ public struct WalletConnectURI: Sendable, Hashable {
         }
 
         guard let secretHex = queryItems.first(where: { $0.name == "secret" })?.value,
-            let secret = Data(hexString: secretHex)
+            let secret = try? PrivateKey(hex: secretHex)
         else {
             throw WalletConnectError.invalidURI(reason: "missing or malformed secret")
         }
@@ -117,7 +110,7 @@ public struct WalletConnectURI: Sendable, Hashable {
         components.host = walletPublicKey.hex
 
         var items = relays.map { URLQueryItem(name: "relay", value: $0.description) }
-        items.append(URLQueryItem(name: "secret", value: secret.hexEncodedString()))
+        items.append(URLQueryItem(name: "secret", value: secret.hex))
         if let lud16 {
             items.append(URLQueryItem(name: "lud16", value: lud16))
         }

@@ -16,7 +16,7 @@ struct MnemonicTests {
 
         let keyPair = try KeyPair(mnemonicPhrase: phrase)
 
-        #expect(keyPair.privateKeyHex == expectedPrivateKey)
+        #expect(keyPair.privateKey.hex == expectedPrivateKey)
         #expect(keyPair.publicKey.hex == expectedPublicKey)
     }
 
@@ -30,7 +30,7 @@ struct MnemonicTests {
 
         let keyPair = try KeyPair(mnemonicPhrase: phrase)
 
-        #expect(keyPair.privateKeyHex == expectedPrivateKey)
+        #expect(keyPair.privateKey.hex == expectedPrivateKey)
         #expect(keyPair.publicKey.hex == expectedPublicKey)
     }
 
@@ -104,12 +104,12 @@ struct MnemonicTests {
         let (mnemonic, keyPair) = try KeyPair.generate(wordCount: 12)
 
         #expect(mnemonic.wordCount == 12)
-        #expect(keyPair.privateKey.count == 32)
+        #expect(keyPair.privateKey.data.count == 32)
         #expect(keyPair.publicKey.data.count == 32)
 
         // Verify the keypair can be recreated from the mnemonic
         let recreatedKeyPair = try KeyPair(mnemonic: mnemonic)
-        #expect(recreatedKeyPair.privateKeyHex == keyPair.privateKeyHex)
+        #expect(recreatedKeyPair.privateKey.hex == keyPair.privateKey.hex)
         #expect(recreatedKeyPair.publicKey.hex == keyPair.publicKey.hex)
     }
 
@@ -171,7 +171,7 @@ struct MnemonicTests {
         let keyPair0 = try KeyPair(mnemonic: mnemonic, account: 0)
         let keyPair1 = try KeyPair(mnemonic: mnemonic, account: 1)
 
-        #expect(keyPair0.privateKeyHex != keyPair1.privateKeyHex)
+        #expect(keyPair0.privateKey.hex != keyPair1.privateKey.hex)
         #expect(keyPair0.publicKey.hex != keyPair1.publicKey.hex)
     }
 
@@ -185,7 +185,7 @@ struct MnemonicTests {
         let keyPairNoPass = try KeyPair(mnemonic: mnemonic, passphrase: "")
         let keyPairWithPass = try KeyPair(mnemonic: mnemonic, passphrase: "mypassphrase")
 
-        #expect(keyPairNoPass.privateKeyHex != keyPairWithPass.privateKeyHex)
+        #expect(keyPairNoPass.privateKey.hex != keyPairWithPass.privateKey.hex)
     }
 
     // MARK: - Mnemonic Phrase
