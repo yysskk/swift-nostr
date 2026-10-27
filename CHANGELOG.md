@@ -698,6 +698,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `filter[tag: .publicKey]` are the `#e` and `#p` queries behind `eventReferences` and
   `publicKeyReferences`, as hex strings; values set through the subscript are encoded as given, and
   the typed properties leave out any that are not canonical hex.
+- **Protocol requirements whose conformers throw one error type use typed throws** (breaking for
+  custom conformers, which must declare the same type): a call through the protocol now gets the
+  concrete error instead of `any Error`. `NostrRelayManaging.connect()` and `connect(to:)`,
+  `NostrSubscribing.subscribe(filters:to:bufferingPolicy:)` with its short forms, `events`, and the
+  feeds, and `NostrRelayRouting.subscribeOutbox(authors:kinds:limit:)` with its short forms are
+  `throws(RelayPool.Error)`; `NostrRelayRouting.connectDirectMessageInboxRelays()` is
+  `throws(NostrClient.Error)`; and `RelayTransport`'s `connect()`, `subscribe(id:filters:)`, and
+  `send(_:)` are `throws(RelayConnection.Error)`.
 
 ### Fixed
 

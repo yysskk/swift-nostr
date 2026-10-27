@@ -19,7 +19,7 @@ extension NostrSubscribing {
     public func subscribe(
         filters: [Filter],
         bufferingPolicy: AsyncStream<SubscriptionEvent>.Continuation.BufferingPolicy = .unbounded
-    ) async throws -> SubscriptionSequence {
+    ) async throws(RelayPool.Error) -> SubscriptionSequence {
         try await subscribe(filters: filters, to: nil, bufferingPolicy: bufferingPolicy)
     }
 
@@ -39,7 +39,7 @@ extension NostrSubscribing {
         filters: [Filter],
         to relayURLs: Set<RelayURL>,
         bufferingPolicy: AsyncStream<SubscriptionEvent>.Continuation.BufferingPolicy = .unbounded
-    ) async throws -> SubscriptionSequence {
+    ) async throws(RelayPool.Error) -> SubscriptionSequence {
         try await subscribe(filters: filters, to: Optional(relayURLs), bufferingPolicy: bufferingPolicy)
     }
 }
@@ -65,7 +65,7 @@ extension NostrSubscribing {
     public func events(
         filters: [Filter],
         bufferingPolicy: AsyncStream<SubscriptionEvent>.Continuation.BufferingPolicy = .unbounded
-    ) async throws -> SubscriptionSequence.Events {
+    ) async throws(RelayPool.Error) -> SubscriptionSequence.Events {
         try await subscribe(filters: filters, bufferingPolicy: bufferingPolicy).events
     }
 
@@ -85,7 +85,7 @@ extension NostrSubscribing {
         filters: [Filter],
         to relayURLs: Set<RelayURL>,
         bufferingPolicy: AsyncStream<SubscriptionEvent>.Continuation.BufferingPolicy = .unbounded
-    ) async throws -> SubscriptionSequence.Events {
+    ) async throws(RelayPool.Error) -> SubscriptionSequence.Events {
         try await subscribe(filters: filters, to: relayURLs, bufferingPolicy: bufferingPolicy).events
     }
 
@@ -94,14 +94,17 @@ extension NostrSubscribing {
     ///   - publicKey: The user whose notes to follow.
     ///   - limit: How many stored notes each relay sends before live ones.
     /// - Returns: The subscription.
-    public func userTimeline(publicKey: PublicKey, limit: Int = 100) async throws -> SubscriptionSequence {
+    public func userTimeline(
+        publicKey: PublicKey,
+        limit: Int = 100
+    ) async throws(RelayPool.Error) -> SubscriptionSequence {
         try await subscribe(filters: [.userNotes(publicKey: publicKey, limit: limit)])
     }
 
     /// Subscribes to every text note (kind 1) on the whole pool.
     /// - Parameter limit: How many stored notes each relay sends before live ones.
     /// - Returns: The subscription.
-    public func globalFeed(limit: Int = 100) async throws -> SubscriptionSequence {
+    public func globalFeed(limit: Int = 100) async throws(RelayPool.Error) -> SubscriptionSequence {
         try await subscribe(filters: [.globalFeed(limit: limit)])
     }
 
@@ -110,14 +113,14 @@ extension NostrSubscribing {
     ///   - publicKey: The user whose mentions to follow.
     ///   - limit: How many stored notes each relay sends before live ones.
     /// - Returns: The subscription.
-    public func mentions(publicKey: PublicKey, limit: Int = 100) async throws -> SubscriptionSequence {
+    public func mentions(publicKey: PublicKey, limit: Int = 100) async throws(RelayPool.Error) -> SubscriptionSequence {
         try await subscribe(filters: [.mentions(publicKey: publicKey, limit: limit)])
     }
 
     /// Subscribes to metadata (kind 0) updates for a list of public keys, on the whole pool.
     /// - Parameter publicKeys: The users whose profiles to follow.
     /// - Returns: The subscription.
-    public func metadata(publicKeys: [PublicKey]) async throws -> SubscriptionSequence {
+    public func metadata(publicKeys: [PublicKey]) async throws(RelayPool.Error) -> SubscriptionSequence {
         try await subscribe(filters: [.metadata(publicKeys: publicKeys)])
     }
 }

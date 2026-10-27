@@ -59,7 +59,7 @@ public struct NostrRoutingAPI: NostrRelayRouting {
         authors: [PublicKey],
         kinds: [Event.Kind],
         limit: Int?
-    ) async throws -> SubscriptionSequence {
+    ) async throws(RelayPool.Error) -> SubscriptionSequence {
         let routeSet = await resolveOutboxRelays(authors: authors)
         let filter = Filter(authors: authors, kinds: kinds, limit: limit)
         return try await client.subscribe(filters: [filter], toURLs: routeSet)

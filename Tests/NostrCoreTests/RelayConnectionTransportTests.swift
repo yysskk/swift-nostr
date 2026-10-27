@@ -346,6 +346,22 @@ struct RelayConnectionTransportTests {
         }
     }
 
+    @Test("the throwing requirements throw RelayConnection.Error through RelayTransport")
+    func requirementsThrowTypedErrorThroughProtocol() async throws {
+        let transport: any RelayTransport = RelayConnectionTransport(relayURLs: [])
+        let event = try Self.event(id: Self.eventID)
+
+        await #expect(throws: RelayConnection.Error.notConnected) {
+            try await transport.connect()
+        }
+        await #expect(throws: RelayConnection.Error.notConnected) {
+            try await transport.subscribe(id: Self.subscriptionID, filters: [Filter(kinds: [.nostrConnect])])
+        }
+        await #expect(throws: RelayConnection.Error.notConnected) {
+            try await transport.send(event)
+        }
+    }
+
     @Test("events() finishes immediately when there are no relays")
     func eventsWithoutRelaysFinishes() async {
         let transport = RelayConnectionTransport(relayURLs: [])

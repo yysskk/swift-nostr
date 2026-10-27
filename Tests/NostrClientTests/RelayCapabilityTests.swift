@@ -74,6 +74,15 @@ struct RelayCapabilityTests {
         #expect(await relays.relayCount == 1)
     }
 
+    @Test("connect() through a generic conformer throws its RelayPool.Error")
+    func connectThrowsTypedErrorThroughGenericConformer() async throws {
+        let stub = RecordingRelayCapabilities(connectError: .allConnectionsFailed)
+
+        await #expect(throws: RelayPool.Error.allConnectionsFailed) {
+            try await connectAll(stub)
+        }
+    }
+
     @Test("relayCount counts the pool's connections, connected or not")
     func relayCountCountsConnections() async throws {
         let stub = RecordingRelayCapabilities()
@@ -88,5 +97,12 @@ struct RelayCapabilityTests {
         await relays.remove(relayA)
         #expect(await relays.relayCount == 1)
         #expect(await relays.relayCount == relays.connections.count)
+    }
+
+    // MARK: - Private
+
+    /// Connects through the protocol in a context that only lets ``RelayPool/Error`` escape.
+    private func connectAll(_ relays: some NostrRelayManaging) async throws(RelayPool.Error) {
+        try await relays.connect()
     }
 }

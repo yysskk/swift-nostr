@@ -19,7 +19,6 @@ struct RequestResponseSessionTests {
     private enum TestError: Error, Equatable {
         case timedOut
         case notConnected
-        case connectFailed
         case rejected
     }
 
@@ -101,10 +100,10 @@ struct RequestResponseSessionTests {
     @Test("a failed start is retried by the next caller")
     func failedStartIsRetried() async throws {
         let transport = FakeTransport()
-        await transport.failNextConnect(with: TestError.connectFailed)
+        await transport.failNextConnect(with: .connectionFailed)
         let session = makeSession(transport)
 
-        await #expect(throws: TestError.connectFailed) {
+        await #expect(throws: RelayConnection.Error.connectionFailed) {
             try await self.start(session)
         }
 
@@ -462,9 +461,9 @@ private actor FakeTransport: RelayTransport {
     private var continuation: AsyncStream<Event>.Continuation?
     private var isGateOpen = true
     private var gate: CheckedContinuation<Void, Never>?
-    private var nextConnectError: (any Error)?
+    private var nextConnectError: RelayConnection.Error?
 
-    func connect() async throws {
+    func connect() async throws(RelayConnection.Error) {
         log.append(.connect)
         connectCount += 1
         if !isGateOpen {
@@ -477,7 +476,7 @@ private actor FakeTransport: RelayTransport {
         isConnected = true
     }
 
-    func subscribe(id: String, filters: [Filter]) async throws {
+    func subscribe(id: String, filters: [Filter]) async throws(RelayConnection.Error) {
         log.append(.subscribe(id))
     }
 
@@ -485,7 +484,7 @@ private actor FakeTransport: RelayTransport {
         log.append(.unsubscribe(id))
     }
 
-    func send(_ event: Event) async throws {
+    func send(_ event: Event) async throws(RelayConnection.Error) {
         log.append(.send(event.content))
     }
 
@@ -528,7 +527,7 @@ private actor FakeTransport: RelayTransport {
     }
 
     /// Fails the next `connect()` with `error`, once.
-    func failNextConnect(with error: any Error) {
+    func failNextConnect(with error: RelayConnection.Error) {
         nextConnectError = error
     }
 

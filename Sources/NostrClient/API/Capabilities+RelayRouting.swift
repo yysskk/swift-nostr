@@ -33,7 +33,7 @@ extension NostrRelayRouting {
     public func subscribeOutbox(
         authors: [PublicKey],
         kinds: [Event.Kind] = [.textNote]
-    ) async throws -> SubscriptionSequence {
+    ) async throws(RelayPool.Error) -> SubscriptionSequence {
         try await subscribeOutbox(authors: authors, kinds: kinds, limit: nil)
     }
 
@@ -49,7 +49,7 @@ extension NostrRelayRouting {
         authors: [PublicKey],
         kinds: [Event.Kind] = [.textNote],
         limit: Int
-    ) async throws -> SubscriptionSequence {
+    ) async throws(RelayPool.Error) -> SubscriptionSequence {
         try await subscribeOutbox(authors: authors, kinds: kinds, limit: Optional(limit))
     }
 
