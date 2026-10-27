@@ -11,6 +11,10 @@ struct FailingSigner: NostrSigning {
         throw RelayConnection.Error.timedOut
     }
 
+    func sign(_ template: EventTemplate) async throws -> Event {
+        throw RelayConnection.Error.timedOut
+    }
+
     func nip44Encrypt(_ plaintext: String, to recipientPublicKey: PublicKey) async throws -> String {
         throw RelayConnection.Error.timedOut
     }

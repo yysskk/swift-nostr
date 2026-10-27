@@ -4,7 +4,8 @@ public import NostrCore
 /// ``EventSigner`` is.
 ///
 /// ``sign(_:)-(UnsignedEvent)``, ``nip44Encrypt(_:to:)``, and ``nip44Decrypt(_:from:)`` already satisfy the protocol
-/// as declared on ``RemoteSigner``; only ``publicKey`` is added here, mapping to the user's key.
+/// as declared on ``RemoteSigner``; ``publicKey``, mapping to the user's key, and
+/// ``sign(_:)-(EventTemplate)`` are added here.
 extension RemoteSigner: NostrSigning {
     /// The user's public key (via `get_public_key`).
     ///
@@ -14,5 +15,13 @@ extension RemoteSigner: NostrSigning {
     ///   but a canonical hex public key.
     public var publicKey: PublicKey {
         get async throws { try await userPublicKey() }
+    }
+
+    /// Signs `template` as the user's public key (via `sign_event`).
+    /// - Parameter template: The event to sign.
+    /// - Returns: The signed ``Event``.
+    /// - Throws: What ``publicKey`` or ``sign(_:)-(UnsignedEvent)`` throws.
+    public func sign(_ template: EventTemplate) async throws -> Event {
+        try await sign(UnsignedEvent(template, publicKey: publicKey))
     }
 }

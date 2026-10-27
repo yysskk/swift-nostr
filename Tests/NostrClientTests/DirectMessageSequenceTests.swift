@@ -17,6 +17,10 @@ private struct UnreachableSigner: NostrSigning {
         throw RelayConnection.Error.timedOut
     }
 
+    func sign(_ template: EventTemplate) async throws -> Event {
+        throw RelayConnection.Error.timedOut
+    }
+
     func nip44Encrypt(_ plaintext: String, to recipientPublicKey: PublicKey) async throws -> String {
         throw RelayConnection.Error.timedOut
     }
@@ -69,7 +73,7 @@ struct DirectMessageSequenceTests {
             .createMessageWithSelfCopy(content: "hi bob", to: bob.publicKey, subject: "greetings")
         let toCarol = try await DirectMessageBuilder(signer: EventSigner(keyPair: alice))
             .createMessageWithSelfCopy(content: "hi carol", to: carol.publicKey)
-        let plainNote = try await EventSigner(keyPair: alice).sign(.textNote("public note"))
+        let plainNote = try EventSigner(keyPair: alice).sign(.textNote("public note"))
 
         let sequence = makeSequence(
             items: [

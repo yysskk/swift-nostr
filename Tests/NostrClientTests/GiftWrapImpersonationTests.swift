@@ -161,7 +161,7 @@ struct GiftWrapImpersonationTests {
     @Test("an event that is not a gift wrap is rejected with its kind")
     func nonGiftWrapIsRejected() async throws {
         let bob = try KeyPair()
-        let note = try await EventSigner(keyPair: try KeyPair()).sign(.textNote("hello"))
+        let note = try EventSigner(keyPair: try KeyPair()).sign(.textNote("hello"))
 
         await #expect(throws: GiftWrap.Error.unexpectedKind(.textNote)) {
             try await GiftWrap.unwrap(giftWrap: note, recipient: EventSigner(keyPair: bob))
@@ -185,7 +185,7 @@ struct GiftWrapImpersonationTests {
         let alice = try KeyPair()
         let bob = try KeyPair()
         // A valid signature, but over another event's id.
-        let foreignSignature = try await EventSigner(keyPair: alice).sign(.textNote("other")).signature
+        let foreignSignature = try EventSigner(keyPair: alice).sign(.textNote("other")).signature
         let giftWrap = try wrap(rumorJSON: "{}", sender: alice, recipientPublicKey: bob.publicKey) { seal in
             Event(
                 id: seal.id, publicKey: seal.publicKey, createdAt: seal.createdAt, kind: seal.kind,
@@ -236,7 +236,7 @@ struct GiftWrapImpersonationTests {
         let bob = try KeyPair()
         let signer = EventSigner(keyPair: alice)
 
-        let original = try await signer.sign(.textNote("Secret message"))
+        let original = try signer.sign(.textNote("Secret message"))
         let giftWrap = try await GiftWrap.wrap(
             event: original, signer: signer, recipientPublicKey: bob.publicKey)
         let unwrapped = try await GiftWrap.unwrap(

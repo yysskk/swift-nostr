@@ -45,7 +45,7 @@ actor RecordingListCapabilities: NostrListManaging {
     func publish(_ list: NostrList, strategy: PublishStrategy?) async throws -> PublishedEvent {
         listPublishes.append(ListPublish(list: list, strategy: strategy))
         let template = try await EventTemplate.list(list, encryptingWith: signer)
-        return PublishedEvent(event: try await signer.sign(template), result: PublishResult(statuses: [:]))
+        return PublishedEvent(event: try signer.sign(template), result: PublishResult(statuses: [:]))
     }
 
     func fetch(kind: Event.Kind, for publicKey: PublicKey?, timeout: Duration?) async throws -> NostrList? {
@@ -56,7 +56,7 @@ actor RecordingListCapabilities: NostrListManaging {
     func publishSet(_ set: NostrListSet, strategy: PublishStrategy?) async throws -> PublishedEvent {
         setPublishes.append(SetPublish(set: set, strategy: strategy))
         let template = try await EventTemplate.set(set, encryptingWith: signer)
-        return PublishedEvent(event: try await signer.sign(template), result: PublishResult(statuses: [:]))
+        return PublishedEvent(event: try signer.sign(template), result: PublishResult(statuses: [:]))
     }
 
     func fetchSet(

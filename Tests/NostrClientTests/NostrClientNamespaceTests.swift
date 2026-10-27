@@ -141,7 +141,7 @@ struct NostrClientNamespaceTests {
         let (client, socket) = try await ConnectedClientFixture.make()
         let fetching: any NostrEventFetching = client.events
         let author = try KeyPair()
-        let note = try await EventSigner(keyPair: author).sign(.textNote("stored"))
+        let note = try EventSigner(keyPair: author).sign(.textNote("stored"))
 
         let events = try await answering(socket, with: [note]) {
             try await fetching.fetch(filters: [Filter(kinds: [.textNote])], timeout: .seconds(5))

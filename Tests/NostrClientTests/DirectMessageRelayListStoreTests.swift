@@ -142,7 +142,7 @@ struct DirectMessageRelayListStoreTests {
         let keyPair = try KeyPair()
         let signer = EventSigner(keyPair: keyPair)
 
-        let event = try await signer.sign(
+        let event = try signer.sign(
             .directMessageRelayList(DirectMessageRelayList(relays: [RelayURL("wss://inbox.example.com")!])))
         let ingested = await store.ingest(event)
         #expect(ingested != nil)
@@ -157,7 +157,7 @@ struct DirectMessageRelayListStoreTests {
         let keyPair = try KeyPair()
         let signer = EventSigner(keyPair: keyPair)
 
-        let textNote = try await signer.sign(.textNote("Hello"))
+        let textNote = try signer.sign(.textNote("Hello"))
         let ingested = await store.ingest(textNote)
         #expect(ingested == nil)
     }

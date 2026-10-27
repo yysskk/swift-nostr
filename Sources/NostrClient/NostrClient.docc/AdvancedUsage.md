@@ -310,8 +310,8 @@ let contacts = [
     Contact(publicKey: alice, relayURL: try RelayURL(string: "wss://relay.example.com"), petname: "alice"),
     Contact(publicKey: bob)
 ]
-// A contact list is an EventTemplate: sign it with any signer, then publish it like any event.
-let signed = try await signer.sign(.contactList(contacts))
+// A contact list is an EventTemplate: sign it, then publish it like any event.
+let signed = try signer.sign(.contactList(contacts))
 try await client.events.publish(signed)
 
 // Extract contacts from a kind-3 event; a `p` tag that is not a canonical hex key is skipped
@@ -649,7 +649,7 @@ every public key it mentions in `p` tags, with ``NostrRoutingAPI/publishGossip(_
 ```swift
 let signer = EventSigner(keyPair: keyPair)
 let alice = try PublicKey(npub: "npub1...")
-let note = try await signer.sign(.textNote("gm!", tags: [.publicKey(alice)]))
+let note = try signer.sign(.textNote("gm!", tags: [.publicKey(alice)]))
 try await client.routing.publishGossip(note)
 ```
 
@@ -674,7 +674,7 @@ guard pay.supportsZaps, let providerPublicKey = pay.nostrPublicKey else { return
 // 2. Sign a zap request (kind 9734) with any signer, local or remote — note it is NOT published
 //    to relays.
 let signer = EventSigner(keyPair: keyPair)
-let zapRequest = try await signer.sign(.zapRequest(
+let zapRequest = try signer.sign(.zapRequest(
     to: try PublicKey(npub: "npub1..."),
     relays: [try RelayURL(string: "wss://relay.example.com")],     // where the recipient's wallet should publish the receipt
     amountMillisats: 21_000,

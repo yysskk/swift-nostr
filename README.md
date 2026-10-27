@@ -325,7 +325,7 @@ Each of these is covered in depth, with worked examples, in the [documentation](
 - **Relay-based groups (NIP-29)** — parse `naddr` share links with `GroupReference`, join and leave, chat with timeline references, moderate with `Groups.ModerationAction`, fetch validated relay-signed state with `groups.fetchState`, and keep the kind-10009 simple group list fresh.
 - **Relay information (NIP-11)** — fetch a relay's capabilities with `RelayInformation.fetch(from:)`.
 - **NIP-19 entities** — encode/decode `npub`/`nsec`/`note`/`nprofile`/`nevent`/`naddr` via `NIP19Entity`, `NProfile`, `NEvent`, and `NAddr`.
-- **Low-level APIs** — drive a single `RelayConnection` directly, or build an `EventTemplate` (`.textNote`, `.reaction`, `.zapRequest`, …) and sign it with any signer: `try await signer.sign(.textNote("gm"))`.
+- **Low-level APIs** — drive a single `RelayConnection` directly, or build an `EventTemplate` (`.textNote`, `.reaction`, `.zapRequest`, …) and sign it — `try signer.sign(.textNote("gm"))` with a local `EventSigner`, or `try await` with any `NostrSigning`, such as a remote signer.
 
 ## Supported NIPs
 

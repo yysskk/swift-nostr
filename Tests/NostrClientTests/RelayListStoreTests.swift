@@ -93,7 +93,7 @@ struct RelayListStoreTests {
         let keyPair = try KeyPair()
         let signer = EventSigner(keyPair: keyPair)
 
-        let event = try await signer.sign(
+        let event = try signer.sign(
             .relayListMetadata(
                 RelayListMetadata(entries: [RelayListEntry(url: RelayURL("wss://a.example.com")!, usage: .write)]))
         )
@@ -110,7 +110,7 @@ struct RelayListStoreTests {
         let keyPair = try KeyPair()
         let signer = EventSigner(keyPair: keyPair)
 
-        let textNote = try await signer.sign(.textNote("Hello"))
+        let textNote = try signer.sign(.textNote("Hello"))
         let ingested = await store.ingest(textNote)
         #expect(ingested == nil)
     }
