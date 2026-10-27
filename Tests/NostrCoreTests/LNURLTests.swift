@@ -70,7 +70,7 @@ struct LNURLTests {
 
         let response = try JSONDecoder().decode(LNURLPayResponse.self, from: Data(json.utf8))
 
-        #expect(response.callback == "https://example.com/lnurl/cb")
+        #expect(response.callback == URL(string: "https://example.com/lnurl/cb"))
         #expect(response.minimumSendable == 1000)
         #expect(response.maximumSendable == 100_000_000)
         #expect(response.nostrPublicKey?.hex == "3bf0c63fcb93463407af97a5e5ee64fa883d107ef9e558472c4eb9aaaefa459d")
@@ -99,7 +99,7 @@ struct LNURLTests {
 
         let response = try JSONDecoder().decode(LNURLPayResponse.self, from: Data(json.utf8))
 
-        #expect(response.callback == "https://example.com/lnurl/cb")
+        #expect(response.callback == URL(string: "https://example.com/lnurl/cb"))
         #expect(response.allowsNostr == true)
         #expect(response.nostrPublicKey == nil)
         #expect(!response.supportsZaps)
@@ -120,10 +120,27 @@ struct LNURLTests {
         #expect(!response.supportsZaps)
     }
 
+    /// Without a usable callback there is nowhere to request an invoice, so the response is rejected
+    /// as a whole rather than decoded into a value that can never be paid. Only `http` and `https`
+    /// URLs with a host are usable, so a third party cannot point the invoice request elsewhere.
+    @Test(
+        "a callback that is not an http(s) URL fails the decode",
+        arguments: [
+            "", "http://[::1", "file:///etc/passwd", "data:text/plain,hi", "lnurlp://example.com/cb", "https://",
+        ]
+    )
+    func invalidCallbackFails(callback: String) {
+        let json = #"{"callback": "\#(callback)", "minSendable": 1000, "maxSendable": 100000000}"#
+
+        #expect(throws: DecodingError.self) {
+            _ = try JSONDecoder().decode(LNURLPayResponse.self, from: Data(json.utf8))
+        }
+    }
+
     @Test("invoiceRequestURL carries the amount and nostr query parameters")
     func invoiceRequestURLCarriesParameters() throws {
         let response = LNURLPayResponse(
-            callback: "https://example.com/lnurl/cb",
+            callback: URL(string: "https://example.com/lnurl/cb")!,
             minimumSendable: 1000,
             maximumSendable: 100_000_000,
             allowsNostr: true,

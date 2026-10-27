@@ -110,12 +110,12 @@ struct RelayInformationTests {
         #expect(info.supportedNIPs == [1, 2, 11])
         #expect(info.software == "https://example.com/relay")
         #expect(info.version == "1.0.0")
-        #expect(info.termsOfService == "https://example.com/tos")
+        #expect(info.termsOfService == URL(string: "https://example.com/tos"))
         #expect(info.relayCountries == ["US", "JP"])
         #expect(info.languageTags == ["en", "ja"])
         #expect(info.tags == ["sfw-only", "bitcoin"])
-        #expect(info.postingPolicy == "https://example.com/policy")
-        #expect(info.paymentsURL == "https://example.com/pay")
+        #expect(info.postingPolicy == URL(string: "https://example.com/policy"))
+        #expect(info.paymentsURL == URL(string: "https://example.com/pay"))
     }
 
     /// The document is written by the relay operator, so a malformed key must not cost the caller
@@ -435,11 +435,11 @@ struct RelayInformationTests {
         let info = RelayInformation(
             selfPublicKey: PublicKey.fixture("abc"),
             supportedNIPs: [1],
-            termsOfService: "https://example.com/tos",
+            termsOfService: URL(string: "https://example.com/tos")!,
             relayCountries: ["US"],
             languageTags: ["en"],
-            postingPolicy: "https://example.com/policy",
-            paymentsURL: "https://example.com/pay"
+            postingPolicy: URL(string: "https://example.com/policy")!,
+            paymentsURL: URL(string: "https://example.com/pay")!
         )
         let data = try JSONEncoder().encode(info)
         let json = try #require(String(data: data, encoding: .utf8))
@@ -451,6 +451,65 @@ struct RelayInformationTests {
         #expect(json.contains("\"language_tags\":"))
         #expect(json.contains("\"posting_policy\":"))
         #expect(json.contains("\"payments_url\":"))
+    }
+
+    @Test("URLs encode as their strings and kinds as integers")
+    func encodingURLsAndKinds() throws {
+        let info = RelayInformation(
+            banner: URL(string: "https://example.com/banner.png")!,
+            icon: URL(string: "https://example.com/icon.png")!,
+            termsOfService: URL(string: "https://example.com/tos")!,
+            postingPolicy: URL(string: "https://example.com/policy")!,
+            paymentsURL: URL(string: "https://example.com/pay?relay=1")!,
+            fees: RelayInformation.Fees(publication: [
+                .init(amount: 100, unit: "msats", kinds: [.encryptedDirectMessage])
+            ]),
+            retention: [RelayInformation.Retention(kinds: [.single(.textNote), .range(30000, 39999)])]
+        )
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+        let json = try #require(String(data: try encoder.encode(info), encoding: .utf8))
+
+        #expect(
+            json == #"{"banner":"https://example.com/banner.png","fees":{"publication":[{"amount":100,"#
+                + #""kinds":[4],"unit":"msats"}]},"icon":"https://example.com/icon.png","#
+                + #""payments_url":"https://example.com/pay?relay=1","posting_policy":"https://example.com/policy","#
+                + #""retention":[{"kinds":[1,[30000,39999]]}],"terms_of_service":"https://example.com/tos"}"#)
+    }
+
+    /// The document is written by the relay operator, so a URL that does not parse must not cost the
+    /// caller the rest of it.
+    @Test(
+        "A URL field that is not a valid URL decodes as nil without failing the document",
+        arguments: ["", "http://[::1"])
+    func decodeInvalidURLsLeniently(value: String) throws {
+        let json = Data(
+            #"""
+            {
+              "name": "Test Relay",
+              "banner": "\#(value)",
+              "icon": "\#(value)",
+              "terms_of_service": "\#(value)",
+              "posting_policy": "\#(value)",
+              "payments_url": "\#(value)"
+            }
+            """#.utf8)
+
+        let info = try JSONDecoder().decode(RelayInformation.self, from: json)
+
+        #expect(info.name == "Test Relay")
+        #expect(info.banner == nil)
+        #expect(info.icon == nil)
+        #expect(info.termsOfService == nil)
+        #expect(info.postingPolicy == nil)
+        #expect(info.paymentsURL == nil)
+    }
+
+    @Test("A URL field that is not a string still fails the document")
+    func decodeNonStringURLFails() {
+        #expect(throws: DecodingError.self) {
+            _ = try JSONDecoder().decode(RelayInformation.self, from: Data(#"{"icon": 42}"#.utf8))
+        }
     }
 
     @Test("KindSpec round-trip preserves format")

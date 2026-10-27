@@ -275,7 +275,7 @@ let nevent = try NEvent(event: event, relays: [try RelayURL(string: "wss://relay
 let naddr = try NAddr(
     identifier: "my-article",
     author: author,
-    kind: 30023,
+    kind: .longFormContent,
     relays: [try RelayURL(string: "wss://relay3.example.com")]
 ).encoded
 ```

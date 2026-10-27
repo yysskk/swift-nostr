@@ -80,7 +80,7 @@ struct NIP17FileMessageTests {
 
         let builder = DirectMessageBuilder(signer: EventSigner(keyPair: sender))
         let result = try await builder.createFileMessageWithSelfCopy(
-            url: "https://files.example.com/1", mimeType: "image/png", encryption: encrypted,
+            url: URL(string: "https://files.example.com/1")!, mimeType: "image/png", encryption: encrypted,
             size: 123, dimensions: "640x480", blurhash: "LKO2", to: recipient.publicKey)
 
         let rumor = result.rumor
@@ -107,7 +107,7 @@ struct NIP17FileMessageTests {
         let recipient = KeyPair()
         let original = Data("hello, this is a secret file".utf8)
         let encrypted = EncryptedFile.encrypt(original)
-        let url = "https://files.example.com/abc"
+        let url = URL(string: "https://files.example.com/abc")!
 
         let builder = DirectMessageBuilder(signer: EventSigner(keyPair: sender))
         let result = try await builder.createFileMessageWithSelfCopy(
@@ -147,7 +147,7 @@ struct NIP17FileMessageTests {
 
         let builder = DirectMessageBuilder(signer: EventSigner(keyPair: sender))
         let result = try await builder.createFileMessageWithSelfCopy(
-            url: "https://files.example.com/1", mimeType: "image/png", encryption: encrypted,
+            url: URL(string: "https://files.example.com/1")!, mimeType: "image/png", encryption: encrypted,
             to: recipient.publicKey)
 
         guard
@@ -157,7 +157,7 @@ struct NIP17FileMessageTests {
             Issue.record("expected a file payload")
             return
         }
-        #expect(file.url == "https://files.example.com/1")
+        #expect(file.url == URL(string: "https://files.example.com/1"))
     }
 
     @Test("parse and parseFileMessage reject the wrong inner kind")
@@ -169,7 +169,8 @@ struct NIP17FileMessageTests {
 
         let message = try await builder.createMessageWithSelfCopy(content: "hi", to: recipient.publicKey)
         let file = try await builder.createFileMessageWithSelfCopy(
-            url: "u", mimeType: "image/png", encryption: encrypted, to: recipient.publicKey)
+            url: URL(string: "https://example.com/u")!, mimeType: "image/png", encryption: encrypted,
+            to: recipient.publicKey)
 
         let parser = DirectMessageParser(signer: EventSigner(keyPair: recipient))
         await #expect(throws: DirectMessagePayload.Error.unexpectedKind(.privateDirectMessage)) {
@@ -228,16 +229,19 @@ struct NIP17FileMessageTests {
         }
     }
 
-    @Test("a file message with an empty URL is rejected")
-    func fileWithEmptyURLRejected() async throws {
+    @Test(
+        "a file message whose content is not an http(s) URL is rejected",
+        arguments: ["", "http://[::1", "file:///etc/passwd", "data:text/plain,hi", "ftp://example.com/f", "https://"]
+    )
+    func fileWithInvalidURLRejected(url: String) async throws {
         let sender = KeyPair()
         let recipient = KeyPair()
 
         let giftWrap = try await Self.wrapFileRumor(
-            sender: sender, recipient: recipient, url: "",
+            sender: sender, recipient: recipient, url: url,
             key: Data(repeating: 0, count: 32), nonce: Data(repeating: 0, count: 12))
 
-        await #expect(throws: DirectMessagePayload.Error.missingFileURL) {
+        await #expect(throws: DirectMessagePayload.Error.invalidFileURL) {
             try await DirectMessageParser(signer: EventSigner(keyPair: recipient)).parseFileMessage(giftWrap)
         }
     }
@@ -269,7 +273,7 @@ struct NIP17FileMessageTests {
 
         let builder = DirectMessageBuilder(signer: EventSigner(keyPair: sender))
         let result = try await builder.createFileMessageWithSelfCopy(
-            url: "u", mimeType: "image/png", encryption: encrypted,
+            url: URL(string: "https://example.com/u")!, mimeType: "image/png", encryption: encrypted,
             to: recipient.publicKey, expiration: expiry)
 
         #expect(result.recipientGiftWrap.expiration == expiry)

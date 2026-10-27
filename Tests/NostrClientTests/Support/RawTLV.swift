@@ -11,7 +11,7 @@ enum RawTLV {
         special: Data,
         relays: [String],
         author: PublicKey? = nil,
-        kind: Int? = nil
+        kind: Event.Kind? = nil
     ) throws -> String {
         var records = [TLV.specialRecord(special)]
         records += relays.map { TLV.Record(type: TLV.Kind.relay.rawValue, value: Data($0.utf8)) }

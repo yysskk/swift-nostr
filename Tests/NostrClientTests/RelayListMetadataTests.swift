@@ -177,7 +177,7 @@ struct RelayListMetadataTests {
 
     @Test("A parsed relay is written back in canonical form")
     func parsedURLIsCanonical() {
-        let list = RelayListMetadata(tags: [.reference("wss://Relay.Example.com/")])
+        let list = RelayListMetadata(tags: [.reference(URL(string: "wss://Relay.Example.com/")!)])
         #expect(list.entries.count == 1)
         #expect(list.entries[0].url == RelayURL("wss://relay.example.com"))
         #expect(list.tags.map(\.rawArray) == [["r", "wss://relay.example.com"]])
@@ -189,7 +189,7 @@ struct RelayListMetadataTests {
     func malformedURLIsSkipped(url: String) {
         #expect(RelayListEntry(tag: Event.Tag(rawArray: ["r", url])) == nil)
         let list = RelayListMetadata(tags: [
-            .reference(url), Event.Tag(name: .reference, values: ["wss://good.example.com", "write"]),
+            Event.Tag(rawArray: ["r", url]), Event.Tag(name: .reference, values: ["wss://good.example.com", "write"]),
         ])
         #expect(list.entries == [RelayListEntry(url: RelayURL("wss://good.example.com")!, usage: .write)])
     }

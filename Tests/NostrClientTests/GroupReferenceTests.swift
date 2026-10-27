@@ -12,7 +12,7 @@ struct GroupReferenceTests {
 
     private func groupNAddr(
         identifier: String = "abcdef",
-        kind: Int = 39000,
+        kind: Event.Kind = 39000,
         relays: [RelayURL] = [RelayURL("wss://groups.example.com")!]
     ) throws -> NAddr {
         try NAddr(identifier: identifier, author: relayPublicKey, kind: kind, relays: relays)

@@ -167,7 +167,7 @@ public struct SimpleGroupList: Sendable, Hashable {
     /// form — but otherwise preserves every tag's content.
     public var list: NostrList {
         var publicItems = publicEntries.map(\.tag)
-        publicItems.append(contentsOf: relayURLs.map { Tag.reference($0.description) })
+        publicItems.append(contentsOf: relayURLs.map { Tag.reference($0.url) })
         publicItems.append(contentsOf: additionalPublicTags)
         return NostrList(
             kind: .simpleGroupList,

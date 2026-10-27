@@ -35,7 +35,7 @@ extension EventTemplate {
     ///   - payload: The request body to commit to in a "payload" tag, if any.
     /// - Returns: The template for the authorization event.
     public static func httpAuthorization(url: URL, method: String, payload: Data? = nil) -> EventTemplate {
-        var tags: [Tag] = [.url(url.absoluteString), .method(method.uppercased())]
+        var tags: [Tag] = [.url(url), .method(method.uppercased())]
         if let payload {
             tags.append(.payload(sha256: Data(SHA256.hash(data: payload)).hexEncodedString()))
         }

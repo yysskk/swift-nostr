@@ -104,6 +104,18 @@ struct NIP19Tests {
         #expect(decoded.relays == [RelayURL("wss://relay.example.com")!])
     }
 
+    @Test("nevent with a kind encodes to and decodes from a fixed vector")
+    func neventKindVector() throws {
+        let vector =
+            "nevent1qqs9eq76w7h3mmrdw2ycxjvc44a2l0v7yxgnjmt4as7vyl66wu3x7dspzamhxue69uhhyetvv9ujuet"
+            + "cv9khqmr99e3k7mgzyqalp33lewf5vdq847t6te0wvnags0gs0mu72kz8938tn24wlfze6qcyqqqqqqgvvhgy3"
+        let event = try NEvent(
+            eventID: eventID, relays: [RelayURL("wss://relay.example.com")!], author: publicKey, kind: .textNote)
+
+        #expect(try event.encoded == vector)
+        #expect(try NEvent(bech32String: vector).kind == .textNote)
+    }
+
     @Test("nevent round-trips with only the event id")
     func neventRoundTripMinimal() throws {
         let event = try NEvent(eventID: eventID)
@@ -131,6 +143,21 @@ struct NIP19Tests {
         #expect(decoded == addr)
         #expect(decoded.kind == 30023)
         #expect(decoded.identifier == "1700847963")
+    }
+
+    @Test("naddr encodes to and decodes from a fixed vector, exposing its coordinate")
+    func naddrKindVector() throws {
+        let vector =
+            "naddr1qq9x67fdv9e8g6trd3jsz9mhwden5te0wfjkccte9ejhsctdwpkx2tnrdaksyg"
+            + "pm7rrrljungc6q0tuh5hj7ue863q73qlheu4vywtzwhx42a7j9n5psgqqqw4rsc5ggs6"
+        let addr = try NAddr(
+            identifier: "my-article", author: publicKey, kind: .longFormContent,
+            relays: [RelayURL("wss://relay.example.com")!])
+
+        #expect(try addr.encoded == vector)
+        let decoded = try NAddr(bech32String: vector)
+        #expect(decoded.kind == .longFormContent)
+        #expect(decoded.coordinate.description == "30023:\(publicKey.hex):my-article")
     }
 
     @Test("naddr round-trips with an empty identifier")
@@ -182,10 +209,11 @@ struct NIP19Tests {
         // Values above Int32.max only fit in `Int` on 64-bit platforms; on 32-bit
         // targets (e.g. watchOS), `Int.max` == `Int32.max` < `UInt32.max`, so
         // `Int(exactly:)` returns `nil` and this boundary is unreachable there.
-        guard let maximumKind = Int(exactly: UInt32.max) else { return }
+        guard let maximum = Int(exactly: UInt32.max) else { return }
+        let maximumKind = Event.Kind(rawValue: maximum)
         #expect(try TLV.validatedKind(maximumKind) == maximumKind)
-        #expect(throws: NIP19Entity.Error.kindOutOfRange(maximumKind + 1)) {
-            _ = try TLV.validatedKind(maximumKind + 1)
+        #expect(throws: NIP19Entity.Error.kindOutOfRange(Event.Kind(rawValue: maximum + 1))) {
+            _ = try TLV.validatedKind(Event.Kind(rawValue: maximum + 1))
         }
     }
 

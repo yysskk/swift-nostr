@@ -451,7 +451,7 @@ Tag.subject("hi")                // ["subject", "hi"]
 Tag.word("spam")                 // ["word", "spam"] (NIP-51 muted word)
 Tag.quote(id, publicKey: pk)        // ["q", id, "", pk] (NIP-18; optional relayURL:)
 Tag.address(coordinate)          // ["a", "30023:<pk>:d"] (EventCoordinate; optional relayURL:)
-Tag.reference("https://x")       // ["r", "https://x"]
+Tag.reference(URL(string: "https://x")!)  // ["r", "https://x"]
 Tag.group("abcdef")              // ["h", "abcdef"] (NIP-29 group scope, on everything a user sends)
 Tag.previous(["12345678"])       // ["previous", ref...] (NIP-29 timeline references)
 Tag.inviteCode("A7fjq2")         // ["code", "A7fjq2"] (NIP-29 kinds 9009/9021)
@@ -1130,8 +1130,8 @@ NIP-17 Private Direct Message (struct: Sendable, Identifiable, Hashable).
 - `expiresAt: Timestamp?` -- the NIP-40 expiration on the gift wrap, if any
 
 `DirectMessageReaction` has `rumorID`, `senderPublicKey`, `messageID: EventID`, and
-`messageAuthorPublicKey: PublicKey`; `DirectMessageFile` has `rumorID`, `senderPublicKey`, and
-`recipientPublicKey`; both also have `createdAt: Timestamp` and `expiresAt: Timestamp?`. A reaction whose `e` or `p` tag is missing or malformed fails to parse.
+`messageAuthorPublicKey: PublicKey`; `DirectMessageFile` has `rumorID`, `senderPublicKey`,
+`recipientPublicKey`, and `url: URL`; both also have `createdAt: Timestamp` and `expiresAt: Timestamp?`. A reaction whose `e` or `p` tag is missing or malformed fails to parse.
 
 ## DirectMessageBuilder
 
@@ -1172,7 +1172,7 @@ print(dm.content)
 
 A rumor that is not the payload being read, or is malformed, throws `DirectMessagePayload.Error`:
 `unexpectedKind(Event.Kind)`, `invalidRecipient` (a `p` tag that is not a hex key),
-`missingReactionTarget`, `missingFileURL`, `invalidDecryptionKey`, or `invalidDecryptionNonce`.
+`missingReactionTarget`, `invalidFileURL`, `invalidDecryptionKey`, or `invalidDecryptionNonce`.
 The `client.messages` `parse`, `parseReaction`, and `parseFile` helpers throw `unexpectedKind` when
 the gift wrap carries another payload.
 
@@ -1217,7 +1217,7 @@ the author. Lists are replaceable, so edit the fetched current list to avoid dro
 // Build and publish (replaces the current list of this kind)
 var list = NostrList(
     kind: .bookmarkList,
-    publicItems: [.event(noteID), .reference("https://example.com")],
+    publicItems: [.event(noteID), .reference(URL(string: "https://example.com")!)],
     privateItems: [.hashtag("private-topic")]
 )
 try await client.lists.publish(list)
@@ -1225,7 +1225,7 @@ try await client.lists.publish(list)
 // Read-modify-write: start from the fetched list so nothing is dropped.
 // No public key -> the current user's list, with private items decrypted (throws if undecryptable).
 if var mine = try await client.lists.fetch(kind: .bookmarkList) {
-    mine.publicItems.append(.reference("https://another.example"))
+    mine.publicItems.append(.reference(URL(string: "https://another.example")!))
     try await client.lists.publish(mine)
 }
 
@@ -1267,7 +1267,7 @@ let set = try NostrListSet(
     kind: .bookmarkSet,
     identifier: "reading",
     title: "Reading list",
-    publicItems: [.event(noteID), .reference("https://example.com")],
+    publicItems: [.event(noteID), .reference(URL(string: "https://example.com")!)],
     privateItems: [.hashtag("private-topic")]
 )
 try await client.lists.publishSet(set)
@@ -1275,7 +1275,7 @@ try await client.lists.publishSet(set)
 // Read-modify-write: start from the fetched set so nothing is dropped.
 // No public key -> the current user's set, with private items decrypted (throws if undecryptable).
 if var mine = try await client.lists.fetchSet(kind: .bookmarkSet, identifier: "reading") {
-    mine.publicItems.append(.reference("https://another.example"))
+    mine.publicItems.append(.reference(URL(string: "https://another.example")!))
     try await client.lists.publishSet(mine)
 }
 
@@ -1562,7 +1562,10 @@ let info = try await connection.fetchInformation()
 let httpURL = RelayInformation.informationURL(from: relay)  // URL
 ```
 
-Nested types: `Limitation`, `Fees`, `FeeSchedule`, `Retention`, `KindSpec` (`.single(Int)` / `.range(Int, Int)`).
+Nested types: `Limitation`, `Fees`, `FeeSchedule`, `Retention`, `KindSpec`
+(`.single(Event.Kind)` / `.range(Event.Kind, Event.Kind)`).
+The URL fields (`banner`, `icon`, `termsOfService`, `postingPolicy`, `paymentsURL`) are `URL?`; one
+that does not parse decodes as nil.
 `FeeSchedule.period` and `Retention.time` are `Duration?` (integer seconds on the wire); a retention
 `time` of `.zero` means not stored, `nil` means no time limit.
 
@@ -1765,8 +1768,8 @@ A NIP-19 bech32-encoded entity (enum: Sendable, Hashable). Cases: `npub(PublicKe
 - `var encoded: String { get throws(NIP19Entity.Error) }` -- canonical bech32 string
 
 The TLV entities hold typed values: `NProfile(publicKey: PublicKey, relays:)`,
-`NEvent(eventID: EventID, relays:, author: PublicKey?, kind: Int?)` (or `NEvent(event:relays:)`), and
-`NAddr(identifier:author: PublicKey, kind:relays:)` (or `NAddr(event:relays:)`); each also has
+`NEvent(eventID: EventID, relays:, author: PublicKey?, kind: Event.Kind?)` (or `NEvent(event:relays:)`), and
+`NAddr(identifier:author: PublicKey, kind: Event.Kind, relays:)` (or `NAddr(event:relays:)`); each also has
 `init(bech32String:)` and `encoded`. Relay hints are `[RelayURL]`: decoding skips a TLV relay
 record that is not a valid relay URL, and encoding writes each hint in canonical form.
 - `init(nostrURI: String) throws(NIP19Entity.Error)` -- decode a NIP-21 `nostr:` URI (case-insensitive scheme, tolerates `nostr://`, rejects `nsec`)
@@ -1776,7 +1779,7 @@ Decoding, encoding, and the entity initializers throw `NIP19Entity.Error`: `inva
 given to `NProfile`/`NEvent`/`NAddr(bech32String:)`), `malformedTLV` (a truncated record),
 `missingPublicKey` / `missingEventID` / `missingIdentifier` / `missingAuthor` / `missingKind` (a
 required TLV record is absent), `invalidLength(Int)` (a key or id that is not 32 bytes, a kind that
-is not 1-4 bytes), `fieldTooLong(Int)` (over the 255 bytes a TLV record holds), `kindOutOfRange(Int)`,
+is not 1-4 bytes), `fieldTooLong(Int)` (over the 255 bytes a TLV record holds), `kindOutOfRange(Event.Kind)`,
 `invalidHex` (an `nsec` case holding non-hex), `missingNostrScheme`, and `privateKeyInURI` (an `nsec`
 in a `nostr:` URI).
 - `var nostrURI: String { get throws }` -- canonical `nostr:` URI (no `//`, throws for `nsec`)

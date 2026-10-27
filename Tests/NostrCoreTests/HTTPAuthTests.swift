@@ -136,7 +136,7 @@ struct HTTPAuthTests {
 
     @Test("NIP-98 tag constructors produce the spec tag shapes")
     func tagConstructors() {
-        #expect(Tag.url("https://example.com/?a=b").rawArray == ["u", "https://example.com/?a=b"])
+        #expect(Tag.url(URL(string: "https://example.com/?a=b")!).rawArray == ["u", "https://example.com/?a=b"])
         #expect(Tag.method("GET").rawArray == ["method", "GET"])
         #expect(Tag.payload(sha256: "abc123").rawArray == ["payload", "abc123"])
     }

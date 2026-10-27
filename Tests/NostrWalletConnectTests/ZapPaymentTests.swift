@@ -9,7 +9,7 @@ import Testing
 struct ZapPaymentTests {
     private func payResponse() -> LNURLPayResponse {
         LNURLPayResponse(
-            callback: "https://example.com/lnurl/callback",
+            callback: URL(string: "https://example.com/lnurl/callback")!,
             minimumSendable: 1000,
             maximumSendable: 1_000_000_000,
             allowsNostr: true,

@@ -12,7 +12,7 @@ public struct NAddr: Sendable, Hashable {
     public let author: PublicKey
 
     /// The event kind.
-    public let kind: Int
+    public let kind: Event.Kind
 
     /// Relay hints where the event may be found. Decoding skips a hint that is not a valid
     /// relay URL; encoding writes each hint in canonical form.
@@ -23,7 +23,7 @@ public struct NAddr: Sendable, Hashable {
     ///   unsigned integer, or ``NIP19Entity/Error/fieldTooLong(_:)`` if a relay hint's canonical
     ///   form is longer than 255 bytes.
     public init(
-        identifier: String, author: PublicKey, kind: Int, relays: [RelayURL] = []
+        identifier: String, author: PublicKey, kind: Event.Kind, relays: [RelayURL] = []
     ) throws(NIP19Entity.Error) {
         self.identifier = identifier
         self.author = author
@@ -33,7 +33,7 @@ public struct NAddr: Sendable, Hashable {
 
     /// The event's coordinate, without the relay hints.
     public var coordinate: EventCoordinate {
-        EventCoordinate(kind: Event.Kind(rawValue: kind), publicKey: author, identifier: identifier)
+        EventCoordinate(kind: kind, publicKey: author, identifier: identifier)
     }
 
     /// Decodes an `naddr` bech32 string.
@@ -54,13 +54,13 @@ public struct NAddr: Sendable, Hashable {
     ///   fit in a 32-bit unsigned integer.
     public init(event: Event, relays: [RelayURL] = []) throws(NIP19Entity.Error) {
         let identifier = event.firstTagValue(named: .identifier) ?? ""
-        try self.init(identifier: identifier, author: event.publicKey, kind: event.kind.rawValue, relays: relays)
+        try self.init(identifier: identifier, author: event.publicKey, kind: event.kind, relays: relays)
     }
 
     init(tlvData: Data) throws(NIP19Entity.Error) {
         var identifier: String?
         var author: PublicKey?
-        var kind: Int?
+        var kind: Event.Kind?
         var relays: [RelayURL] = []
         for record in try TLV.decode(tlvData) {
             switch record.type {

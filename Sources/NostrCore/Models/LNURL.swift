@@ -81,7 +81,7 @@ public enum LNURL {
 /// with ``invoiceRequestURL(amountMillisats:zapRequest:lnurl:)``.
 public struct LNURLPayResponse: Decodable, Sendable, Hashable {
     /// The URL to send the zap request / invoice request to.
-    public let callback: String
+    public let callback: URL
 
     /// Minimum payable amount in millisatoshis.
     public let minimumSendable: Int64
@@ -103,7 +103,7 @@ public struct LNURLPayResponse: Decodable, Sendable, Hashable {
 
     /// Creates a response from its fields, e.g. for tests or a cached endpoint.
     public init(
-        callback: String,
+        callback: URL,
         minimumSendable: Int64,
         maximumSendable: Int64,
         allowsNostr: Bool? = nil,
@@ -130,10 +130,17 @@ public struct LNURLPayResponse: Decodable, Sendable, Hashable {
     /// The response comes from a third-party endpoint, so `nostrPublicKey` is read leniently: a value
     /// that is not a canonical 64-digit lowercase hex public key decodes as nil rather than failing
     /// the whole response. Every other field is decoded strictly.
+    /// - Throws: `DecodingError` if a field has the wrong type, or `callback` is missing or not an
+    ///   `http` or `https` URL with a host.
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
+        let callback = try container.decode(String.self, forKey: .callback)
+        guard let callbackURL = URL(string: callback), callbackURL.isWebURL else {
+            throw DecodingError.dataCorruptedError(
+                forKey: .callback, in: container, debugDescription: "callback is not an http(s) URL: \(callback)")
+        }
         self.init(
-            callback: try container.decode(String.self, forKey: .callback),
+            callback: callbackURL,
             minimumSendable: try container.decode(Int64.self, forKey: .minimumSendable),
             maximumSendable: try container.decode(Int64.self, forKey: .maximumSendable),
             allowsNostr: try container.decodeIfPresent(Bool.self, forKey: .allowsNostr),
@@ -159,7 +166,7 @@ public struct LNURLPayResponse: Decodable, Sendable, Hashable {
     ///   - lnurl: The bech32 `lnurl`, added as the `lnurl` parameter when provided.
     /// - Returns: The invoice request URL, or nil if the callback or zap request can't be encoded.
     public func invoiceRequestURL(amountMillisats: Int64, zapRequest: Event, lnurl: String? = nil) -> URL? {
-        guard var components = URLComponents(string: callback),
+        guard var components = URLComponents(url: callback, resolvingAgainstBaseURL: false),
             let zapData = try? JSONEncoder().encode(zapRequest),
             let zapJSON = String(data: zapData, encoding: .utf8),
             let encodedZap = Self.percentEncodedQueryValue(zapJSON)

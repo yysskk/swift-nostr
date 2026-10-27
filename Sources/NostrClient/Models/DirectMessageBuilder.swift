@@ -88,7 +88,7 @@ public struct DirectMessageBuilder: Sendable {
     ///   - expiration: Optional NIP-40 expiration applied to both gift wraps.
     /// - Returns: The shared rumor and both gift wraps.
     public func createFileMessageWithSelfCopy(
-        url: String,
+        url: URL,
         mimeType: String,
         encryption: EncryptedFile,
         size: Int? = nil,

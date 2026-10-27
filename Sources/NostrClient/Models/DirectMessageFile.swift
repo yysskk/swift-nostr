@@ -22,7 +22,7 @@ public struct DirectMessageFile: Sendable, Identifiable, Hashable {
     public let recipientPublicKey: PublicKey
 
     /// URL of the encrypted file (the kind-15 content).
-    public let url: String
+    public let url: URL
 
     /// MIME type of the file before encryption (`file-type`), e.g. "image/jpeg".
     public let mimeType: String?
@@ -60,7 +60,7 @@ public struct DirectMessageFile: Sendable, Identifiable, Hashable {
         rumorID: EventID,
         senderPublicKey: PublicKey,
         recipientPublicKey: PublicKey,
-        url: String,
+        url: URL,
         mimeType: String?,
         decryptionKey: Data,
         decryptionNonce: Data,
