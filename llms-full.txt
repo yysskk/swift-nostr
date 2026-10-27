@@ -161,7 +161,7 @@ extension NostrEventPublishing {
     public func publishStatus(_ status: String, strategy: PublishStrategy? = nil) async throws -> PublishedEvent {
         try await publish(
             EventTemplate(kind: Event.Kind(rawValue: 30315), tags: [.identifier("general")], content: status),
-            strategy: strategy)
+            route: .pool, strategy: strategy)
     }
 }
 
@@ -305,9 +305,6 @@ try await client.events.publish(signedEvent, route: .pool, strategy: .allSettled
   fetch, count, or subscription goes to the WRITE relays of the filters' authors. Falls back to the
   whole pool when nothing resolves (reads also when a filter has no authors or any author has no
   known list)
-
-```swift
-```
 
 ### Subscriptions
 
@@ -1002,7 +999,7 @@ let signer = try EventSigner(nsec: "nsec1...")
 // Synchronous, without await even in async code; signing a template cannot fail.
 let note = signer.sign(.textNote("Hello"))     // any EventTemplate (see EventTemplate)
 let signed = try signer.sign(unsignedEvent)        // a pre-keyed UnsignedEvent
-let meta = signer.sign(.metadata(UserMetadata(name: "Alice")))
+let meta = try signer.sign(.metadata(UserMetadata(name: "Alice")))  // .metadata(_:) itself throws EncodingError
 let contacts = signer.sign(.contactList([Contact(publicKey: alice)]))
 let pow = try await signer.sign(.textNote("Hello"), proofOfWork: 20)  // mine to 20 leading zero bits, then sign (NIP-13)
 let report = signer.sign(.report(author, type: .impersonation))  // kind 1984, NIP-56
@@ -1784,7 +1781,7 @@ Cases: `.disconnected`, `.connecting`, `.connected`, `.disconnecting`, `.failed(
 A session's seam over relay I/O (protocol: Sendable). A NIP-46 signer session (`RemoteSigner`) or a
 NIP-47 wallet connection (`WalletConnection`) talks to this instead of touching relays directly, and
 both accept one in their initializer. Requirements: `connect()`, `subscribe(id:filters:)`,
-`unsubscribe(id:)`, `send(_:)`, `events() -> AsyncStream<Event>`, `disconnect()`; `connect()`,
+`unsubscribe(id:)`, `send(_:)`, `events() async -> AsyncStream<Event>`, `disconnect()`; `connect()`,
 `subscribe(id:filters:)`, and `send(_:)` are `throws(RelayConnection.Error)`. Request events in
 both protocols are ephemeral, so `send(_:)` is fire-and-forget -- the matching response on `events()`
 is the completion signal, not a relay `OK`.
@@ -1834,7 +1831,7 @@ required TLV record is absent), `invalidLength(Int)` (a key or id that is not 32
 is not 1-4 bytes), `fieldTooLong(Int)` (over the 255 bytes a TLV record holds), `kindOutOfRange(Event.Kind)`,
 `invalidPrivateKey` (an `nsec` payload that is not a valid secp256k1 scalar), `missingNostrScheme`,
 and `privateKeyInURI` (an `nsec` in a `nostr:` URI).
-- `var nostrURI: String { get throws }` -- canonical `nostr:` URI (no `//`, throws for `nsec`)
+- `var nostrURI: String { get throws(NIP19Entity.Error) }` -- canonical `nostr:` URI (no `//`, throws for `nsec`)
 
 ```swift
 let entity = try NIP19Entity(nostrURI: "nostr:npub1...")

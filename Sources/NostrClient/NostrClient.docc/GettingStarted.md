@@ -56,8 +56,8 @@ try await client.relays.connect(to: [
 
 A ``RelayURL`` is validated and normalized when it is created, so `wss://Relay.Example.com/` and
 `wss://relay.example.com` name the same pool entry, and every relay-targeted API — `add`, `remove`,
-`relay(for:)`, the `to:` targets of publish, fetch, count, and subscribe, and the per-relay keys of
-``PublishResult`` — compares relays by that canonical form.
+`relay(for:)`, the ``RelayRoute/relays(_:)`` route of publish, fetch, count, and subscribe, and
+the per-relay keys of ``PublishResult`` — compares relays by that canonical form.
 
 ## Publish Events
 
@@ -103,7 +103,7 @@ await subscription.close()
 
 ## Fetch Events
 
-``NostrClient/NostrClient`` provides one-shot fetch methods that open a temporary subscription, collect matching events until all relays signal End of Stored Events (EOSE), then close the subscription and return the results.
+``NostrClient/events`` provides one-shot fetch methods that open a temporary subscription, collect matching events until all relays signal End of Stored Events (EOSE), then close the subscription and return the results.
 
 ```swift
 // Fetch a specific event by ID

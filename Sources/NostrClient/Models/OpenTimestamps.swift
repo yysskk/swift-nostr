@@ -54,7 +54,7 @@ extension EventTemplate {
     /// ```swift
     /// var note = EventTemplate.textNote("timestamped")
     /// note.openTimestamps = OpenTimestamps(otsFileData: otsFile)
-    /// let event = try signer.sign(note)
+    /// let event = signer.sign(note)
     /// ```
     public var openTimestamps: OpenTimestamps? {
         get {

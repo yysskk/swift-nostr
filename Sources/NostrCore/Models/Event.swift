@@ -44,7 +44,14 @@ public struct Event: Codable, Identifiable, Hashable, Sendable {
     ///
     /// Nothing is checked here: ``verify()`` tells whether `id` and `signature` match the rest.
     /// To build a new event, sign an ``UnsignedEvent`` instead.
-    /// - Parameter signature: The event's signature, or `nil` for an unsigned NIP-59 rumor.
+    /// - Parameters:
+    ///   - id: The event id.
+    ///   - publicKey: The author's public key.
+    ///   - createdAt: The creation time.
+    ///   - kind: The event kind.
+    ///   - tags: The event's tags.
+    ///   - content: The event content.
+    ///   - signature: The event's signature, or `nil` for an unsigned NIP-59 rumor.
     public init(
         id: EventID,
         publicKey: PublicKey,
