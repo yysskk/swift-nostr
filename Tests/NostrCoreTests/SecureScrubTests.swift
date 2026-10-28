@@ -54,8 +54,8 @@ struct SecureScrubTests {
         let alice = KeyPair()
         let bob = KeyPair()
 
-        let sealed = try SealedMessage.seal("hello there", for: bob.publicKey, using: alice)
-        #expect(try sealed.open(from: alice.publicKey, using: bob) == "hello there")
+        let encrypted = try NIP44Payload.encrypt("hello there", for: bob.publicKey, using: alice)
+        #expect(try encrypted.decrypt(from: alice.publicKey, using: bob) == "hello there")
     }
 
     @Test("NIP-49 still round-trips after scrubbing its derived key")
@@ -72,11 +72,11 @@ struct SecureScrubTests {
         let alice = KeyPair()
         let bob = KeyPair()
 
-        let first = try SealedMessage.conversationKeyHex(keyPair: alice, publicKey: bob.publicKey)
-        let second = try SealedMessage.conversationKeyHex(keyPair: alice, publicKey: bob.publicKey)
+        let first = try ConversationKey(privateKey: alice.privateKey, publicKey: bob.publicKey)
+        let second = try ConversationKey(privateKey: alice.privateKey, publicKey: bob.publicKey)
 
         // Scrubbing the ECDH shared point must not disturb the key derived from it.
         #expect(first == second)
-        #expect(first.count == 64)
+        #expect(first.data.count == 32)
     }
 }

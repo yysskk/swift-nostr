@@ -97,11 +97,11 @@ public struct EventSigner: Sendable {
     ///   - plaintext: The message to encrypt.
     ///   - recipientPublicKey: The recipient's public key.
     /// - Returns: The base64-encoded NIP-44 payload.
-    /// - Throws: What ``SealedMessage/seal(_:for:using:)`` throws.
+    /// - Throws: What ``NIP44Payload/encrypt(_:for:using:)`` throws.
     public func nip44Encrypt(
         _ plaintext: String, to recipientPublicKey: PublicKey
-    ) throws(SealedMessage.Error) -> String {
-        try SealedMessage.seal(plaintext, for: recipientPublicKey, using: keyPair).payload
+    ) throws(NIP44Payload.Error) -> String {
+        try NIP44Payload.encrypt(plaintext, for: recipientPublicKey, using: keyPair).base64
     }
 
     /// Decrypts a NIP-44 v2 payload from `senderPublicKey` addressed to this signer's identity.
@@ -109,11 +109,11 @@ public struct EventSigner: Sendable {
     ///   - ciphertext: The base64-encoded NIP-44 payload.
     ///   - senderPublicKey: The sender's public key.
     /// - Returns: The decrypted plaintext.
-    /// - Throws: What ``SealedMessage/open(from:using:)`` throws.
+    /// - Throws: What ``NIP44Payload/decrypt(from:using:)`` throws.
     public func nip44Decrypt(
         _ ciphertext: String, from senderPublicKey: PublicKey
-    ) throws(SealedMessage.Error) -> String {
-        try SealedMessage(payload: ciphertext).open(from: senderPublicKey, using: keyPair)
+    ) throws(NIP44Payload.Error) -> String {
+        try NIP44Payload(base64: ciphertext).decrypt(from: senderPublicKey, using: keyPair)
     }
 
     /// Why ``EventSigner`` refused to sign an event.

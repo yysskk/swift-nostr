@@ -184,23 +184,24 @@ For lower-level access to encryption primitives:
 let senderKeyPair = KeyPair()
 let recipientPublicKey = try PublicKey(npub: "npub1...")
 
-// Seal a message (NIP-44)
-let sealed = try SealedMessage.seal(
+// Encrypt a message (NIP-44)
+let encrypted = try NIP44Payload.encrypt(
     "secret message",
     for: recipientPublicKey,
     using: senderKeyPair
 )
 
-// Open a sealed message
-let plaintext = try sealed.open(
+// Decrypt a payload, e.g. an event's content
+let plaintext = try NIP44Payload(base64: encrypted.base64).decrypt(
     from: senderPublicKey,
     using: recipientKeyPair
 )
 
-// Seal and open under a caller-supplied 32-byte conversation key, e.g. one
-// shared by a group. Anyone holding the key can read and forge messages.
-let groupSealed = try SealedMessage.seal("group message", conversationKey: groupKey)
-let groupPlaintext = try groupSealed.open(conversationKey: groupKey)
+// Encrypt and decrypt under a conversation key shared by a group, distributed
+// out of band. Anyone holding the key can read and forge messages.
+let groupKey = ConversationKey.random()
+let groupEncrypted = try NIP44Payload.encrypt("group message", with: groupKey)
+let groupPlaintext = try groupEncrypted.decrypt(with: groupKey)
 
 // Gift wrap a template (NIP-59); the rumor is authored under the signer's key.
 // Both sides take any NostrSigning, so a remote NIP-46 signer wraps and

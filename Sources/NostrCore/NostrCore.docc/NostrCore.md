@@ -49,7 +49,8 @@ try event.verify()
 - ``NostrSigning``
 - ``EventSigner``
 - ``ProofOfWork``
-- ``SealedMessage``
+- ``NIP44Payload``
+- ``ConversationKey``
 - ``EncryptedPrivateKey``
 
 ### HTTP Authorization (NIP-98)
@@ -113,7 +114,7 @@ try event.verify()
 - ``Mnemonic/Error``
 - ``EncryptedPrivateKey/Error``
 - ``LNURL/Error``
-- ``SealedMessage/Error``
+- ``NIP44Payload/Error``
 - ``Event/VerificationError``
 - ``ProofOfWork/Error``
 - ``RelayMessage/Error``

@@ -1117,32 +1117,45 @@ BIP-32/BIP-39 key derivation for NIP-06 (enum).
 let privateKey = try KeyDerivation.deriveNostrKey(seed: seed, account: 0)
 ```
 
-## SealedMessage
+## NIP44Payload
 
-NIP-44 versioned encryption v2 (struct: Sendable).
+NIP-44 versioned encryption v2 (struct: Sendable). `base64` holds the payload as an event's `content` carries it.
 
 Uses ECDH shared secret, HKDF key derivation, ChaCha20 encryption, HMAC-SHA256 authentication, and timing-safe comparison.
 
 ```swift
-// Seal
-let sealed = try SealedMessage.seal("message", for: recipientPublicKey, using: senderKeyPair)  // PublicKey
-print(sealed.payload)  // base64-encoded
+// Encrypt
+let encrypted = try NIP44Payload.encrypt("message", for: recipientPublicKey, using: senderKeyPair)  // PublicKey
+print(encrypted.base64)  // base64-encoded
 
-// Open
-let plaintext = try sealed.open(from: senderPublicKey, using: recipientKeyPair)
+// Decrypt
+let plaintext = try NIP44Payload(base64: event.content).decrypt(from: senderPublicKey, using: recipientKeyPair)
 ```
 
-With a caller-supplied 32-byte conversation key (e.g. one shared by a group) instead of a key pair. A fresh nonce is generated per call; anyone holding the key can read and forge messages.
+With a `ConversationKey` (e.g. one shared by a group) instead of a key pair. A fresh nonce is generated per call; anyone holding the key can read and forge messages.
 
 ```swift
-let sealed = try SealedMessage.seal("message", conversationKey: groupKey)
-let plaintext = try sealed.open(conversationKey: groupKey)
+let groupKey = ConversationKey.random()                     // 32 bytes from the system CSPRNG
+let encrypted = try NIP44Payload.encrypt("message", with: groupKey)
+let plaintext = try encrypted.decrypt(with: groupKey)
 ```
 
-Every seal and open throws `SealedMessage.Error`: `invalidConversationKey` (not 32 bytes),
-`invalidPlaintextLength(Int)` (not 1...65535 UTF-8 bytes), `invalidPublicKey` (the peer key is not
-on secp256k1), `malformedPayload` (bad base64, length out of range, non-UTF-8 plaintext),
-`unsupportedVersion(UInt8)`, `invalidMAC` (wrong key or tampered), or `invalidPadding`.
+Every encrypt and decrypt throws `NIP44Payload.Error`: `invalidPlaintextLength(Int)` (not 1...65535
+UTF-8 bytes), `invalidPublicKey` (the peer key is not on secp256k1), `malformedPayload` (bad base64,
+length out of range, non-UTF-8 plaintext), `unsupportedVersion(UInt8)`, `invalidMAC` (wrong key or
+tampered), or `invalidPadding`.
+
+## ConversationKey
+
+The 32-byte NIP-44 conversation key (struct: Sendable, Hashable). Secret material: `description`,
+`debugDescription`, and reflection are redacted and equality is constant-time, like `PrivateKey`.
+
+```swift
+let key = try ConversationKey(privateKey: myPrivateKey, publicKey: peerPublicKey)  // ECDH + HKDF; symmetric
+let shared = ConversationKey.random()                   // e.g. a group key
+let imported = try ConversationKey(data: bytes)         // throws NIP44Payload.Error.invalidConversationKey unless 32 bytes
+print(key.data)                                         // export the 32 bytes deliberately
+```
 
 ## GiftWrap
 

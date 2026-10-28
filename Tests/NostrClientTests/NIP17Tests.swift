@@ -9,38 +9,38 @@ struct NIP17Tests {
 
     // MARK: - NIP-44 Encryption Tests
 
-    @Test("NIP-44 seal and open message")
-    func nip44SealOpen() throws {
+    @Test("NIP-44 encrypt and decrypt message")
+    func nip44EncryptDecrypt() throws {
         let alice = KeyPair()
         let bob = KeyPair()
 
         let originalMessage = "Hello, Bob! This is a private message."
 
-        // Alice seals a message for Bob
-        let sealed = try SealedMessage.seal(originalMessage, for: bob.publicKey, using: alice)
+        // Alice encrypts a message for Bob
+        let encrypted = try NIP44Payload.encrypt(originalMessage, for: bob.publicKey, using: alice)
 
         // Verify it's base64 encoded
-        #expect(Data(base64Encoded: sealed.payload) != nil)
+        #expect(Data(base64Encoded: encrypted.base64) != nil)
 
-        // Bob opens the message from Alice
-        let opened = try sealed.open(from: alice.publicKey, using: bob)
+        // Bob decrypts the message from Alice
+        let decrypted = try encrypted.decrypt(from: alice.publicKey, using: bob)
 
-        #expect(opened == originalMessage)
+        #expect(decrypted == originalMessage)
     }
 
-    @Test("NIP-44 sender can open own message")
-    func nip44SenderOpen() throws {
+    @Test("NIP-44 sender can decrypt own message")
+    func nip44SenderDecrypt() throws {
         let alice = KeyPair()
         let bob = KeyPair()
 
         let originalMessage = "Hello, Bob!"
 
-        let sealed = try SealedMessage.seal(originalMessage, for: bob.publicKey, using: alice)
+        let encrypted = try NIP44Payload.encrypt(originalMessage, for: bob.publicKey, using: alice)
 
-        // Alice can open using Bob's public key (same shared secret)
-        let opened = try sealed.open(from: bob.publicKey, using: alice)
+        // Alice can decrypt using Bob's public key (same shared secret)
+        let decrypted = try encrypted.decrypt(from: bob.publicKey, using: alice)
 
-        #expect(opened == originalMessage)
+        #expect(decrypted == originalMessage)
     }
 
     @Test("NIP-44 with special characters")
@@ -50,10 +50,10 @@ struct NIP17Tests {
 
         let originalMessage = "Hello! 🎉 Special: <>&\"'日本語中文한국어"
 
-        let sealed = try SealedMessage.seal(originalMessage, for: bob.publicKey, using: alice)
-        let opened = try sealed.open(from: alice.publicKey, using: bob)
+        let encrypted = try NIP44Payload.encrypt(originalMessage, for: bob.publicKey, using: alice)
+        let decrypted = try encrypted.decrypt(from: alice.publicKey, using: bob)
 
-        #expect(opened == originalMessage)
+        #expect(decrypted == originalMessage)
     }
 
     @Test("NIP-44 with long message")
@@ -63,10 +63,10 @@ struct NIP17Tests {
 
         let originalMessage = String(repeating: "A", count: 10000)
 
-        let sealed = try SealedMessage.seal(originalMessage, for: bob.publicKey, using: alice)
-        let opened = try sealed.open(from: alice.publicKey, using: bob)
+        let encrypted = try NIP44Payload.encrypt(originalMessage, for: bob.publicKey, using: alice)
+        let decrypted = try encrypted.decrypt(from: alice.publicKey, using: bob)
 
-        #expect(opened == originalMessage)
+        #expect(decrypted == originalMessage)
     }
 
     @Test("NIP-44 version check")
@@ -74,8 +74,8 @@ struct NIP17Tests {
         let alice = KeyPair()
         let bob = KeyPair()
 
-        let sealed = try SealedMessage.seal("test", for: bob.publicKey, using: alice)
-        let payload = Data(base64Encoded: sealed.payload)!
+        let encrypted = try NIP44Payload.encrypt("test", for: bob.publicKey, using: alice)
+        let payload = Data(base64Encoded: encrypted.base64)!
 
         // First byte should be version 2
         #expect(payload[0] == 2)

@@ -57,7 +57,7 @@ Or add via Xcode: File → Add Package Dependencies → Enter the repository URL
 
 The package vends four libraries:
 
-- **`NostrCore`** — the shared protocol primitives, cryptography, NIP-19 encoding, and a single-relay WebSocket transport: `Event`, `KeyPair`, `EventSigner`, `Filter`, `Bech32`, `SealedMessage`, `RelayConnection`, and the relay messages. Depend on it directly if that is all you need.
+- **`NostrCore`** — the shared protocol primitives, cryptography, NIP-19 encoding, and a single-relay WebSocket transport: `Event`, `KeyPair`, `EventSigner`, `Filter`, `Bech32`, `NIP44Payload`, `RelayConnection`, and the relay messages. Depend on it directly if that is all you need.
 - **`NostrClient`** — the high-level, actor-based client (multi-relay pool, NIP-65 outbox/gossip, NIP-17 direct messages, fetches, NIP-19 entities, zap receipts). It is built on `NostrCore`, which it re-exports.
 - **`NostrWalletConnect`** — NIP-47 wallet payments. Built on `NostrCore`, which it re-exports.
 - **`NostrConnect`** — NIP-46 remote signing (`bunker://` and `nostrconnect://` flows). Built on `NostrCore`, which it re-exports.
