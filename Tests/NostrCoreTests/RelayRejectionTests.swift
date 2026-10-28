@@ -93,7 +93,7 @@ struct RelayRejectionSurfacingTests {
         RelayConnection(
             url: relayURL,
             webSocketFactory: MockWebSocketSessionFactory(makeSession: { socket }),
-            config: RelayConnectionConfig(publishAckTimeout: publishAckTimeout, autoReconnect: false)
+            config: RelayConnectionConfig(publishAckTimeout: publishAckTimeout, reconnect: nil)
         )
     }
 

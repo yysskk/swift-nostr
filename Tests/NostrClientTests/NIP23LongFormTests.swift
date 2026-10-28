@@ -270,7 +270,7 @@ struct NIP23LongFormTests {
         let pool = RelayPool(
             config: RelayPoolConfig(
                 defaultRelayConfig: RelayConnectionConfig(
-                    connectionTimeout: .seconds(1), pingInterval: .seconds(60), autoReconnect: false)
+                    connectionTimeout: .seconds(1), pingInterval: .seconds(60), reconnect: nil)
             ),
             webSocketFactory: MockWebSocketSessionFactory(makeSession: { mock })
         )
@@ -306,7 +306,7 @@ struct NIP23LongFormTests {
         let pool = RelayPool(
             config: RelayPoolConfig(
                 defaultRelayConfig: RelayConnectionConfig(
-                    connectionTimeout: .seconds(1), pingInterval: .seconds(60), autoReconnect: false)
+                    connectionTimeout: .seconds(1), pingInterval: .seconds(60), reconnect: nil)
             ),
             webSocketFactory: MockWebSocketSessionFactory(makeSession: { mock })
         )

@@ -187,7 +187,7 @@ struct RelayPoolRoutingTests {
         let pool = RelayPool(
             config: RelayPoolConfig(
                 defaultRelayConfig: RelayConnectionConfig(
-                    connectionTimeout: .milliseconds(200), pingInterval: .seconds(60), autoReconnect: false)
+                    connectionTimeout: .milliseconds(200), pingInterval: .seconds(60), reconnect: nil)
             ),
             webSocketFactory: MockWebSocketSessionFactory(makeSession: {
                 MockWebSocketSession(pingError: URLError(.cannotConnectToHost))

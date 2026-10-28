@@ -20,20 +20,8 @@ public struct RelayConnectionConfig: Sendable {
     /// so a relay that simply has no messages to deliver is never torn down.
     public var pingInterval: Duration
 
-    /// Whether to automatically reconnect on failure
-    public var autoReconnect: Bool
-
-    /// Maximum number of reconnection attempts (0 = unlimited)
-    public var maximumReconnectAttempts: Int
-
-    /// The delay before the first reconnection attempt.
-    public var initialReconnectDelay: Duration
-
-    /// The longest delay between reconnection attempts.
-    public var maximumReconnectDelay: Duration
-
-    /// Multiplier for exponential backoff
-    public var reconnectBackoffMultiplier: Double
+    /// How to reconnect after the connection drops, or `nil` to never reconnect automatically.
+    public var reconnect: ReconnectPolicy?
 
     /// Default configuration
     public static let `default` = RelayConnectionConfig()
@@ -45,83 +33,27 @@ public struct RelayConnectionConfig: Sendable {
     ///   - publishAckTimeout: How long a publish waits for the relay's OK response.
     ///   - queryTimeout: How long a count waits for the relay's response without its own timeout.
     ///   - pingInterval: The interval between keepalive pings.
-    ///   - autoReconnect: Whether to reconnect automatically on failure.
-    ///   - maximumReconnectAttempts: The maximum number of reconnection attempts, or 0 for
-    ///     unlimited.
-    ///   - initialReconnectDelay: The delay before the first reconnection attempt.
-    ///   - maximumReconnectDelay: The longest delay between reconnection attempts.
-    ///   - reconnectBackoffMultiplier: The factor each reconnect delay grows by.
+    ///   - reconnect: How to reconnect after a drop, or `nil` to never reconnect automatically.
     public init(
         connectionTimeout: Duration = .seconds(10),
         sendTimeout: Duration = .seconds(10),
         publishAckTimeout: Duration = .seconds(30),
         queryTimeout: Duration = .seconds(10),
         pingInterval: Duration = .seconds(30),
-        autoReconnect: Bool = true,
-        maximumReconnectAttempts: Int = 0,
-        initialReconnectDelay: Duration = .seconds(1),
-        maximumReconnectDelay: Duration = .seconds(60),
-        reconnectBackoffMultiplier: Double = 2.0
+        reconnect: ReconnectPolicy? = .default
     ) {
         self.connectionTimeout = connectionTimeout
         self.sendTimeout = sendTimeout
         self.publishAckTimeout = publishAckTimeout
         self.queryTimeout = queryTimeout
         self.pingInterval = pingInterval
-        self.autoReconnect = autoReconnect
-        self.maximumReconnectAttempts = maximumReconnectAttempts
-        self.initialReconnectDelay = initialReconnectDelay
-        self.maximumReconnectDelay = maximumReconnectDelay
-        self.reconnectBackoffMultiplier = reconnectBackoffMultiplier
+        self.reconnect = reconnect
     }
-
 }
 
-// MARK: - Reconnection Bounds
-
 extension RelayConnectionConfig {
-    /// The shortest a reconnect delay is allowed to be.
-    ///
-    /// `initialReconnectDelay: 0` reads like "reconnect immediately", but zero multiplied by any
-    /// backoff stays zero — with the default of unlimited attempts that is an unbounded loop
-    /// hammering the relay with no pause at all. A negative delay does the same, since
-    /// `Task.sleep` of one returns at once.
-    public static let minimumReconnectDelay: Duration = .milliseconds(100)
-
-    /// The delay to wait before the first reconnection attempt, floored so it always pauses.
-    ///
-    /// Resolved where it is read rather than in the initializer: every configuration field is a
-    /// `var`, so a value set afterwards would otherwise bypass validation done at init time.
-    var resolvedInitialReconnectDelay: Duration {
-        max(initialReconnectDelay, Self.minimumReconnectDelay)
-    }
-
-    /// The ceiling for reconnect delays, never below the initial delay.
-    var resolvedMaximumReconnectDelay: Duration {
-        max(maximumReconnectDelay, resolvedInitialReconnectDelay)
-    }
-
-    /// The backoff multiplier, floored at 1 so a delay can hold steady but never shrink.
-    ///
-    /// A multiplier of exactly 1 is a legitimate choice — retrying at a fixed rate — so it is left
-    /// alone. Anything below it would walk the delay back toward zero, and NaN is treated as 1.
-    var resolvedBackoffMultiplier: Double {
-        reconnectBackoffMultiplier.isNaN ? 1 : max(reconnectBackoffMultiplier, 1)
-    }
-
-    /// The delay that follows `delay`: grown by the backoff multiplier and kept inside the bounds.
-    ///
-    /// Multiplying a `Duration` by an infinite or very large factor traps, so the growth is checked
-    /// against the ceiling in floating point first and only multiplied exactly when it stays below.
-    func nextReconnectDelay(after delay: Duration) -> Duration {
-        let multiplier = resolvedBackoffMultiplier
-        let ceiling = resolvedMaximumReconnectDelay
-        guard delay.timeInterval * multiplier < ceiling.timeInterval else { return ceiling }
-        return boundedReconnectDelay(delay * multiplier)
-    }
-
-    /// Applies `delay` to the ceiling, keeping every wait inside the configured bounds.
-    func boundedReconnectDelay(_ delay: Duration) -> Duration {
-        min(max(delay, Self.minimumReconnectDelay), resolvedMaximumReconnectDelay)
+    /// The delay before the first reconnection attempt, or zero when automatic reconnection is off.
+    var firstReconnectDelay: Duration {
+        reconnect?.resolvedInitialDelay ?? .zero
     }
 }

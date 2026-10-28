@@ -18,12 +18,12 @@ struct NostrClientConnectTests {
     func addRelayAppliesConfig() async throws {
         let client = NostrClient()
         let config = RelayConnectionConfig(
-            connectionTimeout: .seconds(42), pingInterval: .seconds(60), autoReconnect: false)
+            connectionTimeout: .seconds(42), pingInterval: .seconds(60), reconnect: nil)
 
         let connection = await client.relays.add(RelayURL("wss://relay.example.com")!, config: config)
 
         #expect(await connection.config.connectionTimeout == .seconds(42))
-        #expect(await connection.config.autoReconnect == false)
+        #expect(await connection.config.reconnect == nil)
         // The default-config path stays intact for relays added without an override.
         let plain = await client.relays.add(RelayURL("wss://other.example.com")!)
         #expect(await plain.config.connectionTimeout == RelayConnectionConfig.default.connectionTimeout)
@@ -48,7 +48,7 @@ struct NostrClientConnectTests {
         // Nothing listens on the loopback discard port; the attempt fails fast
         // and is bounded by the 1-second connection timeout in the worst case.
         let poolConfig = RelayPoolConfig(
-            defaultRelayConfig: RelayConnectionConfig(connectionTimeout: .seconds(1), autoReconnect: false)
+            defaultRelayConfig: RelayConnectionConfig(connectionTimeout: .seconds(1), reconnect: nil)
         )
         let client = NostrClient(relayPoolConfig: poolConfig)
 

@@ -123,7 +123,7 @@ struct RelayConnectionTests {
 
     private func makeGatedConnection(
         sendTimeout: Duration = .seconds(10),
-        autoReconnect: Bool = false
+        reconnect: ReconnectPolicy? = nil
     ) -> (RelayConnection, GatedRequestSocket) {
         let socket = GatedRequestSocket()
         let connection = RelayConnection(
@@ -131,7 +131,7 @@ struct RelayConnectionTests {
             webSocketFactory: GatedRequestSocketFactory(socket: socket),
             config: RelayConnectionConfig(
                 connectionTimeout: .seconds(1), sendTimeout: sendTimeout, pingInterval: .seconds(60),
-                autoReconnect: autoReconnect)
+                reconnect: reconnect)
         )
         return (connection, socket)
     }
@@ -155,7 +155,7 @@ struct RelayConnectionTests {
             // No auto-reconnect and a long ping interval keep the test's background
             // tasks inert; the connection is torn down explicitly at the end.
             config: RelayConnectionConfig(
-                connectionTimeout: .seconds(1), pingInterval: .seconds(60), autoReconnect: false)
+                connectionTimeout: .seconds(1), pingInterval: .seconds(60), reconnect: nil)
         )
         return (connection, mock)
     }
@@ -404,7 +404,7 @@ struct RelayConnectionTests {
 
     @Test("cancelling a subscribe mid-send still delivers the REQ and keeps the connection", .timeLimit(.minutes(1)))
     func cancelledInFlightSendKeepsConnection() async throws {
-        let (connection, socket) = makeGatedConnection(autoReconnect: true)
+        let (connection, socket) = makeGatedConnection(reconnect: .default)
         try await connection.connect()
 
         let subscribing = Task {
@@ -428,7 +428,7 @@ struct RelayConnectionTests {
 
     @Test("a subscribe from an already-cancelled task still sends its REQ", .timeLimit(.minutes(1)))
     func alreadyCancelledSendKeepsConnection() async throws {
-        let (connection, socket) = makeGatedConnection(autoReconnect: true)
+        let (connection, socket) = makeGatedConnection(reconnect: .default)
         try await connection.connect()
 
         let subscribing = Task {

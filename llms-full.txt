@@ -1685,8 +1685,7 @@ Manages connections to multiple Nostr relays (actor).
 
 ```swift
 let config = RelayPoolConfig(
-    maximumDeduplicationCacheSize: 10000,
-    deduplicationCacheTTL: .seconds(300),
+    deduplication: .init(maximumCount: 10_000, timeToLive: .seconds(300)),  // nil delivers every copy
     queryTimeout: .seconds(10)   // one-shot fetch/count wait when the call passes no timeout
 )
 ```
@@ -1725,8 +1724,9 @@ relay's own error (`RelayRejection` or `RelayConnection.Error`) is thrown instea
 
 Event deduplication is per subscription: copies of one event arriving from several relays
 collapse into a single delivery, an event matching two subscriptions is delivered to both,
-and `unsubscribe` discards that subscription's cache. `maximumDeduplicationCacheSize` bounds the
-entries across all subscriptions and is enforced as events arrive, evicting the oldest.
+and `unsubscribe` discards that subscription's cache. `Deduplication.maximumCount` bounds the
+entries across all subscriptions and is enforced as events arrive, evicting the oldest;
+`deduplication: nil` turns deduplication off, delivering every relay's copy.
 
 ## RelayConnection
 
@@ -1750,11 +1750,12 @@ let config = RelayConnectionConfig(
     publishAckTimeout: .seconds(30),     // wait for the relay's OK
     queryTimeout: .seconds(10),          // countEvents(matching:) wait when the call passes no timeout
     pingInterval: .seconds(30),          // between keepalive pings
-    autoReconnect: true,
-    maximumReconnectAttempts: 10,
-    initialReconnectDelay: .seconds(1),  // floored at RelayConnectionConfig.minimumReconnectDelay (100 ms)
-    maximumReconnectDelay: .seconds(60),
-    reconnectBackoffMultiplier: 2
+    reconnect: ReconnectPolicy(          // nil disables automatic reconnection
+        maximumAttempts: 10,             // nil (the default) keeps trying; 0 or below never retries
+        initialDelay: .seconds(1),       // floored at ReconnectPolicy.minimumDelay (100 ms)
+        maximumDelay: .seconds(60),
+        backoffMultiplier: 2
+    )
 )
 ```
 

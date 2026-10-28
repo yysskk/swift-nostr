@@ -15,7 +15,7 @@ struct NIP45CountTests {
     private let relayURL = RelayURL("wss://relay.example.com")!
 
     private var noReconnectConfig: RelayConnectionConfig {
-        RelayConnectionConfig(connectionTimeout: .seconds(1), pingInterval: .seconds(60), autoReconnect: false)
+        RelayConnectionConfig(connectionTimeout: .seconds(1), pingInterval: .seconds(60), reconnect: nil)
     }
 
     private func makeConnection() -> (RelayConnection, MockWebSocketSession) {
@@ -107,7 +107,7 @@ struct NIP45CountTests {
     func countWithoutTimeoutUsesQueryTimeout() async throws {
         let config = RelayConnectionConfig(
             connectionTimeout: .seconds(1), queryTimeout: .milliseconds(50), pingInterval: .seconds(60),
-            autoReconnect: false)
+            reconnect: nil)
         let mock = MockWebSocketSession()
         let connection = RelayConnection(
             url: relayURL,
@@ -332,7 +332,7 @@ struct NIP45CountTests {
         let mock = MockWebSocketSession()
         let relayConfig = RelayConnectionConfig(
             connectionTimeout: .seconds(1), queryTimeout: .seconds(30), pingInterval: .seconds(60),
-            autoReconnect: false)
+            reconnect: nil)
         let pool = RelayPool(
             config: RelayPoolConfig(defaultRelayConfig: relayConfig, queryTimeout: .milliseconds(50)),
             webSocketFactory: MockWebSocketSessionFactory(makeSession: { mock })

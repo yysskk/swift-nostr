@@ -90,7 +90,7 @@ struct RelayCapabilityTests {
 
         #expect(await relays.relayCount == 0)
         await relays.add(relayA)
-        await relays.add(relayB, config: RelayConnectionConfig(autoReconnect: false))
+        await relays.add(relayB, config: RelayConnectionConfig(reconnect: nil))
         #expect(await relays.relayCount == 2)
         #expect(await relays.connectedRelayCount() == 0)
 

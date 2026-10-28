@@ -12,13 +12,13 @@ import Testing
 struct TerminalDropStreamTests {
     private func makeConnection(
         socket: MockWebSocketSession,
-        autoReconnect: Bool
+        reconnect: ReconnectPolicy?
     ) -> RelayConnection {
         RelayConnection(
             url: RelayURL("wss://relay.example.com")!,
             webSocketFactory: MockWebSocketSessionFactory(makeSession: { socket }),
             config: RelayConnectionConfig(
-                connectionTimeout: .milliseconds(200), pingInterval: .milliseconds(100), autoReconnect: autoReconnect)
+                connectionTimeout: .milliseconds(200), pingInterval: .milliseconds(100), reconnect: reconnect)
         )
     }
 
@@ -47,7 +47,7 @@ struct TerminalDropStreamTests {
     @Test("a keepalive drop with auto-reconnect disabled ends the message streams")
     func keepaliveDropEndsStreams() async throws {
         let socket = MockWebSocketSession(defersPing: true)
-        let connection = makeConnection(socket: socket, autoReconnect: false)
+        let connection = makeConnection(socket: socket, reconnect: nil)
 
         let connectTask = Task { try await connection.connect() }
         await socket.waitForPing()
@@ -64,7 +64,7 @@ struct TerminalDropStreamTests {
     @Test("a transport error with auto-reconnect disabled ends the message streams")
     func transportErrorEndsStreams() async throws {
         let socket = MockWebSocketSession()
-        let connection = makeConnection(socket: socket, autoReconnect: false)
+        let connection = makeConnection(socket: socket, reconnect: nil)
         try await connection.connect()
 
         let messages = await connection.messages()
@@ -78,7 +78,7 @@ struct TerminalDropStreamTests {
     @Test("a drop with auto-reconnect enabled keeps the streams open")
     func reconnectingDropKeepsStreams() async throws {
         let socket = MockWebSocketSession()
-        let connection = makeConnection(socket: socket, autoReconnect: true)
+        let connection = makeConnection(socket: socket, reconnect: .default)
         try await connection.connect()
 
         let messages = await connection.messages()

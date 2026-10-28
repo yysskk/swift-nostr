@@ -13,21 +13,16 @@ struct RelayConnectionConfigTests {
         #expect(config.publishAckTimeout == .seconds(30))
         #expect(config.queryTimeout == .seconds(10))
         #expect(config.pingInterval == .seconds(30))
-        #expect(config.autoReconnect == true)
-        #expect(config.maximumReconnectAttempts == 0)
-        #expect(config.initialReconnectDelay == .seconds(1))
-        #expect(config.maximumReconnectDelay == .seconds(60))
-        #expect(config.reconnectBackoffMultiplier == 2.0)
-        #expect(RelayConnectionConfig.minimumReconnectDelay == .milliseconds(100))
+        #expect(config.reconnect == .default)
     }
 
     @Test("memberwise init resolves unambiguously to the new initializer")
     func memberwiseInitResolution() {
-        let config = RelayConnectionConfig(autoReconnect: false)
+        let config = RelayConnectionConfig(reconnect: nil)
         #expect(config.sendTimeout == .seconds(10))
         #expect(config.publishAckTimeout == .seconds(30))
         #expect(config.pingInterval == .seconds(30))
-        #expect(config.autoReconnect == false)
+        #expect(config.reconnect == nil)
     }
 
 }

@@ -17,13 +17,13 @@ extension RelayConnection {
     /// Resets reconnect state after successful connection
     func resetReconnectState() {
         reconnectAttempts = 0
-        currentReconnectDelay = config.resolvedInitialReconnectDelay
+        currentReconnectDelay = config.firstReconnectDelay
         isReconnecting = false
     }
 
-    /// Schedules a reconnection attempt if auto-reconnect is enabled
+    /// Schedules a reconnection attempt if ``RelayConnectionConfig/reconnect`` allows another.
     func scheduleReconnectIfNeeded() {
-        guard config.autoReconnect else {
+        guard let policy = config.reconnect else {
             // Equally terminal: nothing will reconnect, so the drop that brought us here ends the
             // message streams. The receive loop cannot be relied on to do it — a drop that goes
             // through `discardSocket()` retires the loop's generation first, so the loop exits
@@ -33,8 +33,7 @@ extension RelayConnection {
         }
         guard !isReconnecting else { return }
 
-        // Check if we've exceeded max attempts
-        if config.maximumReconnectAttempts > 0 && reconnectAttempts >= config.maximumReconnectAttempts {
+        guard policy.allowsAttempt(after: reconnectAttempts) else {
             // Terminal give-up: the receive loop kept the message streams
             // alive for this reconnect cycle, and no further attempt will be
             // scheduled, so nothing else can end them.
@@ -52,13 +51,13 @@ extension RelayConnection {
             // Wait with exponential backoff. The delay is bounded where it is read, not where it
             // was configured: the fields are mutable, so a zero or negative delay set after init
             // would otherwise turn the unlimited-attempt default into a loop with no pause at all.
-            let delay = config.boundedReconnectDelay(currentReconnectDelay)
+            let delay = policy.boundedDelay(currentReconnectDelay)
             try? await Task.sleep(for: delay * jitter(Self.jitterRange))
 
             guard !Task.isCancelled else { return }
 
             // Calculate next delay with exponential backoff
-            currentReconnectDelay = config.nextReconnectDelay(after: delay)
+            currentReconnectDelay = policy.nextDelay(after: delay)
             reconnectAttempts += 1
 
             do {
