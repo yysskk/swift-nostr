@@ -101,6 +101,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     list entry: `Tag.group(_:)` → `Tag.groupID(_:)`, `Tag.simpleGroup(id:relayURL:name:)` →
     `Tag.groupListEntry(id:relayURL:name:)`, and the matching `Tag.Name` constants `.group` →
     `.groupID` and `.simpleGroup` → `.groupListEntry`. The wire tags are unchanged.
+- **Relay message parsing and LNURL invoices use value names** (breaking):
+  - Parsing a relay frame is an initializer: `RelayMessage.parse(_:)` → `RelayMessage(json:)`, which
+    still throws `RelayMessage.Error.malformed`.
+  - `RelayMessage.count(subscriptionID:count:approximate:)` → `count(subscriptionID:count:)`, whose
+    `count` is the `EventCount` that `countEvents(matching:timeout:)` returns: `count` →
+    `count.value` and `approximate` → `count.isApproximate`, which is `false` when the relay omits the
+    flag rather than `nil`.
+  - `LNURLInvoiceResponse.pr` → `invoice`, and `init(pr:)` → `init(invoice:)`; it still decodes
+    from the LNURL `pr` key.
 
 ### Fixed
 

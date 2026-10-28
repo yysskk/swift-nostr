@@ -196,11 +196,15 @@ public struct LNURLPayResponse: Decodable, Sendable, Hashable {
 
 /// The response from an LNURL-pay callback: the bolt11 invoice to pay for a zap (NIP-57).
 public struct LNURLInvoiceResponse: Decodable, Sendable, Hashable {
-    /// The bolt11 Lightning invoice to pay (the `pr`, or "payment request", field).
-    public let pr: String
+    /// The bolt11 Lightning invoice to pay (the LNURL `pr` field).
+    public let invoice: String
 
-    public init(pr: String) {
-        self.pr = pr
+    public init(invoice: String) {
+        self.invoice = invoice
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case invoice = "pr"
     }
 }
 
@@ -309,10 +313,10 @@ extension LNURLPayResponse {
             throw InvoiceError.lnurlError(status.reason ?? "unknown error")
         }
 
-        guard let invoice = try? JSONDecoder().decode(LNURLInvoiceResponse.self, from: data) else {
+        guard let response = try? JSONDecoder().decode(LNURLInvoiceResponse.self, from: data) else {
             throw InvoiceError.invalidResponse
         }
-        return invoice.pr
+        return response.invoice
     }
 }
 

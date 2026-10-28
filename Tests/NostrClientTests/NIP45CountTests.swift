@@ -196,13 +196,13 @@ struct NIP45CountTests {
         mock.deliver(.string("[\"COUNT\",\"unrelated-sub\",{\"count\":5}]"))
 
         let message = await observed.value
-        guard case .count(let subscriptionID, let count, _)? = message else {
+        guard case .count(let subscriptionID, let count)? = message else {
             Issue.record("Expected a COUNT message on the messages() stream")
             await connection.disconnect()
             return
         }
         #expect(subscriptionID == "unrelated-sub")
-        #expect(count == 5)
+        #expect(count == EventCount(value: 5))
         await connection.disconnect()
     }
 

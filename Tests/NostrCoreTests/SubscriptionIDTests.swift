@@ -53,8 +53,8 @@ struct SubscriptionIDTests {
             #"["COUNT","sub1",{"count":3}]"#,
         ]
         for frame in frames {
-            switch try RelayMessage.parse(frame) {
-            case .event(let id, _), .endOfStoredEvents(let id), .closed(let id, _), .count(let id, _, _):
+            switch try RelayMessage(json: frame) {
+            case .event(let id, _), .endOfStoredEvents(let id), .closed(let id, _), .count(let id, _):
                 #expect(id == SubscriptionID(rawValue: "sub1"))
             default:
                 Issue.record("\(frame) did not parse as a subscription message")
