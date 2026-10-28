@@ -246,8 +246,8 @@ struct NIP45CountTests {
 
         let urlA = RelayURL("wss://relay-a.example.com")!
         let urlB = RelayURL("wss://relay-b.example.com")!
-        let connectionA = await pool.addRelay(urlA)
-        let connectionB = await pool.addRelay(urlB)
+        let connectionA = await pool.add(urlA)
+        let connectionB = await pool.add(urlB)
         // Connect sequentially so the factory pairs mockA with relay A.
         try await connectionA.connect()
         try await connectionB.connect()
@@ -266,7 +266,7 @@ struct NIP45CountTests {
         let results = try await task.value
         #expect(results[urlA] == EventCount(value: 5))
         #expect(results[urlB] == EventCount(value: 9))
-        await pool.disconnectAll()
+        await pool.disconnect()
     }
 
     @Test("the pool tolerates a relay that never answers and returns only the replies")
@@ -282,8 +282,8 @@ struct NIP45CountTests {
 
         let urlA = RelayURL("wss://relay-a.example.com")!
         let urlB = RelayURL("wss://relay-b.example.com")!
-        let connectionA = await pool.addRelay(urlA)
-        let connectionB = await pool.addRelay(urlB)
+        let connectionA = await pool.add(urlA)
+        let connectionB = await pool.add(urlB)
         try await connectionA.connect()
         try await connectionB.connect()
 
@@ -301,7 +301,7 @@ struct NIP45CountTests {
         #expect(results[urlA] == EventCount(value: 7))
         #expect(results[urlB] == nil)
         #expect(results.count == 1)
-        await pool.disconnectAll()
+        await pool.disconnect()
     }
 
     @Test("the pool count throws when no targeted relay answers")
@@ -315,8 +315,8 @@ struct NIP45CountTests {
             webSocketFactory: MockWebSocketSessionFactory(makeSession: { mocks[counter.next()] })
         )
 
-        let connectionA = await pool.addRelay(RelayURL("wss://relay-a.example.com")!)
-        let connectionB = await pool.addRelay(RelayURL("wss://relay-b.example.com")!)
+        let connectionA = await pool.add(RelayURL("wss://relay-a.example.com")!)
+        let connectionB = await pool.add(RelayURL("wss://relay-b.example.com")!)
         try await connectionA.connect()
         try await connectionB.connect()
 
@@ -324,7 +324,7 @@ struct NIP45CountTests {
         await #expect(throws: RelayConnection.Error.timedOut) {
             try await pool.countEvents(matching: [Filter(kinds: [.textNote])], timeout: .milliseconds(200))
         }
-        await pool.disconnectAll()
+        await pool.disconnect()
     }
 
     @Test("the pool count without a timeout uses the pool's queryTimeout, not the relay's")
@@ -337,7 +337,7 @@ struct NIP45CountTests {
             config: RelayPoolConfig(defaultRelayConfig: relayConfig, queryTimeout: .milliseconds(50)),
             webSocketFactory: MockWebSocketSessionFactory(makeSession: { mock })
         )
-        let connection = await pool.addRelay(relayURL)
+        let connection = await pool.add(relayURL)
         try await connection.connect()
 
         // The relay never replies: the pool's 50 ms governs, not the connection's 30 s.
@@ -346,7 +346,7 @@ struct NIP45CountTests {
             try await pool.countEvents(matching: [Filter(kinds: [.textNote])])
         }
         #expect(ContinuousClock.now - start < .seconds(5))
-        await pool.disconnectAll()
+        await pool.disconnect()
     }
 
     @Test("an explicit pool count timeout overrides the pool's queryTimeout")
@@ -356,7 +356,7 @@ struct NIP45CountTests {
             config: RelayPoolConfig(defaultRelayConfig: noReconnectConfig, queryTimeout: .seconds(30)),
             webSocketFactory: MockWebSocketSessionFactory(makeSession: { mock })
         )
-        let connection = await pool.addRelay(relayURL)
+        let connection = await pool.add(relayURL)
         try await connection.connect()
 
         let start = ContinuousClock.now
@@ -364,7 +364,7 @@ struct NIP45CountTests {
             try await pool.countEvents(matching: [Filter(kinds: [.textNote])], timeout: .milliseconds(50))
         }
         #expect(ContinuousClock.now - start < .seconds(5))
-        await pool.disconnectAll()
+        await pool.disconnect()
     }
 
     // MARK: - NostrClient
@@ -382,8 +382,8 @@ struct NIP45CountTests {
         let client = NostrClient(relayPool: pool)
 
         let urlA = RelayURL("wss://relay-a.example.com")!
-        let connectionA = await pool.addRelay(urlA)
-        let connectionB = await pool.addRelay(RelayURL("wss://relay-b.example.com")!)
+        let connectionA = await pool.add(urlA)
+        let connectionB = await pool.add(RelayURL("wss://relay-b.example.com")!)
         try await connectionA.connect()
         try await connectionB.connect()
 
@@ -418,8 +418,8 @@ struct NIP45CountTests {
 
         let urlA = RelayURL("wss://relay-a.example.com")!
         let urlB = RelayURL("wss://relay-b.example.com")!
-        let connectionA = await pool.addRelay(urlA)
-        let connectionB = await pool.addRelay(urlB)
+        let connectionA = await pool.add(urlA)
+        let connectionB = await pool.add(urlB)
         try await connectionA.connect()
         try await connectionB.connect()
 

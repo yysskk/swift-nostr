@@ -103,7 +103,7 @@ struct NostrClientFetchTests {
             webSocketFactory: MockWebSocketSessionFactory(makeSession: { socket })
         )
         let client = NostrClient(relayPool: pool)
-        let connection = await pool.addRelay(ConnectedClientFixture.defaultRelayURL)
+        let connection = await pool.add(ConnectedClientFixture.defaultRelayURL)
         try await connection.connect()
         return client
     }

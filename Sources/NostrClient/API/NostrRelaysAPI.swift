@@ -38,12 +38,12 @@ public struct NostrRelaysAPI: NostrRelayManaging {
     /// - Returns: The relay's connection in the pool.
     @discardableResult
     public func add(_ url: RelayURL, config: RelayConnectionConfig?) async -> RelayConnection {
-        await client.pool.addRelay(url, config: config)
+        await client.pool.add(url, config: config)
     }
 
     /// Removes a relay from the pool, disconnecting it; removing an absent relay is a no-op.
     public func remove(_ url: RelayURL) async {
-        await client.pool.removeRelay(url)
+        await client.pool.remove(url)
     }
 
     // MARK: - Connection lifecycle
@@ -52,7 +52,7 @@ public struct NostrRelaysAPI: NostrRelayManaging {
     /// - Throws: ``RelayPool/Error/allConnectionsFailed`` if every relay in the pool fails to
     ///   connect; partial connection failures are tolerated.
     public func connect() async throws(RelayPool.Error) {
-        _ = try await client.pool.connectAll()
+        _ = try await client.pool.connect()
     }
 
     /// Disconnects from all relays, ending every open subscription.
@@ -63,7 +63,7 @@ public struct NostrRelaysAPI: NostrRelayManaging {
     /// longer arrive. Reconnecting with ``connect()`` restores the relays; the subscriptions have
     /// to be opened again.
     public func disconnect() async {
-        await client.pool.disconnectAll()
+        await client.pool.disconnect()
     }
 
     // MARK: - Inspection

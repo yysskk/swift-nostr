@@ -59,7 +59,7 @@ extension NostrEventFetching {
     ///   - timeout: How long to wait for relays to finish; `nil` uses
     ///     ``RelayPoolConfig/queryTimeout``.
     /// - Returns: The profile, or nil if none was found or its content does not decode.
-    public func fetchMetadata(publicKey: PublicKey, timeout: Duration? = nil) async throws -> UserMetadata? {
+    public func fetchMetadata(for publicKey: PublicKey, timeout: Duration? = nil) async throws -> UserMetadata? {
         let events = try await fetch(filters: [.metadata(publicKeys: [publicKey])], route: .pool, timeout: timeout)
 
         guard let event = VerifiedEventSelection.newest(in: events, kind: .setMetadata, author: publicKey)

@@ -323,11 +323,11 @@ struct NIP42AutomaticAuthenticationTests {
         let urlA = RelayURL("wss://relay-a.example.com")!
         let urlB = RelayURL("wss://relay-b.example.com")!
 
-        let connectionA = await pool.addRelay(urlA)
+        let connectionA = await pool.add(urlA)
         await pool.setAuthenticationResponder { relayURL, challenge in
             signer.sign(.clientAuthentication(relayURL: relayURL, challenge: challenge))
         }
-        let connectionB = await pool.addRelay(urlB)
+        let connectionB = await pool.add(urlB)
         // Connect sequentially so the factory pairs mockA with relay A and
         // mockB with relay B deterministically.
         try await connectionA.connect()
@@ -341,7 +341,7 @@ struct NIP42AutomaticAuthenticationTests {
             let sent = try await acknowledgeAuth(on: connection, mock: mock)
             #expect(sent.firstTagValue(named: "relay") == url.description)
         }
-        await pool.disconnectAll()
+        await pool.disconnect()
     }
 
     // MARK: - NostrClient

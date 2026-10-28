@@ -57,17 +57,17 @@ struct RelayPoolUnsubscribeTests {
             webSocketFactory: sockets
         )
 
-        let holdingConnection = await pool.addRelay(holding)
-        let droppedConnection = await pool.addRelay(dropped)
+        let holdingConnection = await pool.add(holding)
+        let droppedConnection = await pool.add(dropped)
         try await holdingConnection.connect()
         try await droppedConnection.connect()
         let subscription = try await pool.subscribe(filters: [Filter(kinds: [1])])
 
         // Added after the REQ went out: one connected relay that never received it, and one
         // relay that was never connected at all.
-        let lateConnection = await pool.addRelay(lateConnected)
+        let lateConnection = await pool.add(lateConnected)
         try await lateConnection.connect()
-        await pool.addRelay(neverConnected)
+        await pool.add(neverConnected)
 
         // The dropped relay held the subscription, but its socket — and the relay's REQ — is gone.
         try #require(sockets.sockets(for: dropped).count == 1)
@@ -87,6 +87,6 @@ struct RelayPoolUnsubscribeTests {
         #expect(sockets.sockets(for: neverConnected).isEmpty)
         #expect(await pool.relay(for: neverConnected)?.state == .disconnected)
         #expect(await !droppedConnection.hasSubscription(subscription.id))
-        await pool.disconnectAll()
+        await pool.disconnect()
     }
 }

@@ -25,9 +25,9 @@ struct PublishStrategyTests {
 
     private func makePool() async throws -> RelayPool {
         let pool = RelayPool()
-        await pool.addRelay(urlA)
-        await pool.addRelay(urlB)
-        await pool.addRelay(urlC)
+        await pool.add(urlA)
+        await pool.add(urlB)
+        await pool.add(urlC)
         return pool
     }
 
@@ -99,14 +99,14 @@ struct PublishStrategyTests {
         // fast: one acknowledgment against a quorum of two.
         let (client, socket) = try await ConnectedClientFixture.make(relayURL: urlA)
         let pool = await client.pool
-        await pool.addRelay(urlB)
+        await pool.add(urlB)
 
         await #expect(throws: RelayPool.Error.quorumNotMet(acknowledged: 1, required: 2)) {
             try await PublishAckSupport.acknowledgingPublishes(on: socket) {
                 try await pool.publish(self.dummyEvent, strategy: .quorum(2))
             }
         }
-        await pool.disconnectAll()
+        await pool.disconnect()
     }
 
     @Test("publish on a disconnected connection fails fast with notConnected")

@@ -167,7 +167,7 @@ public protocol NostrEventPublishing: Sendable {
 /// Implemented by ``NostrEventsAPI``.
 ///
 /// The requirements are the fetch and count primitives; the lookups (``fetchEvent(id:timeout:)``,
-/// ``fetchMetadata(publicKey:timeout:)``, …) and the short forms of the primitives are provided by
+/// ``fetchMetadata(for:timeout:)``, …) and the short forms of the primitives are provided by
 /// an extension built on them.
 public protocol NostrEventFetching: Sendable {
     /// Fetches events matching `filters` along `route`, waiting for every targeted relay to send

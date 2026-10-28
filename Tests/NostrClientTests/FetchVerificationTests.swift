@@ -166,7 +166,7 @@ struct FetchVerificationTests {
 
         // The forgery arrives first and is the newest by timestamp: both old selections favoured it.
         let metadata = try await answering(socket, with: [forgery, stale, current]) {
-            try await client.events.fetchMetadata(publicKey: victim.publicKey)
+            try await client.events.fetchMetadata(for: victim.publicKey)
         }
 
         #expect(metadata?.name == "current")

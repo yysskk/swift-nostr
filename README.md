@@ -172,7 +172,7 @@ for await event in try await client.subscriptions.subscribe(filters: [filter]).e
 }
 
 // One-shot fetch
-let metadata = try await client.events.fetchMetadata(publicKey: alice)
+let metadata = try await client.events.fetchMetadata(for: alice)
 print(metadata?.name ?? "Unknown")
 ```
 

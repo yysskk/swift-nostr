@@ -26,7 +26,7 @@ struct NostrClientTargetedPublishTests {
             webSocketFactory: MockWebSocketSessionFactory(makeSession: { sockets[counter.next()] })
         )
         for url in relayURLs {
-            try await pool.addRelay(url).connect()
+            try await pool.add(url).connect()
         }
         return (NostrClient(relayPool: pool), sockets)
     }

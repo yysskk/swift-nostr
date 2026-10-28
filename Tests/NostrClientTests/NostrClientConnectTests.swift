@@ -15,7 +15,7 @@ struct NostrClientConnectTests {
     }
 
     @Test("relays.add(_:config:) applies the per-relay configuration")
-    func addRelayAppliesConfig() async throws {
+    func addAppliesConfig() async throws {
         let client = NostrClient()
         let config = RelayConnectionConfig(
             connectionTimeout: .seconds(42), pingInterval: .seconds(60), reconnect: nil)
@@ -30,7 +30,7 @@ struct NostrClientConnectTests {
     }
 
     @Test("relays.remove removes via an alternate spelling and ignores absent relays")
-    func removeRelayNormalizesAndIgnoresAbsent() async throws {
+    func removeNormalizesAndIgnoresAbsent() async throws {
         let client = NostrClient()
         _ = await client.relays.add(RelayURL("wss://relay.example.com")!)
         #expect(await client.relays.pool.relayCount == 1)

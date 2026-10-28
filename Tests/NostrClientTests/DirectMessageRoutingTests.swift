@@ -45,7 +45,7 @@ struct DirectMessageRoutingTests {
     @Test("Routes to a recipient's cached DM inbox relays present in the pool")
     func routesRecipientInbox() async throws {
         let pool = RelayPool()
-        await pool.addRelay(inboxURL)
+        await pool.add(inboxURL)
         let client = NostrClient(relayPool: pool, gossipPolicy: .requirePresent)
 
         let recipient = PublicKey.fixture("recipient")
