@@ -63,7 +63,7 @@ public struct TLVRecord: Codable, Sendable, Hashable {
 
 /// A `pay_invoice` request: pays a BOLT-11 invoice.
 public struct PayInvoiceRequest: WalletConnectRequest, Codable, Hashable {
-    public typealias Response = PayInvoiceResult
+    public typealias Response = PaymentResult
 
     public static let method: WalletConnectMethod = .payInvoice
 
@@ -105,7 +105,7 @@ struct MultiPayInvoiceParams: Encodable, Sendable {
 
 /// A `pay_keysend` request: sends a spontaneous payment to a Lightning node.
 public struct PayKeysendRequest: WalletConnectRequest, Codable, Hashable {
-    public typealias Response = PayKeysendResult
+    public typealias Response = PaymentResult
 
     public static let method: WalletConnectMethod = .payKeysend
 
@@ -240,38 +240,66 @@ public struct MakeInvoiceRequest: WalletConnectRequest, Codable, Hashable {
     }
 }
 
-/// A `lookup_invoice` request: looks up an invoice.
+/// A `lookup_invoice` request: looks up an invoice by exactly one ``Key``.
 ///
-/// Construct one with ``paymentHash(_:)`` or ``invoice(_:)`` — the type guarantees exactly one
-/// lookup key is set, so an invalid empty request cannot be expressed.
+/// The params carry either `payment_hash` or `invoice`, never both and never neither; the stored
+/// ``key`` makes any other shape unrepresentable, and decoding rejects one.
 public struct LookupInvoiceRequest: WalletConnectRequest, Codable, Hashable {
     public typealias Response = LookupInvoiceResult
 
     public static let method: WalletConnectMethod = .lookupInvoice
 
-    /// The payment hash to look up, if looking up by payment hash.
-    public let paymentHash: String?
-    /// The BOLT-11 invoice to look up, if looking up by invoice.
-    public let invoice: String?
+    /// What a `lookup_invoice` request looks an invoice up by.
+    public enum Key: Sendable, Hashable {
+        /// The invoice's payment hash (hex), sent as `payment_hash`.
+        case paymentHash(String)
+        /// The BOLT-11 invoice string, sent as `invoice`.
+        case invoice(String)
+    }
+
+    /// The key the invoice is looked up by.
+    public let key: Key
 
     enum CodingKeys: String, CodingKey {
         case paymentHash = "payment_hash"
         case invoice
     }
 
-    private init(paymentHash: String?, invoice: String?) {
-        self.paymentHash = paymentHash
-        self.invoice = invoice
+    /// Creates a `lookup_invoice` request.
+    /// - Parameter key: The payment hash or BOLT-11 invoice to look up.
+    public init(_ key: Key) {
+        self.key = key
     }
 
-    /// Looks up an invoice by its payment hash.
-    public static func paymentHash(_ paymentHash: String) -> LookupInvoiceRequest {
-        LookupInvoiceRequest(paymentHash: paymentHash, invoice: nil)
+    /// Decodes the request from params holding exactly one of `payment_hash` and `invoice`.
+    /// - Throws: `DecodingError.dataCorrupted` if both keys or neither is present, or
+    ///   `DecodingError` if the present one is not a string.
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let paymentHash = try container.decodeIfPresent(String.self, forKey: .paymentHash)
+        let invoice = try container.decodeIfPresent(String.self, forKey: .invoice)
+        switch (paymentHash, invoice) {
+        case (let paymentHash?, nil):
+            self.init(.paymentHash(paymentHash))
+        case (nil, let invoice?):
+            self.init(.invoice(invoice))
+        default:
+            let context = DecodingError.Context(
+                codingPath: container.codingPath,
+                debugDescription: "lookup_invoice needs exactly one of payment_hash and invoice")
+            throw DecodingError.dataCorrupted(context)
+        }
     }
 
-    /// Looks up an invoice by its BOLT-11 string.
-    public static func invoice(_ invoice: String) -> LookupInvoiceRequest {
-        LookupInvoiceRequest(paymentHash: nil, invoice: invoice)
+    /// Encodes the request as either `payment_hash` or `invoice`, matching ``key``.
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        switch key {
+        case .paymentHash(let paymentHash):
+            try container.encode(paymentHash, forKey: .paymentHash)
+        case .invoice(let invoice):
+            try container.encode(invoice, forKey: .invoice)
+        }
     }
 }
 

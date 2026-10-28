@@ -33,7 +33,7 @@ struct WalletConnectRequestTests {
         #expect(
             try envelope(PayKeysendRequest(amount: 1, nodePublicKey: "02abc"))["method"] == .string("pay_keysend"))
         #expect(try envelope(MakeInvoiceRequest(amount: 1))["method"] == .string("make_invoice"))
-        #expect(try envelope(LookupInvoiceRequest.invoice("lnbc1"))["method"] == .string("lookup_invoice"))
+        #expect(try envelope(LookupInvoiceRequest(.invoice("lnbc1")))["method"] == .string("lookup_invoice"))
         #expect(try envelope(ListTransactionsRequest())["method"] == .string("list_transactions"))
         #expect(try envelope(GetBalanceRequest())["method"] == .string("get_balance"))
         #expect(try envelope(GetInfoRequest())["method"] == .string("get_info"))
@@ -159,11 +159,34 @@ struct WalletConnectRequestTests {
 
     @Test("lookup_invoice by payment hash sends only payment_hash")
     func lookupByPaymentHash() throws {
-        let root = try wire(
-            RequestEnvelope(method: .lookupInvoice, params: LookupInvoiceRequest.paymentHash("aa")))
-        let params = try params(root)
-        #expect(params["payment_hash"] == .string("aa"))
-        #expect(params["invoice"] == nil)
+        let params = try wire(LookupInvoiceRequest(.paymentHash("aa")))
+        #expect(params == ["payment_hash": .string("aa")])
+    }
+
+    @Test("lookup_invoice by invoice sends only invoice")
+    func lookupByInvoice() throws {
+        let params = try wire(LookupInvoiceRequest(.invoice("lnbc1")))
+        #expect(params == ["invoice": .string("lnbc1")])
+    }
+
+    @Test(
+        "lookup_invoice decodes exactly one key",
+        arguments: [
+            (#"{"payment_hash":"aa"}"#, LookupInvoiceRequest.Key.paymentHash("aa")),
+            (#"{"invoice":"lnbc1"}"#, LookupInvoiceRequest.Key.invoice("lnbc1")),
+        ])
+    func lookupDecodesOneKey(json: String, key: LookupInvoiceRequest.Key) throws {
+        let request = try JSONDecoder().decode(LookupInvoiceRequest.self, from: Data(json.utf8))
+        #expect(request.key == key)
+    }
+
+    @Test(
+        "lookup_invoice decoding rejects both keys or neither",
+        arguments: [#"{"payment_hash":"aa","invoice":"lnbc1"}"#, "{}"])
+    func lookupRejectsBothOrNeither(json: String) {
+        #expect(throws: DecodingError.self) {
+            _ = try JSONDecoder().decode(LookupInvoiceRequest.self, from: Data(json.utf8))
+        }
     }
 
     @Test("list_transactions encodes the transaction type")

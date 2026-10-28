@@ -5,8 +5,11 @@ public import NostrCore
 /// The info event's content is a space-separated list of supported method names; its `encryption`
 /// and `notifications` tags list the supported encryption schemes and notification types. A wallet
 /// that omits the `encryption` tag is assumed to use NIP-04 (the spec's legacy default).
+///
+/// Returned by ``WalletConnection/fetchCapabilities()``. For the Lightning node behind the wallet
+/// (`get_info`), see ``GetInfoResult``.
 /// https://github.com/nostr-protocol/nips/blob/master/47.md
-public struct WalletInfo: Sendable, Hashable {
+public struct WalletCapabilities: Sendable, Hashable {
     /// The commands the wallet advertises, in order, including methods this package has no
     /// constant for.
     public let methods: [WalletConnectMethod]

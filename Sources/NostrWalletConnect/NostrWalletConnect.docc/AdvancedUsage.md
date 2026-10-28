@@ -30,38 +30,39 @@ let config = WalletConnection.Config(preferredEncryption: .nip04)
 let connection = WalletConnection(uri: uri, config: config)
 
 // 2. Negotiate from the wallet's advertised capabilities.
-let info = try await connection.fetchInfo()   // cached; later commands use the negotiated scheme
-print(info.negotiatedEncryption)              // .nip44 when supported, else .nip04
+let capabilities = try await connection.fetchCapabilities() // cached; later commands negotiate
+print(capabilities.negotiatedEncryption)                    // .nip44 when supported, else .nip04
 ```
 
-``WalletConnection/fetchInfo()`` fetches the wallet's info event (kind 13194) and caches it, so
-subsequent commands automatically use ``WalletInfo/negotiatedEncryption``. An explicit
+``WalletConnection/fetchCapabilities()`` fetches the wallet's info event (kind 13194) and caches
+the capabilities it advertises, so subsequent commands automatically use
+``WalletCapabilities/negotiatedEncryption``. An explicit
 ``WalletConnection/Config/preferredEncryption`` always wins over negotiation.
 
 ## Inspecting Wallet Capabilities
 
-``WalletInfo`` describes what a wallet supports. Use it to gate features before issuing a command
-that the wallet would reject:
+``WalletCapabilities`` describes what a wallet supports. Use it to gate features before issuing a
+command that the wallet would reject:
 
 ```swift
-let info = try await connection.fetchInfo()
+let capabilities = try await connection.fetchCapabilities()
 
-if info.supports(.payInvoice) {
+if capabilities.supports(.payInvoice) {
     let payment = try await connection.payInvoice("lnbc...")
     print(payment.preimage)
 }
 
-print("Methods:", info.methods)             // every advertised command
-print("Encryptions:", info.encryptions)     // never empty; defaults to [.nip04]
-print("Notifications:", info.notifications) // e.g. [payment_received, payment_sent]
+print("Methods:", capabilities.methods)             // every advertised command
+print("Encryptions:", capabilities.encryptions)     // never empty; defaults to [.nip04]
+print("Notifications:", capabilities.notifications) // e.g. [payment_received, payment_sent]
 ```
 
-``WalletConnectMethod`` is open-ended: ``WalletInfo/methods`` keeps every token the wallet
+``WalletConnectMethod`` is open-ended: ``WalletCapabilities/methods`` keeps every token the wallet
 advertises, and a method this package has no constant for is checked with
 ``WalletConnectMethod/init(rawValue:)``:
 
 ```swift
-if info.supports(WalletConnectMethod(rawValue: "sign_message")) {
+if capabilities.supports(WalletConnectMethod(rawValue: "sign_message")) {
     // the wallet advertises a command outside the built-in set
 }
 ```
@@ -70,11 +71,10 @@ if info.supports(WalletConnectMethod(rawValue: "sign_message")) {
 
 ```swift
 // Create an invoice to receive a payment.
-let created = try await connection.makeInvoice(
-    MakeInvoiceRequest(amount: 21_000, description: "coffee", expiry: .seconds(3600)))
+let created = try await connection.makeInvoice(amount: 21_000, description: "coffee", expiry: .seconds(3600))
 print(created.invoice ?? "")   // a WalletConnectTransaction
 
-// Look up an invoice — by payment hash or by BOLT-11 string. The type guarantees exactly one key.
+// Look up an invoice — by payment hash or by BOLT-11 string. The key is exactly one of the two.
 let byHash = try await connection.lookupInvoice(.paymentHash("abc123..."))
 let byBolt11 = try await connection.lookupInvoice(.invoice("lnbc..."))
 print(byHash.state == .settled, byBolt11.amount)
@@ -86,15 +86,14 @@ print("\(balance.balance) msat")
 
 ## Listing Transactions
 
-``WalletConnection/listTransactions(_:)`` returns matching ``WalletConnectTransaction`` values,
-newest first. Filter by time window (`from` / `until`, each a `Timestamp`), direction,
-paid/unpaid, and paginate with `limit` / `offset`. A transaction's `createdAt`, `expiresAt`, and
+``WalletConnection/listTransactions(from:until:limit:offset:unpaid:type:)`` returns matching
+``WalletConnectTransaction`` values, newest first. Filter by time window (`from` / `until`, each a
+`Timestamp`), direction, paid/unpaid, and paginate with `limit` / `offset`. A transaction's `createdAt`, `expiresAt`, and
 `settledAt` are `Timestamp` values too:
 
 ```swift
 let lastWeek = Timestamp.now.advanced(by: .seconds(-7 * 24 * 60 * 60))
-let outgoing = try await connection.listTransactions(
-    ListTransactionsRequest(from: lastWeek, limit: 50, type: .outgoing))
+let outgoing = try await connection.listTransactions(from: lastWeek, limit: 50, type: .outgoing)
 for tx in outgoing {
     print("\(tx.type) \(tx.amount) msat — \(tx.state?.rawValue ?? "?")")
 }
@@ -108,10 +107,9 @@ A keysend is a spontaneous payment to a node's public key, with no invoice. The
 
 ```swift
 let result = try await connection.payKeysend(
-    PayKeysendRequest(
-        amount: 10_000,
-        nodePublicKey: "<lightning-node-public-key-hex>",
-        tlvRecords: [TLVRecord(type: 696969, value: "68656c6c6f")]))
+    amount: 10_000,
+    nodePublicKey: "<lightning-node-public-key-hex>",
+    tlvRecords: [TLVRecord(type: 696969, value: "68656c6c6f")])
 print(result.preimage)
 ```
 
@@ -171,8 +169,8 @@ struct GetBudgetResult: Decodable, Sendable {
     }
 }
 
-let info = try await connection.fetchInfo()
-if info.supports(GetBudgetRequest.method) {
+let capabilities = try await connection.fetchCapabilities()
+if capabilities.supports(GetBudgetRequest.method) {
     let budget = try await connection.send(GetBudgetRequest())
     print("\(budget.usedBudget) msat used")
 }
@@ -309,7 +307,7 @@ The other cases — ``WalletConnectError/invalidURI(reason:)``,
 ``WalletConnectError/missingResult``, ``WalletConnectError/unsupportedEncryption(_:)``,
 ``WalletConnectError/superseded``, ``WalletConnectError/notConnected``, and
 ``WalletConnectError/cancelled`` — cover URI parsing, encryption/encoding failures, malformed
-responses, a response encrypted with a scheme this package does not implement, a `fetchInfo()`
+responses, a response encrypted with a scheme this package does not implement, a `fetchCapabilities()`
 superseded by a newer call, a connection torn down while waiting, and a cancelled task. A request
 cancelled after it was sent may still be carried out by the wallet.
 

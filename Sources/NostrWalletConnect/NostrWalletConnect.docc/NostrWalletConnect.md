@@ -64,15 +64,12 @@ print(payment.preimage)
 
 ### Results
 
-- ``PayInvoiceResult``
-- ``PayKeysendResult``
+- ``PaymentResult``
 - ``GetBalanceResult``
 - ``GetInfoResult``
 - ``ListTransactionsResult``
 - ``MakeInvoiceResult``
 - ``LookupInvoiceResult``
-- ``MultiPayInvoiceItemResult``
-- ``MultiPayKeysendItemResult``
 
 ### Transactions and Notifications
 
@@ -81,9 +78,9 @@ print(payment.preimage)
 - ``WalletConnectNotification``
 - ``WalletConnectNotificationType``
 
-### Wallet Info and Encryption
+### Wallet Capabilities and Encryption
 
-- ``WalletInfo``
+- ``WalletCapabilities``
 - ``WalletConnectEncryption``
 
 ### Lightning Zaps (NIP-57)
