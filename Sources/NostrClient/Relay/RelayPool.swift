@@ -50,7 +50,7 @@ public actor RelayPool {
     /// Relay URLs compare by their canonical form, so re-adding the same relay under a different
     /// spelling returns the existing connection (its `config` is ignored).
     @discardableResult
-    public func addRelay(_ url: RelayURL, config: RelayConnectionConfig? = nil) async -> RelayConnection {
+    public func add(_ url: RelayURL, config: RelayConnectionConfig? = nil) async -> RelayConnection {
         if let existing = relays[url] {
             return existing
         }
@@ -80,9 +80,9 @@ public actor RelayPool {
 
     /// Removes a relay from the pool; removing an absent relay is a no-op.
     ///
-    /// The entry is removed before the disconnect suspends, so a concurrent `addRelay` of the
+    /// The entry is removed before the disconnect suspends, so a concurrent `add(_:config:)` of the
     /// same relay cannot receive a connection that is about to be torn down.
-    public func removeRelay(_ url: RelayURL) async {
+    public func remove(_ url: RelayURL) async {
         guard let connection = relays.removeValue(forKey: url) else { return }
         await connection.disconnect()
     }
@@ -93,7 +93,7 @@ public actor RelayPool {
     /// - Throws: ``RelayPool/Error/allConnectionsFailed`` when the pool is not empty and every
     ///   relay fails to connect.
     @discardableResult
-    public func connectAll() async throws(Error) -> Int {
+    public func connect() async throws(Error) -> Int {
         var successCount = 0
 
         await withTaskGroup(of: Bool.self) { group in
@@ -126,9 +126,9 @@ public actor RelayPool {
     ///
     /// Each subscription is closed first — CLOSE goes out while the connections are still up and
     /// its sequence ends — because nothing would deliver to it afterwards: each connection clears
-    /// its own tracked subscriptions on disconnect, so a later `connectAll()` restores the sockets
+    /// its own tracked subscriptions on disconnect, so a later ``connect()`` restores the sockets
     /// but not the subscriptions. They have to be opened again.
-    public func disconnectAll() async {
+    public func disconnect() async {
         await unsubscribeAll()
         eventCache?.removeAll()
 
@@ -346,7 +346,7 @@ public actor RelayPool {
         continuation.onTermination = { [weak self] _ in
             Task { await self?.unsubscribe(id: id) }
         }
-        // Registered before anything suspends, so an `unsubscribeAll()` or `disconnectAll()` that
+        // Registered before anything suspends, so an `unsubscribeAll()` or `disconnect()` that
         // runs while this subscription is being set up ends it too.
         subscriptions[id] = ActiveSubscription(continuation: continuation)
 
@@ -542,9 +542,9 @@ public actor RelayPool {
 // MARK: - Convenience Methods
 extension RelayPool {
     /// Adds multiple relays, each with the pool's default connection configuration.
-    public func addRelays(_ urls: some Sequence<RelayURL>) async {
+    public func add(_ urls: some Sequence<RelayURL>) async {
         for url in urls {
-            await addRelay(url)
+            await add(url)
         }
     }
 }
@@ -617,7 +617,7 @@ extension RelayPool {
         public var errorDescription: String? {
             switch self {
             case .emptyPool:
-                return "The relay pool is empty — add relays with addRelay(_:) or connect(to:) first"
+                return "The relay pool is empty — add relays with add(_:) or connect(to:) first"
             case .noMatchingRelays(let requested):
                 if requested.isEmpty {
                     return "The target relay list is empty"

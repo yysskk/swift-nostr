@@ -148,7 +148,7 @@ public struct NostrGroupsAPI: NostrGroupManaging {
     /// - Returns: The group's relay URL, to pass to the pool's targeting parameters.
     /// - Throws: ``RelayConnection/Error`` when the relay cannot be connected.
     private func ensureRelay(_ group: GroupReference) async throws(RelayConnection.Error) -> RelayURL {
-        let connection = await client.pool.addRelay(group.relayURL)
+        let connection = await client.pool.add(group.relayURL)
         try await connection.connect()
         return group.relayURL
     }

@@ -116,9 +116,9 @@ struct NIP29GroupClientTests {
     @Test("groups.join publishes a kind-9021 event only to the group's relay")
     func joinGroupTargetsOnlyTheGroupRelay() async throws {
         let (client, groupSocket, otherSocket) = makeTwoSocketClient()
-        let groupConnection = await client.relays.pool.addRelay(groupRelayURL)
+        let groupConnection = await client.relays.pool.add(groupRelayURL)
         try await groupConnection.connect()
-        let otherConnection = await client.relays.pool.addRelay(otherRelayURL)
+        let otherConnection = await client.relays.pool.add(otherRelayURL)
         try await otherConnection.connect()
         try await client.identity.setSigner(EventSigner(keyPair: KeyPair()))
 

@@ -71,7 +71,7 @@ struct NIP42AuthenticationEventTests {
     @Test("an authentication event must not be published")
     func authenticationEventCannotBePublished() async throws {
         let pool = RelayPool()
-        await pool.addRelay(RelayURL("wss://relay.example.com")!)
+        await pool.add(RelayURL("wss://relay.example.com")!)
         let signer = EventSigner(keyPair: KeyPair())
         let authEvent = signer.sign(
             .clientAuthentication(

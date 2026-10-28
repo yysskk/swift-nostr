@@ -32,7 +32,7 @@ struct RelayRouteTests {
             webSocketFactory: MockWebSocketSessionFactory(makeSession: { factorySockets[counter.next()] })
         )
         for url in [urlA, urlB, urlC] {
-            try await pool.addRelay(url).connect()
+            try await pool.add(url).connect()
         }
         return (NostrClient(relayPool: pool, gossipPolicy: gossipPolicy), sockets)
     }

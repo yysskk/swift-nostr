@@ -134,7 +134,7 @@ struct RelayListStoreTests {
             })
         )
         let store = RelayListStore(pool: pool, policy: .addAndConnect)
-        let connection = await pool.addRelay(RelayURL("wss://relay.example.com")!)
+        let connection = await pool.add(RelayURL("wss://relay.example.com")!)
         try await connection.connect()
         #expect(socketCount.current == 1)
 
@@ -147,7 +147,7 @@ struct RelayListStoreTests {
         #expect(available == [RelayURL("wss://relay.example.com")!])
         #expect(socketCount.current == 1)
         #expect(await pool.relayCount == 1)
-        await pool.disconnectAll()
+        await pool.disconnect()
     }
 
     @Test("addAndConnect returns canonical URLs for relays it adds")
@@ -162,7 +162,7 @@ struct RelayListStoreTests {
 
         #expect(available == [RelayURL("wss://new.example.com")!])
         #expect(await pool.relay(for: RelayURL("wss://new.example.com")!) != nil)
-        await pool.disconnectAll()
+        await pool.disconnect()
     }
 
 }

@@ -27,9 +27,9 @@ struct RelayPoolRoutingTests {
 
     private func makePool() async throws -> RelayPool {
         let pool = RelayPool()
-        await pool.addRelay(urlA)
-        await pool.addRelay(urlB)
-        await pool.addRelay(urlC)
+        await pool.add(urlA)
+        await pool.add(urlB)
+        await pool.add(urlC)
         return pool
     }
 
@@ -118,12 +118,12 @@ struct RelayPoolRoutingTests {
 
     // MARK: - Canonical pool keys
 
-    @Test("addRelay dedupes alternate spellings of the same relay")
-    func addRelayDedupesSpellings() async throws {
+    @Test("add dedupes alternate spellings of the same relay")
+    func addDedupesSpellings() async throws {
         let pool = RelayPool()
-        let first = await pool.addRelay(RelayURL("wss://Relay.Example.com/")!)
-        let second = await pool.addRelay(RelayURL("wss://relay.example.com")!)
-        let third = await pool.addRelay(RelayURL("wss://relay.example.com:443")!)
+        let first = await pool.add(RelayURL("wss://Relay.Example.com/")!)
+        let second = await pool.add(RelayURL("wss://relay.example.com")!)
+        let third = await pool.add(RelayURL("wss://relay.example.com:443")!)
 
         #expect(await pool.relayCount == 1)
         #expect(first === second)
@@ -131,31 +131,44 @@ struct RelayPoolRoutingTests {
         #expect(first.url == RelayURL("wss://relay.example.com")!)
     }
 
-    @Test("relay(for:) and removeRelay resolve alternate spellings")
+    @Test("add(_:) with a sequence adds each relay once and keeps existing connections")
+    func addSequenceAddsEachRelayOnce() async throws {
+        let pool = RelayPool()
+        let existing = await pool.add(urlA)
+
+        await pool.add([RelayURL("wss://A.example.com/")!, urlB, urlC, urlB])
+
+        #expect(await pool.relayCount == 3)
+        #expect(await pool.relay(for: urlA) === existing)
+        #expect(await pool.relay(for: urlB) != nil)
+        #expect(await pool.relay(for: urlC) != nil)
+    }
+
+    @Test("relay(for:) and remove resolve alternate spellings")
     func lookupAndRemoveViaAlternateSpelling() async throws {
         let pool = RelayPool()
-        let added = await pool.addRelay(RelayURL("wss://relay.example.com")!)
+        let added = await pool.add(RelayURL("wss://relay.example.com")!)
 
         #expect(await pool.relay(for: RelayURL("wss://Relay.Example.com/")!) === added)
-        await pool.removeRelay(RelayURL("wss://RELAY.EXAMPLE.COM")!)
+        await pool.remove(RelayURL("wss://RELAY.EXAMPLE.COM")!)
         #expect(await pool.relayCount == 0)
     }
 
-    @Test("removeRelay then re-adding under another spelling yields a fresh connection")
+    @Test("remove then re-adding under another spelling yields a fresh connection")
     func removeThenReAddYieldsFreshConnection() async throws {
         let pool = RelayPool(
             config: RelayPoolConfig(defaultRelayConfig: ConnectedClientFixture.noReconnectConfig),
             webSocketFactory: MockWebSocketSessionFactory(makeSession: { MockWebSocketSession() })
         )
-        let first = await pool.addRelay(RelayURL("wss://relay.example.com")!)
+        let first = await pool.add(RelayURL("wss://relay.example.com")!)
         try await first.connect()
 
-        await pool.removeRelay(RelayURL("wss://relay.example.com")!)
-        let second = await pool.addRelay(RelayURL("wss://Relay.Example.com/")!)
+        await pool.remove(RelayURL("wss://relay.example.com")!)
+        let second = await pool.add(RelayURL("wss://Relay.Example.com/")!)
 
         #expect(await pool.relayCount == 1)
         #expect(first !== second)
-        await pool.disconnectAll()
+        await pool.disconnect()
     }
 
     @Test("publish statuses are keyed by the canonical relay URL")
@@ -166,7 +179,7 @@ struct RelayPoolRoutingTests {
             webSocketFactory: MockWebSocketSessionFactory(makeSession: { socket })
         )
         let canonical = RelayURL("wss://relay.example.com")!
-        let connection = await pool.addRelay(RelayURL("wss://Relay.Example.com/")!)
+        let connection = await pool.add(RelayURL("wss://Relay.Example.com/")!)
         try await connection.connect()
 
         // Target the relay under yet another spelling; the result reports the canonical key.
@@ -175,7 +188,7 @@ struct RelayPoolRoutingTests {
         }
         #expect(result.acceptedRelays == [canonical])
         #expect(result.status(for: RelayURL("wss://Relay.Example.com/")!) == .accepted)
-        await pool.disconnectAll()
+        await pool.disconnect()
     }
 
     // MARK: - Subscribe failure cleanup
@@ -193,8 +206,8 @@ struct RelayPoolRoutingTests {
                 MockWebSocketSession(pingError: URLError(.cannotConnectToHost))
             })
         )
-        await pool.addRelay(urlA)
-        await pool.addRelay(urlB)
+        await pool.add(urlA)
+        await pool.add(urlB)
 
         await #expect(throws: RelayPool.Error.subscriptionFailed) {
             try await pool.subscribe(filters: [Filter()])

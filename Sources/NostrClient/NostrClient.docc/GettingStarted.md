@@ -110,7 +110,7 @@ await subscription.close()
 let event = try await client.events.fetchEvent(id: try EventID(note: "note1..."))
 
 // Fetch user metadata
-let metadata = try await client.events.fetchMetadata(publicKey: alice)
+let metadata = try await client.events.fetchMetadata(for: alice)
 print("Name: \(metadata?.name ?? "Unknown")")
 
 // Fetch with custom filters

@@ -79,7 +79,7 @@ struct RelayCapabilityTests {
         let stub = RecordingRelayCapabilities(connectError: .allConnectionsFailed)
 
         await #expect(throws: RelayPool.Error.allConnectionsFailed) {
-            try await connectAll(stub)
+            try await connectThroughProtocol(stub)
         }
     }
 
@@ -102,7 +102,7 @@ struct RelayCapabilityTests {
     // MARK: - Private
 
     /// Connects through the protocol in a context that only lets ``RelayPool/Error`` escape.
-    private func connectAll(_ relays: some NostrRelayManaging) async throws(RelayPool.Error) {
+    private func connectThroughProtocol(_ relays: some NostrRelayManaging) async throws(RelayPool.Error) {
         try await relays.connect()
     }
 }

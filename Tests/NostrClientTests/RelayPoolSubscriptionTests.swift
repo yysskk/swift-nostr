@@ -34,7 +34,7 @@ struct RelayPoolSubscriptionTests {
             #expect(socket.sentTextFrames.contains { $0.hasPrefix(#"["REQ",""# + id.rawValue + #"","#) })
         }
 
-        await pool.disconnectAll()
+        await pool.disconnect()
     }
 
     /// The listener has to be registered on the connection before the REQ goes out, or the events
@@ -55,7 +55,7 @@ struct RelayPoolSubscriptionTests {
         }
         #expect(relayURL == ConnectedClientFixture.defaultRelayURL)
 
-        await pool.disconnectAll()
+        await pool.disconnect()
     }
 
     @Test("unsubscribe(id:) sends CLOSE for that id and ends the sequence")
@@ -80,18 +80,18 @@ struct RelayPoolSubscriptionTests {
         await pool.unsubscribe(id: closed.id)
         #expect(socket.sentTextFrames.filter { $0.hasPrefix(#"["CLOSE""#) }.count == 1)
 
-        await pool.disconnectAll()
+        await pool.disconnect()
     }
 
-    @Test("disconnectAll ends every subscription sequence")
-    func disconnectAllEndsSequences() async throws {
+    @Test("disconnect() ends every subscription sequence")
+    func disconnectEndsSequences() async throws {
         let (pool, _) = try await makePool()
         let subscription = try await pool.subscribe(filters: [Filter(kinds: [1])])
         let drained = Task {
             for await _ in subscription {}
         }
 
-        await pool.disconnectAll()
+        await pool.disconnect()
 
         await drained.value
         #expect(await pool.subscriptionCount == 0)

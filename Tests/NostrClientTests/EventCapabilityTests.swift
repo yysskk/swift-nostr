@@ -374,7 +374,7 @@ struct EventCapabilityTests {
             author.sign(older), stranger.sign(impostor), author.sign(newer),
         ])
 
-        let metadata = try await stub.fetchMetadata(publicKey: author.publicKey)
+        let metadata = try await stub.fetchMetadata(for: author.publicKey)
 
         let recorded = try await onlyFetch(stub)
         #expect(recorded.filters == [.metadata(publicKeys: [author.publicKey])])

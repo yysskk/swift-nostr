@@ -359,7 +359,7 @@ results. With zero resolved relays they throw (`RelayPool.Error.emptyPool` /
 ```swift
 let events = try await client.events.fetch(filters: [filter])
 let event = try await client.events.fetchEvent(id: eventID)      // EventID
-let metadata = try await client.events.fetchMetadata(publicKey: alice)
+let metadata = try await client.events.fetchMetadata(for: alice)
 // Scope a fetch to a subset of relays (e.g. naddr relay hints) with `route: .relays(_:)`;
 // omit `route:` for the whole pool. [] throws, and relays not in the pool are skipped.
 let scoped = try await client.events.fetch(filters: [filter], route: .relays([relay]))
@@ -1693,12 +1693,12 @@ let config = RelayPoolConfig(
 ### Methods
 
 ```swift
-let connection = await pool.addRelay(relay, config: relayConfig)  // existing connection if pooled
-await pool.addRelays([relay, otherRelay])
-await pool.removeRelay(relay)
+let connection = await pool.add(relay, config: relayConfig)  // existing connection if pooled
+await pool.add([relay, otherRelay])
+await pool.remove(relay)
 let pooled = await pool.relay(for: relay)  // RelayConnection?
-try await pool.connectAll()      // tolerates partial failures
-await pool.disconnectAll()
+try await pool.connect()      // tolerates partial failures
+await pool.disconnect()
 let subscription = try await pool.subscribe(filters: [filter])  // SubscriptionSequence, fresh id
 try await pool.subscribe(filters: [filter], to: [relay], bufferingPolicy: .bufferingNewest(500))
 await pool.unsubscribe(id: subscription.id)   // CLOSE only to connected relays holding it
@@ -1718,7 +1718,7 @@ none is in the pool — an empty set included — the call throws
 Pool-level failures throw `RelayPool.Error`: `emptyPool`, `noMatchingRelays([RelayURL])`,
 `cannotPublishAuthenticationEvent` (publishing a kind-22242 event), `quorumNotMet(acknowledged:required:)`
 (a `.quorum` publish that too few relays accepted), `subscriptionFailed` (no relay accepted the
-subscription), and `allConnectionsFailed` (`connectAll()` with every relay failing). `connectAll()` and
+subscription), and `allConnectionsFailed` (`connect()` with every relay failing). `connect()` and
 `subscribe` are `throws(RelayPool.Error)`; when every targeted relay fails a publish or count, the last
 relay's own error (`RelayRejection` or `RelayConnection.Error`) is thrown instead.
 

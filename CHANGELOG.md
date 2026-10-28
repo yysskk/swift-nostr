@@ -81,6 +81,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     drop is final.
   - `RelayPoolConfig`'s `maximumDeduplicationCacheSize` and `deduplicationCacheTTL` move into
     `deduplication: RelayPoolConfig.Deduplication?` as `maximumCount` and `timeToLive`.
+- **`RelayPool` and fetch names match the `client` namespaces** (breaking):
+  - `RelayPool`'s membership and lifecycle methods take the names `client.relays` already uses:
+    `addRelay(_:config:)` → `add(_:config:)`, `addRelays(_:)` → `add(_:)`, `removeRelay(_:)` →
+    `remove(_:)`, `connectAll()` → `connect()`, and `disconnectAll()` → `disconnect()`.
+  - `NostrEventFetching.fetchMetadata(publicKey:timeout:)` → `fetchMetadata(for:timeout:)`, labeling
+    the subject public key `for:` like `fetchRelayList(for:)` and the list fetches.
 
 ### Fixed
 

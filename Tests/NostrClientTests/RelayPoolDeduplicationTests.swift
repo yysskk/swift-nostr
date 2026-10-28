@@ -34,7 +34,7 @@ struct RelayPoolDeduplicationTests {
             webSocketFactory: MockWebSocketSessionFactory(makeSession: { sockets[counter.next()] })
         )
         for url in relayURLs {
-            try await pool.addRelay(url).connect()
+            try await pool.add(url).connect()
         }
         return (pool, sockets)
     }
@@ -89,7 +89,7 @@ struct RelayPoolDeduplicationTests {
         #expect(await pool.deduplicationCacheSize(forSubscription: first.id) == 1)
         #expect(await pool.deduplicationCacheSize(forSubscription: second.id) == 1)
 
-        await pool.disconnectAll()
+        await pool.disconnect()
     }
 
     @Test("copies of one event from two relays collapse into a single delivery")
@@ -111,7 +111,7 @@ struct RelayPoolDeduplicationTests {
         #expect(collector.recorded == [event, sentinel])
         #expect(await pool.deduplicationCacheSize(forSubscription: collector.id) == 2)
 
-        await pool.disconnectAll()
+        await pool.disconnect()
     }
 
     @Test(
@@ -131,7 +131,7 @@ struct RelayPoolDeduplicationTests {
         #expect(collector.recorded == [event, event])
         #expect(await pool.deduplicationCacheSize == 0)
 
-        await pool.disconnectAll()
+        await pool.disconnect()
     }
 
     // MARK: - Cache lifetime
@@ -154,7 +154,7 @@ struct RelayPoolDeduplicationTests {
         #expect(await pool.deduplicationCacheSize(forSubscription: second.id) == 1)
         #expect(await pool.deduplicationCacheSize == 1)
 
-        await pool.disconnectAll()
+        await pool.disconnect()
     }
 
     @Test("the TTL sweep expires entries and drops emptied subscriptions")
@@ -175,7 +175,7 @@ struct RelayPoolDeduplicationTests {
         #expect(await pool.deduplicationCacheSize == 0)
         #expect(await pool.deduplicationCacheSize(forSubscription: collector.id) == 0)
 
-        await pool.disconnectAll()
+        await pool.disconnect()
     }
 
     @Test("the size limit holds as events arrive, without waiting for a sweep")
@@ -199,7 +199,7 @@ struct RelayPoolDeduplicationTests {
         #expect(await pool.deduplicationCacheSize(forSubscription: first.id) == 0)
         #expect(await pool.deduplicationCacheSize(forSubscription: second.id) == 1)
 
-        await pool.disconnectAll()
+        await pool.disconnect()
     }
 
     @Test("clearDeduplicationCache empties every subscription's cache")
@@ -218,7 +218,7 @@ struct RelayPoolDeduplicationTests {
         await pool.clearDeduplicationCache()
         #expect(await pool.deduplicationCacheSize == 0)
 
-        await pool.disconnectAll()
+        await pool.disconnect()
     }
 }
 

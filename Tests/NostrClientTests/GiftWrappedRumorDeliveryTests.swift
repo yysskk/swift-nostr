@@ -67,8 +67,8 @@ struct GiftWrappedRumorDeliveryTests {
             config: RelayPoolConfig(defaultRelayConfig: ConnectedClientFixture.noReconnectConfig),
             webSocketFactory: MockWebSocketSessionFactory(makeSession: { sockets[counter.next()] })
         )
-        try await pool.addRelay(poolURL).connect()
-        try await pool.addRelay(inboxURL).connect()
+        try await pool.add(poolURL).connect()
+        try await pool.add(inboxURL).connect()
         let client = NostrClient(relayPool: pool, gossipPolicy: .requirePresent)
         try await client.identity.setSigner(EventSigner(privateKey: PrivateKey(hex: senderKey)))
         let sender = try KeyPair(privateKey: PrivateKey(hex: senderKey))

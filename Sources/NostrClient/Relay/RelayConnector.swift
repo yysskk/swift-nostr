@@ -32,7 +32,7 @@ struct RelayConnector: Sendable {
                 continue
             }
             guard policy == .addAndConnect, added < maximumRelaysPerResolve else { continue }
-            let connection = await pool.addRelay(url)
+            let connection = await pool.add(url)
             added += 1
             // Best-effort: a dead outbox/inbox relay must not fail the whole operation.
             try? await connection.connect()
