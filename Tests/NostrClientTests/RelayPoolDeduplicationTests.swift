@@ -15,23 +15,21 @@ struct RelayPoolDeduplicationTests {
 
     /// A relay config that fails fast and never reconnects, keeping tests deterministic.
     private var noReconnectConfig: RelayConnectionConfig {
-        RelayConnectionConfig(connectionTimeout: .seconds(1), pingInterval: .seconds(60), autoReconnect: false)
+        RelayConnectionConfig(connectionTimeout: .seconds(1), pingInterval: .seconds(60), reconnect: nil)
     }
 
     /// A pool holding one connected relay per URL, paired with the socket driving it.
     /// Relays connect one at a time so each pairs with a known socket.
     private func makeConnectedPool(
         relayURLs: [RelayURL],
-        maximumDeduplicationCacheSize: Int = 10000,
-        deduplicationCacheTTL: Duration = .seconds(300)
+        deduplication: RelayPoolConfig.Deduplication? = .default
     ) async throws -> (pool: RelayPool, sockets: [MockWebSocketSession]) {
         let sockets = relayURLs.map { _ in MockWebSocketSession() }
         let counter = SocketCounter()
         let pool = RelayPool(
             config: RelayPoolConfig(
                 defaultRelayConfig: noReconnectConfig,
-                maximumDeduplicationCacheSize: maximumDeduplicationCacheSize,
-                deduplicationCacheTTL: deduplicationCacheTTL
+                deduplication: deduplication
             ),
             webSocketFactory: MockWebSocketSessionFactory(makeSession: { sockets[counter.next()] })
         )
@@ -65,10 +63,12 @@ struct RelayPoolDeduplicationTests {
 
     // MARK: - Per-subscription scope
 
-    @Test("the default configuration remembers event ids for five minutes")
-    func defaultTTL() {
-        #expect(RelayPoolConfig.default.deduplicationCacheTTL == .seconds(300))
-        #expect(RelayPoolConfig().deduplicationCacheTTL == .seconds(300))
+    @Test("the default configuration remembers up to 10,000 event ids for five minutes")
+    func defaultDeduplication() {
+        let expected = RelayPoolConfig.Deduplication(maximumCount: 10_000, timeToLive: .seconds(300))
+        #expect(RelayPoolConfig.Deduplication.default == expected)
+        #expect(RelayPoolConfig.default.deduplication == expected)
+        #expect(RelayPoolConfig().deduplication == expected)
     }
 
     @Test("an event matching two subscriptions is delivered to both")
@@ -114,6 +114,26 @@ struct RelayPoolDeduplicationTests {
         await pool.disconnectAll()
     }
 
+    @Test(
+        "without deduplication, every relay's copy of an event is delivered",
+        arguments: [nil, RelayPoolConfig.Deduplication(maximumCount: 0), .init(maximumCount: -1)]
+    )
+    func disabledDeduplicationDeliversEveryCopy(deduplication: RelayPoolConfig.Deduplication?) async throws {
+        let (pool, sockets) = try await makeConnectedPool(relayURLs: [urlA, urlB], deduplication: deduplication)
+        let collector = try await subscribe(pool, sockets: sockets)
+
+        let event = try makeEvent(content: "stored on both relays")
+        sockets[0].deliver(.string(try eventFrame(subscriptionID: collector.id, event: event)))
+        try await NIP42TestSupport.pollUntil { collector.recorded == [event] }
+        sockets[1].deliver(.string(try eventFrame(subscriptionID: collector.id, event: event)))
+
+        try await NIP42TestSupport.pollUntil { collector.recorded.count == 2 }
+        #expect(collector.recorded == [event, event])
+        #expect(await pool.deduplicationCacheSize == 0)
+
+        await pool.disconnectAll()
+    }
+
     // MARK: - Cache lifetime
 
     @Test("unsubscribe discards only that subscription's cache")
@@ -139,7 +159,8 @@ struct RelayPoolDeduplicationTests {
 
     @Test("the TTL sweep expires entries and drops emptied subscriptions")
     func sweepExpiresEntriesPastTheTTL() async throws {
-        let (pool, sockets) = try await makeConnectedPool(relayURLs: [urlA], deduplicationCacheTTL: .seconds(300))
+        let deduplication = RelayPoolConfig.Deduplication(timeToLive: .seconds(300))
+        let (pool, sockets) = try await makeConnectedPool(relayURLs: [urlA], deduplication: deduplication)
         let socket = sockets[0]
         let collector = try await subscribe(pool, sockets: sockets)
 
@@ -159,7 +180,8 @@ struct RelayPoolDeduplicationTests {
 
     @Test("the size limit holds as events arrive, without waiting for a sweep")
     func sizeLimitHoldsAsEventsArrive() async throws {
-        let (pool, sockets) = try await makeConnectedPool(relayURLs: [urlA], maximumDeduplicationCacheSize: 1)
+        let deduplication = RelayPoolConfig.Deduplication(maximumCount: 1)
+        let (pool, sockets) = try await makeConnectedPool(relayURLs: [urlA], deduplication: deduplication)
         let socket = sockets[0]
         let first = try await subscribe(pool, sockets: sockets)
         let second = try await subscribe(pool, sockets: sockets)

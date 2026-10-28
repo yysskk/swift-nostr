@@ -20,7 +20,7 @@ struct RelayConnectionSocketTests {
             // No auto-reconnect and a long ping interval keep the test's background
             // tasks inert; the connection is torn down explicitly at the end.
             config: RelayConnectionConfig(
-                connectionTimeout: .seconds(1), pingInterval: .seconds(60), autoReconnect: false)
+                connectionTimeout: .seconds(1), pingInterval: .seconds(60), reconnect: nil)
         )
         return (connection, mock)
     }

@@ -18,7 +18,7 @@ struct RelayConnectionSocketGenerationTests {
         RelayConnection(
             url: relayURL,
             webSocketFactory: MockWebSocketSessionFactory(makeSession: sockets),
-            config: RelayConnectionConfig(autoReconnect: false)
+            config: RelayConnectionConfig(reconnect: nil)
         )
     }
 

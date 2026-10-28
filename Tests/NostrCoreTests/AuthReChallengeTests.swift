@@ -15,7 +15,7 @@ struct AuthReChallengeTests {
         RelayConnection(
             url: relayURL,
             webSocketFactory: MockWebSocketSessionFactory(makeSession: { socket }),
-            config: RelayConnectionConfig(autoReconnect: false)
+            config: RelayConnectionConfig(reconnect: nil)
         )
     }
 

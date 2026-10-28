@@ -79,6 +79,7 @@ try event.verify()
 - ``RelayURL``
 - ``RelayConnection``
 - ``RelayConnectionConfig``
+- ``ReconnectPolicy``
 - ``RelayConnectionState``
 
 ### WebSocket Transport Seam

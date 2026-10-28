@@ -18,6 +18,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   operations that need a signer throw `NostrClient.Error.signerNotSet`, and NIP-42 AUTH challenges
   are no longer answered automatically until a signer is set again. Removing when none is set does
   nothing.
+- **`ReconnectPolicy` groups the reconnection settings**: `maximumAttempts` (`nil` keeps trying),
+  `initialDelay`, `maximumDelay`, and `backoffMultiplier`, with the same clamping as before and
+  `ReconnectPolicy.minimumDelay` as the 100 ms floor. `RelayConnectionConfig.reconnect` holds one,
+  `.default` unless set; `nil` turns automatic reconnection off.
+- **`RelayPoolConfig.Deduplication` groups the deduplication cache settings**: `maximumCount` and
+  `timeToLive`. `RelayPoolConfig.deduplication` holds one, `.default` unless set; `nil` turns
+  deduplication off, so a subscription or fetch delivers every relay's copy of an event.
 
 ### Changed
 
@@ -63,6 +70,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `setNsec(_:)` are removed; wrap the key in an `EventSigner` instead:
   `setPrivateKey(hex)` → `setSigner(EventSigner(privateKey: PrivateKey(hex: hex)))` and
   `setNsec(nsec)` → `setSigner(EventSigner(nsec: nsec))`.
+- **Reconnection and deduplication settings move into value types** (breaking):
+  - `RelayConnectionConfig`'s reconnect fields move into `reconnect: ReconnectPolicy?`:
+    `autoReconnect: false` → `reconnect: nil`, `maximumReconnectAttempts` →
+    `reconnect.maximumAttempts`, `initialReconnectDelay` → `initialDelay`, `maximumReconnectDelay`
+    → `maximumDelay`, `reconnectBackoffMultiplier` → `backoffMultiplier`, and
+    `RelayConnectionConfig.minimumReconnectDelay` → `ReconnectPolicy.minimumDelay`.
+  - Unlimited attempts is now `maximumAttempts: nil` rather than `0`: `maximumReconnectAttempts: 0`
+    → `maximumAttempts: nil`. A `maximumAttempts` of 0 or below now makes no attempt, so the first
+    drop is final.
+  - `RelayPoolConfig`'s `maximumDeduplicationCacheSize` and `deduplicationCacheTTL` move into
+    `deduplication: RelayPoolConfig.Deduplication?` as `maximumCount` and `timeToLive`.
 
 ### Fixed
 

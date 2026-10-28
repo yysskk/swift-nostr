@@ -206,7 +206,7 @@ public actor RelayConnection {
         self.url = url
         self.webSocketFactory = webSocketFactory
         self.config = config
-        self.currentReconnectDelay = config.resolvedInitialReconnectDelay
+        self.currentReconnectDelay = config.firstReconnectDelay
     }
 
     /// Creates a connection whose reconnect delays are randomized by `jitter` instead of the
@@ -220,7 +220,7 @@ public actor RelayConnection {
         self.url = url
         self.webSocketFactory = webSocketFactory
         self.config = config
-        self.currentReconnectDelay = config.resolvedInitialReconnectDelay
+        self.currentReconnectDelay = config.firstReconnectDelay
         self.jitter = jitter
     }
 
@@ -953,11 +953,11 @@ public actor RelayConnection {
     /// session arrives, rather than finishing on the spot.
     ///
     /// It finishes when the connection is torn down for good: on ``disconnect()``, when
-    /// auto-reconnect gives up after ``RelayConnectionConfig/maximumReconnectAttempts`` failed
-    /// attempts, or when the connection drops with ``RelayConnectionConfig/autoReconnect``
-    /// disabled. With the default configuration (unlimited reconnect attempts) only an explicit
-    /// ``disconnect()`` finishes it. Streams open at that point end; a stream taken afterwards
-    /// belongs to the next session, so call ``messages()`` again after reconnecting manually.
+    /// auto-reconnect gives up after ``ReconnectPolicy/maximumAttempts`` failed attempts, or when
+    /// the connection drops with ``RelayConnectionConfig/reconnect`` set to `nil`. With the default
+    /// configuration (unlimited reconnect attempts) only an explicit ``disconnect()`` finishes it.
+    /// Streams open at that point end; a stream taken afterwards belongs to the next session, so
+    /// call ``messages()`` again after reconnecting manually.
     public func messages() -> AsyncStream<RelayMessage> {
         let id = UUID()
         return AsyncStream { continuation in

@@ -733,11 +733,12 @@ let config = RelayConnectionConfig(
     publishAckTimeout: .seconds(30),
     queryTimeout: .seconds(10),
     pingInterval: .seconds(30),
-    autoReconnect: true,
-    maximumReconnectAttempts: 10,
-    initialReconnectDelay: .seconds(1),
-    maximumReconnectDelay: .seconds(60),
-    reconnectBackoffMultiplier: 2
+    reconnect: ReconnectPolicy(
+        maximumAttempts: 10,
+        initialDelay: .seconds(1),
+        maximumDelay: .seconds(60),
+        backoffMultiplier: 2
+    )
 )
 await client.relays.add(try RelayURL(string: "wss://relay.example.com"), config: config)
 ```
@@ -746,12 +747,14 @@ Liveness is detected with periodic WebSocket pings (`pingInterval`); an idle rel
 that simply has no messages to deliver is never torn down. The pong wait is bounded
 by `connectionTimeout`.
 
+``ReconnectPolicy`` shapes automatic reconnection: `maximumAttempts: nil` (the default) keeps
+trying, and `reconnect: nil` turns automatic reconnection off.
+
 ### Pool Configuration
 
 ```swift
 let poolConfig = RelayPoolConfig(
-    maximumDeduplicationCacheSize: 10000,
-    deduplicationCacheTTL: .seconds(300),
+    deduplication: .init(maximumCount: 10_000, timeToLive: .seconds(300)),
     queryTimeout: .seconds(10)
 )
 let client = NostrClient(relayPoolConfig: poolConfig)
@@ -888,8 +891,9 @@ To reset every subscription's cache:
 await client.relays.clearDeduplicationCache()
 ```
 
-``RelayPoolConfig`` configures how much is remembered:
-``RelayPoolConfig/maximumDeduplicationCacheSize`` bounds the entries across all subscriptions and
+``RelayPoolConfig/deduplication`` configures how much is remembered:
+``RelayPoolConfig/Deduplication/maximumCount`` bounds the entries across all subscriptions and
 is enforced as events arrive, evicting the oldest, and
-``RelayPoolConfig/deduplicationCacheTTL`` bounds how long an entry survives. Dropping an entry
-only risks delivering a duplicate later, never losing an event.
+``RelayPoolConfig/Deduplication/timeToLive`` bounds how long an entry survives. Dropping an entry
+only risks delivering a duplicate later, never losing an event. Setting it to `nil` turns
+deduplication off, so every relay's copy of an event is delivered.

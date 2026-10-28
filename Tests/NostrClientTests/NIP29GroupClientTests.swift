@@ -17,7 +17,7 @@ struct NIP29GroupClientTests {
     private let groupID = "abcdef"
 
     private var noReconnectConfig: RelayConnectionConfig {
-        RelayConnectionConfig(connectionTimeout: .seconds(1), pingInterval: .seconds(60), autoReconnect: false)
+        RelayConnectionConfig(connectionTimeout: .seconds(1), pingInterval: .seconds(60), reconnect: nil)
     }
 
     /// Builds a client whose relays all speak to one test-controlled socket.

@@ -99,7 +99,7 @@ struct NIP42RelayConnectionTests {
                 connectionTimeout: .seconds(1),
                 publishAckTimeout: publishAckTimeout,
                 pingInterval: .seconds(60),
-                autoReconnect: false
+                reconnect: nil
             )
         )
         return (connection, mock)
