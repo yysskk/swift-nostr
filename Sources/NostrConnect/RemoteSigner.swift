@@ -11,11 +11,11 @@ public import NostrCore
 /// flow, see `RemoteSigner+NostrConnect`), then call the typed commands (see `RemoteSigner+Commands`),
 /// or ``send(_:params:)`` for a method without one.
 ///
-/// ### The connect handshake
-/// For a `bunker://` session the client sends the first `connect` request, presenting the bunker
-/// secret when the token carries one; call ``connect()`` to run it. For a `nostrconnect://` session
-/// the signer initiates instead: ``awaitConnection()`` waits for the signer's first response, whose
-/// echoed secret both authenticates it and reveals its public key.
+/// ### Connecting
+/// Call ``connect()`` in either flow. For a `bunker://` session it sends the first `connect`
+/// request, presenting the bunker secret when the token carries one. For a `nostrconnect://`
+/// session the signer initiates instead, so it waits for the signer's first response, whose echoed
+/// secret both authenticates it and reveals its public key.
 ///
 /// ### Authentication challenges
 /// A signer may answer a request with an `auth_url` challenge instead of a result, asking the user
@@ -63,7 +63,7 @@ public actor RemoteSigner {
     public nonisolated let clientPublicKey: PublicKey
 
     /// The remote signer's public key. Known up front for a `bunker://` session; `nil` for a
-    /// client-initiated `nostrconnect://` session until ``awaitConnection()`` discovers it from the
+    /// client-initiated `nostrconnect://` session until ``connect()`` discovers it from the
     /// signer's first valid response.
     private var signerPublicKey: PublicKey?
 
@@ -83,6 +83,9 @@ public actor RemoteSigner {
 
     private var didConnect = false
 
+    /// The ``connect()`` attempt in flight, which concurrent calls join rather than repeat.
+    private let connectOperation = SharedOperation<Void, RemoteSignerError>(cancelledError: .cancelled)
+
     /// Open auth-challenge streams, keyed so each can deregister on termination.
     private var authChallengeStreams: [UUID: AsyncStream<RemoteSignerAuthChallenge>.Continuation] = [:]
 
@@ -95,11 +98,12 @@ public actor RemoteSigner {
     /// The user's public key (`get_public_key`), cached after the first fetch.
     private var cachedUserPublicKey: PublicKey?
 
-    /// The waiter suspended in ``awaitConnection()``, resolved once a valid connect response
-    /// (echoing the invitation secret) arrives, or the wait times out. `nil` when not awaiting.
+    /// The waiter of the `nostrconnect://` discovery ``connect()`` runs, resolved once a valid
+    /// connect response (echoing the invitation secret) arrives, or the wait times out. `nil` when
+    /// not awaiting.
     private var connectionWaiter: ConnectionWaiter?
     /// A discovered signer public key from a valid connect response that arrived before
-    /// ``discoverSigner()`` registered its waiter (the response can be delivered as soon as the
+    /// the discovery registered its waiter (the response can be delivered as soon as the
     /// subscription exists, which is before the waiter is set). Consumed when the waiter registers so
     /// the acknowledgement is never lost to that window.
     private var bufferedDiscovery: PublicKey?
@@ -166,7 +170,7 @@ public actor RemoteSigner {
     }
 
     /// The remote signer's public key, or `nil` for a client-initiated `nostrconnect://` session
-    /// before ``awaitConnection()`` has discovered it. Known immediately for a `bunker://` session.
+    /// before ``connect()`` has discovered it. Known immediately for a `bunker://` session.
     /// Not necessarily the user's key (see ``userPublicKey()``).
     public var remoteSignerPublicKey: PublicKey? {
         signerPublicKey
@@ -174,14 +178,58 @@ public actor RemoteSigner {
 
     // MARK: - Lifecycle
 
-    /// Connects, subscribes to responses, and performs the `connect` handshake, presenting the
-    /// bunker secret when the token carries one. Commands call this automatically; call it
-    /// explicitly to surface connection errors up front. Calling it again after a successful
-    /// handshake is a no-op.
-    /// - Throws: ``RemoteSignerError/connectionRejected(message:)`` if the signer declines or
-    ///   returns a secret other than the one sent, or what ``send(_:params:)`` throws.
+    /// Establishes the session with the remote signer, in either flow.
+    ///
+    /// - For a `bunker://` session, connects to the relays, subscribes for responses, and performs
+    ///   the `connect` handshake, presenting the bunker secret when the token carries one and the
+    ///   requested permissions when there are any.
+    /// - For a `nostrconnect://` session, connects and waits for the signer to accept the
+    ///   invitation: the first response whose result echoes the invitation secret (per NIP-46, the
+    ///   client MUST validate the returned secret). Its sender becomes the remote signer, and later
+    ///   traffic is pinned to it. A response whose result does *not* equal the secret is treated as
+    ///   a spoofing attempt and ignored: the wait continues until the correct secret arrives or the
+    ///   wait times out.
+    ///
+    /// Once this returns, ``remoteSignerPublicKey`` is non-nil and the typed commands work. Calling
+    /// it again after it has succeeded is a no-op. Concurrent calls share one attempt — one
+    /// `connect` request, one wait for the invitation reply — and all receive its result, success
+    /// or the same error. A caller whose task is cancelled stops waiting with
+    /// ``RemoteSignerError/cancelled`` without ending the attempt for the others; the attempt is
+    /// abandoned only when every caller waiting on it has been cancelled.
+    ///
+    /// The typed commands call this themselves on a `nostrconnect://` session whose signer is not
+    /// yet known; call it explicitly to surface connection errors up front.
+    /// - Throws: ``RemoteSignerError/connectionRejected(message:)`` if a `bunker://` signer declines
+    ///   or returns a secret other than the one sent, ``RemoteSignerError/timedOut`` if the signer
+    ///   does not answer within ``Config/requestTimeout``, ``RemoteSignerError/notConnected`` if
+    ///   the session ends first — on ``disconnect()``, or when the relays' streams end —
+    ///   ``RemoteSignerError/cancelled`` if the calling task is cancelled,
+    ///   ``RemoteSignerError/transportFailed(_:)`` if the relay cannot be connected to or the
+    ///   request cannot be sent, or what ``send(_:params:)`` throws.
     public func connect() async throws(RemoteSignerError) {
-        try await ensureStarted()
+        try await connectOperation.run { [weak self] in
+            guard let self else { return .failure(.notConnected) }
+            return await self.connectAttempt()
+        }
+    }
+
+    /// One shared ``connect()`` attempt: starts the session, then runs the flow's handshake.
+    private func connectAttempt() async -> Result<Void, RemoteSignerError> {
+        do throws(RemoteSignerError) {
+            try await ensureStarted()
+            if expectedInvitationSecret != nil {
+                try await discoverSigner()
+            } else {
+                try await performHandshake()
+            }
+            return .success(())
+        } catch {
+            return .failure(error)
+        }
+    }
+
+    /// Sends the `bunker://` flow's `connect` request and checks the signer's answer.
+    private func performHandshake() async throws(RemoteSignerError) {
         guard !didConnect else { return }
 
         let signerPublicKey = try requireSignerPublicKey()
@@ -262,8 +310,8 @@ public actor RemoteSigner {
         }
     }
 
-    /// Fails a pending ``awaitConnection()`` and ends the auth-challenge streams: nothing can answer
-    /// either once the session has ended.
+    /// Fails a pending ``connect()`` discovery and ends the auth-challenge streams: nothing can
+    /// answer either once the session has ended.
     private func sessionEnded() {
         failConnection(with: .notConnected)
         finishAuthChallengeStreams()
@@ -335,7 +383,7 @@ public actor RemoteSigner {
 
     private func buildRequestEvent(_ request: RemoteSignerRequest) throws(RemoteSignerError) -> Event {
         // The signer's public key must be known before any request can be addressed to it — always true
-        // for a bunker session, and true for a nostrconnect session once awaitConnection() resolves.
+        // for a bunker session, and true for a nostrconnect session once connect() resolves.
         let signerPublicKey = try requireSignerPublicKey()
         do {
             let json = String(decoding: try JSONEncoder().encode(request), as: UTF8.self)
@@ -418,18 +466,11 @@ public actor RemoteSigner {
 
     // MARK: - Client-initiated connection
 
-    /// Waits for the signer to accept a `nostrconnect://` invitation and returns its discovered
-    /// public key. Backs ``awaitConnection()``; see that method for the full contract.
-    func discoverSigner() async throws(RemoteSignerError) -> PublicKey {
-        try await ensureStarted()
-
-        // Already discovered (e.g. a second call, or a bunker session): nothing to wait for.
-        if let signerPublicKey { return signerPublicKey }
-
-        // Only one waiter at a time; a concurrent caller would clobber the continuation.
-        guard connectionWaiter == nil else {
-            throw .connectionInProgress
-        }
+    /// Waits for the signer to accept a `nostrconnect://` invitation and pins the session to its
+    /// discovered public key. Backs ``connect()`` for that flow; see it for the full contract.
+    private func discoverSigner() async throws(RemoteSignerError) {
+        // Already discovered (e.g. a repeat call): nothing to wait for.
+        guard signerPublicKey == nil else { return }
 
         let signerPublicKey: PublicKey
         if let buffered = bufferedDiscovery {
@@ -444,12 +485,16 @@ public actor RemoteSigner {
         self.signerPublicKey = signerPublicKey
         didConnect = true
         try? await session.subscribe(id: Self.responseSubscriptionID, filters: [responseFilter])
-        return signerPublicKey
     }
 
     /// Registers the connection waiter and suspends until the signer's connect response resolves it,
     /// the wait times out, the session ends, or the calling task is cancelled.
     private func waitForSigner() async throws(RemoteSignerError) -> PublicKey {
+        // Only one attempt waits at a time, except that an attempt every caller abandoned may still
+        // be winding down when the next starts. Retire its waiter and timeout first, so its timer
+        // cannot fail this wait early.
+        failConnection(with: .cancelled)
+
         let (stream, continuation) = AsyncStream<Result<PublicKey, RemoteSignerError>>.makeStream()
         let waiter = ConnectionWaiter(continuation: continuation)
         connectionWaiter = waiter
@@ -464,8 +509,8 @@ public actor RemoteSigner {
         for await result in stream {
             return try result.get()
         }
-        // Withdraw the wait so a later call can start another — unless it has already been
-        // settled, and the slot may hold that later call's waiter.
+        // Withdraw the wait so a later attempt can start another — unless it has already been
+        // settled, and the slot may hold that later attempt's waiter.
         if connectionWaiter?.id == waiter.id {
             failConnection(with: .cancelled)
         }
@@ -492,12 +537,12 @@ public actor RemoteSigner {
             resolveConnection(with: event.publicKey)
         } else {
             // The waiter isn't registered yet (the response arrived between the subscription being
-            // created and ``discoverSigner()`` suspending); hold the public key for it to pick up.
+            // created and the discovery suspending); hold the public key for it to pick up.
             bufferedDiscovery = event.publicKey
         }
     }
 
-    /// Resolves the pending ``discoverSigner()`` waiter with the discovered signer public key.
+    /// Resolves the pending discovery waiter with the discovered signer public key.
     private func resolveConnection(with signerPublicKey: PublicKey) {
         connectionTimeoutTask?.cancel()
         connectionTimeoutTask = nil
@@ -507,7 +552,8 @@ public actor RemoteSigner {
         waiter?.continuation.finish()
     }
 
-    /// Fails the pending ``discoverSigner()`` waiter (on timeout, or when the session ends).
+    /// Fails the pending discovery waiter (on timeout, when the session ends, or when its attempt is
+    /// cancelled).
     private func failConnection(with error: RemoteSignerError) {
         connectionTimeoutTask?.cancel()
         connectionTimeoutTask = nil
@@ -518,7 +564,7 @@ public actor RemoteSigner {
     }
 
     /// The signer's public key, or throws ``RemoteSignerError/notConnected`` if it is not yet known (a
-    /// nostrconnect session before ``awaitConnection()`` resolves).
+    /// nostrconnect session before ``connect()`` resolves).
     private func requireSignerPublicKey() throws(RemoteSignerError) -> PublicKey {
         guard let signerPublicKey else { throw .notConnected }
         return signerPublicKey
@@ -532,6 +578,10 @@ public actor RemoteSigner {
     /// wrapper, such as one specific to a particular signer. An `auth_url` challenge keeps the
     /// request pending exactly as it does for a typed command (see ``authChallenges()``).
     ///
+    /// On a `nostrconnect://` session whose signer is not yet known, this first runs ``connect()``
+    /// — or joins the call already in flight — and sends the request once the signer has accepted
+    /// the invitation. Each phase has its own ``Config/requestTimeout``.
+    ///
     /// ```swift
     /// let info = try await signer.send(RemoteSignerMethod(rawValue: "get_session_info"))
     /// ```
@@ -542,13 +592,16 @@ public actor RemoteSigner {
     /// - Throws: ``RemoteSignerError/signerError(message:)`` if the signer answers with an error,
     ///   ``RemoteSignerError/responseDecodingFailed`` if the response carries no result,
     ///   ``RemoteSignerError/timedOut`` if it does not answer in time,
-    ///   ``RemoteSignerError/notConnected`` if the signer is not yet known (a `nostrconnect://`
-    ///   session before ``awaitConnection()``) or the session disconnects while the request is
+    ///   ``RemoteSignerError/notConnected`` if the session disconnects while the request is
     ///   pending, ``RemoteSignerError/requestEncodingFailed`` if the request cannot be encrypted or
     ///   signed, ``RemoteSignerError/cancelled`` if the calling task is cancelled — before the send,
-    ///   nothing is sent — or ``RemoteSignerError/transportFailed(_:)`` if the relay cannot be
-    ///   connected to or the request cannot be sent.
+    ///   nothing is sent — ``RemoteSignerError/transportFailed(_:)`` if the relay cannot be
+    ///   connected to or the request cannot be sent, or what ``connect()`` throws while it waits for
+    ///   a `nostrconnect://` signer.
     public func send(_ method: RemoteSignerMethod, params: [String] = []) async throws(RemoteSignerError) -> String {
+        if signerPublicKey == nil {
+            try await connect()
+        }
         let response = try await sendRequest(method: method, params: params)
         guard let result = response.result else {
             throw .responseDecodingFailed
@@ -586,14 +639,19 @@ public actor RemoteSigner {
         didConnect
     }
 
-    /// Whether an ``awaitConnection()`` wait is currently suspended. Exposed for tests.
+    /// Whether a `nostrconnect://` discovery is currently suspended. Exposed for tests.
     var isAwaitingConnectionForTesting: Bool {
         connectionWaiter != nil
     }
+
+    /// How many ``connect()`` callers are waiting on the attempt in flight. Exposed for tests.
+    var connectWaiterCountForTesting: Int {
+        get async { await connectOperation.waiterCount }
+    }
 }
 
-/// The waiter suspended in ``RemoteSigner/awaitConnection()``, identified so a cancelled wait
-/// withdraws only itself.
+/// The waiter of a `nostrconnect://` discovery, identified so a cancelled wait withdraws only
+/// itself.
 private struct ConnectionWaiter {
     let id = UUID()
     let continuation: AsyncStream<Result<PublicKey, RemoteSignerError>>.Continuation

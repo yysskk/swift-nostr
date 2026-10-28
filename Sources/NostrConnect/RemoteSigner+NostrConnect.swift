@@ -6,14 +6,15 @@ public import NostrCore
 /// In this flow the client — not the signer — starts the handshake. The client generates a
 /// ``NostrConnectURI`` invitation (shown to the user as a QR code or deep link), the signer scans it
 /// and replies, and the client discovers the signer's public key from that reply *after* validating the
-/// invitation secret the signer echoes back. Once ``awaitConnection()`` resolves, the typed commands
-/// (``sign(_:)-(UnsignedEvent)``, ``userPublicKey()``, …) work exactly as they do for a `bunker://` session.
+/// invitation secret the signer echoes back. ``connect()`` waits for that reply; once it returns, the
+/// typed commands (``sign(_:)-(UnsignedEvent)``, ``userPublicKey()``, …) work exactly as they do for
+/// a `bunker://` session. A command issued before then waits for the reply itself.
 ///
 /// https://github.com/nostr-protocol/nips/blob/master/46.md
 extension RemoteSigner {
     /// Creates a client-initiated session from a `nostrconnect://` invitation you generated and
     /// showed to the signer (QR/link). The signer's public key is discovered from its first valid
-    /// response — call ``awaitConnection()`` to wait for it.
+    /// response — call ``connect()`` to wait for it.
     ///
     /// - Parameters:
     ///   - invitation: The invitation you built with ``NostrConnectURI/invitation(clientKeyPair:relays:permissions:name:url:image:)``
@@ -40,30 +41,5 @@ extension RemoteSigner {
             expectedInvitationSecret: invitation.secret,
             transport: transport ?? RelayConnectionTransport(relayURLs: invitation.relays),
             config: config)
-    }
-
-    /// Waits for the signer to accept the invitation: the first kind-24133 response whose result
-    /// echoes the invitation secret (per NIP-46, the client MUST validate the returned secret).
-    /// Returns the discovered remote-signer public key and pins subsequent traffic to it.
-    ///
-    /// A response whose result is present but does *not* equal the secret is treated as a spoofing
-    /// attempt and ignored: the method keeps waiting for the correct secret rather than failing, and
-    /// gives up only when the wait times out. Once resolved, ``remoteSignerPublicKey`` returns the
-    /// discovered public key and the session is connected, so the typed commands work immediately.
-    ///
-    /// Calling this on a session whose signer is already known (a `bunker://` session, or a repeat
-    /// call) returns the known public key without waiting.
-    ///
-    /// - Returns: The remote signer's public key.
-    /// - Throws: ``RemoteSignerError/timedOut`` if no valid response arrives within
-    ///   ``Config/requestTimeout``, ``RemoteSignerError/connectionInProgress`` if another
-    ///   ``awaitConnection()`` wait is already running on this session,
-    ///   ``RemoteSignerError/notConnected`` if the session ends first — on ``disconnect()``, or when
-    ///   the relays' streams end — ``RemoteSignerError/cancelled`` if the calling task is cancelled,
-    ///   or ``RemoteSignerError/transportFailed(_:)`` if the relay cannot be connected to or
-    ///   subscribed on.
-    @discardableResult
-    public func awaitConnection() async throws(RemoteSignerError) -> PublicKey {
-        try await discoverSigner()
     }
 }

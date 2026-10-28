@@ -15,6 +15,7 @@ actor FakeRemoteSignerTransport: RelayTransport {
     private var continuation: AsyncStream<Event>.Continuation?
     private var nextConnectError: RelayConnection.Error?
     private var nextSendError: RelayConnection.Error?
+    private var startEvents: [Event] = []
 
     init() {}
 
@@ -48,6 +49,10 @@ actor FakeRemoteSignerTransport: RelayTransport {
         continuation?.finish()
         let (stream, continuation) = AsyncStream<Event>.makeStream()
         self.continuation = continuation
+        for event in startEvents {
+            continuation.yield(event)
+        }
+        startEvents.removeAll()
         return stream
     }
 
@@ -62,6 +67,12 @@ actor FakeRemoteSignerTransport: RelayTransport {
     /// Pushes a simulated incoming event to the ``events()`` stream.
     func deliver(_ event: Event) {
         continuation?.yield(event)
+    }
+
+    /// Queues `event` to be delivered as soon as the session opens its ``events()`` stream, before
+    /// the session has done anything else with it.
+    func deliverOnStart(_ event: Event) {
+        startEvents.append(event)
     }
 
     /// Ends the ``events()`` stream without disconnecting, standing in for every relay's message

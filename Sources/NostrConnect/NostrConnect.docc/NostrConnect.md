@@ -19,6 +19,7 @@ answers with the result. The user's private key never leaves the signer.
   automatically and any requested permissions sent along.
 - The client-initiated `nostrconnect://` flow: generate an invitation, then discover the signer from
   its first response after validating the invitation secret.
+- One ``RemoteSigner/connect()`` for both flows, whose concurrent callers share a single attempt.
 - Typed commands: sign an event, fetch the user public key, ping, NIP-44/NIP-04 encrypt and
   decrypt, and switch relays.
 - ``RemoteSigner/send(_:params:)`` for any other method, including one this package does not
