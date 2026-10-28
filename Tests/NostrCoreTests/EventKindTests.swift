@@ -24,14 +24,14 @@ struct EventKindTests {
 
     @Test("kinds compare by raw value")
     func comparable() {
-        #expect(Event.Kind.setMetadata < .textNote)
+        #expect(Event.Kind.metadata < .textNote)
         #expect(Event.Kind(rawValue: 30311) > .relayListMetadata)
     }
 
     @Test("NIP-01 range helpers")
     func rangeHelpers() {
-        #expect(Event.Kind.setMetadata.isReplaceable)
-        #expect(Event.Kind.contacts.isReplaceable)
+        #expect(Event.Kind.metadata.isReplaceable)
+        #expect(Event.Kind.followList.isReplaceable)
         #expect(Event.Kind.relayListMetadata.isReplaceable)
         #expect(!Event.Kind.textNote.isReplaceable)
 

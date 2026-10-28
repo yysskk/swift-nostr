@@ -31,7 +31,7 @@ struct NIP51SimpleGroupListTests {
 
     @Test("A named group tag parses and round-trips")
     func namedTagRoundTrip() throws {
-        let tag = Event.Tag.simpleGroup(id: groupID, relayURL: groupRelay, name: "Cooking")
+        let tag = Event.Tag.groupListEntry(id: groupID, relayURL: groupRelay, name: "Cooking")
         let entry = try #require(GroupListEntry(tag: tag))
         #expect(entry.groupID == groupID)
         #expect(entry.relayURL == groupRelay)
@@ -41,7 +41,7 @@ struct NIP51SimpleGroupListTests {
 
     @Test("A nameless group tag parses with a nil name and round-trips")
     func namelessTagRoundTrip() throws {
-        let tag = Event.Tag.simpleGroup(id: groupID, relayURL: groupRelay)
+        let tag = Event.Tag.groupListEntry(id: groupID, relayURL: groupRelay)
         let entry = try #require(GroupListEntry(tag: tag))
         #expect(entry.name == nil)
         #expect(entry.tag == tag)
@@ -115,10 +115,10 @@ struct NIP51SimpleGroupListTests {
         let list = NostrList(
             kind: .simpleGroupList,
             publicItems: [
-                .simpleGroup(id: groupID, relayURL: groupRelay, name: "Cooking"),
+                .groupListEntry(id: groupID, relayURL: groupRelay, name: "Cooking"),
                 unknown,
                 .reference(groupRelay.url),
-                .simpleGroup(id: "012345", relayURL: RelayURL("wss://other.example.com")!),
+                .groupListEntry(id: "012345", relayURL: RelayURL("wss://other.example.com")!),
                 malformedGroup,
                 .reference(URL(string: "wss://other.example.com")!),
                 markedRelay,
@@ -147,13 +147,13 @@ struct NIP51SimpleGroupListTests {
             publicItems: [
                 .reference(groupRelay.url),
                 Event.Tag(name: "client", values: ["nostrapp"]),
-                .simpleGroup(id: groupID, relayURL: groupRelay, name: "Cooking"),
+                .groupListEntry(id: groupID, relayURL: groupRelay, name: "Cooking"),
                 malformedGroup,
-                .simpleGroup(id: "012345", relayURL: RelayURL("wss://other.example.com")!),
+                .groupListEntry(id: "012345", relayURL: RelayURL("wss://other.example.com")!),
             ],
             privateItems: [
                 Event.Tag(name: "note", values: ["remember"]),
-                .simpleGroup(id: "5ec4e7", relayURL: RelayURL("wss://hidden.example.com")!),
+                .groupListEntry(id: "5ec4e7", relayURL: RelayURL("wss://hidden.example.com")!),
             ]
         )
 
@@ -163,8 +163,8 @@ struct NIP51SimpleGroupListTests {
         // The documented grouping: entries first, then "r" tags, then the additional tags.
         #expect(
             rebuilt.publicItems == [
-                Event.Tag.simpleGroup(id: groupID, relayURL: groupRelay, name: "Cooking"),
-                .simpleGroup(id: "012345", relayURL: RelayURL("wss://other.example.com")!),
+                Event.Tag.groupListEntry(id: groupID, relayURL: groupRelay, name: "Cooking"),
+                .groupListEntry(id: "012345", relayURL: RelayURL("wss://other.example.com")!),
                 .reference(groupRelay.url),
                 Event.Tag(name: "client", values: ["nostrapp"]),
                 malformedGroup,
@@ -172,7 +172,7 @@ struct NIP51SimpleGroupListTests {
         )
         #expect(
             rebuilt.privateItems == [
-                Event.Tag.simpleGroup(id: "5ec4e7", relayURL: RelayURL("wss://hidden.example.com")!),
+                Event.Tag.groupListEntry(id: "5ec4e7", relayURL: RelayURL("wss://hidden.example.com")!),
                 Event.Tag(name: "note", values: ["remember"]),
             ]
         )
@@ -378,7 +378,7 @@ struct NIP51SimpleGroupListClientTests {
         #expect(sentFirst.kind == .simpleGroupList)
         #expect(
             sentFirst.tags == [
-                .simpleGroup(id: groupID, relayURL: groupRelay, name: "Cooking"),
+                .groupListEntry(id: groupID, relayURL: groupRelay, name: "Cooking"),
                 .reference(groupRelay.url),
             ]
         )

@@ -219,7 +219,7 @@ struct EventTemplateTests {
     func deletion() {
         let template = EventTemplate.deletion(of: [.fixture("first"), .fixture("second")], reason: "oops")
 
-        #expect(template.kind == .eventDeletion)
+        #expect(template.kind == .deletionRequest)
         #expect(
             template.tags.map(\.rawArray) == [
                 ["e", EventID.fixture("first").hex], ["e", EventID.fixture("second").hex],

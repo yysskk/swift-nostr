@@ -181,7 +181,7 @@ struct EventCapabilityTests {
         try await stub.publishMetadata(profile, strategy: .allSettled)
 
         let recorded = try await onlyTemplatePublish(stub)
-        #expect(recorded.template.kind == .setMetadata)
+        #expect(recorded.template.kind == .metadata)
         let decoded = try JSONDecoder().decode(UserMetadata.self, from: Data(recorded.template.content.utf8))
         #expect(decoded.name == "Alice")
         #expect(decoded.about == "Nostr user")
@@ -228,7 +228,7 @@ struct EventCapabilityTests {
         try await stub.publishDeletion(eventIDs: [.fixture("first")], reason: "oops", strategy: .allSettled)
 
         let recorded = await stub.templatePublishes
-        #expect(recorded.map(\.template.kind) == [.eventDeletion, .eventDeletion])
+        #expect(recorded.map(\.template.kind) == [.deletionRequest, .deletionRequest])
         #expect(
             recorded[0].template.tags.map(\.rawArray) == [
                 ["e", EventID.fixture("first").hex], ["e", EventID.fixture("second").hex],

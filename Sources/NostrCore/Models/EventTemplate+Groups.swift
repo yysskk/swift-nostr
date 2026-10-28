@@ -18,7 +18,7 @@ extension EventTemplate {
         inviteCode: String? = nil,
         reason: String? = nil
     ) -> EventTemplate {
-        var tags: [Tag] = [.group(groupID)]
+        var tags: [Tag] = [.groupID(groupID)]
         if let inviteCode {
             tags.append(.inviteCode(inviteCode))
         }
@@ -33,7 +33,7 @@ extension EventTemplate {
     ///   - reason: A free-form message (the event content; "" when nil).
     /// - Returns: The template for the leave request.
     public static func groupLeaveRequest(groupID: String, reason: String? = nil) -> EventTemplate {
-        EventTemplate(kind: .groupLeaveRequest, tags: [.group(groupID)], content: reason ?? "")
+        EventTemplate(kind: .groupLeaveRequest, tags: [.groupID(groupID)], content: reason ?? "")
     }
 
     /// An event of any kind scoped to a group.
@@ -57,7 +57,7 @@ extension EventTemplate {
         tags: [Tag] = [],
         previous: [String] = []
     ) -> EventTemplate {
-        var allTags: [Tag] = [.group(groupID)]
+        var allTags: [Tag] = [.groupID(groupID)]
         allTags.append(contentsOf: tags)
         if !previous.isEmpty {
             allTags.append(.previous(previous))
@@ -91,7 +91,7 @@ extension EventTemplate {
         previous: [String] = [],
         reason: String? = nil
     ) -> EventTemplate {
-        var tags: [Tag] = [.group(groupID)]
+        var tags: [Tag] = [.groupID(groupID)]
         tags.append(contentsOf: action.actionTags)
         if !previous.isEmpty {
             tags.append(.previous(previous))

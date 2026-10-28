@@ -163,7 +163,7 @@ struct NIP45CountTests {
         try await connection.connect()
 
         let taskA = Task { try await connection.countEvents(matching: [Filter(kinds: [.textNote])]) }
-        let taskB = Task { try await connection.countEvents(matching: [Filter(kinds: [.setMetadata])]) }
+        let taskB = Task { try await connection.countEvents(matching: [Filter(kinds: [.metadata])]) }
 
         try await pollUntil { countFrames(in: mock).count == 2 }
         let frames = countFrames(in: mock)

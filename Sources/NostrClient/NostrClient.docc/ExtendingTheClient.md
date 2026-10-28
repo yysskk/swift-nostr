@@ -92,7 +92,7 @@ public struct ZapsAPI: Sendable {
     /// Fetches the zap receipts naming the signer as recipient.
     public func received(limit: Int = 50, timeout: Duration? = nil) async throws -> [ZapReceipt] {
         guard let publicKey = await identity.publicKey else { throw NostrClient.Error.signerNotSet }
-        let filter = Filter(kinds: [.zap], publicKeyReferences: [publicKey], limit: limit)
+        let filter = Filter(kinds: [.zapReceipt], publicKeyReferences: [publicKey], limit: limit)
         return try await events.fetch(filters: [filter], route: .pool, timeout: timeout)
             .compactMap(ZapReceipt.init(event:))
     }
@@ -148,7 +148,8 @@ actor CannedEvents: NostrEventFetching {
     let receipts = try await zaps.received()
 
     #expect(receipts.map(\.amountMillisats) == [21_000])
-    #expect(await events.requests == [[Filter(kinds: [.zap], publicKeyReferences: [signer.publicKey], limit: 50)]])
+    let expected = Filter(kinds: [.zapReceipt], publicKeyReferences: [signer.publicKey], limit: 50)
+    #expect(await events.requests == [[expected]])
 }
 ```
 

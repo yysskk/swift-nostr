@@ -1,7 +1,7 @@
 import Foundation
 import NostrCore
 
-/// Contact information for NIP-02 Contact List
+/// Contact information for NIP-02 Follow List
 /// https://github.com/nostr-protocol/nips/blob/master/02.md
 public struct Contact: Codable, Hashable, Sendable {
     /// The public key of the contact
@@ -30,7 +30,7 @@ public struct Contact: Codable, Hashable, Sendable {
         self.petname = petname
     }
 
-    /// The `p` tag for a NIP-02 contact list: `["p", public key, relayURL, petname]`, with an empty
+    /// The `p` tag for a NIP-02 follow list: `["p", public key, relayURL, petname]`, with an empty
     /// relay placeholder when only a petname is set.
     public var tag: Tag {
         .publicKey(publicKey, relayURL: relayURL, petname: petname)
@@ -53,21 +53,21 @@ public struct Contact: Codable, Hashable, Sendable {
     }
 }
 
-// MARK: - Contact List Helpers
+// MARK: - Follow List Helpers
 extension Event {
-    /// Extracts contacts from a kind 3 (contacts) event
-    /// Returns nil if the event is not a contact list event. A `p` tag whose value is not a
+    /// Extracts contacts from a kind 3 (NIP-02 follow list) event
+    /// Returns nil if the event is not a follow list event. A `p` tag whose value is not a
     /// canonical hex public key is skipped.
     public var contacts: [Contact]? {
-        guard kind == .contacts else {
+        guard kind == .followList else {
             return nil
         }
 
         return tags.compactMap(Contact.init(tag:))
     }
 
-    /// Checks if this is a contact list event
-    public var isContactList: Bool {
-        kind == .contacts
+    /// Checks if this is a follow list event
+    public var isFollowList: Bool {
+        kind == .followList
     }
 }

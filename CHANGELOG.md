@@ -87,6 +87,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     `remove(_:)`, `connectAll()` → `connect()`, and `disconnectAll()` → `disconnect()`.
   - `NostrEventFetching.fetchMetadata(publicKey:timeout:)` → `fetchMetadata(for:timeout:)`, labeling
     the subject public key `for:` like `fetchRelayList(for:)` and the list fetches.
+- **Kind constants and group tags use the NIP terms** (breaking):
+  - `Event.Kind` constants take the names their NIPs use: `setMetadata` → `metadata` (kind 0,
+    NIP-01 user metadata), `contacts` → `followList` (kind 3, NIP-02), `eventDeletion` →
+    `deletionRequest` (kind 5, NIP-09), and `zap` → `zapReceipt` (kind 9735, NIP-57). The NIP-29
+    moderation kinds 9007 and 9008 are named after their actions like the others: `groupCreation`
+    → `createGroup` and `groupDeletion` → `deleteGroup`.
+  - The NIP-02 helpers follow the kind: `Filter.contactList(publicKeys:)` and
+    `contactList(publicKey:)` → `followList(publicKeys:)` and `followList(publicKey:)`,
+    `EventTemplate.contactList(_:)` → `followList(_:)`, and `Event.isContactList` → `isFollowList`.
+    `Contact` and `Event.contacts` keep their names.
+  - The NIP-29 `h` tag says it carries a group id, and the NIP-51 `group` tag says it is a group
+    list entry: `Tag.group(_:)` → `Tag.groupID(_:)`, `Tag.simpleGroup(id:relayURL:name:)` →
+    `Tag.groupListEntry(id:relayURL:name:)`, and the matching `Tag.Name` constants `.group` →
+    `.groupID` and `.simpleGroup` → `.groupListEntry`. The wire tags are unchanged.
 
 ### Fixed
 

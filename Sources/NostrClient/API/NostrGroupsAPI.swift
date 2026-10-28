@@ -101,7 +101,7 @@ public struct NostrGroupsAPI: NostrGroupManaging {
         let relayURL = try await ensureRelay(group)
         let scoped = filters.map { filter in
             var filter = filter
-            filter[tag: .group] = [group.id]
+            filter[tag: .groupID] = [group.id]
             return filter
         }
         return try await client.pool.subscribe(filters: scoped, to: [relayURL])

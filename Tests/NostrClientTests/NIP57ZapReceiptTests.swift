@@ -27,7 +27,7 @@ struct NIP57ZapReceiptTests {
         let signer = EventSigner(keyPair: payee)
         return try signer.sign(
             UnsignedEvent(
-                publicKey: signer.publicKey, kind: .zap, tags: tags.map(Event.Tag.init(rawArray:)), content: ""))
+                publicKey: signer.publicKey, kind: .zapReceipt, tags: tags.map(Event.Tag.init(rawArray:)), content: ""))
     }
 
     /// Builds a JSON-encoded kind-9734 zap request with the given amount and, optionally, zapped event.

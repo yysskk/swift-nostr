@@ -13,7 +13,7 @@ Swift library for Nostr protocol
 ## Features
 
 - **Full NIP-01 Support**: Events, subscriptions, and relay communication
-- **NIP-02 Contact List**: Follow/unfollow users and manage contact lists
+- **NIP-02 Follow List**: Follow/unfollow users and manage follow lists
 - **NIP-03 OpenTimestamps**: Attach OTS attestations to events
 - **NIP-05 Verification**: DNS-based identifier verification
 - **NIP-06 Key Derivation**: Generate keys from BIP-39 mnemonic seed phrases
@@ -332,7 +332,7 @@ Each of these is covered in depth, with worked examples, in the [documentation](
 ## Supported NIPs
 
 - [x] NIP-01: Basic protocol
-- [x] NIP-02: Contact list and petnames
+- [x] NIP-02: Follow list and petnames
 - [x] NIP-03: OpenTimestamps attestations
 - [x] NIP-05: DNS-based identifiers
 - [x] NIP-06: Basic key derivation from mnemonic seed phrase

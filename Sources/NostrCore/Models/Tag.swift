@@ -118,16 +118,16 @@ extension Event.Tag {
         public static let address = Name(rawValue: "a")
         /// "r": a URL reference (NIP-24).
         public static let reference = Name(rawValue: "r")
-        /// "h": the group an event belongs to (NIP-29).
-        public static let group = Name(rawValue: "h")
+        /// "h": the id of the group an event belongs to (NIP-29).
+        public static let groupID = Name(rawValue: "h")
         /// "previous": recent timeline references of a group event (NIP-29).
         public static let previous = Name(rawValue: "previous")
         /// "code": a group invite code (NIP-29).
         public static let inviteCode = Name(rawValue: "code")
         /// "role": a group role (NIP-29).
         public static let role = Name(rawValue: "role")
-        /// "group": an entry of a simple group list (NIP-51).
-        public static let simpleGroup = Name(rawValue: "group")
+        /// "group": an entry of the kind-10009 simple groups list (NIP-51).
+        public static let groupListEntry = Name(rawValue: "group")
     }
 }
 
@@ -316,11 +316,12 @@ extension Tag {
         Tag(name: .reference, values: [url.absoluteString])
     }
 
-    /// An "h" tag scoping an event to a NIP-29 group. Required on everything a user sends
-    /// to a group relay: content, join/leave requests, and moderation events.
+    /// An "h" tag carrying the id of the NIP-29 group an event belongs to. Required on
+    /// everything a user sends to a group relay: content, join/leave requests, and moderation
+    /// events.
     /// https://github.com/nostr-protocol/nips/blob/master/29.md
-    public static func group(_ groupID: String) -> Tag {
-        Tag(name: .group, values: [groupID])
+    public static func groupID(_ groupID: String) -> Tag {
+        Tag(name: .groupID, values: [groupID])
     }
 
     /// A "previous" tag carrying NIP-29 timeline references (the first 8 characters of
@@ -347,15 +348,15 @@ extension Tag {
         return Tag(name: .role, values: values)
     }
 
-    /// A "group" tag of the NIP-51 kind-10009 simple group list:
+    /// A "group" tag: one entry of the NIP-51 kind-10009 simple groups list,
     /// `["group", groupID, relayURL, name?]`, with the relay URL in its canonical form.
     /// https://github.com/nostr-protocol/nips/blob/master/51.md
-    public static func simpleGroup(id: String, relayURL: RelayURL, name: String? = nil) -> Tag {
+    public static func groupListEntry(id: String, relayURL: RelayURL, name: String? = nil) -> Tag {
         var values = [id, relayURL.description]
         if let name {
             values.append(name)
         }
-        return Tag(name: .simpleGroup, values: values)
+        return Tag(name: .groupListEntry, values: values)
     }
 }
 

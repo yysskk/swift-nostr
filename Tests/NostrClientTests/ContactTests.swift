@@ -193,14 +193,14 @@ struct ContactTests {
     }
 }
 
-@Suite("Contact List Event Tests")
-struct ContactListEventTests {
+@Suite("Follow List Event Tests")
+struct FollowListEventTests {
     private let publicKey1 = PublicKey.fixture("publicKey1")
     private let publicKey2 = PublicKey.fixture("publicKey2")
     private let publicKey3 = PublicKey.fixture("publicKey3")
 
-    @Test("Sign contact list event")
-    func contactListEvent() throws {
+    @Test("Sign follow list event")
+    func followListEvent() throws {
         let keyPair = KeyPair()
         let signer = EventSigner(keyPair: keyPair)
 
@@ -210,7 +210,7 @@ struct ContactListEventTests {
             Contact(publicKey: publicKey3),
         ]
 
-        let event = signer.sign(.contactList(contacts))
+        let event = signer.sign(.followList(contacts))
 
         #expect(event.kind == 3)
         #expect(event.content == "")
@@ -222,12 +222,12 @@ struct ContactListEventTests {
     }
 
     @Test("Contacts without a relay or petname become bare p tags")
-    func contactListFromPublicKeys() throws {
+    func followListFromPublicKeys() throws {
         let keyPair = KeyPair()
         let signer = EventSigner(keyPair: keyPair)
 
         let publicKeys = [publicKey1, publicKey2, publicKey3]
-        let event = signer.sign(.contactList(publicKeys.map { Contact(publicKey: $0) }))
+        let event = signer.sign(.followList(publicKeys.map { Contact(publicKey: $0) }))
 
         #expect(event.kind == 3)
         #expect(event.tags.count == 3)
@@ -246,7 +246,7 @@ struct ContactListEventTests {
             Contact(publicKey: publicKey2),
         ]
 
-        let event = signer.sign(.contactList(contacts))
+        let event = signer.sign(.followList(contacts))
 
         let extractedContacts = event.contacts
         #expect(extractedContacts != nil)
@@ -264,7 +264,7 @@ struct ContactListEventTests {
         let event = try signer.sign(
             UnsignedEvent(
                 publicKey: signer.publicKey,
-                kind: .contacts,
+                kind: .followList,
                 tags: [
                     ["p", publicKey1.hex],
                     ["p", "publicKey2"],
@@ -277,16 +277,16 @@ struct ContactListEventTests {
         #expect(event.contacts == [Contact(publicKey: publicKey1), Contact(publicKey: publicKey3, petname: "carol")])
     }
 
-    @Test("isContactList property")
-    func isContactListProperty() throws {
+    @Test("isFollowList property")
+    func isFollowListProperty() throws {
         let keyPair = KeyPair()
         let signer = EventSigner(keyPair: keyPair)
 
-        let contactEvent = signer.sign(.contactList([Contact(publicKey: publicKey1)]))
+        let contactEvent = signer.sign(.followList([Contact(publicKey: publicKey1)]))
         let textNote = signer.sign(.textNote("Hello"))
 
-        #expect(contactEvent.isContactList == true)
-        #expect(textNote.isContactList == false)
+        #expect(contactEvent.isFollowList == true)
+        #expect(textNote.isFollowList == false)
     }
 
     @Test("contacts property returns nil for non-contact event")
@@ -299,21 +299,21 @@ struct ContactListEventTests {
     }
 }
 
-@Suite("Contact List Filter Tests")
-struct ContactListFilterTests {
+@Suite("Follow List Filter Tests")
+struct FollowListFilterTests {
 
-    @Test("Contact list filter for single public key")
-    func contactListFilterSinglePublicKey() {
-        let filter = Filter.contactList(publicKey: .fixture("abc123"))
+    @Test("Follow list filter for single public key")
+    func followListFilterSinglePublicKey() {
+        let filter = Filter.followList(publicKey: .fixture("abc123"))
 
         #expect(filter.authors == [.fixture("abc123")])
         #expect(filter.kinds == [3])
         #expect(filter.limit == 1)
     }
 
-    @Test("Contact list filter for multiple public keys")
-    func contactListFilterMultiplePublicKeys() {
-        let filter = Filter.contactList(publicKeys: [.fixture("abc123"), .fixture("def456")])
+    @Test("Follow list filter for multiple public keys")
+    func followListFilterMultiplePublicKeys() {
+        let filter = Filter.followList(publicKeys: [.fixture("abc123"), .fixture("def456")])
 
         #expect(filter.authors == [.fixture("abc123"), .fixture("def456")])
         #expect(filter.kinds == [3])

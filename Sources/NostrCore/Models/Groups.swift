@@ -131,7 +131,7 @@ extension Event {
     /// relay-generated group state (kinds 39000-39005) — the "d" tag value. Nil for events
     /// carrying neither.
     public var groupID: String? {
-        if let groupID = firstTagValue(named: .group) {
+        if let groupID = firstTagValue(named: .groupID) {
             return groupID
         }
         if (39000...39005).contains(kind.rawValue) {

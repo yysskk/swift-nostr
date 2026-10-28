@@ -55,8 +55,8 @@ struct TagTests {
             (.identifier, "d"), (.subject, "subject"), (.relay, "relay"), (.challenge, "challenge"),
             (.url, "u"), (.method, "method"), (.payload, "payload"), (.expiration, "expiration"),
             (.kind, "k"), (.nonce, "nonce"), (.word, "word"), (.address, "a"), (.reference, "r"),
-            (.group, "h"), (.previous, "previous"), (.inviteCode, "code"), (.role, "role"),
-            (.simpleGroup, "group"),
+            (.groupID, "h"), (.previous, "previous"), (.inviteCode, "code"), (.role, "role"),
+            (.groupListEntry, "group"),
         ]
     )
     func nameConstantsCarryWireStrings(name: Event.Tag.Name, rawValue: String) {
@@ -109,11 +109,11 @@ struct TagTests {
             (.word("spam"), .word),
             (.address(EventCoordinate(kind: .longFormContent, publicKey: pk1, identifier: "post")), .address),
             (.reference(URL(string: "https://example.com")!), .reference),
-            (.group("g"), .group),
+            (.groupID("g"), .groupID),
             (.previous(["abcd1234"]), .previous),
             (.inviteCode("invite"), .inviteCode),
             (.role("admin"), .role),
-            (.simpleGroup(id: "g", relayURL: relay), .simpleGroup),
+            (.groupListEntry(id: "g", relayURL: relay), .groupListEntry),
         ]
         for (tag, name) in pairs {
             #expect(tag.name == name)

@@ -97,6 +97,6 @@ extension EventTemplate {
     ///   - reason: Why the events are deleted (the event content).
     /// - Returns: The template for the deletion request.
     public static func deletion(of eventIDs: [EventID], reason: String = "") -> EventTemplate {
-        EventTemplate(kind: .eventDeletion, tags: eventIDs.map { Tag.event($0) }, content: reason)
+        EventTemplate(kind: .deletionRequest, tags: eventIDs.map { Tag.event($0) }, content: reason)
     }
 }

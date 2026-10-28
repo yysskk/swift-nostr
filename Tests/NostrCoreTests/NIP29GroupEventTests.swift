@@ -61,8 +61,8 @@ struct NIP29GroupKindAndTagTests {
         #expect(Event.Kind.groupRemoveUser.rawValue == 9001)
         #expect(Event.Kind.groupEditMetadata.rawValue == 9002)
         #expect(Event.Kind.groupDeleteEvent.rawValue == 9005)
-        #expect(Event.Kind.groupCreation.rawValue == 9007)
-        #expect(Event.Kind.groupDeletion.rawValue == 9008)
+        #expect(Event.Kind.createGroup.rawValue == 9007)
+        #expect(Event.Kind.deleteGroup.rawValue == 9008)
         #expect(Event.Kind.groupCreateInvite.rawValue == 9009)
         #expect(Event.Kind.groupUpdatePinList.rawValue == 9010)
         #expect(Event.Kind.groupJoinRequest.rawValue == 9021)
@@ -94,7 +94,7 @@ struct NIP29GroupKindAndTagTests {
 
     @Test("NIP-29 tag constructors produce the spec tag shapes")
     func tagConstructors() {
-        #expect(Event.Tag.group("abcdef").rawArray == ["h", "abcdef"])
+        #expect(Event.Tag.groupID("abcdef").rawArray == ["h", "abcdef"])
         #expect(
             Event.Tag.previous(["00000001", "00000002", "00000003"]).rawArray
                 == ["previous", "00000001", "00000002", "00000003"])
@@ -104,10 +104,10 @@ struct NIP29GroupKindAndTagTests {
             Event.Tag.role("admin", description: "Can edit metadata").rawArray
                 == ["role", "admin", "Can edit metadata"])
         #expect(
-            Event.Tag.simpleGroup(id: "abcdef", relayURL: RelayURL("wss://groups.example.com")!).rawArray
+            Event.Tag.groupListEntry(id: "abcdef", relayURL: RelayURL("wss://groups.example.com")!).rawArray
                 == ["group", "abcdef", "wss://groups.example.com"])
         #expect(
-            Event.Tag.simpleGroup(id: "abcdef", relayURL: RelayURL("wss://groups.example.com")!, name: "Cooking")
+            Event.Tag.groupListEntry(id: "abcdef", relayURL: RelayURL("wss://groups.example.com")!, name: "Cooking")
                 .rawArray
                 == ["group", "abcdef", "wss://groups.example.com", "Cooking"])
     }
@@ -304,7 +304,7 @@ struct NIP29GroupEventTests {
 
     @Test("groupID reads the h tag of user events")
     func groupIDFromHTag() {
-        let event = makeEvent(tags: [Event.Tag(name: "x", values: ["other"]), .group("abcdef")])
+        let event = makeEvent(tags: [Event.Tag(name: "x", values: ["other"]), .groupID("abcdef")])
 
         #expect(event.groupID == "abcdef")
     }
@@ -423,7 +423,7 @@ struct NIP29TimelineReferenceTests {
 
     @Test("previousReferences(of:) reads the previous tag")
     func previousReferencesOfEvent() {
-        let event = makeEvent(tags: [.group("abcdef"), Event.Tag(name: .previous, values: ["00000001", "00000002"])])
+        let event = makeEvent(tags: [.groupID("abcdef"), Event.Tag(name: .previous, values: ["00000001", "00000002"])])
 
         #expect(Groups.previousReferences(of: event) == ["00000001", "00000002"])
         #expect(Groups.previousReferences(of: makeEvent()) == [])

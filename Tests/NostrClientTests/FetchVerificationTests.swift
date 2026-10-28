@@ -157,12 +157,12 @@ struct FetchVerificationTests {
         let victim = EventSigner(keyPair: KeyPair())
 
         let forgery = try forged(
-            claiming: victim.publicKey, kind: .setMetadata, createdAt: Timestamp(rawValue: 2_000_000_000),
+            claiming: victim.publicKey, kind: .metadata, createdAt: Timestamp(rawValue: 2_000_000_000),
             content: #"{"name":"attacker","lud16":"attacker@example.com"}"#)
         let stale = try signed(
-            victim, kind: .setMetadata, createdAt: Timestamp(rawValue: 1_700_000_000), content: #"{"name":"old"}"#)
+            victim, kind: .metadata, createdAt: Timestamp(rawValue: 1_700_000_000), content: #"{"name":"old"}"#)
         let current = try signed(
-            victim, kind: .setMetadata, createdAt: Timestamp(rawValue: 1_800_000_000), content: #"{"name":"current"}"#)
+            victim, kind: .metadata, createdAt: Timestamp(rawValue: 1_800_000_000), content: #"{"name":"current"}"#)
 
         // The forgery arrives first and is the newest by timestamp: both old selections favoured it.
         let metadata = try await answering(socket, with: [forgery, stale, current]) {
@@ -219,17 +219,17 @@ struct FetchVerificationTests {
         for index in 0..<6 {
             candidates.append(
                 try signed(
-                    signer, kind: .setMetadata, createdAt: Timestamp(rawValue: 1_700_000_000),
+                    signer, kind: .metadata, createdAt: Timestamp(rawValue: 1_700_000_000),
                     content: #"{"name":"n\#(index)"}"#))
         }
         let expected = candidates.map(\.id).min()
 
         #expect(
             VerifiedEventSelection.newest(
-                in: candidates, kind: .setMetadata, author: signer.publicKey)?.id == expected)
+                in: candidates, kind: .metadata, author: signer.publicKey)?.id == expected)
         #expect(
             VerifiedEventSelection.newest(
-                in: candidates.reversed(), kind: .setMetadata, author: signer.publicKey)?.id == expected)
+                in: candidates.reversed(), kind: .metadata, author: signer.publicKey)?.id == expected)
     }
 
     @Test("an addressable selection matches the d identifier")

@@ -42,9 +42,9 @@ extension Groups {
             case .deleteEvent:
                 return .groupDeleteEvent
             case .createGroup:
-                return .groupCreation
+                return .createGroup
             case .deleteGroup:
-                return .groupDeletion
+                return .deleteGroup
             case .createInvite:
                 return .groupCreateInvite
             case .updatePinList:
@@ -105,7 +105,7 @@ extension Groups {
         /// The eight moderation kinds the spec defines: 9000-9002, 9005, and 9007-9010.
         private static let moderationKinds: Set<Event.Kind> = [
             .groupPutUser, .groupRemoveUser, .groupEditMetadata, .groupDeleteEvent,
-            .groupCreation, .groupDeletion, .groupCreateInvite, .groupUpdatePinList,
+            .createGroup, .deleteGroup, .groupCreateInvite, .groupUpdatePinList,
         ]
 
         /// Parses a moderation event of kinds 9000-9002, 9005, or 9007-9010.
@@ -122,7 +122,7 @@ extension Groups {
             guard Self.moderationKinds.contains(event.kind) else {
                 throw ValidationError.unsupportedModerationKind(event.kind)
             }
-            guard let groupID = event.firstTagValue(named: .group), !groupID.isEmpty else {
+            guard let groupID = event.firstTagValue(named: .groupID), !groupID.isEmpty else {
                 throw ValidationError.missingGroupID(event.kind)
             }
 
@@ -143,7 +143,7 @@ extension Groups {
                 action = .editMetadata(
                     Metadata(
                         groupID: groupID,
-                        fieldTags: event.tags.filter { ![.group, .previous].contains($0.name) }
+                        fieldTags: event.tags.filter { ![.groupID, .previous].contains($0.name) }
                     )
                 )
             case .groupDeleteEvent:
@@ -151,9 +151,9 @@ extension Groups {
                     throw ValidationError.missingTag(name: .event, kind: event.kind)
                 }
                 action = .deleteEvent(id: id)
-            case .groupCreation:
+            case .createGroup:
                 action = .createGroup
-            case .groupDeletion:
+            case .deleteGroup:
                 action = .deleteGroup
             case .groupCreateInvite:
                 guard let code = event.firstTagValue(named: .inviteCode), !code.isEmpty else {

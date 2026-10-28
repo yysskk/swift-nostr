@@ -169,12 +169,18 @@ extension Event {
 
         // MARK: Common Kinds Defined in NIPs
 
-        public static let setMetadata = Kind(rawValue: 0)
+        /// Kind 0, user metadata (NIP-01): the author's profile as JSON content.
+        /// https://github.com/nostr-protocol/nips/blob/master/01.md
+        public static let metadata = Kind(rawValue: 0)
         public static let textNote = Kind(rawValue: 1)
         public static let recommendRelay = Kind(rawValue: 2)
-        public static let contacts = Kind(rawValue: 3)
+        /// Kind 3, a follow list (NIP-02): one "p" tag per followed public key.
+        /// https://github.com/nostr-protocol/nips/blob/master/02.md
+        public static let followList = Kind(rawValue: 3)
         public static let encryptedDirectMessage = Kind(rawValue: 4)
-        public static let eventDeletion = Kind(rawValue: 5)
+        /// Kind 5, an event deletion request (NIP-09): asks relays to delete the referenced events.
+        /// https://github.com/nostr-protocol/nips/blob/master/09.md
+        public static let deletionRequest = Kind(rawValue: 5)
         public static let repost = Kind(rawValue: 6)
         public static let reaction = Kind(rawValue: 7)
         public static let badgeAward = Kind(rawValue: 8)
@@ -212,12 +218,14 @@ extension Event {
         /// or the relay itself.
         /// https://github.com/nostr-protocol/nips/blob/master/29.md
         public static let groupDeleteEvent = Kind(rawValue: 9005)
-        /// A NIP-29 moderation event creating a group, sent by a group admin or the relay itself.
+        /// Kind 9007, a NIP-29 "create-group" moderation event creating a group, sent by a group
+        /// admin or the relay itself.
         /// https://github.com/nostr-protocol/nips/blob/master/29.md
-        public static let groupCreation = Kind(rawValue: 9007)
-        /// A NIP-29 moderation event deleting a group, sent by a group admin or the relay itself.
+        public static let createGroup = Kind(rawValue: 9007)
+        /// Kind 9008, a NIP-29 "delete-group" moderation event deleting a group, sent by a group
+        /// admin or the relay itself.
         /// https://github.com/nostr-protocol/nips/blob/master/29.md
-        public static let groupDeletion = Kind(rawValue: 9008)
+        public static let deleteGroup = Kind(rawValue: 9008)
         /// A NIP-29 moderation event creating an invite code for a closed group, sent by a
         /// group admin or the relay itself.
         /// https://github.com/nostr-protocol/nips/blob/master/29.md
@@ -233,7 +241,10 @@ extension Event {
         /// https://github.com/nostr-protocol/nips/blob/master/29.md
         public static let groupLeaveRequest = Kind(rawValue: 9022)
         public static let zapRequest = Kind(rawValue: 9734)
-        public static let zap = Kind(rawValue: 9735)
+        /// Kind 9735, a zap receipt (NIP-57): published by the recipient's LNURL server once the
+        /// invoice of a ``zapRequest`` is paid.
+        /// https://github.com/nostr-protocol/nips/blob/master/57.md
+        public static let zapReceipt = Kind(rawValue: 9735)
         public static let muteList = Kind(rawValue: 10000)
         public static let pinList = Kind(rawValue: 10001)
         public static let relayListMetadata = Kind(rawValue: 10002)

@@ -37,7 +37,7 @@ struct GroupCapabilityTests {
     func publishShortForm() async throws {
         let stub = makeStub()
         let groups: any NostrGroupManaging = stub
-        let template = EventTemplate(kind: .chatMessage, tags: [.group("pizza")], content: "hi")
+        let template = EventTemplate(kind: .chatMessage, tags: [.groupID("pizza")], content: "hi")
 
         let published = try await groups.publish(template, in: group)
 
@@ -148,7 +148,7 @@ struct GroupCapabilityTests {
             reason: "promoted", strategy: .firstAck)
 
         let publishes = await stub.publishes
-        #expect(publishes.map(\.template.kind) == [.groupCreation, .groupPutUser])
+        #expect(publishes.map(\.template.kind) == [.createGroup, .groupPutUser])
         #expect(
             publishes.map { $0.template.tags.map(\.rawArray) } == [
                 [["h", "pizza"]],

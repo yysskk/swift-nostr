@@ -45,7 +45,7 @@ public struct GroupListEntry: Sendable, Hashable {
     /// to ``SimpleGroupList``'s additional-tag buckets so its content survives a round
     /// trip. A present-but-empty name is treated as nil.
     public init?(tag: Tag) {
-        guard tag.name == .simpleGroup, (2...3).contains(tag.values.count) else { return nil }
+        guard tag.name == .groupListEntry, (2...3).contains(tag.values.count) else { return nil }
         let groupID = tag.values[0]
         guard !groupID.isEmpty, let relayURL = RelayURL(tag.values[1]) else { return nil }
         let name = tag.values.count == 3 && !tag.values[2].isEmpty ? tag.values[2] : nil
@@ -53,9 +53,9 @@ public struct GroupListEntry: Sendable, Hashable {
     }
 
     /// The wire tag: `["group", groupID, relayURL, name?]`
-    /// (``Event/Tag/simpleGroup(id:relayURL:name:)``).
+    /// (``Event/Tag/groupListEntry(id:relayURL:name:)``).
     public var tag: Tag {
-        .simpleGroup(id: groupID, relayURL: relayURL, name: name)
+        .groupListEntry(id: groupID, relayURL: relayURL, name: name)
     }
 
     /// The entry as a ``GroupReference``.

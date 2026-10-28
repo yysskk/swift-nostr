@@ -33,8 +33,8 @@ struct NIP29ModerationTemplateTests {
             Groups.ModerationAction.editMetadata(Groups.Metadata(groupID: "abcdef")).kind
                 == .groupEditMetadata)
         #expect(Groups.ModerationAction.deleteEvent(id: EventID.fixture("deleted")).kind == .groupDeleteEvent)
-        #expect(Groups.ModerationAction.createGroup.kind == .groupCreation)
-        #expect(Groups.ModerationAction.deleteGroup.kind == .groupDeletion)
+        #expect(Groups.ModerationAction.createGroup.kind == .createGroup)
+        #expect(Groups.ModerationAction.deleteGroup.kind == .deleteGroup)
         #expect(Groups.ModerationAction.createInvite(code: "invite123").kind == .groupCreateInvite)
         #expect(Groups.ModerationAction.updatePinList([]).kind == .groupUpdatePinList)
     }
@@ -120,12 +120,12 @@ struct NIP29ModerationTemplateTests {
     @Test("create-group and delete-group carry only the h tag")
     func lifecycleLayouts() {
         let create = EventTemplate.groupModeration(.createGroup, groupID: "abcdef")
-        #expect(create.kind == .groupCreation)
+        #expect(create.kind == .createGroup)
         #expect(create.tags.map(\.rawArray) == [["h", "abcdef"]])
         #expect(create.content.isEmpty)
 
         let delete = EventTemplate.groupModeration(.deleteGroup, groupID: "abcdef")
-        #expect(delete.kind == .groupDeletion)
+        #expect(delete.kind == .deleteGroup)
         #expect(delete.tags.map(\.rawArray) == [["h", "abcdef"]])
     }
 
@@ -306,7 +306,7 @@ struct NIP29ModerationParsingTests {
     func unsupportedKinds() {
         for raw in [1, 9003, 9004, 9006, 9011] {
             let kind = Event.Kind(rawValue: raw)
-            let event = makeEvent(kind: kind, tags: [.group("abcdef"), .publicKey(target)])
+            let event = makeEvent(kind: kind, tags: [.groupID("abcdef"), .publicKey(target)])
 
             #expect(throws: Groups.ValidationError.unsupportedModerationKind(kind)) {
                 try Groups.ModerationRequest(event: event)
@@ -327,10 +327,10 @@ struct NIP29ModerationParsingTests {
     func missingGroupID() {
         let kinds: [Event.Kind] = [
             .groupPutUser, .groupRemoveUser, .groupEditMetadata, .groupDeleteEvent,
-            .groupCreation, .groupDeletion, .groupCreateInvite, .groupUpdatePinList,
+            .createGroup, .deleteGroup, .groupCreateInvite, .groupUpdatePinList,
         ]
         for kind in kinds {
-            for tags: [Event.Tag] in [[], [Event.Tag(name: .group)], [.group("")]] {
+            for tags: [Event.Tag] in [[], [Event.Tag(name: .groupID)], [.groupID("")]] {
                 let event = makeEvent(kind: kind, tags: tags + [.publicKey(target)])
                 #expect(throws: Groups.ValidationError.missingGroupID(kind)) {
                     try Groups.ModerationRequest(event: event)
@@ -342,12 +342,12 @@ struct NIP29ModerationParsingTests {
     @Test("put-user and remove-user require a p tag with a public key")
     func missingPublicKeyTag() {
         for kind in [Event.Kind.groupPutUser, .groupRemoveUser] {
-            let missing = makeEvent(kind: kind, tags: [.group("abcdef")])
+            let missing = makeEvent(kind: kind, tags: [.groupID("abcdef")])
             #expect(throws: Groups.ValidationError.missingTag(name: "p", kind: kind)) {
                 try Groups.ModerationRequest(event: missing)
             }
 
-            let valueless = makeEvent(kind: kind, tags: [.group("abcdef"), Event.Tag(name: .publicKey)])
+            let valueless = makeEvent(kind: kind, tags: [.groupID("abcdef"), Event.Tag(name: .publicKey)])
             #expect(throws: Groups.ValidationError.missingTag(name: "p", kind: kind)) {
                 try Groups.ModerationRequest(event: valueless)
             }
@@ -361,7 +361,7 @@ struct NIP29ModerationParsingTests {
         for kind in [Event.Kind.groupPutUser, .groupRemoveUser] {
             for value in ["other", target.hex.uppercased(), String(target.hex.dropLast())] {
                 let event = makeEvent(
-                    kind: kind, tags: [.group("abcdef"), Event.Tag(name: .publicKey, values: [value])])
+                    kind: kind, tags: [.groupID("abcdef"), Event.Tag(name: .publicKey, values: [value])])
                 #expect(throws: Groups.ValidationError.missingTag(name: "p", kind: kind)) {
                     try Groups.ModerationRequest(event: event)
                 }
@@ -372,7 +372,7 @@ struct NIP29ModerationParsingTests {
     @Test("delete-event treats a malformed e value as a missing e tag")
     func malformedEventTag() {
         let event = makeEvent(
-            kind: .groupDeleteEvent, tags: [.group("abcdef"), Event.Tag(name: .event, values: ["not-an-id"])])
+            kind: .groupDeleteEvent, tags: [.groupID("abcdef"), Event.Tag(name: .event, values: ["not-an-id"])])
 
         #expect(throws: Groups.ValidationError.missingTag(name: "e", kind: .groupDeleteEvent)) {
             try Groups.ModerationRequest(event: event)
@@ -386,7 +386,7 @@ struct NIP29ModerationParsingTests {
         let event = makeEvent(
             kind: .groupUpdatePinList,
             tags: [
-                .group("abcdef"), Event.Tag(name: .event, values: ["not-an-id"]), .event(pinned),
+                .groupID("abcdef"), Event.Tag(name: .event, values: ["not-an-id"]), .event(pinned),
                 Event.Tag(name: .address, values: ["39000:pubkey:abcdef"]), .address(coordinate),
             ]
         )
@@ -398,7 +398,7 @@ struct NIP29ModerationParsingTests {
 
     @Test("parse failures are thrown as the concrete ValidationError")
     func typedValidationError() {
-        let event = makeEvent(kind: .groupDeleteEvent, tags: [.group("abcdef")])
+        let event = makeEvent(kind: .groupDeleteEvent, tags: [.groupID("abcdef")])
 
         do {
             _ = try Groups.ModerationRequest(event: event)
@@ -410,7 +410,7 @@ struct NIP29ModerationParsingTests {
 
     @Test("delete-event requires an e tag")
     func missingEventTag() {
-        let event = makeEvent(kind: .groupDeleteEvent, tags: [.group("abcdef")])
+        let event = makeEvent(kind: .groupDeleteEvent, tags: [.groupID("abcdef")])
 
         #expect(throws: Groups.ValidationError.missingTag(name: "e", kind: .groupDeleteEvent)) {
             try Groups.ModerationRequest(event: event)
@@ -420,7 +420,9 @@ struct NIP29ModerationParsingTests {
     @Test("create-invite requires a code tag with a non-empty value")
     func missingInviteCode() {
         for tags: [Event.Tag] in [
-            [.group("abcdef")], [.group("abcdef"), Event.Tag(name: .inviteCode)], [.group("abcdef"), .inviteCode("")],
+            [.groupID("abcdef")],
+            [.groupID("abcdef"), Event.Tag(name: .inviteCode)],
+            [.groupID("abcdef"), .inviteCode("")],
         ] {
             let event = makeEvent(kind: .groupCreateInvite, tags: tags)
             #expect(throws: Groups.ValidationError.missingTag(name: "code", kind: .groupCreateInvite)) {
@@ -434,7 +436,7 @@ struct NIP29ModerationParsingTests {
         let event = makeEvent(
             kind: .groupPutUser,
             tags: [
-                .group("abcdef"), Event.Tag(name: .publicKey, values: [target.hex, "ceo"]),
+                .groupID("abcdef"), Event.Tag(name: .publicKey, values: [target.hex, "ceo"]),
                 Event.Tag(name: .publicKey, values: ["other", "member"]),
             ]
         )
@@ -447,7 +449,7 @@ struct NIP29ModerationParsingTests {
         let event = makeEvent(
             kind: .groupRemoveUser,
             tags: [
-                .group("abcdef"), Event.Tag(name: .publicKey, values: [target.hex, "ceo"]),
+                .groupID("abcdef"), Event.Tag(name: .publicKey, values: [target.hex, "ceo"]),
                 Event.Tag(name: .publicKey, values: ["other"]),
             ]
         )

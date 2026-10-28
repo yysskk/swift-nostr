@@ -177,7 +177,7 @@ public struct ZapsAPI: Sendable {
     /// Fetches the zap receipts naming the signer as recipient.
     public func received(limit: Int = 50, timeout: Duration? = nil) async throws -> [ZapReceipt] {
         guard let publicKey = await identity.publicKey else { throw NostrClient.Error.signerNotSet }
-        let filter = Filter(kinds: [.zap], publicKeyReferences: [publicKey], limit: limit)
+        let filter = Filter(kinds: [.zapReceipt], publicKeyReferences: [publicKey], limit: limit)
         return try await events.fetch(filters: [filter], route: .pool, timeout: timeout)
             .compactMap(ZapReceipt.init(event:))
     }
@@ -257,7 +257,7 @@ default port removed, path case and a non-root trailing slash kept. `RelayURL(st
 `containsCredentials` (a user or password); `RelayURL(_:)` is the failable
 form. Equality and hashing use the canonical form, so any spelling of the same relay routes
 to one pooled connection. `description` (and the JSON encoding) is the canonical string;
-`url` is the `URL` the WebSocket opens. Relay hints read from third-party tags (contact lists,
+`url` is the `URL` the WebSocket opens. Relay hints read from third-party tags (follow lists,
 NIP-10 positional roots, NIP-19 references) are parsed leniently: a malformed one is dropped.
 
 ```swift
@@ -491,12 +491,12 @@ Tag.word("spam")                 // ["word", "spam"] (NIP-51 muted word)
 Tag.quote(id, publicKey: pk)        // ["q", id, "", pk] (NIP-18; optional relayURL:)
 Tag.address(coordinate)          // ["a", "30023:<pk>:d"] (EventCoordinate; optional relayURL:)
 Tag.reference(URL(string: "https://x")!)  // ["r", "https://x"]
-Tag.group("abcdef")              // ["h", "abcdef"] (NIP-29 group scope, on everything a user sends)
+Tag.groupID("abcdef")            // ["h", "abcdef"] (NIP-29 group scope, on everything a user sends)
 Tag.previous(["12345678"])       // ["previous", ref...] (NIP-29 timeline references)
 Tag.inviteCode("A7fjq2")         // ["code", "A7fjq2"] (NIP-29 kinds 9009/9021)
 Tag.role("mod", description: "kicks")  // ["role", name, description?] (NIP-29 kind 39003)
 Tag.publicKey(pk, roles: ["admin"]) // ["p", pk, role...] (NIP-29; index 1 is a role, not a relay hint)
-Tag.simpleGroup(id: "abcdef", relayURL: try RelayURL(string: "wss://g"), name: "Cool")  // ["group", ...] (NIP-51 kind 10009)
+Tag.groupListEntry(id: "abcdef", relayURL: try RelayURL(string: "wss://g"), name: "Cool")  // ["group", ...] (NIP-51 kind 10009)
 Tag.expiration(Timestamp(rawValue: 1_700_000_000))  // ["expiration", "1700000000"] (NIP-40)
 Tag(rawArray: ["custom", "x"])   // any [String]; [] has an empty name and no values
 tag.rawArray                     // [String] wire form
@@ -510,8 +510,8 @@ open-ended). It is `ExpressibleByStringLiteral` (`Tag(name: "x")`) and encodes a
 Constants are named after the builder that emits them: `.event` ("e"), `.quote` ("q"),
 `.publicKey` ("p"), `.hashtag` ("t"), `.identifier` ("d"), `.subject`, `.relay`, `.challenge`,
 `.url` ("u"), `.method`, `.payload`, `.expiration`, `.kind` ("k"), `.nonce`, `.word`,
-`.address` ("a"), `.reference` ("r"), `.group` ("h"), `.previous`, `.inviteCode` ("code"),
-`.role`, `.simpleGroup` ("group").
+`.address` ("a"), `.reference` ("r"), `.groupID` ("h"), `.previous`, `.inviteCode` ("code"),
+`.role`, `.groupListEntry` ("group").
 
 ```swift
 Tag(name: "x-custom", values: ["v"])  // any name via string literal
@@ -541,12 +541,12 @@ so any integer can be represented. It is `ExpressibleByIntegerLiteral` (`kind: 1
 ```swift
 Event.Kind(rawValue: 30311)      // arbitrary kind
 let k: Event.Kind = 1            // integer literal == .textNote
-Event.Kind.setMetadata           // 0
+Event.Kind.metadata              // 0
 Event.Kind.textNote              // 1
 Event.Kind.recommendRelay        // 2
-Event.Kind.contacts              // 3
+Event.Kind.followList            // 3
 Event.Kind.encryptedDirectMessage // 4
-Event.Kind.eventDeletion         // 5
+Event.Kind.deletionRequest       // 5
 Event.Kind.repost                // 6
 Event.Kind.reaction              // 7
 Event.Kind.chatMessage           // 9   (NIP-C7 chat message, common in NIP-29 groups)
@@ -557,7 +557,7 @@ Event.Kind.giftWrap              // 1059 (NIP-59)
 Event.Kind.groupPutUser          // 9000 (NIP-29 moderation: 9000-9002, 9005, 9007-9010)
 Event.Kind.groupJoinRequest      // 9021 (NIP-29; groupLeaveRequest = 9022)
 Event.Kind.zapRequest            // 9734
-Event.Kind.zap                   // 9735
+Event.Kind.zapReceipt            // 9735
 Event.Kind.simpleGroupList       // 10009 (NIP-51 simple group list)
 Event.Kind.groupMetadata         // 39000 (NIP-29 relay-generated state: 39000-39003, 39005)
 ```
@@ -616,7 +616,7 @@ NostrClient adds factories for its models:
 
 ```swift
 try EventTemplate.metadata(UserMetadata(name: "Alice"))      // kind 0, JSON content; throws EncodingError
-EventTemplate.contactList([Contact(publicKey: alice)])       // kind 3, one p tag per contact (NIP-02)
+EventTemplate.followList([Contact(publicKey: alice)])       // kind 3, one p tag per contact (NIP-02)
 EventTemplate.relayListMetadata(RelayListMetadata(read: [inbox], write: [outbox]))  // kind 10002, r tags (NIP-65)
 EventTemplate.directMessageRelayList(DirectMessageRelayList(relays: [inbox]))      // kind 10050, relay tags (NIP-17)
 EventTemplate.directMessage("hi", to: bob, subject: nil, replyTo: nil)  // kind 14 rumor: p, subject, e reply-marker tags (NIP-17)
@@ -684,7 +684,7 @@ Filter.metadata(publicKeys: [pk])
 Filter.replies(to: eventID, limit: 20)
 Filter.mentions(publicKey: pk)
 Filter.globalFeed(limit: 100)
-Filter.contactList(publicKey: pk)   // also relayListMetadata(publicKey:), directMessageRelayList(publicKey:), and publicKeys: variants
+Filter.followList(publicKey: pk)   // also relayListMetadata(publicKey:), directMessageRelayList(publicKey:), and publicKeys: variants
 Filter.search("nostr", kinds: [.textNote], limit: 20)  // NIP-50 full-text search
 Filter.groupTimeline(groupID: "abcdef", kinds: [.chatMessage], since: .now, limit: 50)  // NIP-29 "#h" timeline
 Filter.groupState(groupID: "abcdef")  // NIP-29 kind-39xxx state by "#d" (all five kinds by default)
@@ -1013,7 +1013,7 @@ let signer = try EventSigner(nsec: "nsec1...")
 let note = signer.sign(.textNote("Hello"))     // any EventTemplate (see EventTemplate)
 let signed = try signer.sign(unsignedEvent)        // a pre-keyed UnsignedEvent
 let meta = try signer.sign(.metadata(UserMetadata(name: "Alice")))  // .metadata(_:) itself throws EncodingError
-let contacts = signer.sign(.contactList([Contact(publicKey: alice)]))
+let contacts = signer.sign(.followList([Contact(publicKey: alice)]))
 let pow = try await signer.sign(.textNote("Hello"), proofOfWork: 20)  // mine to 20 leading zero bits, then sign (NIP-13)
 let report = signer.sign(.report(author, type: .impersonation))  // kind 1984, NIP-56
 ```
@@ -1262,7 +1262,7 @@ let parsed = Contact(tag: tag)      // nil unless a "p" tag with a canonical hex
 
 // Extract contacts from kind-3 event; "p" tags with a malformed key are skipped
 let contacts = event.contacts       // [Contact]?
-let isList = event.isContactList    // Bool
+let isList = event.isFollowList    // Bool
 ```
 
 ## NostrList
@@ -1986,7 +1986,7 @@ set; extensions built on the capability protocols throw it too.
 ## Supported NIPs
 
 - NIP-01: Basic protocol (events, filters, subscriptions, publishing)
-- NIP-02: Contact list and petnames
+- NIP-02: Follow list and petnames
 - NIP-03: OpenTimestamps attestations
 - NIP-05: DNS-based internet identifiers
 - NIP-06: BIP-39 key derivation (m/44'/1237'/account'/0/0)

@@ -18,7 +18,7 @@ public struct ZapReceipt: Sendable, Hashable {
 
     /// Wraps a kind-9735 event. Returns nil if `event` is not a zap receipt.
     public init?(event: Event) {
-        guard event.kind == .zap else { return nil }
+        guard event.kind == .zapReceipt else { return nil }
         self.event = event
         // Decode the embedded zap request once, rather than on every property access.
         if let descriptionJSON = event.firstTagValue(named: "description") {
