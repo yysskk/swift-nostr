@@ -18,7 +18,7 @@ public enum WalletConnectError: Error, LocalizedError, Sendable, Equatable {
     /// The wallet did not respond before the configured timeout elapsed.
     case timedOut
 
-    /// A pending operation was superseded by a newer one (e.g. a concurrent `fetchInfo()`).
+    /// A pending operation was superseded by a newer one (e.g. a concurrent `fetchCapabilities()`).
     case superseded
 
     /// The task awaiting the wallet was cancelled. A request cancelled after it was sent may still

@@ -11,8 +11,8 @@ public import NostrCore
 /// ### Encryption
 /// By default the connection encrypts with NIP-44 (which NIP-47 says clients should prefer). To talk
 /// to a legacy NIP-04-only wallet, either set ``Config/preferredEncryption`` to `.nip04`, or call
-/// ``fetchInfo()`` first — it caches the wallet's advertised capabilities and the connection then
-/// uses the negotiated scheme.
+/// ``fetchCapabilities()`` first — it caches the wallet's advertised capabilities and the connection
+/// then uses the negotiated scheme.
 ///
 /// https://github.com/nostr-protocol/nips/blob/master/47.md
 public actor WalletConnection {
@@ -22,7 +22,7 @@ public actor WalletConnection {
         public var requestTimeout: Duration
 
         /// Forces an encryption scheme instead of negotiating. Default: `nil` (prefer NIP-44, or the
-        /// scheme negotiated by ``WalletConnection/fetchInfo()``).
+        /// scheme negotiated by ``WalletConnection/fetchCapabilities()``).
         public var preferredEncryption: WalletConnectEncryption?
 
         /// Creates a connection configuration.
@@ -51,11 +51,11 @@ public actor WalletConnection {
 
     /// Open notification streams, keyed so each can deregister on termination.
     private var notificationStreams: [UUID: AsyncStream<WalletConnectNotification>.Continuation] = [:]
-    /// The current ``fetchInfo()`` waiter, if any.
-    private var pendingInfo: AsyncStream<Result<WalletInfo, WalletConnectError>>.Continuation?
+    /// The current ``fetchCapabilities()`` waiter, if any.
+    private var pendingCapabilities: AsyncStream<Result<WalletCapabilities, WalletConnectError>>.Continuation?
 
-    /// The last fetched wallet info, if any.
-    public private(set) var info: WalletInfo?
+    /// The capabilities from the last fetched info event, if any. Set by ``fetchCapabilities()``.
+    public private(set) var capabilities: WalletCapabilities?
 
     /// Creates a connection.
     /// - Parameters:
@@ -107,18 +107,20 @@ public actor WalletConnection {
         }
     }
 
-    /// Fails a pending ``fetchInfo()`` and ends the notification streams: nothing can answer either
+    /// Fails a pending ``fetchCapabilities()`` and ends the notification streams: nothing can answer either
     /// once the connection has ended.
     private func connectionEnded() {
-        failPendingInfo(with: .notConnected)
+        failPendingCapabilities(with: .notConnected)
         finishNotificationStreams()
     }
 
-    // MARK: - Info
+    // MARK: - Capabilities
 
-    /// Fetches the wallet's NIP-47 info event (kind 13194) and caches it, so later commands use the
-    /// negotiated encryption scheme.
-    /// - Returns: The parsed ``WalletInfo``.
+    /// Fetches the capabilities the wallet advertises in its NIP-47 info event (kind 13194) and
+    /// caches them in ``capabilities``, so later commands use the negotiated encryption scheme.
+    ///
+    /// For the Lightning node behind the wallet, see ``fetchNodeInfo()`` (`get_info`).
+    /// - Returns: The parsed ``WalletCapabilities``.
     /// - Throws: ``WalletConnectError/timedOut`` if no info event arrives within the request timeout,
     ///   ``WalletConnectError/notConnected`` if the connection ends first — on ``disconnect()``, or
     ///   when the relays' streams end — ``WalletConnectError/superseded`` if a later call replaces
@@ -126,22 +128,22 @@ public actor WalletConnection {
     ///   ``WalletConnectError/transportFailed(_:)`` if the relay cannot be connected to or
     ///   subscribed on.
     @discardableResult
-    public func fetchInfo() async throws(WalletConnectError) -> WalletInfo {
+    public func fetchCapabilities() async throws(WalletConnectError) -> WalletCapabilities {
         try await ensureStarted()
 
         // Register the waiter before subscribing so an info event delivered during the subscribe
         // round-trip is buffered into this stream rather than dropped.
-        let (stream, continuation) = AsyncStream<Result<WalletInfo, WalletConnectError>>.makeStream()
-        // A prior in-flight fetchInfo is superseded by this one (the connection stays active).
-        failPendingInfo(with: .superseded)
-        pendingInfo = continuation
+        let (stream, continuation) = AsyncStream<Result<WalletCapabilities, WalletConnectError>>.makeStream()
+        // A prior in-flight fetchCapabilities() is superseded by this one (the connection stays active).
+        failPendingCapabilities(with: .superseded)
+        pendingCapabilities = continuation
 
         try await session.subscribe(id: Self.infoSubscriptionID, filters: [infoFilter])
         defer {
             Task { [weak self, session] in
-                // If a concurrent fetchInfo() superseded this one and is still waiting, it owns the
+                // If a concurrent fetchCapabilities() superseded this one and is still waiting, it owns the
                 // subscription — don't close it out from under the survivor.
-                if await self?.isFetchingInfo == true { return }
+                if await self?.isFetchingCapabilities == true { return }
                 await session.unsubscribe(id: Self.infoSubscriptionID)
             }
         }
@@ -150,9 +152,9 @@ public actor WalletConnection {
         let timeoutTask = Task { [weak self] in
             try? await Task.sleep(for: timeout)
             // If this call was superseded/finished, its timeout was cancelled — don't end the
-            // continuation that now belongs to a concurrent fetchInfo().
+            // continuation that now belongs to a concurrent fetchCapabilities().
             guard !Task.isCancelled else { return }
-            await self?.failPendingInfo(with: .timedOut)
+            await self?.failPendingCapabilities(with: .timedOut)
         }
         defer { timeoutTask.cancel() }
 
@@ -163,16 +165,16 @@ public actor WalletConnection {
         throw .cancelled
     }
 
-    /// Fails the current ``fetchInfo()`` waiter, if any, with `error`.
-    private func failPendingInfo(with error: WalletConnectError) {
-        pendingInfo?.yield(.failure(error))
-        pendingInfo?.finish()
-        pendingInfo = nil
+    /// Fails the current ``fetchCapabilities()`` waiter, if any, with `error`.
+    private func failPendingCapabilities(with error: WalletConnectError) {
+        pendingCapabilities?.yield(.failure(error))
+        pendingCapabilities?.finish()
+        pendingCapabilities = nil
     }
 
-    /// Whether a ``fetchInfo()`` call is currently waiting on the info subscription.
-    private var isFetchingInfo: Bool {
-        pendingInfo != nil
+    /// Whether a ``fetchCapabilities()`` call is currently waiting on the info subscription.
+    private var isFetchingCapabilities: Bool {
+        pendingCapabilities != nil
     }
 
     // MARK: - Notifications
@@ -214,10 +216,10 @@ public actor WalletConnection {
 
     /// Sends a single-response NIP-47 command and returns its decoded result.
     ///
-    /// The built-in commands have typed wrappers such as ``payInvoice(_:amount:)``; this sends any
-    /// ``WalletConnectRequest``, including one this package does not define. The request is encoded
-    /// as the `params` object under `Request.method`, and a response whose `result_type` names
-    /// another method is rejected rather than decoded.
+    /// The built-in commands have typed wrappers such as ``payInvoice(_:amount:metadata:)``; this
+    /// sends any ``WalletConnectRequest``, including one this package does not define. The request is
+    /// encoded as the `params` object under `Request.method`, and a response whose `result_type`
+    /// names another method is rejected rather than decoded.
     /// - Parameter request: The command to send.
     /// - Returns: The response's `result`, decoded as `Request.Response`.
     /// - Throws: ``WalletConnectError/walletError(code:message:)`` when the wallet answers with an
@@ -300,7 +302,7 @@ public actor WalletConnection {
     }
 
     private var activeEncryption: WalletConnectEncryption {
-        config.preferredEncryption ?? info?.negotiatedEncryption ?? .nip44
+        config.preferredEncryption ?? capabilities?.negotiatedEncryption ?? .nip44
     }
 
     private func buildRequestEvent(
@@ -449,11 +451,11 @@ public actor WalletConnection {
     }
 
     private func handleInfo(_ event: Event) {
-        guard let walletInfo = WalletInfo(infoEvent: event) else { return }
-        info = walletInfo
-        pendingInfo?.yield(.success(walletInfo))
-        pendingInfo?.finish()
-        pendingInfo = nil
+        guard let parsed = WalletCapabilities(infoEvent: event) else { return }
+        capabilities = parsed
+        pendingCapabilities?.yield(.success(parsed))
+        pendingCapabilities?.finish()
+        pendingCapabilities = nil
     }
 
     // MARK: - Filters

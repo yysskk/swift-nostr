@@ -68,13 +68,19 @@ struct WalletConnectResponseTests {
         #expect(result.notifications == nil)
     }
 
-    @Test("decodes a pay_invoice result")
-    func decodePayInvoice() throws {
-        let json = #"{"result_type":"pay_invoice","result":{"preimage":"0011","fees_paid":100}}"#
-        let response = try decode(json, as: PayInvoiceResult.self)
+    @Test("decodes a payment result with fees_paid", arguments: ["pay_invoice", "pay_keysend"])
+    func decodePaymentResult(resultType: String) throws {
+        let json = #"{"result_type":"\#(resultType)","result":{"preimage":"0011","fees_paid":100}}"#
+        let response = try decode(json, as: PaymentResult.self)
         let result = try #require(response.result)
+        #expect(result == PaymentResult(preimage: "0011", feesPaid: 100))
+    }
+
+    @Test("decodes a payment result without fees_paid")
+    func decodePaymentResultWithoutFees() throws {
+        let result = try JSONDecoder().decode(PaymentResult.self, from: Data(#"{"preimage":"0011"}"#.utf8))
         #expect(result.preimage == "0011")
-        #expect(result.feesPaid == 100)
+        #expect(result.feesPaid == nil)
     }
 
     @Test("a transaction encodes its times as integer Unix seconds under the NIP-47 keys")
@@ -182,7 +188,7 @@ struct WalletConnectResponseTests {
             {"result_type":"pay_invoice","error":{"code":"INSUFFICIENT_BALANCE","message":"no funds"},
             "result":null}
             """
-        let response = try decode(json, as: PayInvoiceResult.self)
+        let response = try decode(json, as: PaymentResult.self)
         #expect(response.result == nil)
         let error = try #require(response.error)
         #expect(error.code == .insufficientBalance)
@@ -191,7 +197,7 @@ struct WalletConnectResponseTests {
     @Test("decodes an unrecognized error code verbatim")
     func decodeUnknownErrorCode() throws {
         let json = #"{"result_type":"pay_invoice","error":{"code":"SOMETHING_NEW","message":"?"}}"#
-        let error = try #require(try decode(json, as: PayInvoiceResult.self).error)
+        let error = try #require(try decode(json, as: PaymentResult.self).error)
         #expect(error.code == WalletConnectErrorCode(rawValue: "SOMETHING_NEW"))
     }
 }

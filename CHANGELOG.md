@@ -125,6 +125,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     which take a `ConversationKey` instead of `Data`. A wrong-length key is now rejected when the
     `ConversationKey` is created, so these no longer throw `invalidConversationKey`.
   - `EventSigner.nip44Encrypt(_:to:)` and `nip44Decrypt(_:from:)` throw `NIP44Payload.Error`.
+- **The NIP-47 typed commands share one shape** (breaking):
+  - Every single-response command takes its request's fields as labeled parameters, with the same
+    labels and defaults as the request's initializer, as `payInvoice(_:amount:)` already did:
+    `payKeysend(PayKeysendRequest(amount:nodePublicKey:...))` →
+    `payKeysend(amount:nodePublicKey:preimage:tlvRecords:)`,
+    `makeInvoice(MakeInvoiceRequest(amount:...))` →
+    `makeInvoice(amount:description:descriptionHash:expiry:metadata:)`, and
+    `listTransactions(ListTransactionsRequest(...))` →
+    `listTransactions(from:until:limit:offset:unpaid:type:)`. `payInvoice` gains `metadata:`. The
+    request types stay public for `send(_:)`.
+  - `LookupInvoiceRequest`'s optional `paymentHash` and `invoice` → one `key: LookupInvoiceRequest.Key`
+    (`.paymentHash(_:)` or `.invoice(_:)`), and the static factories → `init(_:)`:
+    `LookupInvoiceRequest.paymentHash(hash)` → `LookupInvoiceRequest(.paymentHash(hash))`.
+    `lookupInvoice(_:)` takes the key, so `lookupInvoice(.paymentHash(hash))` reads as before. The
+    wire form is unchanged, and decoding now rejects params with both keys or neither.
+  - `PayInvoiceResult` and `PayKeysendResult`, which were identical, → `PaymentResult`, the
+    `Response` of both `PayInvoiceRequest` and `PayKeysendRequest`. The multi-pay results drop their
+    generic parameter and carry `PaymentResult`: `MultiPayResults<MultiPayInvoiceItemResult>` and
+    `MultiPayResults<MultiPayKeysendItemResult>` → `MultiPayResults`, likewise `MultiPayOutcome` and
+    `UnmatchedMultiPayResponse`, and the `MultiPayInvoiceItemResult` and `MultiPayKeysendItemResult`
+    aliases are removed.
+  - The wallet's info event and the `get_info` command no longer share a name:
+    `WalletConnection.fetchInfo()` → `fetchCapabilities()`, `WalletInfo` → `WalletCapabilities`,
+    and `WalletConnection.info` → `capabilities`. `fetchNodeInfo()` and `GetInfoResult` (`get_info`)
+    are unchanged.
 
 ### Fixed
 

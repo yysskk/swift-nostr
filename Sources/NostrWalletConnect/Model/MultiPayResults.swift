@@ -1,9 +1,9 @@
 import Foundation
 
 /// What became of one item in a `multi_pay_invoice` or `multi_pay_keysend` request.
-public enum MultiPayOutcome<Item: Sendable>: Sendable {
+public enum MultiPayOutcome: Sendable {
     /// The wallet answered for this item: the payment result, or the error it reported.
-    case answered(Result<Item, WalletConnectError>)
+    case answered(Result<PaymentResult, WalletConnectError>)
     /// No response arrived that could be tied to this item.
     ///
     /// Either the wallet did not answer it before the request completed, or its answer is in
@@ -11,7 +11,7 @@ public enum MultiPayOutcome<Item: Sendable>: Sendable {
     case noResponse
 
     /// The payment result, if the wallet answered successfully.
-    public var value: Item? {
+    public var value: PaymentResult? {
         guard case .answered(.success(let item)) = self else { return nil }
         return item
     }
@@ -24,7 +24,7 @@ public enum MultiPayOutcome<Item: Sendable>: Sendable {
 }
 
 /// A response the wallet sent that could not be tied to a requested item.
-public struct UnmatchedMultiPayResponse<Item: Sendable>: Sendable {
+public struct UnmatchedMultiPayResponse: Sendable {
     /// The `d` tag the wallet correlated the response by, if it sent one.
     ///
     /// NIP-47 sets this to the item's `id` when the request supplied one, and otherwise to the
@@ -33,9 +33,9 @@ public struct UnmatchedMultiPayResponse<Item: Sendable>: Sendable {
     /// response matched.
     public let dTag: String?
     /// The payment result, or the error the wallet reported.
-    public let result: Result<Item, WalletConnectError>
+    public let result: Result<PaymentResult, WalletConnectError>
 
-    public init(dTag: String?, result: Result<Item, WalletConnectError>) {
+    public init(dTag: String?, result: Result<PaymentResult, WalletConnectError>) {
         self.dTag = dTag
         self.result = result
     }
@@ -48,17 +48,17 @@ public struct UnmatchedMultiPayResponse<Item: Sendable>: Sendable {
 /// caller would have to derive. Keying by it silently dropped a colliding result and left no way to
 /// tell which invoice a result belonged to; here nothing is lost, and anything that could not be
 /// tied back is reported in ``unmatched`` instead of being discarded.
-public struct MultiPayResults<Item: Sendable>: Sendable {
+public struct MultiPayResults: Sendable {
     /// One outcome per requested item, aligned to the order they were requested in.
-    public let outcomes: [MultiPayOutcome<Item>]
+    public let outcomes: [MultiPayOutcome]
 
     /// Responses that could not be tied to a requested item — a `d` tag matching none of them, a
     /// duplicate of one already matched, or a response for an item sent without an `id`.
     ///
     /// Usually empty. When it is not, the payments it describes still happened.
-    public let unmatched: [UnmatchedMultiPayResponse<Item>]
+    public let unmatched: [UnmatchedMultiPayResponse]
 
-    public init(outcomes: [MultiPayOutcome<Item>], unmatched: [UnmatchedMultiPayResponse<Item>] = []) {
+    public init(outcomes: [MultiPayOutcome], unmatched: [UnmatchedMultiPayResponse] = []) {
         self.outcomes = outcomes
         self.unmatched = unmatched
     }

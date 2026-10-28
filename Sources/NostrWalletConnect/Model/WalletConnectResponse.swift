@@ -24,9 +24,14 @@ struct WalletConnectResponseError: Decodable, Sendable, Equatable {
 
 // MARK: - Results
 
-/// The result of `pay_invoice`.
-public struct PayInvoiceResult: Codable, Sendable, Hashable {
-    /// The payment preimage proving the invoice was paid.
+/// The result of a payment: `pay_invoice`, `pay_keysend`, and each item of `multi_pay_invoice`
+/// and `multi_pay_keysend`.
+///
+/// Returned by ``WalletConnection/payInvoice(_:amount:metadata:)`` and
+/// ``WalletConnection/payKeysend(amount:nodePublicKey:preimage:tlvRecords:)``, and carried per item by
+/// ``MultiPayResults``.
+public struct PaymentResult: Codable, Sendable, Hashable {
+    /// The payment preimage proving the payment was made.
     public let preimage: String
     /// The fees paid in millisatoshis, if reported.
     public let feesPaid: Int64?
@@ -36,24 +41,10 @@ public struct PayInvoiceResult: Codable, Sendable, Hashable {
         case feesPaid = "fees_paid"
     }
 
-    public init(preimage: String, feesPaid: Int64? = nil) {
-        self.preimage = preimage
-        self.feesPaid = feesPaid
-    }
-}
-
-/// The result of `pay_keysend`.
-public struct PayKeysendResult: Codable, Sendable, Hashable {
-    /// The payment preimage.
-    public let preimage: String
-    /// The fees paid in millisatoshis, if reported.
-    public let feesPaid: Int64?
-
-    enum CodingKeys: String, CodingKey {
-        case preimage
-        case feesPaid = "fees_paid"
-    }
-
+    /// Creates a payment result.
+    /// - Parameters:
+    ///   - preimage: The payment preimage.
+    ///   - feesPaid: The fees paid in millisatoshis, if reported.
     public init(preimage: String, feesPaid: Int64? = nil) {
         self.preimage = preimage
         self.feesPaid = feesPaid
@@ -145,9 +136,3 @@ public typealias MakeInvoiceResult = WalletConnectTransaction
 
 /// The result of `lookup_invoice`: the matching invoice transaction.
 public typealias LookupInvoiceResult = WalletConnectTransaction
-
-/// The per-invoice result of `multi_pay_invoice` (one response event per invoice).
-public typealias MultiPayInvoiceItemResult = PayInvoiceResult
-
-/// The per-keysend result of `multi_pay_keysend` (one response event per keysend).
-public typealias MultiPayKeysendItemResult = PayKeysendResult

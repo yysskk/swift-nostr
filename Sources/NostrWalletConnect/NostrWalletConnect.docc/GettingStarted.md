@@ -51,7 +51,7 @@ connection errors up front.
 
 ## Pay an Invoice
 
-``WalletConnection/payInvoice(_:amount:)`` asks the wallet to pay a BOLT-11 invoice and returns the
+``WalletConnection/payInvoice(_:amount:metadata:)`` asks the wallet to pay a BOLT-11 invoice and returns the
 payment preimage:
 
 ```swift
