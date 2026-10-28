@@ -177,6 +177,8 @@ struct RemoteSignerNostrConnectFlowTests {
 
         let publicKey = Task { try await remote.userPublicKey() }
         try await waitForConnectWaiters(remote, count: 1)
+        // The ack can only be heard once the session has subscribed and is waiting for it.
+        try await waitForConnectionWaiter(remote)
         // Nothing can be addressed to the signer yet, so nothing has been sent.
         #expect(await transport.sentEvents.isEmpty)
 
@@ -269,6 +271,7 @@ struct RemoteSignerNostrConnectFlowTests {
         let first = Task { try await remote.connect() }
         let second = Task { try await remote.connect() }
         try await waitForConnectWaiters(remote, count: 2)
+        try await waitForConnectionWaiter(remote)
 
         try await deliverAck(invitation, transport: transport)
 
