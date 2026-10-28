@@ -51,7 +51,10 @@ public actor WalletConnection {
 
     /// Open notification streams, keyed so each can deregister on termination.
     private var notificationStreams: [UUID: AsyncStream<WalletConnectNotification>.Continuation] = [:]
-    /// The current ``fetchCapabilities()`` waiter, if any.
+    /// The ``fetchCapabilities()`` attempt in flight, which concurrent calls join rather than repeat.
+    private let capabilitiesOperation = SharedOperation<WalletCapabilities, WalletConnectError>(
+        cancelledError: .cancelled)
+    /// The waiter of the info-event fetch a ``fetchCapabilities()`` attempt runs, if any.
     private var pendingCapabilities: AsyncStream<Result<WalletCapabilities, WalletConnectError>>.Continuation?
 
     /// The capabilities from the last fetched info event, if any. Set by ``fetchCapabilities()``.
@@ -119,30 +122,53 @@ public actor WalletConnection {
     /// Fetches the capabilities the wallet advertises in its NIP-47 info event (kind 13194) and
     /// caches them in ``capabilities``, so later commands use the negotiated encryption scheme.
     ///
+    /// Concurrent calls share one fetch — one info subscription — and all receive its result, the
+    /// capabilities or the same error. A caller whose task is cancelled stops waiting with
+    /// ``WalletConnectError/cancelled`` without ending the fetch for the others; the fetch is
+    /// abandoned only when every caller waiting on it has been cancelled.
+    ///
     /// For the Lightning node behind the wallet, see ``fetchNodeInfo()`` (`get_info`).
     /// - Returns: The parsed ``WalletCapabilities``.
     /// - Throws: ``WalletConnectError/timedOut`` if no info event arrives within the request timeout,
     ///   ``WalletConnectError/notConnected`` if the connection ends first — on ``disconnect()``, or
-    ///   when the relays' streams end — ``WalletConnectError/superseded`` if a later call replaces
-    ///   this one, ``WalletConnectError/cancelled`` if the calling task is cancelled, or
-    ///   ``WalletConnectError/transportFailed(_:)`` if the relay cannot be connected to or
-    ///   subscribed on.
+    ///   when the relays' streams end — ``WalletConnectError/cancelled`` if the calling task is
+    ///   cancelled, or ``WalletConnectError/transportFailed(_:)`` if the relay cannot be connected
+    ///   to or subscribed on.
     @discardableResult
     public func fetchCapabilities() async throws(WalletConnectError) -> WalletCapabilities {
+        try await capabilitiesOperation.run { [weak self] in
+            guard let self else { return .failure(.notConnected) }
+            return await self.fetchCapabilitiesAttempt()
+        }
+    }
+
+    /// One shared ``fetchCapabilities()`` attempt, reporting its outcome as a value.
+    private func fetchCapabilitiesAttempt() async -> Result<WalletCapabilities, WalletConnectError> {
+        do throws(WalletConnectError) {
+            return .success(try await fetchInfoEvent())
+        } catch {
+            return .failure(error)
+        }
+    }
+
+    /// Subscribes for the wallet's info event and waits for it, the timeout, the connection
+    /// ending, or the attempt being cancelled.
+    private func fetchInfoEvent() async throws(WalletConnectError) -> WalletCapabilities {
         try await ensureStarted()
 
         // Register the waiter before subscribing so an info event delivered during the subscribe
         // round-trip is buffered into this stream rather than dropped.
         let (stream, continuation) = AsyncStream<Result<WalletCapabilities, WalletConnectError>>.makeStream()
-        // A prior in-flight fetchCapabilities() is superseded by this one (the connection stays active).
-        failPendingCapabilities(with: .superseded)
+        // Only one attempt fetches at a time, except that an attempt every caller abandoned may still
+        // be winding down when the next starts. Retire its waiter so the two never share one slot.
+        failPendingCapabilities(with: .cancelled)
         pendingCapabilities = continuation
 
         try await session.subscribe(id: Self.infoSubscriptionID, filters: [infoFilter])
         defer {
             Task { [weak self, session] in
-                // If a concurrent fetchCapabilities() superseded this one and is still waiting, it owns the
-                // subscription — don't close it out from under the survivor.
+                // If a newer attempt is already waiting, it owns the subscription — don't close it
+                // out from under it.
                 if await self?.isFetchingCapabilities == true { return }
                 await session.unsubscribe(id: Self.infoSubscriptionID)
             }
@@ -151,8 +177,8 @@ public actor WalletConnection {
         let timeout = config.requestTimeout
         let timeoutTask = Task { [weak self] in
             try? await Task.sleep(for: timeout)
-            // If this call was superseded/finished, its timeout was cancelled — don't end the
-            // continuation that now belongs to a concurrent fetchCapabilities().
+            // If this attempt finished or was retired, its timeout was cancelled — don't end the
+            // continuation that now belongs to a newer attempt.
             guard !Task.isCancelled else { return }
             await self?.failPendingCapabilities(with: .timedOut)
         }
@@ -165,14 +191,14 @@ public actor WalletConnection {
         throw .cancelled
     }
 
-    /// Fails the current ``fetchCapabilities()`` waiter, if any, with `error`.
+    /// Fails the current info-event waiter, if any, with `error`.
     private func failPendingCapabilities(with error: WalletConnectError) {
         pendingCapabilities?.yield(.failure(error))
         pendingCapabilities?.finish()
         pendingCapabilities = nil
     }
 
-    /// Whether a ``fetchCapabilities()`` call is currently waiting on the info subscription.
+    /// Whether a ``fetchCapabilities()`` attempt is currently waiting on the info subscription.
     private var isFetchingCapabilities: Bool {
         pendingCapabilities != nil
     }
@@ -469,6 +495,14 @@ public actor WalletConnection {
 
     private var infoFilter: Filter {
         Filter(authors: [walletPublicKey], kinds: [.walletConnectInfo], limit: 1)
+    }
+
+    // MARK: - Testing
+
+    /// How many ``fetchCapabilities()`` callers are waiting on the attempt in flight. Exposed for
+    /// tests.
+    var capabilitiesWaiterCountForTesting: Int {
+        get async { await capabilitiesOperation.waiterCount }
     }
 }
 

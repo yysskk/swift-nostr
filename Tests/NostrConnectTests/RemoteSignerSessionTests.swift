@@ -108,6 +108,70 @@ struct RemoteSignerSessionTests {
         }
     }
 
+    @Test("concurrent connect calls send one connect request and both succeed", .timeLimit(.minutes(1)))
+    func concurrentConnectsShareOneHandshake() async throws {
+        let transport = FakeRemoteSignerTransport()
+        let remote = try makeSigner(transport: transport, requestTimeout: .seconds(20))
+
+        let first = Task { try await remote.connect() }
+        let second = Task { try await remote.connect() }
+        try await waitForConnectWaiters(remote, count: 2)
+
+        let sent = try await RemoteSignerFixtures.waitForSentEvents(transport, count: 1)
+        let request = try RemoteSignerFixtures.decryptRequest(sent[0], client: client, signer: signer)
+        let ack = try RemoteSignerFixtures.response(
+            requestID: request.id, result: "ack", client: client, signer: signer)
+        await transport.deliver(ack)
+
+        try await first.value
+        try await second.value
+        #expect(await transport.sentEvents.count == 1)
+        #expect(await remote.isConnectedForTesting == true)
+    }
+
+    @Test("concurrent connect calls both receive the signer's rejection", .timeLimit(.minutes(1)))
+    func concurrentConnectsShareRejection() async throws {
+        let transport = FakeRemoteSignerTransport()
+        let remote = try makeSigner(transport: transport, requestTimeout: .seconds(20))
+
+        let first = Task { try await remote.connect() }
+        let second = Task { try await remote.connect() }
+        try await waitForConnectWaiters(remote, count: 2)
+
+        let sent = try await RemoteSignerFixtures.waitForSentEvents(transport, count: 1)
+        let request = try RemoteSignerFixtures.decryptRequest(sent[0], client: client, signer: signer)
+        let reply = try RemoteSignerFixtures.response(
+            requestID: request.id, result: "nope", client: client, signer: signer)
+        await transport.deliver(reply)
+
+        await #expect(throws: RemoteSignerError.connectionRejected(message: "nope")) { try await first.value }
+        await #expect(throws: RemoteSignerError.connectionRejected(message: "nope")) { try await second.value }
+        #expect(await transport.sentEvents.count == 1)
+    }
+
+    @Test("cancelling one of two connect calls leaves the handshake running for the other", .timeLimit(.minutes(1)))
+    func cancellingOneConnectLeavesHandshake() async throws {
+        let transport = FakeRemoteSignerTransport()
+        let remote = try makeSigner(transport: transport, requestTimeout: .seconds(20))
+
+        let cancelled = Task { try await remote.connect() }
+        let survivor = Task { try await remote.connect() }
+        try await waitForConnectWaiters(remote, count: 2)
+        let sent = try await RemoteSignerFixtures.waitForSentEvents(transport, count: 1)
+
+        cancelled.cancel()
+        await #expect(throws: RemoteSignerError.cancelled) { try await cancelled.value }
+
+        let request = try RemoteSignerFixtures.decryptRequest(sent[0], client: client, signer: signer)
+        let ack = try RemoteSignerFixtures.response(
+            requestID: request.id, result: "ack", client: client, signer: signer)
+        await transport.deliver(ack)
+
+        try await survivor.value
+        #expect(await transport.sentEvents.count == 1)
+        #expect(await remote.isConnectedForTesting == true)
+    }
+
     // MARK: - correlation by id
 
     @Test("concurrent requests resolve with their own responses, matched by id")
@@ -414,6 +478,15 @@ struct RemoteSignerSessionTests {
     }
 
     // MARK: - Helpers
+
+    /// Polls until `count` ``RemoteSigner/connect()`` callers are waiting on the attempt in flight.
+    private func waitForConnectWaiters(_ remote: RemoteSigner, count: Int) async throws {
+        for _ in 0..<400 {
+            if await remote.connectWaiterCountForTesting == count { return }
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        throw RemoteSignerError.timedOut
+    }
 
     /// Drives the connect handshake to completion so a test can then exercise commands.
     private func connectHandshake(_ remote: RemoteSigner, transport: FakeRemoteSignerTransport) async throws {

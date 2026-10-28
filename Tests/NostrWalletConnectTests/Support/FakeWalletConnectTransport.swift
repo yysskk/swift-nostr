@@ -12,6 +12,8 @@ actor FakeWalletConnectTransport: RelayTransport {
     private(set) var connectCount = 0
     private(set) var sentEvents: [Event] = []
     private(set) var subscriptions: [SubscriptionID: [Filter]] = [:]
+    /// How many times each subscription id has been opened (or replaced).
+    private(set) var subscribeCounts: [SubscriptionID: Int] = [:]
     /// How many events were sent before any subscription existed, so a test can prove that no
     /// command raced past the connection setup.
     private(set) var sendsBeforeSubscribe = 0
@@ -37,6 +39,7 @@ actor FakeWalletConnectTransport: RelayTransport {
 
     func subscribe(id: SubscriptionID, filters: [Filter]) async throws(RelayConnection.Error) {
         subscriptions[id] = filters
+        subscribeCounts[id, default: 0] += 1
     }
 
     func unsubscribe(id: SubscriptionID) async {

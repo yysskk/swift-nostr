@@ -39,6 +39,10 @@ the capabilities it advertises, so subsequent commands automatically use
 ``WalletCapabilities/negotiatedEncryption``. An explicit
 ``WalletConnection/Config/preferredEncryption`` always wins over negotiation.
 
+Concurrent ``WalletConnection/fetchCapabilities()`` calls share one fetch and all receive its
+result. Cancelling one caller's task fails that call with ``WalletConnectError/cancelled`` and
+leaves the fetch running for the others.
+
 ## Inspecting Wallet Capabilities
 
 ``WalletCapabilities`` describes what a wallet supports. Use it to gate features before issuing a
@@ -305,10 +309,9 @@ do {
 The other cases — ``WalletConnectError/invalidURI(reason:)``,
 ``WalletConnectError/requestEncodingFailed``, ``WalletConnectError/responseDecodingFailed``,
 ``WalletConnectError/missingResult``, ``WalletConnectError/unsupportedEncryption(_:)``,
-``WalletConnectError/superseded``, ``WalletConnectError/notConnected``, and
-``WalletConnectError/cancelled`` — cover URI parsing, encryption/encoding failures, malformed
-responses, a response encrypted with a scheme this package does not implement, a `fetchCapabilities()`
-superseded by a newer call, a connection torn down while waiting, and a cancelled task. A request
+``WalletConnectError/notConnected``, and ``WalletConnectError/cancelled`` — cover URI parsing,
+encryption/encoding failures, malformed responses, a response encrypted with a scheme this package
+does not implement, a connection torn down while waiting, and a cancelled task. A request
 cancelled after it was sent may still be carried out by the wallet.
 
 ## Event Kinds

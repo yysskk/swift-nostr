@@ -247,7 +247,8 @@ let invitation = try NostrConnectURI.invitation(clientKeyPair: clientKeyPair, re
 displayQRCode(invitation.stringValue)
 
 let signer = try RemoteSigner(invitation: invitation, clientKeyPair: clientKeyPair)
-let remotePublicKey = try await signer.awaitConnection()   // the signer's PublicKey, once it accepts
+try await signer.connect()                                  // returns once the signer accepts
+let remotePublicKey = await signer.remoteSignerPublicKey    // the signer's PublicKey, set by connect()
 ```
 
 `ping`, NIP-44/NIP-04 encrypt and decrypt, `switch_relays`, and `logout` are available too, along with an `authChallenges()` stream for `auth_url` approvals. `RemoteSignerMethod` is an open set, so `send(_:params:)` calls a method without a typed wrapper and returns its raw `result`.

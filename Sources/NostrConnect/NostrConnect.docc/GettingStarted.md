@@ -42,9 +42,13 @@ The token's host is the signer's public key, held as a `PublicKey` in
 included, throws ``RemoteSignerError/invalidURI(reason:)``.
 
 The session signs and encrypts with a *client* identity — a fresh random keypair by default — so the
-user's main Nostr key never leaves the signer. Commands connect to the relay and perform the
-`connect` handshake automatically on first use; call ``RemoteSigner/connect()`` explicitly to
-surface connection errors up front.
+user's main Nostr key never leaves the signer. Call ``RemoteSigner/connect()`` to connect to the
+relay and perform the `connect` handshake, which presents the token's secret. Commands connect to
+the relay on first use but do not send the handshake themselves.
+
+```swift
+try await signer.connect()
+```
 
 To resume a previously authorized session, persist the client keypair and pass it back in:
 
@@ -69,8 +73,8 @@ A `nostrconnect://` invitation carries its permissions in the URI instead (see b
 Alternatively the *client* can begin the handshake with a `nostrconnect://` invitation. Generate one
 with ``NostrConnectURI/invitation(clientKeyPair:relays:permissions:name:url:image:)``, show its
 ``NostrConnectURI/stringValue`` as a QR code or deep link, and create a ``RemoteSigner`` from it. The
-signer's public key is unknown until it scans the invitation and replies, so wait for it with
-``RemoteSigner/awaitConnection()``:
+signer's public key is unknown until it scans the invitation and replies, so wait for it with the
+same ``RemoteSigner/connect()``:
 
 ```swift
 let clientKeyPair = KeyPair()
@@ -80,14 +84,21 @@ displayQRCode(invitation.stringValue)
 
 let signer = try RemoteSigner(invitation: invitation, clientKeyPair: clientKeyPair)
 
-// Resolves once the signer accepts. The response's secret is validated against the invitation, per
+// Returns once the signer accepts. The response's secret is validated against the invitation, per
 // NIP-46, so a spoofed reply is ignored; a reply that never arrives throws
-// ``RemoteSignerError/timedOut``.
-let remoteSignerPublicKey: PublicKey = try await signer.awaitConnection()
+// RemoteSignerError.timedOut.
+try await signer.connect()
+let remoteSignerPublicKey = await signer.remoteSignerPublicKey  // non-nil from here on
 ```
 
-Once ``RemoteSigner/awaitConnection()`` returns, the session is connected and the commands below work
-exactly as for a `bunker://` session.
+Once ``RemoteSigner/connect()`` returns, the session is connected and the commands below work
+exactly as for a `bunker://` session. A command issued before then waits for the signer's reply
+itself, as though it had called ``RemoteSigner/connect()`` first.
+
+In either flow, concurrent ``RemoteSigner/connect()`` calls share one attempt — one `connect`
+request, or one wait for the invitation reply — and all receive its result. Cancelling one caller's
+task fails that call with ``RemoteSignerError/cancelled`` and leaves the attempt running for the
+others.
 
 ## Prove the User's Public Key
 

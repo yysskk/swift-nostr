@@ -150,6 +150,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     `WalletConnection.fetchInfo()` → `fetchCapabilities()`, `WalletInfo` → `WalletCapabilities`,
     and `WalletConnection.info` → `capabilities`. `fetchNodeInfo()` and `GetInfoResult` (`get_info`)
     are unchanged.
+- **One `connect()` for both NIP-46 flows, and concurrent waits share one attempt** (breaking):
+  - `RemoteSigner.awaitConnection() -> PublicKey` → `connect()`, which now waits for the signer's
+    invitation reply on a `nostrconnect://` session as well as running the `bunker://` handshake.
+    Read the discovered key from `remoteSignerPublicKey`, which is non-nil once `connect()` returns.
+    A command on a `nostrconnect://` session whose signer is not yet known waits for that reply
+    instead of throwing `notConnected`.
+  - Concurrent `RemoteSigner.connect()` calls share one attempt — one `connect` request, or one wait
+    for the invitation reply — and all receive its result, where a second `awaitConnection()` threw
+    `RemoteSignerError.connectionInProgress`, which is removed. Likewise, concurrent
+    `WalletConnection.fetchCapabilities()` calls share one info subscription and all receive the
+    capabilities, where a later call failed the earlier one with `WalletConnectError.superseded`,
+    which is removed. Cancelling one caller's task fails that call with `.cancelled` and leaves the
+    attempt running for the others; the attempt is abandoned only when every caller is cancelled.
 
 ### Fixed
 

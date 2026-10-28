@@ -130,6 +130,73 @@ struct WalletConnectNotificationTests {
         await #expect(throws: WalletConnectError.cancelled) { try await info.value }
     }
 
+    // MARK: - Concurrent fetches
+
+    @Test("concurrent fetchCapabilities calls share one info subscription", .timeLimit(.minutes(1)))
+    func concurrentFetchesShareOneSubscription() async throws {
+        let wallet = KeyPair()
+        let transport = FakeWalletConnectTransport()
+        let connection = WalletConnection(
+            uri: try NWCFixtures.uri(wallet: wallet, client: KeyPair()), transport: transport,
+            config: .init(requestTimeout: .seconds(20)))
+
+        let first = Task { try await connection.fetchCapabilities() }
+        let second = Task { try await connection.fetchCapabilities() }
+        try await waitForCapabilitiesWaiters(connection, count: 2)
+        try await waitForInfoSubscription(transport)
+
+        let info = try NWCFixtures.info(content: "pay_invoice get_balance", tags: [], wallet: wallet)
+        await transport.emit(info)
+
+        let firstCapabilities = try await first.value
+        let secondCapabilities = try await second.value
+        #expect(firstCapabilities.methods == [.payInvoice, .getBalance])
+        #expect(secondCapabilities == firstCapabilities)
+        #expect(await transport.subscribeCounts["nwc-info"] == 1)
+    }
+
+    @Test("concurrent fetchCapabilities calls both fail when the connection disconnects", .timeLimit(.minutes(1)))
+    func concurrentFetchesShareFailure() async throws {
+        let transport = FakeWalletConnectTransport()
+        let connection = WalletConnection(
+            uri: try NWCFixtures.uri(wallet: KeyPair(), client: KeyPair()), transport: transport,
+            config: .init(requestTimeout: .seconds(20)))
+
+        let first = Task { try await connection.fetchCapabilities() }
+        let second = Task { try await connection.fetchCapabilities() }
+        try await waitForCapabilitiesWaiters(connection, count: 2)
+        try await waitForInfoSubscription(transport)
+        await connection.disconnect()
+
+        await #expect(throws: WalletConnectError.notConnected) { try await first.value }
+        await #expect(throws: WalletConnectError.notConnected) { try await second.value }
+    }
+
+    @Test("cancelling one of two fetchCapabilities calls leaves the other", .timeLimit(.minutes(1)))
+    func cancellingOneFetchLeavesTheOther() async throws {
+        let wallet = KeyPair()
+        let transport = FakeWalletConnectTransport()
+        let connection = WalletConnection(
+            uri: try NWCFixtures.uri(wallet: wallet, client: KeyPair()), transport: transport,
+            config: .init(requestTimeout: .seconds(20)))
+
+        let cancelled = Task { try await connection.fetchCapabilities() }
+        let survivor = Task { try await connection.fetchCapabilities() }
+        try await waitForCapabilitiesWaiters(connection, count: 2)
+        try await waitForInfoSubscription(transport)
+
+        cancelled.cancel()
+        await #expect(throws: WalletConnectError.cancelled) { try await cancelled.value }
+        #expect(await connection.capabilitiesWaiterCountForTesting == 1)
+
+        let info = try NWCFixtures.info(content: "pay_invoice", tags: [], wallet: wallet)
+        await transport.emit(info)
+
+        let capabilities = try await survivor.value
+        #expect(capabilities.methods == [.payInvoice])
+        #expect(await transport.subscribeCounts["nwc-info"] == 1)
+    }
+
     // MARK: - Stream lifetime
 
     /// The merged event stream ends when every relay's has — automatic reconnection gave up, or the
@@ -199,6 +266,16 @@ struct WalletConnectNotificationTests {
     }
 
     // MARK: - Helpers
+
+    /// Polls until `count` ``WalletConnection/fetchCapabilities()`` callers are waiting on the
+    /// fetch in flight.
+    private func waitForCapabilitiesWaiters(_ connection: WalletConnection, count: Int) async throws {
+        for _ in 0..<400 {
+            if await connection.capabilitiesWaiterCountForTesting == count { return }
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        throw WalletConnectError.timedOut
+    }
 
     /// Polls until ``WalletConnection/fetchCapabilities()`` has subscribed for the info event, by
     /// which point its waiter is registered.

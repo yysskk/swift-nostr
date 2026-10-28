@@ -1917,7 +1917,9 @@ let authorized = RemoteSigner(
     requesting: [.signEvent(kind: .textNote), .nip44Encrypt, .nip44Decrypt])
 
 // Connect, subscribe to responses, and perform the connect handshake (presents the bunker secret
-// when present). Commands call this automatically; call it to surface errors up front.
+// when present). Commands start the relay session on first use but do not send the handshake.
+// Concurrent connect() calls share one handshake (one connect request) and all get its result;
+// cancelling one caller fails only that call with .cancelled. Repeat calls after success are no-ops.
 try await signer.connect()
 signer.clientPublicKey                       // PublicKey — the local client identity (nonisolated)
 let remotePublicKey = await signer.remoteSignerPublicKey   // PublicKey? — the signer's key (not necessarily the user's)
@@ -1928,7 +1930,7 @@ let remotePublicKey = await signer.remoteSignerPublicKey   // PublicKey? — the
 ```swift
 // The client starts the handshake: generate an invitation, show it as a QR code or deep link, and
 // wait for the signer to accept. The signer's public key is unknown until then, so remoteSignerPublicKey is
-// nil until awaitConnection() resolves.
+// nil until connect() returns.
 let invitation = try NostrConnectURI.invitation(clientKeyPair: clientKeyPair, relays: [relayURL])
 displayQRCode(invitation.stringValue)
 
@@ -1937,12 +1939,15 @@ displayQRCode(invitation.stringValue)
 // defaults to a RelayConnectionTransport over the invitation's relays.
 let signer = try RemoteSigner(invitation: invitation, clientKeyPair: clientKeyPair)
 
-// Waits for the first kind-24133 response whose result echoes the invitation secret (validated per
-// spec), pins subsequent traffic to that public key, marks the session connected, and returns it. A
-// response with a mismatched secret is ignored (keeps waiting); throws RemoteSignerError.timedOut
-// after Config.requestTimeout, or .notConnected if the session ends first (disconnect(), or the
-// relays' streams end). Commands then work exactly as in the bunker flow.
-let remoteSignerPublicKey: PublicKey = try await signer.awaitConnection()
+// The same connect() as the bunker flow: waits for the first kind-24133 response whose result
+// echoes the invitation secret (validated per spec), pins subsequent traffic to that public key, and
+// marks the session connected. A response with a mismatched secret is ignored (keeps waiting);
+// throws RemoteSignerError.timedOut after Config.requestTimeout, or .notConnected if the session ends
+// first (disconnect(), or the relays' streams end). Concurrent calls share the one wait. Commands
+// then work exactly as in the bunker flow; a command issued before then calls connect() itself and
+// waits for the reply first.
+try await signer.connect()
+let remoteSignerPublicKey = await signer.remoteSignerPublicKey   // PublicKey? — non-nil after connect()
 ```
 
 ### Commands
@@ -1987,7 +1992,7 @@ for await challenge in await signer.authChallenges() {
 - `RemoteSignerAuthChallenge` — `url`, `method`, `requestID`
 - `RelayTransport` / `RelayConnectionTransport` (`NostrCore`) — the relay seam; inject a fake for
   tests, or the default transport with a `webSocketFactory:` for a platform-native socket
-- `RemoteSignerError` — `invalidURI(reason:)`, `notConnected`, `connectionInProgress`, `requestEncodingFailed`, `responseDecodingFailed`, `timedOut`, `cancelled`, `transportFailed(RelayConnection.Error)`, `connectionRejected(message:)`, `signerError(message:)`, `responseValidationFailed`; every `RemoteSigner` and URI method is `throws(RemoteSignerError)`
+- `RemoteSignerError` — `invalidURI(reason:)`, `notConnected`, `requestEncodingFailed`, `responseDecodingFailed`, `timedOut`, `cancelled`, `transportFailed(RelayConnection.Error)`, `connectionRejected(message:)`, `signerError(message:)`, `responseValidationFailed`; every `RemoteSigner` and URI method is `throws(RemoteSignerError)`
 
 ## Errors
 
