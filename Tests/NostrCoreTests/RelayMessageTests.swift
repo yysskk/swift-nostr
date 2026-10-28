@@ -11,7 +11,7 @@ struct RelayMessageTests {
         let json =
             #"["EVENT","sub1",{"id":"abababababababababababababababababababababababababababababababab","pubkey":"cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd","created_at":1234567890,"kind":1,"tags":[],"content":"Hello","sig":"efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef"}]"#
 
-        let message = try RelayMessage.parse(json)
+        let message = try RelayMessage(json: json)
 
         if case .event(let subscriptionID, let event) = message {
             #expect(subscriptionID == "sub1")
@@ -30,7 +30,7 @@ struct RelayMessageTests {
             #"["EVENT","sub1",{"id":"abc123","pubkey":"cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd","created_at":1234567890,"kind":1,"tags":[],"content":"Hello","sig":"efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef"}]"#
 
         #expect(throws: RelayMessage.Error.malformed) {
-            try RelayMessage.parse(json)
+            try RelayMessage(json: json)
         }
     }
 
@@ -38,7 +38,7 @@ struct RelayMessageTests {
     func parseEoseMessage() throws {
         let json = #"["EOSE","sub1"]"#
 
-        let message = try RelayMessage.parse(json)
+        let message = try RelayMessage(json: json)
 
         if case .endOfStoredEvents(let subscriptionID) = message {
             #expect(subscriptionID == "sub1")
@@ -51,7 +51,7 @@ struct RelayMessageTests {
     func parseNoticeMessage() throws {
         let json = #"["NOTICE","Rate limit exceeded"]"#
 
-        let message = try RelayMessage.parse(json)
+        let message = try RelayMessage(json: json)
 
         if case .notice(let noticeMessage) = message {
             #expect(noticeMessage == "Rate limit exceeded")
@@ -65,7 +65,7 @@ struct RelayMessageTests {
         let id = EventID.fixture("ok")
         let json = #"["OK","\#(id.hex)",true,""]"#
 
-        let message = try RelayMessage.parse(json)
+        let message = try RelayMessage(json: json)
 
         if case .ok(let eventID, let accepted, let okMessage) = message {
             #expect(eventID == id)
@@ -81,7 +81,7 @@ struct RelayMessageTests {
         let id = EventID.fixture("ok")
         let json = #"["OK","\#(id.hex)",false,"duplicate: already have this event"]"#
 
-        let message = try RelayMessage.parse(json)
+        let message = try RelayMessage(json: json)
 
         if case .ok(let eventID, let accepted, let okMessage) = message {
             #expect(eventID == id)
@@ -104,7 +104,7 @@ struct RelayMessageTests {
         ])
     func parseOkMessageWithMalformedID(id: String) {
         #expect(throws: RelayMessage.Error.malformed) {
-            try RelayMessage.parse(#"["OK","\#(id)",true,""]"#)
+            try RelayMessage(json: #"["OK","\#(id)",true,""]"#)
         }
     }
 
@@ -112,7 +112,7 @@ struct RelayMessageTests {
     func parseAuthMessage() throws {
         let json = #"["AUTH","challenge123"]"#
 
-        let message = try RelayMessage.parse(json)
+        let message = try RelayMessage(json: json)
 
         if case .auth(let challenge) = message {
             #expect(challenge == "challenge123")
@@ -125,7 +125,7 @@ struct RelayMessageTests {
     func parseClosedMessage() throws {
         let json = #"["CLOSED","sub1","subscription closed by relay"]"#
 
-        let message = try RelayMessage.parse(json)
+        let message = try RelayMessage(json: json)
 
         if case .closed(let subscriptionID, let closedMessage) = message {
             #expect(subscriptionID == "sub1")
@@ -135,31 +135,29 @@ struct RelayMessageTests {
         }
     }
 
-    @Test("Parse COUNT message (NIP-45)")
+    @Test("A COUNT message without the approximate flag parses as an exact EventCount (NIP-45)")
     func parseCountMessage() throws {
         let json = #"["COUNT","sub1",{"count":238}]"#
 
-        let message = try RelayMessage.parse(json)
+        let message = try RelayMessage(json: json)
 
-        if case .count(let subscriptionID, let count, let approximate) = message {
+        if case .count(let subscriptionID, let count) = message {
             #expect(subscriptionID == "sub1")
-            #expect(count == 238)
-            #expect(approximate == nil)
+            #expect(count == EventCount(value: 238, isApproximate: false))
         } else {
             Issue.record("Expected COUNT message")
         }
     }
 
-    @Test("Parse COUNT message with approximate flag (NIP-45)")
+    @Test("A COUNT message with the approximate flag parses into the EventCount (NIP-45)")
     func parseCountMessageApproximate() throws {
         let json = #"["COUNT","sub1",{"count":93,"approximate":true}]"#
 
-        let message = try RelayMessage.parse(json)
+        let message = try RelayMessage(json: json)
 
-        if case .count(let subscriptionID, let count, let approximate) = message {
+        if case .count(let subscriptionID, let count) = message {
             #expect(subscriptionID == "sub1")
-            #expect(count == 93)
-            #expect(approximate == true)
+            #expect(count == EventCount(value: 93, isApproximate: true))
         } else {
             Issue.record("Expected COUNT message")
         }
@@ -169,15 +167,15 @@ struct RelayMessageTests {
     func parseMalformedCountMessage() {
         // Missing the `count` key in the payload.
         #expect(throws: RelayMessage.Error.malformed) {
-            _ = try RelayMessage.parse(#"["COUNT","sub1",{"approximate":true}]"#)
+            _ = try RelayMessage(json: #"["COUNT","sub1",{"approximate":true}]"#)
         }
         // Payload is not a dictionary.
         #expect(throws: RelayMessage.Error.malformed) {
-            _ = try RelayMessage.parse(#"["COUNT","sub1",238]"#)
+            _ = try RelayMessage(json: #"["COUNT","sub1",238]"#)
         }
         // Too short — no payload element.
         #expect(throws: RelayMessage.Error.malformed) {
-            _ = try RelayMessage.parse(#"["COUNT","sub1"]"#)
+            _ = try RelayMessage(json: #"["COUNT","sub1"]"#)
         }
     }
 
@@ -185,7 +183,7 @@ struct RelayMessageTests {
     func parseUnknownMessage() throws {
         let json = #"["UNKNOWN","data1","data2"]"#
 
-        let message = try RelayMessage.parse(json)
+        let message = try RelayMessage(json: json)
 
         if case .unknown(let type, _) = message {
             #expect(type == "UNKNOWN")
@@ -198,14 +196,14 @@ struct RelayMessageTests {
     func nonJSONFrameIsMalformed() {
         let json = "not json"
         #expect(throws: RelayMessage.Error.malformed) {
-            _ = try RelayMessage.parse(json)
+            _ = try RelayMessage(json: json)
         }
     }
 
     @Test("A JSON frame that is not an array is malformed")
     func nonArrayFrameIsMalformed() {
         #expect(throws: RelayMessage.Error.malformed) {
-            _ = try RelayMessage.parse(#"{"type":"EOSE"}"#)
+            _ = try RelayMessage(json: #"{"type":"EOSE"}"#)
         }
     }
 }

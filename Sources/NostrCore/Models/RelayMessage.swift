@@ -82,21 +82,22 @@ public enum RelayMessage: Sendable {
     /// Closed subscription notice
     case closed(subscriptionID: SubscriptionID, message: String)
 
-    /// Count of events matching the requested filters (NIP-45).
+    /// Count of events matching the requested filters (NIP-45); a payload without the
+    /// `approximate` flag is an exact count.
     /// https://github.com/nostr-protocol/nips/blob/master/45.md
-    case count(subscriptionID: SubscriptionID, count: Int, approximate: Bool?)
+    case count(subscriptionID: SubscriptionID, count: EventCount)
 
     /// Unknown message type
     case unknown(type: String, rawData: String)
 
-    /// Parses a raw JSON message from a relay.
+    /// Parses a raw JSON frame received from a relay.
     ///
     /// - Throws: ``RelayMessage/Error/malformed`` if the frame is not a JSON array or lacks the
     ///   fields its type requires — including an `OK` whose event id is not canonical 64-digit
     ///   lowercase hex, which cannot answer any event this client sent, and an `EVENT` carrying a
     ///   malformed event.
-    public static func parse(_ text: String) throws(RelayMessage.Error) -> RelayMessage {
-        guard let object = try? JSONSerialization.jsonObject(with: Data(text.utf8)),
+    public init(json: String) throws(RelayMessage.Error) {
+        guard let object = try? JSONSerialization.jsonObject(with: Data(json.utf8)),
             let array = object as? [Any],
             let type = array.first as? String
         else {
@@ -114,7 +115,7 @@ public enum RelayMessage: Sendable {
             guard let event = try? Event(jsonObject: eventDict) else {
                 throw .malformed
             }
-            return .event(subscriptionID: subscriptionID, event: event)
+            self = .event(subscriptionID: subscriptionID, event: event)
 
         case "EOSE":
             guard array.count >= 2,
@@ -122,7 +123,7 @@ public enum RelayMessage: Sendable {
             else {
                 throw .malformed
             }
-            return .endOfStoredEvents(subscriptionID: subscriptionID)
+            self = .endOfStoredEvents(subscriptionID: subscriptionID)
 
         case "NOTICE":
             guard array.count >= 2,
@@ -130,7 +131,7 @@ public enum RelayMessage: Sendable {
             else {
                 throw .malformed
             }
-            return .notice(message: message)
+            self = .notice(message: message)
 
         case "OK":
             guard array.count >= 4,
@@ -140,7 +141,7 @@ public enum RelayMessage: Sendable {
             else {
                 throw .malformed
             }
-            return .ok(eventID: eventID, accepted: accepted, message: message)
+            self = .ok(eventID: eventID, accepted: accepted, message: message)
 
         case "AUTH":
             guard array.count >= 2,
@@ -148,7 +149,7 @@ public enum RelayMessage: Sendable {
             else {
                 throw .malformed
             }
-            return .auth(challenge: challenge)
+            self = .auth(challenge: challenge)
 
         case "CLOSED":
             guard array.count >= 3,
@@ -157,7 +158,7 @@ public enum RelayMessage: Sendable {
             else {
                 throw .malformed
             }
-            return .closed(subscriptionID: subscriptionID, message: message)
+            self = .closed(subscriptionID: subscriptionID, message: message)
 
         case "COUNT":
             // The payload carries `count` and an optional `approximate` flag; any
@@ -169,11 +170,12 @@ public enum RelayMessage: Sendable {
             else {
                 throw .malformed
             }
-            let approximate = payload["approximate"] as? Bool
-            return .count(subscriptionID: subscriptionID, count: count, approximate: approximate)
+            let isApproximate = payload["approximate"] as? Bool ?? false
+            let eventCount = EventCount(value: count, isApproximate: isApproximate)
+            self = .count(subscriptionID: subscriptionID, count: eventCount)
 
         default:
-            return .unknown(type: type, rawData: text)
+            self = .unknown(type: type, rawData: json)
         }
     }
 

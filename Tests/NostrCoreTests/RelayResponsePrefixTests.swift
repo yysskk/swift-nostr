@@ -76,33 +76,33 @@ struct RelayMessageResponsePrefixTests {
 
     @Test("OK message exposes its machine-readable prefix")
     func okPrefix() throws {
-        let message = try RelayMessage.parse(
-            #"["OK","abababababababababababababababababababababababababababababababab",false,"auth-required: we only accept events from registered users"]"#
-        )
+        let eventID = String(repeating: "ab", count: 32)
+        let status = "auth-required: we only accept events from registered users"
+        let message = try RelayMessage(json: #"["OK","\#(eventID)",false,"\#(status)"]"#)
         #expect(message.responsePrefix == .authRequired)
     }
 
     @Test("CLOSED message exposes its machine-readable prefix")
     func closedPrefix() throws {
-        let message = try RelayMessage.parse(
-            #"["CLOSED","sub1","auth-required: we can't serve DMs to unauthenticated users"]"#
-        )
+        let frame = #"["CLOSED","sub1","auth-required: we can't serve DMs to unauthenticated users"]"#
+        let message = try RelayMessage(json: frame)
         #expect(message.responsePrefix == .authRequired)
     }
 
     @Test("OK message without a prefix has none")
     func okWithoutPrefix() throws {
         let eventID = String(repeating: "ab", count: 32)
-        let message = try RelayMessage.parse(#"["OK","\#(eventID)",true,""]"#)
+        let message = try RelayMessage(json: #"["OK","\#(eventID)",true,""]"#)
         #expect(message.responsePrefix == nil)
     }
 
     @Test("Messages that carry no status string have no prefix")
     func otherMessagesHaveNoPrefix() throws {
-        let eose = try RelayMessage.parse(#"["EOSE","sub1"]"#)
+        let eose = try RelayMessage(json: #"["EOSE","sub1"]"#)
         #expect(eose.responsePrefix == nil)
 
-        let notice = try RelayMessage.parse(#"["NOTICE","restricted: this looks like a prefix but NOTICE has none"]"#)
+        let noticeFrame = #"["NOTICE","restricted: this looks like a prefix but NOTICE has none"]"#
+        let notice = try RelayMessage(json: noticeFrame)
         #expect(notice.responsePrefix == nil)
     }
 }

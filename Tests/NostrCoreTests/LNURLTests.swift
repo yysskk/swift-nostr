@@ -165,4 +165,24 @@ struct LNURLTests {
         #expect(items["nostr"] != nil)
         #expect(items["lnurl"] == "lnurl1xyz")
     }
+
+    // MARK: - Invoice Response
+
+    @Test("An invoice response decodes the pr field as its invoice")
+    func invoiceResponseDecodesPrField() throws {
+        let data = Data(#"{"pr":"lnbc210n1pjexample","routes":[]}"#.utf8)
+
+        let response = try JSONDecoder().decode(LNURLInvoiceResponse.self, from: data)
+
+        #expect(response == LNURLInvoiceResponse(invoice: "lnbc210n1pjexample"))
+    }
+
+    @Test("An invoice response without a pr field fails to decode")
+    func invoiceResponseWithoutPrFails() {
+        let data = Data(#"{"invoice":"lnbc210n1pjexample"}"#.utf8)
+
+        #expect(throws: DecodingError.self) {
+            _ = try JSONDecoder().decode(LNURLInvoiceResponse.self, from: data)
+        }
+    }
 }

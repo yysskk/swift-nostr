@@ -20,7 +20,7 @@ extension RelayConnection {
 
                     switch message {
                     case .string(let text):
-                        if let relayMessage = try? RelayMessage.parse(text) {
+                        if let relayMessage = try? RelayMessage(json: text) {
                             switch relayMessage {
                             case .ok(let eventID, let accepted, let message):
                                 // Settle a pending NIP-42 authentication for this event id.
@@ -58,9 +58,9 @@ extension RelayConnection {
                                 if let waiter = pendingCountWaiters.removeValue(forKey: subscriptionID) {
                                     waiter.finish(throwing: RelayRejection(status: message))
                                 }
-                            case .count(let subscriptionID, let count, let approximate):
+                            case .count(let subscriptionID, let count):
                                 if let waiter = pendingCountWaiters.removeValue(forKey: subscriptionID) {
-                                    waiter.yield(EventCount(value: count, isApproximate: approximate ?? false))
+                                    waiter.yield(count)
                                     waiter.finish()
                                 }
                             default:

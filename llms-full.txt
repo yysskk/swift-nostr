@@ -744,13 +744,13 @@ Messages received from relay (NIP-01) (enum: Sendable).
 - `.ok(eventID: EventID, accepted: Bool, message: String)` -- an `OK` whose id is not canonical hex fails to parse (`RelayMessage.Error.malformed`, also thrown for a frame that is not a JSON array or lacks its fields)
 - `.auth(challenge: String)` -- NIP-42
 - `.closed(subscriptionID: SubscriptionID, message: String)`
-- `.count(subscriptionID: SubscriptionID, count: Int, approximate: Bool?)` -- NIP-45
+- `.count(subscriptionID: SubscriptionID, count: EventCount)` -- NIP-45; a payload without `approximate` is an exact count
 - `.unknown(type: String, rawData: String)`
 
 ### Parsing
 
 ```swift
-let message = try RelayMessage.parse(jsonString)
+let message = try RelayMessage(json: jsonString)
 ```
 
 ## ClientMessage
