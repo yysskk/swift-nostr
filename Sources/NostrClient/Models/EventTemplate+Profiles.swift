@@ -10,17 +10,17 @@ extension EventTemplate {
     /// - Throws: `EncodingError` if `metadata` cannot be encoded as JSON.
     public static func metadata(_ metadata: UserMetadata) throws -> EventTemplate {
         let content = try JSONEncoder().encode(metadata)
-        return EventTemplate(kind: .setMetadata, content: String(decoding: content, as: UTF8.self))
+        return EventTemplate(kind: .metadata, content: String(decoding: content, as: UTF8.self))
     }
 
-    /// A contact list (kind 3): one `p` tag per contact, carrying its relay URL and petname, and
+    /// A follow list (kind 3): one `p` tag per contact, carrying its relay URL and petname, and
     /// an empty content.
     /// https://github.com/nostr-protocol/nips/blob/master/02.md
     /// - Parameter contacts: The followed public keys, in order.
-    /// - Returns: The template for the contact list.
-    public static func contactList(_ contacts: [Contact]) -> EventTemplate {
+    /// - Returns: The template for the follow list.
+    public static func followList(_ contacts: [Contact]) -> EventTemplate {
         EventTemplate(
-            kind: .contacts,
+            kind: .followList,
             tags: contacts.map { .publicKey($0.publicKey, relayURL: $0.relayURL, petname: $0.petname) }
         )
     }

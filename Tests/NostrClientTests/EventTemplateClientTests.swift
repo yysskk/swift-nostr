@@ -17,27 +17,27 @@ struct EventTemplateClientTests {
     func metadata() throws {
         let template = try EventTemplate.metadata(UserMetadata(name: "alice", displayName: "Alice"))
 
-        #expect(template.kind == .setMetadata)
+        #expect(template.kind == .metadata)
         #expect(template.tags.isEmpty)
         let decoded = try JSONSerialization.jsonObject(with: Data(template.content.utf8)) as? [String: String]
         #expect(decoded == ["name": "alice", "display_name": "Alice"])
     }
 
-    @Test("contactList is kind 3 with one p tag per contact, in order, and empty content")
-    func contactList() {
-        let template = EventTemplate.contactList([
+    @Test("followList is kind 3 with one p tag per contact, in order, and empty content")
+    func followList() {
+        let template = EventTemplate.followList([
             Contact(publicKey: .fixture("alice"), relayURL: RelayURL("wss://relay.example.com")!, petname: "alice"),
             Contact(publicKey: .fixture("bob")),
         ])
 
-        #expect(template.kind == .contacts)
+        #expect(template.kind == .followList)
         #expect(
             template.tags.map(\.rawArray) == [
                 ["p", PublicKey.fixture("alice").hex, "wss://relay.example.com", "alice"],
                 ["p", PublicKey.fixture("bob").hex],
             ])
         #expect(template.content.isEmpty)
-        #expect(EventTemplate.contactList([]).tags.isEmpty)
+        #expect(EventTemplate.followList([]).tags.isEmpty)
     }
 
     // MARK: - Relay lists

@@ -112,12 +112,12 @@ struct PublishedEventTests {
         let metadata = try await PublishAckSupport.acknowledgingPublishes(on: socket) {
             try await client.events.publishMetadata(UserMetadata(name: "alice"))
         }
-        #expect(metadata.event.kind == .setMetadata)
+        #expect(metadata.event.kind == .metadata)
 
         let deletion = try await PublishAckSupport.acknowledgingPublishes(on: socket) {
             try await client.events.publishDeletion(eventIDs: [metadata.event.id], reason: "cleanup")
         }
-        #expect(deletion.event.kind == .eventDeletion)
+        #expect(deletion.event.kind == .deletionRequest)
         #expect(deletion.event.tags.contains(Event.Tag(rawArray: ["e", metadata.event.id.hex])))
         await client.relays.disconnect()
     }

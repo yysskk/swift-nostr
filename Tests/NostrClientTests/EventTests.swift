@@ -117,14 +117,16 @@ struct EventTests {
 
     @Test("Event kind constants")
     func eventKindConstants() {
-        #expect(Event.Kind.setMetadata.rawValue == 0)
+        #expect(Event.Kind.metadata.rawValue == 0)
         #expect(Event.Kind.textNote.rawValue == 1)
         #expect(Event.Kind.recommendRelay.rawValue == 2)
-        #expect(Event.Kind.contacts.rawValue == 3)
+        #expect(Event.Kind.followList.rawValue == 3)
         #expect(Event.Kind.encryptedDirectMessage.rawValue == 4)
-        #expect(Event.Kind.eventDeletion.rawValue == 5)
+        #expect(Event.Kind.deletionRequest.rawValue == 5)
         #expect(Event.Kind.repost.rawValue == 6)
         #expect(Event.Kind.reaction.rawValue == 7)
+        #expect(Event.Kind.zapRequest.rawValue == 9734)
+        #expect(Event.Kind.zapReceipt.rawValue == 9735)
     }
 
     @Test("Event JSON encoding/decoding")

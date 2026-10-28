@@ -50,7 +50,7 @@ private struct ZapsAPI: Sendable {
     /// Fetches the zap receipts naming the signer as recipient.
     func received(limit: Int = 50, timeout: Duration? = nil) async throws -> [ZapReceipt] {
         guard let publicKey = await identity.publicKey else { throw NostrClient.Error.signerNotSet }
-        let filter = Filter(kinds: [.zap], publicKeyReferences: [publicKey], limit: limit)
+        let filter = Filter(kinds: [.zapReceipt], publicKeyReferences: [publicKey], limit: limit)
         return try await events.fetch(filters: [filter], route: .pool, timeout: timeout)
             .compactMap(ZapReceipt.init(event:))
     }
@@ -97,7 +97,7 @@ struct ExtendingTheClientTests {
         let provider = EventSigner(keyPair: KeyPair())
         return provider.sign(
             EventTemplate(
-                kind: .zap,
+                kind: .zapReceipt,
                 tags: [
                     .publicKey(recipient),
                     Event.Tag(name: "bolt11", values: ["lnbc210n1"]),
@@ -198,7 +198,7 @@ struct ExtendingTheClientTests {
         socket.deliver(.string("[\"EOSE\",\"\(subscriptionID)\"]"))
         let receipts = try await task.value
 
-        #expect(filter["kinds"] as? [Int] == [Event.Kind.zap.rawValue])
+        #expect(filter["kinds"] as? [Int] == [Event.Kind.zapReceipt.rawValue])
         #expect(filter["#p"] as? [String] == [signer.publicKey.hex])
         #expect(filter["limit"] as? Int == 10)
         #expect(receipts.map(\.event) == [receipt])
@@ -219,7 +219,8 @@ struct ExtendingTheClientTests {
 
         let fetches = await events.fetches
         #expect(fetches.count == 1)
-        #expect(fetches[0].filters == [Filter(kinds: [.zap], publicKeyReferences: [signer.publicKey], limit: 50)])
+        let expected = Filter(kinds: [.zapReceipt], publicKeyReferences: [signer.publicKey], limit: 50)
+        #expect(fetches[0].filters == [expected])
         #expect(fetches[0].route == .pool)
         #expect(fetches[0].timeout == nil)
         #expect(receipts.first?.amountMillisats == 5_000)
@@ -237,7 +238,8 @@ struct ExtendingTheClientTests {
         let receipts = try await zaps.received()
 
         #expect(receipts.map(\.amountMillisats) == [21_000])
-        #expect(await events.requests == [[Filter(kinds: [.zap], publicKeyReferences: [signer.publicKey], limit: 50)]])
+        let expected = Filter(kinds: [.zapReceipt], publicKeyReferences: [signer.publicKey], limit: 50)
+        #expect(await events.requests == [[expected]])
     }
 
     @Test("a composed namespace throws signerNotSet before fetching when no signer is set")

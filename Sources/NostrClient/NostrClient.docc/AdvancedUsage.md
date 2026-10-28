@@ -312,15 +312,15 @@ case .nsec:
 let parsed = try NEvent(bech32String: nevent)
 ```
 
-## Contact Lists (NIP-02)
+## Follow Lists (NIP-02)
 
 ```swift
 let contacts = [
     Contact(publicKey: alice, relayURL: try RelayURL(string: "wss://relay.example.com"), petname: "alice"),
     Contact(publicKey: bob)
 ]
-// A contact list is an EventTemplate: sign it, then publish it like any event.
-let signed = signer.sign(.contactList(contacts))
+// A follow list is an EventTemplate: sign it, then publish it like any event.
+let signed = signer.sign(.followList(contacts))
 try await client.events.publish(signed)
 
 // Extract contacts from a kind-3 event; a `p` tag that is not a canonical hex key is skipped
@@ -864,7 +864,7 @@ try signed.verify()
 ```
 
 NostrClient's models have template factories too — ``EventTemplate/metadata(_:)``,
-``EventTemplate/contactList(_:)``, ``EventTemplate/relayListMetadata(_:)``,
+``EventTemplate/followList(_:)``, ``EventTemplate/relayListMetadata(_:)``,
 ``EventTemplate/directMessageRelayList(_:)``, ``EventTemplate/report(_:type:reason:)-(PublicKey,_,_)``,
 and ``EventTemplate/longFormContent(_:draft:)``. A NIP-51 list or set needs the signer to encrypt its
 private items to itself, and to decrypt them again, so it works the same with a local key or a

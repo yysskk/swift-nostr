@@ -155,10 +155,10 @@ struct FilterTests {
     @Test("Profile list filters take public keys and encode them as hex authors")
     func profileListFilters() throws {
         let filters: [(Filter, Event.Kind, Int?)] = [
-            (.contactList(publicKey: alice), .contacts, 1),
+            (.followList(publicKey: alice), .followList, 1),
             (.relayListMetadata(publicKey: alice), .relayListMetadata, 1),
             (.directMessageRelayList(publicKey: alice), .directMessageRelayList, 1),
-            (.contactList(publicKeys: [alice]), .contacts, nil),
+            (.followList(publicKeys: [alice]), .followList, nil),
             (.relayListMetadata(publicKeys: [alice]), .relayListMetadata, nil),
             (.directMessageRelayList(publicKeys: [alice]), .directMessageRelayList, nil),
         ]

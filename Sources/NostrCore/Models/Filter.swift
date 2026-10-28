@@ -178,7 +178,7 @@ extension Filter {
     public static func metadata(publicKeys: [PublicKey]) -> Filter {
         Filter(
             authors: publicKeys,
-            kinds: [.setMetadata]
+            kinds: [.metadata]
         )
     }
 
@@ -208,19 +208,19 @@ extension Filter {
         )
     }
 
-    /// Create a filter for contact lists of specific users (NIP-02)
-    public static func contactList(publicKeys: [PublicKey]) -> Filter {
+    /// Create a filter for follow lists of specific users (NIP-02)
+    public static func followList(publicKeys: [PublicKey]) -> Filter {
         Filter(
             authors: publicKeys,
-            kinds: [.contacts]
+            kinds: [.followList]
         )
     }
 
-    /// Create a filter for a specific user's contact list (NIP-02)
-    public static func contactList(publicKey: PublicKey) -> Filter {
+    /// Create a filter for a specific user's follow list (NIP-02)
+    public static func followList(publicKey: PublicKey) -> Filter {
         Filter(
             authors: [publicKey],
-            kinds: [.contacts],
+            kinds: [.followList],
             limit: 1
         )
     }
@@ -283,7 +283,7 @@ extension Filter {
             since: since,
             limit: limit
         )
-        filter[tag: .group] = [groupID]
+        filter[tag: .groupID] = [groupID]
         return filter
     }
 

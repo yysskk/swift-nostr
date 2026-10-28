@@ -62,7 +62,7 @@ extension NostrEventFetching {
     public func fetchMetadata(for publicKey: PublicKey, timeout: Duration? = nil) async throws -> UserMetadata? {
         let events = try await fetch(filters: [.metadata(publicKeys: [publicKey])], route: .pool, timeout: timeout)
 
-        guard let event = VerifiedEventSelection.newest(in: events, kind: .setMetadata, author: publicKey)
+        guard let event = VerifiedEventSelection.newest(in: events, kind: .metadata, author: publicKey)
         else { return nil }
 
         return try? JSONDecoder().decode(UserMetadata.self, from: Data(event.content.utf8))

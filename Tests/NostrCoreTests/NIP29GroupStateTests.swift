@@ -412,13 +412,13 @@ struct NIP29GroupMembershipTests {
     private func putUser(id: EventID, createdAt: Timestamp, roles: [String]) -> Event {
         moderation(
             id: id, kind: .groupPutUser, createdAt: createdAt,
-            tags: [.group("abcdef"), .publicKey(member, roles: roles)])
+            tags: [.groupID("abcdef"), .publicKey(member, roles: roles)])
     }
 
     private func removeUser(id: EventID, createdAt: Timestamp) -> Event {
         moderation(
             id: id, kind: .groupRemoveUser, createdAt: createdAt,
-            tags: [.group("abcdef"), .publicKey(member)])
+            tags: [.groupID("abcdef"), .publicKey(member)])
     }
 
     @Test("membership is nil when no moderation event targets the public key")
@@ -477,7 +477,7 @@ struct NIP29GroupMembershipTests {
             putUser(id: paddedID(1), createdAt: Timestamp(rawValue: 1_700_000_000), roles: ["member"]),
             moderation(
                 id: paddedID(2), kind: .groupRemoveUser, createdAt: Timestamp(rawValue: 1_700_000_100),
-                tags: [.group("abcdef"), .publicKey(other)]),
+                tags: [.groupID("abcdef"), .publicKey(other)]),
         ]
 
         #expect(Groups.membership(of: member, in: events) == .member(roles: ["member"]))
@@ -490,10 +490,10 @@ struct NIP29GroupMembershipTests {
             putUser(id: paddedID(1), createdAt: Timestamp(rawValue: 1_700_000_000), roles: ["member"]),
             moderation(
                 id: paddedID(2), kind: .chatMessage, createdAt: Timestamp(rawValue: 1_700_000_100),
-                tags: [.group("abcdef"), .publicKey(member)]),
+                tags: [.groupID("abcdef"), .publicKey(member)]),
             moderation(
                 id: paddedID(3), kind: .groupDeleteEvent, createdAt: Timestamp(rawValue: 1_700_000_200),
-                tags: [.group("abcdef"), .publicKey(member)]),
+                tags: [.groupID("abcdef"), .publicKey(member)]),
         ]
 
         #expect(Groups.membership(of: member, in: events) == .member(roles: ["member"]))
@@ -505,7 +505,7 @@ struct NIP29GroupMembershipTests {
         let event = moderation(
             id: paddedID(1), kind: .groupPutUser, createdAt: Timestamp(rawValue: 1_700_000_000),
             tags: [
-                .group("abcdef"), Event.Tag(name: .publicKey, values: [other.hex, "ceo"]),
+                .groupID("abcdef"), Event.Tag(name: .publicKey, values: [other.hex, "ceo"]),
                 Event.Tag(name: .publicKey, values: [member.hex, "moderator"]),
             ])
 
