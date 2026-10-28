@@ -90,7 +90,7 @@ public struct DirectMessageParser: Sendable {
         // The seal does not verify as the event it claims to be.
         if error is Event.VerificationError { return true }
         // NIP-44 refused the payload — the usual outcome for a wrap sealed to someone else.
-        if error is SealedMessage.Error { return true }
+        if error is NIP44Payload.Error { return true }
         // The wrap is not a gift wrap or its seal is not a seal, the seal's signature does not
         // verify, the rumor's id is not its hash, or the rumor claims another author.
         if error is GiftWrap.Error { return true }

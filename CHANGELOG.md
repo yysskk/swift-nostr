@@ -25,6 +25,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`RelayPoolConfig.Deduplication` groups the deduplication cache settings**: `maximumCount` and
   `timeToLive`. `RelayPoolConfig.deduplication` holds one, `.default` unless set; `nil` turns
   deduplication off, so a subscription or fetch delivers every relay's copy of an event.
+- **`ConversationKey` holds a NIP-44 conversation key**: exactly 32 bytes, checked once by
+  `init(data:)`, which throws `NIP44Payload.Error.invalidConversationKey` for any other length.
+  `init(privateKey:publicKey:)` derives the key two parties share with ECDH and HKDF, and `random()`
+  generates one from the system CSPRNG for a group. Like `PrivateKey`, it compares in constant time
+  and redacts its `description`, `debugDescription`, and reflection; read `data` to export it.
 
 ### Changed
 
@@ -110,6 +115,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     flag rather than `nil`.
   - `LNURLInvoiceResponse.pr` → `invoice`, and `init(pr:)` → `init(invoice:)`; it still decodes
     from the LNURL `pr` key.
+- **`SealedMessage` is `NIP44Payload`, and it encrypts rather than seals** (breaking): "seal" is
+  the NIP-59 kind-13 term, which `GiftWrap` builds on top of NIP-44.
+  - `SealedMessage` → `NIP44Payload`, `SealedMessage.Error` → `NIP44Payload.Error`, and `payload` →
+    `base64`, with `init(payload:)` → `init(base64:)`.
+  - `seal(_:for:using:)` → `encrypt(_:for:using:)` and `open(from:using:)` →
+    `decrypt(from:using:)`.
+  - `seal(_:conversationKey:)` → `encrypt(_:with:)` and `open(conversationKey:)` → `decrypt(with:)`,
+    which take a `ConversationKey` instead of `Data`. A wrong-length key is now rejected when the
+    `ConversationKey` is created, so these no longer throw `invalidConversationKey`.
+  - `EventSigner.nip44Encrypt(_:to:)` and `nip44Decrypt(_:from:)` throw `NIP44Payload.Error`.
 
 ### Fixed
 

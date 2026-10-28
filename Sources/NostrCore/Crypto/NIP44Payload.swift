@@ -1,17 +1,16 @@
 import Crypto
 import Foundation
-import P256K
 
-/// NIP-44 Versioned Encryption
+/// A NIP-44 v2 encrypted payload.
 /// https://github.com/nostr-protocol/nips/blob/master/44.md
 ///
-/// Two modes produce the same NIP-44 v2 payload. ``seal(_:for:using:)`` and
-/// ``open(from:using:)`` derive the conversation key from a sender and recipient key pair, for
-/// one-to-one messages. ``seal(_:conversationKey:)`` and ``open(conversationKey:)`` take the
-/// conversation key directly, for a ciphertext shared by everyone who holds that key.
-public struct SealedMessage: Sendable {
-    /// The base64-encoded sealed payload
-    public let payload: String
+/// Every payload is encrypted under a ``ConversationKey``. ``encrypt(_:for:using:)`` and
+/// ``decrypt(from:using:)`` derive that key from a sender and recipient key pair, for one-to-one
+/// messages. ``encrypt(_:with:)`` and ``decrypt(with:)`` take the key directly, for a ciphertext
+/// shared by everyone who holds it. Both produce the same on-wire format.
+public struct NIP44Payload: Sendable {
+    /// The payload as base64 text, the form a Nostr event carries in its `content`.
+    public let base64: String
 
     /// Current NIP-44 version
     public static let version: UInt8 = 2
@@ -19,124 +18,120 @@ public struct SealedMessage: Sendable {
     /// Minimum padded length
     private static let minimumPlaintextSize = 1
     private static let maximumPlaintextSize = 65535
-    /// The length of a NIP-44 conversation key, the HKDF-Extract output the message keys expand from.
-    private static let conversationKeyByteCount = 32
     /// The length of the per-message nonce NIP-44 expands the message keys over.
     private static let nonceByteCount = 32
 
     // MARK: - Initializers
 
-    /// Creates a SealedMessage from an existing base64-encoded payload
-    public init(payload: String) {
-        self.payload = payload
+    /// Wraps an existing base64-encoded payload, such as an event's `content`, for decryption.
+    public init(base64: String) {
+        self.base64 = base64
     }
 
     // MARK: - Public API
 
-    /// Seals a message for a recipient using NIP-44 encryption
+    /// Encrypts a message to a recipient under the conversation key the two parties share.
     /// - Parameters:
-    ///   - message: The plaintext message to seal
-    ///   - recipientPublicKey: The recipient's public key
-    ///   - senderKeyPair: The sender's key pair
-    /// - Returns: A SealedMessage containing the encrypted payload
-    /// - Throws: ``SealedMessage/Error/invalidPlaintextLength(_:)`` if `message` is not 1 to 65535
-    ///   bytes of UTF-8, or ``SealedMessage/Error/invalidPublicKey`` if `recipientPublicKey` is not
+    ///   - message: The plaintext message to encrypt.
+    ///   - recipientPublicKey: The recipient's public key.
+    ///   - senderKeyPair: The sender's key pair.
+    /// - Returns: The encrypted payload.
+    /// - Throws: ``NIP44Payload/Error/invalidPlaintextLength(_:)`` if `message` is not 1 to 65535
+    ///   bytes of UTF-8, or ``NIP44Payload/Error/invalidPublicKey`` if `recipientPublicKey` is not
     ///   a point on secp256k1.
-    public static func seal(
+    public static func encrypt(
         _ message: String,
         for recipientPublicKey: PublicKey,
         using senderKeyPair: KeyPair
-    ) throws(SealedMessage.Error) -> SealedMessage {
-        // Generate a random 32-byte nonce, then delegate to the deterministic implementation.
-        let nonce = SecureRandom.generateBytes(count: 32)
-        return try seal(message, for: recipientPublicKey, using: senderKeyPair, nonce: nonce)
+    ) throws(NIP44Payload.Error) -> NIP44Payload {
+        let nonce = SecureRandom.generateBytes(count: nonceByteCount)
+        return try encrypt(message, for: recipientPublicKey, using: senderKeyPair, nonce: nonce)
     }
 
-    /// Seals a message with a caller-supplied nonce.
+    /// Encrypts a message to a recipient with a caller-supplied nonce.
     ///
     /// Internal and intended for tests that pin the on-wire output to a known nonce (e.g. the
-    /// official NIP-44 vectors). Production callers should use ``seal(_:for:using:)``, which
+    /// official NIP-44 vectors). Production callers should use ``encrypt(_:for:using:)``, which
     /// generates a fresh random nonce for every message as the spec requires.
     /// - Parameters:
-    ///   - message: The plaintext message to seal.
+    ///   - message: The plaintext message to encrypt.
     ///   - recipientPublicKey: The recipient's public key.
     ///   - senderKeyPair: The sender's key pair.
     ///   - nonce: The 32-byte nonce to use.
-    /// - Returns: A SealedMessage containing the encrypted payload.
-    static func seal(
+    /// - Returns: The encrypted payload.
+    static func encrypt(
         _ message: String,
         for recipientPublicKey: PublicKey,
         using senderKeyPair: KeyPair,
         nonce: Data
-    ) throws(SealedMessage.Error) -> SealedMessage {
-        let conversationKey = try Self.conversationKey(
+    ) throws(NIP44Payload.Error) -> NIP44Payload {
+        let conversationKey = try ConversationKey(
             privateKey: senderKeyPair.privateKey,
-            publicKey: recipientPublicKey.data
+            publicKey: recipientPublicKey
         )
-
-        let payload = try encrypt(plaintext: message, conversationKey: conversationKey, nonce: nonce)
-        return SealedMessage(payload: payload)
+        return try encrypt(message, with: conversationKey, nonce: nonce)
     }
 
-    /// Seals a message under a caller-supplied conversation key.
+    /// Encrypts a message under a caller-supplied conversation key.
     ///
-    /// A conversation key is the 32-byte NIP-44 key that the per-message keys are expanded from.
-    /// ``seal(_:for:using:)`` derives it by ECDH and HKDF from a key pair; here the caller supplies
-    /// it, e.g. a key shared among a group so that one ciphertext can be read by all of its
-    /// members. It must be uniformly random secret material, such as 32 bytes from a CSPRNG.
+    /// ``encrypt(_:for:using:)`` derives the conversation key from a key pair; here the caller
+    /// supplies it, e.g. a key from ``ConversationKey/random()`` shared among a group so that one
+    /// ciphertext can be read by all of its members.
     ///
     /// A fresh random nonce is generated for every call. The payload is standard NIP-44 v2, so any
-    /// implementation holding the same conversation key can open it.
+    /// implementation holding the same conversation key can decrypt it.
     ///
     /// NIP-44 authenticates the key, not a sender: anyone holding the conversation key can both
     /// read and forge messages under it.
     /// - Parameters:
-    ///   - message: The plaintext message to seal.
-    ///   - conversationKey: The 32-byte conversation key.
-    /// - Returns: A SealedMessage containing the encrypted payload.
-    /// - Throws: ``SealedMessage/Error/invalidPlaintextLength(_:)`` if `message` is not 1 to 65535
-    ///   bytes of UTF-8, or ``SealedMessage/Error/invalidConversationKey`` if `conversationKey` is
-    ///   not 32 bytes.
-    public static func seal(_ message: String, conversationKey: Data) throws(SealedMessage.Error) -> SealedMessage {
+    ///   - message: The plaintext message to encrypt.
+    ///   - conversationKey: The conversation key.
+    /// - Returns: The encrypted payload.
+    /// - Throws: ``NIP44Payload/Error/invalidPlaintextLength(_:)`` if `message` is not 1 to 65535
+    ///   bytes of UTF-8.
+    public static func encrypt(
+        _ message: String,
+        with conversationKey: ConversationKey
+    ) throws(NIP44Payload.Error) -> NIP44Payload {
         let nonce = SecureRandom.generateBytes(count: nonceByteCount)
-        let payload = try encrypt(plaintext: message, conversationKey: conversationKey, nonce: nonce)
-        return SealedMessage(payload: payload)
+        return try encrypt(message, with: conversationKey, nonce: nonce)
     }
 
-    /// Encrypts a plaintext under an already-derived conversation key.
+    /// Encrypts a message under a conversation key with a caller-supplied nonce.
     ///
-    /// Backs ``seal(_:conversationKey:)`` and ``seal(_:for:using:)``. Taking the nonce keeps it
-    /// testable against the official `encrypt_decrypt` vectors, which give the conversation key and
-    /// nonce directly; it stays internal so that callers cannot reuse a nonce. Splitting this out
-    /// mirrors the reference implementation's own `encrypt`/`get_conversation_key` split.
+    /// Backs both public `encrypt` forms. Taking the nonce keeps it testable against the official
+    /// `encrypt_decrypt` vectors, which give the conversation key and nonce directly; it stays
+    /// internal so that callers cannot reuse a nonce. Splitting this out mirrors the reference
+    /// implementation's own `encrypt`/`get_conversation_key` split.
     /// - Parameters:
-    ///   - plaintext: The plaintext message.
-    ///   - conversationKey: The 32-byte conversation key.
+    ///   - message: The plaintext message.
+    ///   - conversationKey: The conversation key.
     ///   - nonce: The 32-byte nonce.
-    /// - Returns: The base64-encoded `version || nonce || ciphertext || mac` payload.
+    /// - Returns: The `version || nonce || ciphertext || mac` payload.
+    /// - Throws: ``NIP44Payload/Error/invalidPlaintextLength(_:)`` if `message` is not 1 to 65535
+    ///   bytes of UTF-8, or ``NIP44Payload/Error/invalidNonce`` if `nonce` is not 32 bytes.
     static func encrypt(
-        plaintext: String, conversationKey: Data, nonce: Data
-    ) throws(SealedMessage.Error) -> String {
+        _ message: String,
+        with conversationKey: ConversationKey,
+        nonce: Data
+    ) throws(NIP44Payload.Error) -> NIP44Payload {
         // Measured rather than encoded first, so an out-of-range plaintext — the invalid vectors
         // reach 10 MB — is rejected without copying it or expanding the message keys.
-        let unpaddedLen = plaintext.utf8.count
+        let unpaddedLen = message.utf8.count
         guard unpaddedLen >= minimumPlaintextSize,
             unpaddedLen <= maximumPlaintextSize
         else {
             throw .invalidPlaintextLength(unpaddedLen)
         }
 
-        // HKDF accepts inputs of any length, so a wrong-length key or nonce would expand into a
-        // payload that is well-formed and undecryptable by anyone — a failure that surfaces only on
-        // the recipient's side, if at all.
-        guard conversationKey.count == conversationKeyByteCount else {
-            throw .invalidConversationKey
-        }
+        // HKDF accepts inputs of any length, so a wrong-length nonce would expand into a payload
+        // that is well-formed and undecryptable by anyone — a failure that surfaces only on the
+        // recipient's side, if at all. The key's length is guaranteed by ``ConversationKey``.
         guard nonce.count == nonceByteCount else {
             throw .invalidNonce
         }
 
-        let plaintextData = Data(plaintext.utf8)
+        let plaintextData = Data(message.utf8)
 
         // 1. Derive message keys from conversation key and nonce
         var (chachaKey, chachaNonce, hmacKey) = deriveMessageKeys(conversationKey: conversationKey, nonce: nonce)
@@ -164,62 +159,43 @@ public struct SealedMessage: Sendable {
         payloadData.append(ciphertext)
         payloadData.append(Data(mac))
 
-        return payloadData.base64EncodedString()
+        return NIP44Payload(base64: payloadData.base64EncodedString())
     }
 
-    /// Opens a sealed message from a sender
+    /// Decrypts a payload from a sender under the conversation key the two parties share.
     /// - Parameters:
-    ///   - senderPublicKey: The sender's public key
-    ///   - recipientKeyPair: The recipient's key pair
-    /// - Returns: The decrypted plaintext message
-    /// - Throws: ``SealedMessage/Error/invalidPublicKey`` if `senderPublicKey` is not a point on
-    ///   secp256k1, or what ``open(conversationKey:)`` throws for a payload that does not open.
-    public func open(
-        from senderPublicKey: PublicKey, using recipientKeyPair: KeyPair
-    ) throws(SealedMessage.Error) -> String {
-        let conversationKey = try Self.conversationKey(
+    ///   - senderPublicKey: The sender's public key.
+    ///   - recipientKeyPair: The recipient's key pair.
+    /// - Returns: The decrypted plaintext message.
+    /// - Throws: ``NIP44Payload/Error/invalidPublicKey`` if `senderPublicKey` is not a point on
+    ///   secp256k1, or what ``decrypt(with:)`` throws for a payload that does not decrypt.
+    public func decrypt(
+        from senderPublicKey: PublicKey,
+        using recipientKeyPair: KeyPair
+    ) throws(NIP44Payload.Error) -> String {
+        let conversationKey = try ConversationKey(
             privateKey: recipientKeyPair.privateKey,
-            publicKey: senderPublicKey.data
+            publicKey: senderPublicKey
         )
-
-        return try Self.decrypt(payload: payload, conversationKey: conversationKey)
+        return try decrypt(with: conversationKey)
     }
 
-    /// Opens a message sealed under a caller-supplied conversation key.
+    /// Decrypts a payload under a caller-supplied conversation key.
     ///
-    /// The counterpart of ``seal(_:conversationKey:)``. It opens any NIP-44 v2 payload encrypted
-    /// under `conversationKey`, including one sealed with ``seal(_:for:using:)`` when the caller
-    /// holds that pair's conversation key.
+    /// The counterpart of ``encrypt(_:with:)``. It decrypts any NIP-44 v2 payload encrypted under
+    /// `conversationKey`, including one from ``encrypt(_:for:using:)`` when the caller holds that
+    /// pair's conversation key.
     ///
-    /// A successful open shows only that the payload was sealed by someone holding the
+    /// A successful decryption shows only that the payload was encrypted by someone holding the
     /// conversation key, not who: anyone holding it can both read and forge messages under it.
-    /// - Parameter conversationKey: The 32-byte conversation key.
+    /// - Parameter conversationKey: The conversation key.
     /// - Returns: The decrypted plaintext message.
-    /// - Throws: ``SealedMessage/Error/invalidConversationKey`` if `conversationKey` is not 32
-    ///   bytes; ``SealedMessage/Error/malformedPayload`` if the payload is not valid base64, is out
-    ///   of range, or does not decrypt to UTF-8; ``SealedMessage/Error/unsupportedVersion(_:)`` if
-    ///   its version is not 2; ``SealedMessage/Error/invalidMAC`` if it was not sealed under this
-    ///   key or was altered; ``SealedMessage/Error/invalidPadding`` if its padding is not canonical.
-    public func open(conversationKey: Data) throws(SealedMessage.Error) -> String {
-        try Self.decrypt(payload: payload, conversationKey: conversationKey)
-    }
-
-    /// Decrypts a base64 payload under an already-derived conversation key.
-    ///
-    /// Backs ``open(conversationKey:)`` and ``open(from:using:)``, and lets tests drive the
-    /// official `encrypt_decrypt` and `invalid.decrypt` vectors, which give the conversation key
-    /// directly rather than a pair of keys. Splitting this out mirrors the reference
-    /// implementation's own `decrypt` / `get_conversation_key` split.
-    /// - Parameters:
-    ///   - payload: The base64-encoded `version || nonce || ciphertext || mac` payload.
-    ///   - conversationKey: The 32-byte conversation key.
-    /// - Returns: The decrypted plaintext message.
-    static func decrypt(payload: String, conversationKey: Data) throws(SealedMessage.Error) -> String {
-        guard conversationKey.count == conversationKeyByteCount else {
-            throw .invalidConversationKey
-        }
-
-        guard let payloadData = Data(base64Encoded: payload) else {
+    /// - Throws: ``NIP44Payload/Error/malformedPayload`` if the payload is not valid base64, is out
+    ///   of range, or does not decrypt to UTF-8; ``NIP44Payload/Error/unsupportedVersion(_:)`` if
+    ///   its version is not 2; ``NIP44Payload/Error/invalidMAC`` if it was not encrypted under this
+    ///   key or was altered; ``NIP44Payload/Error/invalidPadding`` if its padding is not canonical.
+    public func decrypt(with conversationKey: ConversationKey) throws(NIP44Payload.Error) -> String {
+        guard let payloadData = Data(base64Encoded: base64) else {
             throw .malformedPayload
         }
 
@@ -273,88 +249,21 @@ public struct SealedMessage: Sendable {
 
     // MARK: - Internal Methods
 
-    /// Derives the NIP-44 conversation key between `keyPair` and `publicKey` and returns it as hex.
-    ///
-    /// Internal and intended for tests that check the derivation against the official
-    /// `get_conversation_key` vectors.
-    /// - Parameters:
-    ///   - keyPair: The caller's key pair.
-    ///   - publicKey: The peer's x-only public key.
-    /// - Returns: The 32-byte conversation key as a hex string.
-    /// - Throws: ``SealedMessage/Error/invalidPublicKey`` if `publicKey` is not a point on
-    ///   secp256k1.
-    static func conversationKeyHex(keyPair: KeyPair, publicKey: PublicKey) throws(SealedMessage.Error) -> String {
-        try Self.conversationKey(privateKey: keyPair.privateKey, publicKey: publicKey.data).hexEncodedString()
-    }
-
-    /// Computes the conversation key using ECDH + HKDF.
-    /// - Parameters:
-    ///   - privateKey: The caller's private key.
-    ///   - publicKey: The peer's 32-byte x-only public key.
-    private static func conversationKey(privateKey: PrivateKey, publicKey: Data) throws(SealedMessage.Error) -> Data {
-        // Get the private key for ECDH (use KeyAgreement, not Signing). A PrivateKey only ever holds
-        // a valid scalar, so this cannot fail.
-        let agreementKey: P256K.KeyAgreement.PrivateKey
-        do {
-            agreementKey = try P256K.KeyAgreement.PrivateKey(dataRepresentation: privateKey.data)
-        } catch {
-            preconditionFailure("A PrivateKey holds a valid secp256k1 scalar: \(error)")
-        }
-
-        // Lift the x-only public key to a full point. Either parity yields the same shared x, so
-        // the even one (0x02) is tried first and the odd one (0x03) only if that fails.
-        let peerKey: P256K.KeyAgreement.PublicKey
-        if let evenKey = try? P256K.KeyAgreement.PublicKey(
-            dataRepresentation: Data([0x02]) + publicKey, format: .compressed)
-        {
-            peerKey = evenKey
-        } else if let oddKey = try? P256K.KeyAgreement.PublicKey(
-            dataRepresentation: Data([0x03]) + publicKey, format: .compressed)
-        {
-            peerKey = oddKey
-        } else {
-            throw .invalidPublicKey
-        }
-
-        // Compute ECDH shared point
-        // The sharedSecret in compressed format is: version (1 byte) + x-coordinate (32 bytes)
-        // NIP-44 needs only the x-coordinate, so skip the version byte
-        let sharedSecret = agreementKey.sharedSecretFromKeyAgreement(with: peerKey, format: .compressed)
-        var sharedX = sharedSecret.withUnsafeBytes { bytes in
-            Data(bytes.dropFirst())
-        }
-        // The conversation key is derived from this; nothing needs the shared point afterwards.
-        defer { sharedX.secureScrub() }
-
-        // Derive conversation key using HKDF
-        let salt = Data("nip44-v2".utf8)
-        let conversationKey = hkdfExtract(salt: salt, ikm: sharedX)
-
-        return conversationKey
-    }
-
     /// Derives message keys from conversation key and nonce using HKDF-Expand.
     ///
     /// Internal rather than private so tests can check the derivation against the official
     /// `get_message_keys` vectors, which pin all three outputs for a fixed conversation key.
     static func deriveMessageKeys(
-        conversationKey: Data, nonce: Data
+        conversationKey: ConversationKey, nonce: Data
     ) -> (chachaKey: Data, chachaNonce: Data, hmacKey: Data) {
         let info = nonce
-        let expanded = hkdfExpand(prk: conversationKey, info: info, length: 76)
+        let expanded = hkdfExpand(prk: conversationKey.data, info: info, length: 76)
 
         let chachaKey = expanded[0..<32]
         let chachaNonce = expanded[32..<44]
         let hmacKey = expanded[44..<76]
 
         return (Data(chachaKey), Data(chachaNonce), Data(hmacKey))
-    }
-
-    /// HKDF-Extract
-    private static func hkdfExtract(salt: Data, ikm: Data) -> Data {
-        let key = SymmetricKey(data: salt)
-        let prk = HMAC<Crypto.SHA256>.authenticationCode(for: ikm, using: key)
-        return Data(prk)
     }
 
     /// HKDF-Expand
@@ -386,12 +295,12 @@ public struct SealedMessage: Sendable {
     ///
     /// NIP-44 uses bare ChaCha20 with the block counter starting at 0 (RFC 8439 §2.4), not the
     /// AEAD construction, whose message keystream starts at counter 1. Because ChaCha20 is a
-    /// stream cipher the same XOR both encrypts and decrypts, so `seal` and `open` share this.
+    /// stream cipher the same XOR both encrypts and decrypts, so encryption and decryption share this.
     private static func chacha20(_ data: Data, key: Data, nonce: Data) -> Data {
         ChaCha20.xor(data, key: key, nonce: nonce)
     }
 
-    /// Pads plaintext according to NIP-44 spec. ``encrypt(plaintext:conversationKey:nonce:)``
+    /// Pads plaintext according to NIP-44 spec. ``encrypt(_:with:nonce:)``
     /// rejects an out-of-range plaintext before calling this.
     private static func pad(_ plaintext: Data) -> Data {
         let unpaddedLen = plaintext.count
@@ -420,7 +329,7 @@ public struct SealedMessage: Sendable {
     /// into a longer or shorter block still produces a valid MAC over it, so accepting
     /// non-canonical padding would make the ciphertext malleable. The official `invalid padding`
     /// vectors are exactly that: correct MACs over blocks no compliant encryptor emits.
-    private static func unpad(_ padded: Data) throws(SealedMessage.Error) -> Data {
+    private static func unpad(_ padded: Data) throws(NIP44Payload.Error) -> Data {
         guard padded.count >= 2 else {
             throw .invalidPadding
         }
@@ -474,10 +383,10 @@ public struct SealedMessage: Sendable {
     }
 }
 
-extension SealedMessage {
-    /// Why a NIP-44 message could not be sealed or opened.
+extension NIP44Payload {
+    /// Why a NIP-44 payload could not be encrypted or decrypted.
     public enum Error: Swift.Error, LocalizedError, Sendable, Equatable {
-        /// The conversation key is not 32 bytes.
+        /// The bytes given to ``ConversationKey/init(data:)`` are not 32 long.
         case invalidConversationKey
         /// The plaintext is not 1 to 65535 bytes of UTF-8 (payload: its byte count).
         case invalidPlaintextLength(Int)
@@ -490,7 +399,7 @@ extension SealedMessage {
         case malformedPayload
         /// The payload declares a version other than 2 (payload: the version byte).
         case unsupportedVersion(UInt8)
-        /// The MAC does not match: the payload was not sealed under this conversation key, or it
+        /// The MAC does not match: the payload was not encrypted under this conversation key, or it
         /// was altered.
         case invalidMAC
         /// The decrypted padding is not the canonical NIP-44 layout.

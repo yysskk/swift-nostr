@@ -19,7 +19,7 @@ The high-level `NostrClient` library provides an actor-based API for the Nostr n
 - `EncryptedFile` / `FileAttachment`: AES-256-GCM encryption for NIP-17 file messages, and the attachment a file message sends and receives (`client.messages.sendFile(_:to:)`)
 - `Groups` / `GroupReference` / `GroupState`: NIP-29 relay-based groups — join/leave and chat with timeline references (events built by the `EventTemplate.group*` factories), moderation (kinds 9000-9002, 9005, 9007-9010), relay-signed state parsing (metadata/admins/members/roles/pins), naddr share links with invite codes
 - `SimpleGroupList` / `GroupListEntry`: the NIP-51 kind-10009 list of the NIP-29 groups a user is in (public + NIP-44-encrypted private entries)
-- `SealedMessage` / `GiftWrap`: NIP-44 encryption and NIP-59 gift wrap
+- `NIP44Payload` / `ConversationKey` / `GiftWrap`: NIP-44 encryption (key-pair or shared conversation key) and NIP-59 gift wrap
 - `LNURL` / `LNURLPayResponse`: NIP-57 zap LNURL-pay resolution and invoice-request URLs
 - `Mnemonic` / `KeyDerivation`: BIP-39 seed phrase and BIP-32 key derivation (NIP-06)
 

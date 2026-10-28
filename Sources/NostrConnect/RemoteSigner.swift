@@ -339,12 +339,12 @@ public actor RemoteSigner {
         let signerPublicKey = try requireSignerPublicKey()
         do {
             let json = String(decoding: try JSONEncoder().encode(request), as: UTF8.self)
-            let sealed = try SealedMessage.seal(json, for: signerPublicKey, using: clientKeyPair)
+            let encrypted = try NIP44Payload.encrypt(json, for: signerPublicKey, using: clientKeyPair)
             let unsigned = UnsignedEvent(
                 publicKey: clientKeyPair.publicKey,
                 kind: .nostrConnect,
                 tags: [.publicKey(signerPublicKey)],
-                content: sealed.payload)
+                content: encrypted.base64)
             return try signer.sign(unsigned)
         } catch {
             throw .requestEncodingFailed
@@ -366,8 +366,9 @@ public actor RemoteSigner {
         // ignore anything that is not from the signer.
         guard event.publicKey == signerPublicKey else { return }
 
+        let payload = NIP44Payload(base64: event.content)
         guard
-            let content = try? SealedMessage(payload: event.content).open(from: event.publicKey, using: clientKeyPair),
+            let content = try? payload.decrypt(from: event.publicKey, using: clientKeyPair),
             let response = try? JSONDecoder().decode(RemoteSignerResponse.self, from: Data(content.utf8))
         else {
             return
@@ -478,8 +479,9 @@ public actor RemoteSigner {
     private func handleConnectionCandidate(_ event: Event) {
         guard let expectedInvitationSecret else { return }
 
+        let payload = NIP44Payload(base64: event.content)
         guard
-            let content = try? SealedMessage(payload: event.content).open(from: event.publicKey, using: clientKeyPair),
+            let content = try? payload.decrypt(from: event.publicKey, using: clientKeyPair),
             let response = try? JSONDecoder().decode(RemoteSignerResponse.self, from: Data(content.utf8)),
             response.result.map({ Self.constantTimeEquals($0, expectedInvitationSecret) }) == true
         else {

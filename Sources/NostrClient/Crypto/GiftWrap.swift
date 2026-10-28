@@ -108,7 +108,7 @@ public struct GiftWrap: Sendable {
     ///   unsigned, ``GiftWrap/Error/invalidRumorID`` if the rumor's id is not the hash of its
     ///   contents, ``GiftWrap/Error/authorMismatch`` if the rumor claims a different author than
     ///   the seal, a `DecodingError` if a layer is not an event, or what `recipient` throws when a
-    ///   NIP-44 layer does not open (``SealedMessage/Error`` for a local signer).
+    ///   NIP-44 layer does not decrypt (``NIP44Payload/Error`` for a local signer).
     public static func unwrap(
         giftWrap: Event,
         recipient: any NostrSigning

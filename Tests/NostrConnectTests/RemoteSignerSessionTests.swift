@@ -170,11 +170,11 @@ struct RemoteSignerSessionTests {
         // A response encrypted by a different keypair, authored by an impostor, must be dropped.
         let impostor = KeyPair()
         let json = "{\"id\":\"\(request.id)\",\"result\":\"pong\"}"
-        let sealed = try SealedMessage.seal(json, for: client.publicKey, using: impostor)
+        let encrypted = try NIP44Payload.encrypt(json, for: client.publicKey, using: impostor)
         let forged = Event(
             id: .fixture("forged"), publicKey: impostor.publicKey, createdAt: Timestamp(rawValue: 0),
             kind: .nostrConnect,
-            tags: [.publicKey(client.publicKey)], content: sealed.payload, signature: nil)
+            tags: [.publicKey(client.publicKey)], content: encrypted.base64, signature: nil)
         await transport.deliver(forged)
 
         await #expect(throws: RemoteSignerError.timedOut) { try await ping.value }
