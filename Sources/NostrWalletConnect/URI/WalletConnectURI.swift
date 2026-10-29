@@ -103,25 +103,18 @@ public struct WalletConnectURI: Sendable, Hashable {
         try self.init(walletPublicKey: walletPublicKey, relays: relays, secret: secret, lud16: lud16)
     }
 
-    /// The connection string, with each relay percent-encoded as a `relay` query parameter.
+    /// The connection string, with every query value percent-encoded.
+    ///
+    /// The reserved characters `:`, `/`, `?`, `#`, `&`, `=`, `+`, `,` and space are escaped inside
+    /// values, so a relay is written as `relay=wss%3A%2F%2Frelay.example`, as in the NIP-47 example
+    /// and the NIP-46 connection URIs. ``init(string:)`` decodes them.
     public var stringValue: String {
-        var components = URLComponents()
-        components.scheme = Self.scheme
-        components.host = walletPublicKey.hex
-
         var items = relays.map { URLQueryItem(name: "relay", value: $0.description) }
         items.append(URLQueryItem(name: "secret", value: secret.hex))
         if let lud16 {
             items.append(URLQueryItem(name: "lud16", value: lud16))
         }
-        components.queryItems = items
-
-        // Unreachable for a validated URI (constant scheme, hex host, URL relays); fail loud rather
-        // than emit a silently broken connection string if that invariant is ever violated.
-        guard let string = components.string else {
-            fatalError("URLComponents failed to serialize a validated NWC URI")
-        }
-        return string
+        return "\(Self.scheme)://\(walletPublicKey.hex)?\(URIQuery.encode(items))"
     }
 
     /// The client identity derived from ``secret`` — used to sign requests and encrypt payloads.

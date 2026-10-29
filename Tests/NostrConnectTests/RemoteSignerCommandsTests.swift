@@ -116,6 +116,41 @@ struct RemoteSignerCommandsTests {
         #expect(event.publicKey == signer.publicKey)
     }
 
+    @Test("sign sends the event as {kind, content, tags, created_at} without pubkey")
+    func signRequestParams() async throws {
+        let (remote, transport) = try await connected()
+        let tags: [Event.Tag] = [
+            Event.Tag(rawArray: ["r", #"https://example.com/?q="x"&y=1"#]),
+            Event.Tag(rawArray: ["t", #"back\slash"#]),
+        ]
+        let unsigned = UnsignedEvent(
+            publicKey: signer.publicKey, createdAt: Timestamp(rawValue: 1000), kind: .textNote,
+            tags: tags, content: "see https://example.com/a — ünïcödé 🎉")
+
+        async let signed = remote.sign(unsigned)
+        let request = try await nextRequest(transport)
+
+        let expected =
+            #"{"content":"see https://example.com/a — ünïcödé 🎉","created_at":1000,"kind":1,"#
+            + #""tags":[["r","https://example.com/?q=\"x\"&y=1"],["t","back\\slash"]]}"#
+        #expect(request.params == [expected])
+
+        let param = try #require(request.params.first)
+        let decoded = try #require(try JSONSerialization.jsonObject(with: Data(param.utf8)) as? [String: Any])
+        #expect(Set(decoded.keys) == ["kind", "content", "tags", "created_at"])
+        #expect(decoded["kind"] as? Int == 1)
+        #expect(decoded["created_at"] as? Int == 1000)
+        #expect(decoded["content"] as? String == unsigned.content)
+        #expect(decoded["tags"] as? [[String]] == tags.map(\.rawArray))
+
+        let toSign = try RemoteSignerFixtures.unsignedEvent(from: request, author: signer.publicKey)
+        let json = try RemoteSignerFixtures.signedEventJSON(toSign, signer: signer)
+        let response = try RemoteSignerFixtures.response(
+            requestID: request.id, result: json, client: client, signer: signer)
+        await transport.deliver(response)
+        #expect(try await signed.content == unsigned.content)
+    }
+
     @Test("sign rejects a tampered event whose content was altered after signing")
     func signRejectsTampered() async throws {
         let (remote, transport) = try await connected()

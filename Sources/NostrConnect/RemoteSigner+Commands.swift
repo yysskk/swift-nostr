@@ -128,19 +128,33 @@ extension RemoteSigner {
     }
 
     /// JSON-stringifies an unsigned event as `{kind, content, tags, created_at}` for `sign_event`.
+    ///
+    /// NIP-46 leaves `pubkey` out: the signer signs under the user's key, and ``sign(_:)-(UnsignedEvent)``
+    /// checks the returned event against `event.publicKey`.
     private func encodeUnsignedEvent(_ event: UnsignedEvent) throws(RemoteSignerError) -> String {
-        let object: [String: Any] = [
-            "kind": event.kind.rawValue,
-            "content": event.content,
-            "tags": event.tags.map(\.rawArray),
-            "created_at": event.createdAt.rawValue,
-        ]
-        guard
-            let data = try? JSONSerialization.data(
-                withJSONObject: object, options: [.sortedKeys, .withoutEscapingSlashes])
-        else {
+        let params = SignEventParams(
+            kind: event.kind.rawValue,
+            content: event.content,
+            tags: event.tags.map(\.rawArray),
+            createdAt: event.createdAt.rawValue)
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+        guard let data = try? encoder.encode(params) else {
             throw RemoteSignerError.requestEncodingFailed
         }
         return String(decoding: data, as: UTF8.self)
+    }
+}
+
+/// The event a `sign_event` request carries as its single parameter.
+private struct SignEventParams: Encodable {
+    let kind: Int
+    let content: String
+    let tags: [[String]]
+    let createdAt: Int64
+
+    private enum CodingKeys: String, CodingKey {
+        case kind, content, tags
+        case createdAt = "created_at"
     }
 }

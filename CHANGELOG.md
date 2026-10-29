@@ -187,6 +187,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the send timeout fails the connection. Subscribing, unsubscribing, publishing, counting, and
   authenticating all send this way, so the 0.9.0 workaround that let a timed-out fetch finish its
   `CLOSE` frames is no longer needed and is removed.
+- **`WalletConnectURI.stringValue` percent-encodes its query values and can no longer crash**: it was
+  built with `URLComponents`, which leaves `:` and `/` unescaped inside values, and trapped with
+  `fatalError` if serialization ever failed. It now encodes the query the same way as `BunkerURI` and
+  `NostrConnectURI`, so the generated string changes from `relay=wss://relay.example` to
+  `relay=wss%3A%2F%2Frelay.example`, as in the NIP-47 example; `?`, `#`, `&`, `=`, `+`, `,`, and space
+  inside a relay, secret, or `lud16` value are escaped as well. `WalletConnectURI(string:)` and other
+  NIP-47 parsers decode either form, so existing strings still parse.
 
 ## [0.9.0] - 2026-10-27
 

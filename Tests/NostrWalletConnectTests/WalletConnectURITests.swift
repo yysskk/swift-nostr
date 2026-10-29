@@ -131,9 +131,46 @@ struct WalletConnectURITests {
             string: "nostr+walletconnect://\(walletKeyHex)?relay=WSS%3A%2F%2FRelay.Damus.io%2F&secret=\(secretHex)")
 
         #expect(uri.relays == [RelayURL("wss://relay.damus.io")!])
-        #expect(
-            uri.stringValue == "nostr+walletconnect://\(walletKeyHex)?relay=wss://relay.damus.io&secret=\(secretHex)"
-        )
+        #expect(uri.stringValue == canonical)
+    }
+
+    @Test("serializes every query value percent-encoded, as the NIP-47 example does")
+    func percentEncodesQueryValues() throws {
+        let damus = try #require(RelayURL("wss://relay.damus.io"))
+        let withPath = try #require(RelayURL("wss://relay.example/nwc"))
+        let uri = try WalletConnectURI(
+            walletPublicKey: try PublicKey(hex: walletKeyHex),
+            relays: [damus, withPath],
+            secret: try PrivateKey(hex: secretHex),
+            lud16: "alice@example.com")
+
+        let expected =
+            "nostr+walletconnect://\(walletKeyHex)"
+            + "?relay=wss%3A%2F%2Frelay.damus.io&relay=wss%3A%2F%2Frelay.example%2Fnwc"
+            + "&secret=\(secretHex)&lud16=alice@example.com"
+        #expect(uri.stringValue == expected)
+    }
+
+    @Test(
+        "round-trips relays and lightning addresses with reserved characters",
+        arguments: [
+            (["wss://relay.one.example", "wss://relay.two.example", "ws://relay.three.example:7777"], nil),
+            (["wss://relay.example.com/path?x=1"], "alice@example.com"),
+            (["wss://relay.example.com/a%20b?k=v&w=x+y"], "a+b=c&d#e/f?g h@example.com"),
+            (["wss://relay.example"], "ünïcödé@例え.jp"),
+        ] as [([String], String?)])
+    func roundTripsReservedCharacters(relays: [String], lud16: String?) throws {
+        let relayURLs = try relays.map { try #require(RelayURL($0)) }
+        let uri = try WalletConnectURI(
+            walletPublicKey: try PublicKey(hex: walletKeyHex),
+            relays: relayURLs,
+            secret: try PrivateKey(hex: secretHex),
+            lud16: lud16)
+
+        let reparsed = try WalletConnectURI(string: uri.stringValue)
+        #expect(reparsed == uri)
+        #expect(reparsed.relays == relayURLs)
+        #expect(reparsed.lud16 == lud16)
     }
 
     @Test("rejects a malformed secret")
