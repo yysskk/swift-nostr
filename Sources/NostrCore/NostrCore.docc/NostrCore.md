@@ -41,6 +41,7 @@ try event.verify()
 - ``PrivateKey``
 - ``PublicKey``
 - ``Mnemonic``
+- ``Mnemonic/WordCount``
 - ``BIP39WordList``
 
 ### Signing and Encryption

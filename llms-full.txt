@@ -843,12 +843,12 @@ let fromMnemonic = try KeyPair(                       // from BIP-39 (NIP-06)
     passphrase: "",
     account: 0
 )
-let (mnemonic, kp) = try KeyPair.generate(wordCount: 12)  // random mnemonic
+let (mnemonic, kp) = try KeyPair.generate(wordCount: .twelve)  // random mnemonic
 ```
 
 The nsec and mnemonic initializers and `generate` throw `KeyPair.Error`: `invalidHex` (not 64
 hex digits), `invalidLength(Int)` (not 32 bytes), `invalidBech32(Bech32Error)` or `unexpectedPrefix(String)`
-for an nsec, `invalidMnemonic(Mnemonic.Error)` for a bad phrase or word count, and `invalidPrivateKey` for
+for an nsec, `invalidMnemonic(Mnemonic.Error)` for a bad phrase, and `invalidPrivateKey` for
 bytes that are not a valid secp256k1 scalar.
 
 ## PrivateKey
@@ -1086,12 +1086,13 @@ BIP-39 mnemonic seed phrase for NIP-06 key derivation (struct: Sendable).
 
 - `words: [String]`
 - `phrase: String` -- space-separated
-- `wordCount: Int`
+- `wordCount: Mnemonic.WordCount` -- `.twelve`, `.fifteen`, `.eighteen`, `.twentyOne`, or `.twentyFour`
+  (128 to 256 bits of entropy); `rawValue` is the number of words
 
 ### Usage
 
 ```swift
-let mnemonic = try Mnemonic.generate(wordCount: 12)  // 12, 15, 18, 21, or 24
+let mnemonic = Mnemonic.generate(wordCount: .twelve)  // does not throw
 let mnemonic = try Mnemonic(phrase: "word1 word2 ...")
 let mnemonic = try Mnemonic(entropy: entropy)       // 16-32 bytes of BIP-39 entropy
 let seed = mnemonic.seed(passphrase: "optional")  // 64-byte seed
@@ -1101,8 +1102,8 @@ let keyPair = try KeyPair(mnemonic: mnemonic, passphrase: "optional", account: 0
 `KeyPair(mnemonic:passphrase:account:)` and `KeyPair(mnemonicPhrase:passphrase:account:)` derive the key with
 BIP-32 along the NIP-06 path m/44'/1237'/<account>'/0/0; read `keyPair.privateKey` for the `PrivateKey`.
 
-Failures throw `Mnemonic.Error`: `invalidWordCount(Int)`, `unknownWord(String)`, `invalidChecksum`,
-`invalidEntropyLength(Int)`.
+The phrase, words, and entropy initializers throw `Mnemonic.Error`: `invalidWordCount(Int)`, `unknownWord(String)`,
+`invalidChecksum`, `invalidEntropyLength(Int)`.
 
 ## NIP44Payload
 

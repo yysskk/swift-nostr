@@ -223,7 +223,7 @@ let unwrapped = try await GiftWrap.unwrap(
 
 ```swift
 // Generate a new mnemonic and keypair
-let (mnemonic, keyPair) = try KeyPair.generate(wordCount: 24)
+let (mnemonic, keyPair) = try KeyPair.generate(wordCount: .twentyFour)
 print("Mnemonic: \(mnemonic.phrase)")
 
 // Restore from mnemonic phrase
@@ -234,7 +234,7 @@ let restored = try KeyPair(
 )
 
 // Work with Mnemonic directly
-let mnemonic = try Mnemonic.generate(wordCount: 12)
+let mnemonic = Mnemonic.generate(wordCount: .twelve)
 let account1 = try KeyPair(mnemonic: mnemonic, passphrase: "optional passphrase", account: 1)
 let privateKey = account1.privateKey
 ```

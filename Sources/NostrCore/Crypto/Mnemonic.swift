@@ -12,9 +12,7 @@ public struct Mnemonic: Sendable {
     }
 
     /// Number of words in the mnemonic
-    public var wordCount: Int {
-        words.count
-    }
+    public let wordCount: WordCount
 
     // MARK: - Initialization
 
@@ -30,7 +28,7 @@ public struct Mnemonic: Sendable {
     ///   words, ``Mnemonic/Error/unknownWord(_:)`` for the first word not in the BIP-39 English
     ///   word list, or ``Mnemonic/Error/invalidChecksum`` if the checksum does not match.
     public init(words: [String]) throws(Mnemonic.Error) {
-        guard [12, 15, 18, 21, 24].contains(words.count) else {
+        guard let wordCount = WordCount(rawValue: words.count) else {
             throw .invalidWordCount(words.count)
         }
 
@@ -46,36 +44,32 @@ public struct Mnemonic: Sendable {
             throw .invalidChecksum
         }
 
-        self.words = words
+        self.init(validatedWords: words, wordCount: wordCount)
     }
 
     /// Generates a new random mnemonic with the specified word count
-    /// - Throws: ``Mnemonic/Error/invalidWordCount(_:)`` unless `wordCount` is 12, 15, 18, 21, or 24.
-    public static func generate(wordCount: Int = 12) throws(Mnemonic.Error) -> Mnemonic {
-        guard [12, 15, 18, 21, 24].contains(wordCount) else {
-            throw .invalidWordCount(wordCount)
-        }
-
-        // Calculate entropy bytes needed
-        // 12 words = 128 bits = 16 bytes
-        // 15 words = 160 bits = 20 bytes
-        // 18 words = 192 bits = 24 bytes
-        // 21 words = 224 bits = 28 bytes
-        // 24 words = 256 bits = 32 bytes
-        let entropyBytes = wordCount * 4 / 3
-
-        let entropy = SecureRandom.generateBytes(count: entropyBytes)
-
-        return try Mnemonic(entropy: entropy)
+    public static func generate(wordCount: WordCount = .twelve) -> Mnemonic {
+        let entropy = SecureRandom.generateBytes(count: wordCount.entropyByteCount)
+        return Mnemonic(validatedEntropy: entropy, wordCount: wordCount)
     }
 
     /// Creates a mnemonic from BIP-39 entropy: 16, 20, 24, 28 or 32 bytes for 12 to 24 words.
     /// - Throws: ``Mnemonic/Error/invalidEntropyLength(_:)`` for any other byte count.
     public init(entropy: Data) throws(Mnemonic.Error) {
-        guard [16, 20, 24, 28, 32].contains(entropy.count) else {
+        guard let wordCount = WordCount.allCases.first(where: { $0.entropyByteCount == entropy.count }) else {
             throw .invalidEntropyLength(entropy.count)
         }
+        self.init(validatedEntropy: entropy, wordCount: wordCount)
+    }
 
+    /// Creates a mnemonic from words already known to form a valid phrase of `wordCount` words.
+    private init(validatedWords words: [String], wordCount: WordCount) {
+        self.words = words
+        self.wordCount = wordCount
+    }
+
+    /// Encodes entropy whose length is `wordCount.entropyByteCount` bytes, appending its checksum.
+    private init(validatedEntropy entropy: Data, wordCount: WordCount) {
         // Calculate checksum
         let hash = Data(SHA256.hash(data: entropy))
         let checksumBits = entropy.count / 4
@@ -94,10 +88,10 @@ public struct Mnemonic: Sendable {
         }
 
         // Convert bits to word indices (11 bits per word)
-        let wordCount = bits.count / 11
         var words: [String] = []
+        words.reserveCapacity(wordCount.rawValue)
 
-        for i in 0..<wordCount {
+        for i in 0..<wordCount.rawValue {
             var index = 0
             for j in 0..<11 {
                 index = (index << 1) | Int(bits[i * 11 + j])
@@ -105,7 +99,7 @@ public struct Mnemonic: Sendable {
             words.append(BIP39WordList.english[index])
         }
 
-        try self.init(words: words)
+        self.init(validatedWords: words, wordCount: wordCount)
     }
 
     // MARK: - Seed Derivation
@@ -211,6 +205,27 @@ public struct Mnemonic: Sendable {
         }
 
         return Data(derivedKey.prefix(keyLength))
+    }
+}
+
+extension Mnemonic {
+    /// The number of words in a BIP-39 mnemonic, which fixes how much entropy it encodes.
+    public enum WordCount: Int, Sendable, Hashable, CaseIterable {
+        /// 12 words, encoding 128 bits of entropy.
+        case twelve = 12
+        /// 15 words, encoding 160 bits of entropy.
+        case fifteen = 15
+        /// 18 words, encoding 192 bits of entropy.
+        case eighteen = 18
+        /// 21 words, encoding 224 bits of entropy.
+        case twentyOne = 21
+        /// 24 words, encoding 256 bits of entropy.
+        case twentyFour = 24
+
+        /// Bytes of entropy the mnemonic encodes: 16, 20, 24, 28, or 32.
+        var entropyByteCount: Int {
+            rawValue * 4 / 3
+        }
     }
 }
 

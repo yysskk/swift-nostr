@@ -70,21 +70,14 @@ public struct KeyPair: Sendable {
 
     /// Generates a new keypair with a random mnemonic (NIP-06)
     /// - Parameters:
-    ///   - wordCount: Number of words in the mnemonic (12, 15, 18, 21, or 24)
+    ///   - wordCount: Number of words in the mnemonic
     ///   - passphrase: Optional passphrase for additional security
     /// - Returns: A tuple containing the generated mnemonic and keypair
-    /// - Throws: ``KeyPair/Error/invalidMnemonic(_:)`` wrapping ``Mnemonic/Error/invalidWordCount(_:)``
-    ///   for an unsupported `wordCount`, or ``KeyPair/Error/invalidPrivateKey`` if derivation
-    ///   produces an invalid scalar.
+    /// - Throws: ``KeyPair/Error/invalidPrivateKey`` if derivation produces an invalid scalar.
     public static func generate(
-        wordCount: Int = 12, passphrase: String = ""
+        wordCount: Mnemonic.WordCount = .twelve, passphrase: String = ""
     ) throws(KeyPair.Error) -> (mnemonic: Mnemonic, keyPair: KeyPair) {
-        let mnemonic: Mnemonic
-        do throws(Mnemonic.Error) {
-            mnemonic = try Mnemonic.generate(wordCount: wordCount)
-        } catch {
-            throw .invalidMnemonic(error)
-        }
+        let mnemonic = Mnemonic.generate(wordCount: wordCount)
         let keyPair = try KeyPair(mnemonic: mnemonic, passphrase: passphrase)
         return (mnemonic, keyPair)
     }
