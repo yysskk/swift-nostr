@@ -308,6 +308,23 @@ struct RelayConnectionTests {
         #expect(await connection.state == .disconnected)
     }
 
+    @Test("a connect whose verifying ping fails reports the connect operation")
+    func failedConnectReportsConnectOperation() async throws {
+        let connection = RelayConnection(
+            url: RelayURL("wss://relay.example.com")!,
+            config: RelayConnectionConfig(connectionTimeout: .seconds(1), pingInterval: .seconds(60), reconnect: nil),
+            webSocketFactory: MockWebSocketSessionFactory(makeSession: {
+                MockWebSocketSession(pingError: URLError(.cannotConnectToHost))
+            })
+        )
+
+        await #expect(throws: RelayConnection.Error.connectionFailed) { try await connection.connect() }
+
+        let failure = RelayConnectionState.Failure(
+            operation: .connect, reason: URLError(.cannotConnectToHost).localizedDescription)
+        #expect(await connection.state == .failed(failure))
+    }
+
     @Test("unsubscribe after a drop forgets the subscription without reconnecting")
     func unsubscribeAfterDropForgetsSubscriptionWithoutReconnecting() async throws {
         let socketCount = SocketCount()
@@ -319,6 +336,9 @@ struct RelayConnectionTests {
             if case .failed = await connection.state { return true }
             return false
         }
+        #expect(
+            await connection.state
+                == .failed(.init(operation: .receive, reason: URLError(.networkConnectionLost).localizedDescription)))
         #expect(await connection.hasSubscription(Self.subscriptionID))
 
         await connection.unsubscribe(id: Self.subscriptionID)
@@ -376,10 +396,12 @@ struct RelayConnectionTests {
         await #expect(throws: RelayConnection.Error.notConnected) { try await subscribing.value }
 
         #expect(await !connection.hasSubscription(Self.subscriptionID))
-        guard case .failed = await connection.state else {
+        guard case .failed(let failure) = await connection.state else {
             Issue.record("a socket send error should fail the connection")
             return
         }
+        #expect(failure.operation == .send)
+        #expect(failure.reason == URLError(.networkConnectionLost).localizedDescription)
         #expect(socket.mock.didClose)
         await connection.disconnect()
     }
@@ -393,10 +415,11 @@ struct RelayConnectionTests {
             try await connection.subscribe(id: Self.subscriptionID, filters: [Filter(kinds: [.textNote])])
         }
 
-        guard case .failed = await connection.state else {
+        guard case .failed(let failure) = await connection.state else {
             Issue.record("a timed-out send should fail the connection")
             return
         }
+        #expect(failure == .init(operation: .send, reason: RelayConnection.Error.timedOut.localizedDescription))
         #expect(socket.mock.didClose)
         #expect(await !connection.hasSubscription(Self.subscriptionID))
         await connection.disconnect()

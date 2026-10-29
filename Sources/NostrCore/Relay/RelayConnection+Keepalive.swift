@@ -66,7 +66,7 @@ extension RelayConnection {
 
     /// Tears the connection down after a failed keepalive ping and schedules a reconnect.
     private func handleKeepaliveFailure(_ error: any Swift.Error) {
-        updateState(.failed(error.localizedDescription))
+        updateState(.failed(RelayConnectionState.Failure(.keepalive, error: error)))
         // Cancel the socket so the receive loop's pending receive() exits promptly.
         discardSocket()
         scheduleReconnectIfNeeded()

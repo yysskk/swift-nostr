@@ -83,7 +83,7 @@ extension RelayConnection {
                     keepaliveTask?.cancel()
                     keepaliveTask = nil
                     if state == .connected {
-                        updateState(.failed(error.localizedDescription))
+                        updateState(.failed(RelayConnectionState.Failure(.receive, error: error)))
                         scheduleReconnectIfNeeded()
                     }
                     break

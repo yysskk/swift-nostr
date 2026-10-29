@@ -1844,7 +1844,16 @@ the connection itself detects is `RelayConnection.Error` (`connect()` and `recon
 
 Connection state (enum: Sendable, Hashable).
 
-Cases: `.disconnected`, `.connecting`, `.connected`, `.disconnecting`, `.failed(String)`.
+Cases: `.disconnected`, `.connecting`, `.connected`, `.disconnecting`, `.failed(RelayConnectionState.Failure)`.
+
+`Failure` (struct: Error, LocalizedError, Sendable, Hashable) has `operation` (`.connect`,
+`.keepalive`, `.send`, `.receive`) and `reason` (the underlying error's description):
+
+```swift
+if case .failed(let failure) = await connection.state, failure.operation == .keepalive {
+    print(failure.localizedDescription)   // "The relay stopped answering keepalive pings: ..."
+}
+```
 
 ## RelayTransport
 
