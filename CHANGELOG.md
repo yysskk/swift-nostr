@@ -45,6 +45,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`WebSocketSession` is a plain async API** (breaking for custom transports). `resume()` is now
+  `open()`, `cancel(with:reason:)` is now `close(code:reason:)` with a `String?` UTF-8 reason
+  instead of `Data?`, and `sendPing(pongReceiveHandler:)` is now `ping() async throws`, which
+  returns when the pong arrives and throws when the ping fails. Implement `ping()` over a
+  callback-based socket with `withCheckedThrowingContinuation`, resuming it once from the pong
+  callback; it needs no timeout or cancellation handling, because the connection bounds every
+  ping with `connectionTimeout` and stops waiting even if `ping()` never returns.
 - **One initializer per relay layer, with the socket source as a defaulted trailing parameter**
   (breaking). `webSocketFactory:` now follows `config:` everywhere and defaults to
   `URLSessionWebSocketFactory()` (over `URLSession.shared`); a custom session is

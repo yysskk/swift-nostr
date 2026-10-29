@@ -62,7 +62,7 @@ struct RelayConnectionSocketGenerationTests {
 
         let state = await connection.state
         #expect(state == .connected)
-        #expect(sockets.second.didResume)
+        #expect(sockets.second.didOpen)
 
         await connection.disconnect()
     }
@@ -75,11 +75,11 @@ struct RelayConnectionSocketGenerationTests {
         let connection = makeConnection(sockets: { sockets.next() })
 
         try await connection.connect()
-        #expect(!sockets.first.didCancel)
+        #expect(!sockets.first.didClose)
 
         // Dropping the transport fails the receive loop, which tears the session down.
         await connection.disconnect()
-        #expect(sockets.first.didCancel)
+        #expect(sockets.first.didClose)
     }
 
     /// After teardown nothing should still be running against the old socket, so a frame arriving

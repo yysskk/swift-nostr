@@ -4,50 +4,34 @@ import Foundation
 extension RelayConnection {
     /// Sends a WebSocket ping and waits for the pong, bounded by `timeout`.
     ///
-    /// `sendPing` can invoke its handler multiple times when the socket is
-    /// cancelled/aborted (e.g. errno 53 "Software caused connection abort"), the
-    /// timeout watchdog races the handler, and task cancellation races both — so
-    /// ``ResumeOnceGuard`` arbitrates every resume site to fire exactly once.
-    /// Cancelling the waiting task resumes immediately with `CancellationError`
-    /// instead of staying suspended until the pong or the watchdog fires.
-    static func pingSocket(_ task: any WebSocketSession, timeout: Duration) async throws {
-        let resumeGuard = ResumeOnceGuard()
-        let cancellationBox = PingCancellationBox()
-        // Held outside the continuation so the cancellation handler can stop the watchdog too.
-        // Left running, it sleeps out the full timeout after the wait is already over — so
-        // cancelling a connect did not actually release its resources for up to that long.
-        let watchdogBox = PingWatchdogBox()
-        defer { watchdogBox.cancel() }
-        try await withTaskCancellationHandler {
-            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Swift.Error>) in
-                guard cancellationBox.register(continuation) else {
-                    // The task was cancelled before the wait began; onCancel found
-                    // nothing to resume, so it is this path's job.
-                    guard resumeGuard.claim() else { return }
-                    continuation.resume(throwing: CancellationError())
-                    return
-                }
-                watchdogBox.store(
-                    Task {
-                        try? await Task.sleep(for: timeout)
-                        guard resumeGuard.claim() else { return }
-                        continuation.resume(throwing: Error.timedOut)
-                    })
-                task.sendPing { error in
-                    guard resumeGuard.claim() else { return }
-                    watchdogBox.cancel()
-                    if let error = error {
-                        continuation.resume(throwing: error)
-                    } else {
-                        continuation.resume()
-                    }
-                }
+    /// The ping runs in its own task so the wait never depends on ``WebSocketSession/ping()``
+    /// returning: a transport may ignore cancellation, or its pong callback may never fire. The
+    /// wait itself is a task group racing the ping's outcome against the timeout, and both of its
+    /// children end promptly when cancelled — so the timeout, or cancelling the waiting task, ends
+    /// the wait at once. A ping still running then is cancelled and left to finish on its own;
+    /// closing the socket, which every failure path does, fails it on a real transport.
+    static func pingSocket(_ socket: any WebSocketSession, timeout: Duration) async throws {
+        let outcome = PingOutcome()
+        let ping = Task {
+            do {
+                try await socket.ping()
+                outcome.resolve(.success(()))
+            } catch {
+                outcome.resolve(.failure(error))
             }
-        } onCancel: {
-            watchdogBox.cancel()
-            guard let continuation = cancellationBox.cancel() else { return }
-            guard resumeGuard.claim() else { return }
-            continuation.resume(throwing: CancellationError())
+        }
+        defer { ping.cancel() }
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            group.addTask {
+                try await outcome.value()
+            }
+            group.addTask {
+                try await Task.sleep(for: timeout)
+                throw Error.timedOut
+            }
+            // The first child to finish decides; the other is cancelled and its result discarded.
+            defer { group.cancelAll() }
+            try await group.next()
         }
     }
 
@@ -89,65 +73,45 @@ extension RelayConnection {
     }
 }
 
-/// Holds the ping's timeout watchdog so every exit — pong, cancellation, or returning normally —
-/// can stop it, whichever happens first.
-private final class PingWatchdogBox: @unchecked Sendable {
-    private let lock = NSLock()
-    private var task: Task<Void, Never>?
-    private var isCancelled = false
-
-    /// Stores the watchdog, cancelling it immediately if this box was already cancelled.
-    func store(_ task: Task<Void, Never>) {
-        lock.lock()
-        if isCancelled {
-            lock.unlock()
-            task.cancel()
-            return
-        }
-        self.task = task
-        lock.unlock()
-    }
-
-    /// Cancels the watchdog, and marks the box so a later `store` cancels on arrival.
-    func cancel() {
-        lock.lock()
-        isCancelled = true
-        let task = self.task
-        self.task = nil
-        lock.unlock()
-        task?.cancel()
-    }
-}
-
-/// Hands the ping continuation from the suspension point to the task-cancellation
-/// handler, closing the race where cancellation fires before the continuation exists.
+/// The one-shot result of a keepalive ping, awaited without depending on the ping's own task.
 ///
-/// `register` returns `false` when cancellation already happened, telling the caller
-/// to resume the continuation itself; `cancel` marks the box cancelled and takes the
-/// continuation if one was registered. Exactly-once resumption across the pong
-/// handler, the watchdog, and cancellation remains the job of ``ResumeOnceGuard``.
-private final class PingCancellationBox: @unchecked Sendable {
+/// The first ``resolve(_:)`` wins and later ones are ignored, so the ping finishing, the waiter
+/// being cancelled, and their races resume the waiting continuation exactly once.
+private final class PingOutcome: @unchecked Sendable {
     private let lock = NSLock()
-    private var continuation: CheckedContinuation<Void, any Swift.Error>?
-    private var isCancelled = false
+    private var result: Result<Void, any Swift.Error>?
+    private var waiter: CheckedContinuation<Void, any Swift.Error>?
 
-    /// Stores the continuation for a later `cancel`; returns `false` if the task
-    /// was already cancelled (the continuation is not stored).
-    func register(_ continuation: CheckedContinuation<Void, any Swift.Error>) -> Bool {
-        lock.lock()
-        defer { lock.unlock() }
-        if isCancelled { return false }
-        self.continuation = continuation
-        return true
+    /// Records `result` if none is recorded yet, resuming a suspended ``value()``.
+    func resolve(_ result: Result<Void, any Swift.Error>) {
+        let waiter: CheckedContinuation<Void, any Swift.Error>? = lock.withLock {
+            guard self.result == nil else { return nil }
+            self.result = result
+            defer { self.waiter = nil }
+            return self.waiter
+        }
+        waiter?.resume(with: result)
     }
 
-    /// Marks the box cancelled and returns the registered continuation, if any.
-    func cancel() -> CheckedContinuation<Void, any Swift.Error>? {
-        lock.lock()
-        defer { lock.unlock() }
-        isCancelled = true
-        let continuation = self.continuation
-        self.continuation = nil
-        return continuation
+    /// Suspends until a result is recorded; cancelling the caller records `CancellationError`.
+    func value() async throws {
+        try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Swift.Error>) in
+                wait(with: continuation)
+            }
+        } onCancel: {
+            resolve(.failure(CancellationError()))
+        }
+    }
+
+    private func wait(with continuation: CheckedContinuation<Void, any Swift.Error>) {
+        // Checked under the lock `resolve` takes, so a result recorded first is never missed.
+        let recorded: Result<Void, any Swift.Error>? = lock.withLock {
+            if result == nil { waiter = continuation }
+            return result
+        }
+        if let recorded {
+            continuation.resume(with: recorded)
+        }
     }
 }

@@ -46,13 +46,10 @@ struct TerminalDropStreamTests {
     /// running under — so nothing was left to finish the streams and a consumer waited forever.
     @Test("a keepalive drop with auto-reconnect disabled ends the message streams")
     func keepaliveDropEndsStreams() async throws {
-        let socket = MockWebSocketSession(defersPing: true)
+        // The handshake ping is answered at once; every keepalive ping after it is deferred.
+        let socket = MockWebSocketSession(defersPing: true, immediatePings: 1)
         let connection = makeConnection(socket: socket, reconnect: nil)
-
-        let connectTask = Task { try await connection.connect() }
-        await socket.waitForPing()
-        socket.completePing()
-        try await connectTask.value
+        try await connection.connect()
 
         let messages = await connection.messages()
         // The keepalive ping is never answered, so it times out and drops the connection.
