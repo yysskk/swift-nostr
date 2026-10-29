@@ -21,7 +21,7 @@ The high-level `NostrClient` library provides an actor-based API for the Nostr n
 - `SimpleGroupList` / `GroupListEntry`: the NIP-51 kind-10009 list of the NIP-29 groups a user is in (public + NIP-44-encrypted private entries)
 - `NIP44Payload` / `ConversationKey` / `GiftWrap`: NIP-44 encryption (key-pair or shared conversation key) and NIP-59 gift wrap
 - `LNURL` / `LNURLPayResponse`: NIP-57 zap LNURL-pay resolution and invoice-request URLs
-- `Mnemonic`: BIP-39 seed phrase; `KeyPair(mnemonic:passphrase:account:)` derives the NIP-06 key (BIP-32 path m/44'/1237'/<account>'/0/0)
+- `Mnemonic`: BIP-39 seed phrase; `Mnemonic.generate(wordCount:)` takes a `Mnemonic.WordCount` (`.twelve` to `.twentyFour`); `KeyPair(mnemonic:passphrase:account:)` derives the NIP-06 key (BIP-32 path m/44'/1237'/<account>'/0/0)
 
 ## Supported NIPs
 

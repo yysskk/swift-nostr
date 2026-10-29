@@ -37,7 +37,7 @@ print("nsec: \(keyPair.privateKey.nsec)")
 let imported = try KeyPair(nsec: "nsec1...")
 
 // Generate from BIP-39 mnemonic (NIP-06)
-let (mnemonic, keyPairFromMnemonic) = try KeyPair.generate(wordCount: 12)
+let (mnemonic, keyPairFromMnemonic) = try KeyPair.generate(wordCount: .twelve)
 print("Mnemonic: \(mnemonic.phrase)")
 ```
 

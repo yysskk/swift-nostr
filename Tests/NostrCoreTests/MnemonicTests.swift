@@ -78,32 +78,41 @@ struct MnemonicTests {
 
     // MARK: - Mnemonic Generation
 
-    @Test("Generate 12 word mnemonic")
-    func generate12Words() throws {
-        let mnemonic = try Mnemonic.generate(wordCount: 12)
+    @Test("generate() defaults to 12 words")
+    func generateDefaultsToTwelveWords() {
+        let mnemonic = Mnemonic.generate()
 
-        #expect(mnemonic.wordCount == 12)
+        #expect(mnemonic.wordCount == .twelve)
         #expect(mnemonic.words.count == 12)
-
-        // All words should be in the BIP-39 wordlist
-        for word in mnemonic.words {
-            #expect(BIP39WordList.english.contains(word))
-        }
     }
 
-    @Test("Generate 24 word mnemonic")
-    func generate24Words() throws {
-        let mnemonic = try Mnemonic.generate(wordCount: 24)
+    @Test("generate(wordCount:) yields a valid mnemonic of that length", arguments: Mnemonic.WordCount.allCases)
+    func generateWordCount(wordCount: Mnemonic.WordCount) throws {
+        let mnemonic = Mnemonic.generate(wordCount: wordCount)
 
-        #expect(mnemonic.wordCount == 24)
-        #expect(mnemonic.words.count == 24)
+        #expect(mnemonic.wordCount == wordCount)
+        #expect(mnemonic.words.count == wordCount.rawValue)
+
+        // Parsing the phrase checks every word against the word list and the checksum
+        let parsed = try Mnemonic(phrase: mnemonic.phrase)
+        #expect(parsed.words == mnemonic.words)
+        #expect(parsed.wordCount == wordCount)
+    }
+
+    @Test("wordCount of a parsed 24-word phrase is twentyFour")
+    func parsedWordCount() throws {
+        let phrase =
+            "what bleak badge arrange retreat wolf trade produce cricket blur garlic valid "
+            + "proud rude strong choose busy staff weather area salt hollow arm fade"
+
+        #expect(try Mnemonic(phrase: phrase).wordCount == .twentyFour)
     }
 
     @Test("Generate keypair with mnemonic")
     func generateKeypairWithMnemonic() throws {
-        let (mnemonic, keyPair) = try KeyPair.generate(wordCount: 12)
+        let (mnemonic, keyPair) = try KeyPair.generate(wordCount: .fifteen)
 
-        #expect(mnemonic.wordCount == 12)
+        #expect(mnemonic.wordCount == .fifteen)
         #expect(keyPair.privateKey.data.count == 32)
         #expect(keyPair.publicKey.data.count == 32)
 
@@ -115,10 +124,11 @@ struct MnemonicTests {
 
     // MARK: - Mnemonic Validation
 
-    @Test("Invalid word count throws error")
+    @Test("Words of an unsupported count throw error")
     func invalidWordCount() {
+        let words = Array(repeating: "abandon", count: 13)
         #expect(throws: Mnemonic.Error.invalidWordCount(13)) {
-            _ = try Mnemonic.generate(wordCount: 13)
+            _ = try Mnemonic(words: words)
         }
     }
 
@@ -151,13 +161,6 @@ struct MnemonicTests {
         let invalidPhrase = "leader monkey parrot ring guide accident before fence cannon height naive notaword"
         #expect(throws: KeyPair.Error.invalidMnemonic(.unknownWord("notaword"))) {
             _ = try KeyPair(mnemonicPhrase: invalidPhrase)
-        }
-    }
-
-    @Test("Generating a keypair with an unsupported word count throws the mnemonic error")
-    func generateKeyPairWithInvalidWordCount() {
-        #expect(throws: KeyPair.Error.invalidMnemonic(.invalidWordCount(13))) {
-            _ = try KeyPair.generate(wordCount: 13)
         }
     }
 

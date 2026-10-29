@@ -31,9 +31,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   generates one from the system CSPRNG for a group. Like `PrivateKey`, it compares in constant time
   and redacts its `description`, `debugDescription`, and reflection; read `data` or `hex` to export
   it.
+- **`Mnemonic.WordCount` names the BIP-39 mnemonic lengths**: `.twelve`, `.fifteen`, `.eighteen`,
+  `.twentyOne`, and `.twentyFour` (128 to 256 bits of entropy), with the word count as `rawValue`.
 
 ### Changed
 
+- **Mnemonic generation takes a `Mnemonic.WordCount` and cannot fail** (breaking):
+  - `Mnemonic.generate(wordCount: Int = 12) throws(Mnemonic.Error)` →
+    `generate(wordCount: Mnemonic.WordCount = .twelve)`, which no longer throws:
+    `try Mnemonic.generate(wordCount: 24)` → `Mnemonic.generate(wordCount: .twentyFour)`.
+  - `KeyPair.generate(wordCount:passphrase:)` takes a `Mnemonic.WordCount` (default `.twelve`)
+    instead of an `Int`: `KeyPair.generate(wordCount: 12)` → `KeyPair.generate(wordCount: .twelve)`.
+    It still throws `KeyPair.Error.invalidPrivateKey`, but no longer
+    `invalidMnemonic(.invalidWordCount(_:))`.
+  - `Mnemonic.wordCount: Int` → `wordCount: Mnemonic.WordCount`: `mnemonic.wordCount == 24` →
+    `mnemonic.wordCount == .twentyFour`, and `wordCount.rawValue` gives the number. `init(words:)`,
+    `init(phrase:)`, and `init(entropy:)` still throw `invalidWordCount(Int)` or
+    `invalidEntropyLength(Int)` for an unsupported length.
 - **The NIP-46 and NIP-47 session surfaces are aligned** (breaking):
   - `WalletConnection.notifications() async throws(WalletConnectError)` →
     `notifications() -> AsyncStream<WalletConnectNotification>`, like `RemoteSigner.authChallenges()`:
