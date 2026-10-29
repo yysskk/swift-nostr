@@ -14,8 +14,8 @@ struct AuthReChallengeTests {
     private func makeConnection(socket: MockWebSocketSession) -> RelayConnection {
         RelayConnection(
             url: relayURL,
-            webSocketFactory: MockWebSocketSessionFactory(makeSession: { socket }),
-            config: RelayConnectionConfig(reconnect: nil)
+            config: RelayConnectionConfig(reconnect: nil),
+            webSocketFactory: MockWebSocketSessionFactory(makeSession: { socket })
         )
     }
 

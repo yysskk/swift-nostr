@@ -18,13 +18,13 @@ struct NIP42AuthRetryTests {
         let mock = MockWebSocketSession()
         let connection = RelayConnection(
             url: relayURL,
-            webSocketFactory: MockWebSocketSessionFactory(makeSession: { mock }),
             config: RelayConnectionConfig(
                 connectionTimeout: .seconds(1),
                 publishAckTimeout: publishAckTimeout,
                 pingInterval: .seconds(60),
                 reconnect: nil
-            )
+            ),
+            webSocketFactory: MockWebSocketSessionFactory(makeSession: { mock })
         )
         return (connection, mock)
     }

@@ -50,7 +50,7 @@ struct NostrClientConnectTests {
         let poolConfig = RelayPoolConfig(
             defaultRelayConfig: RelayConnectionConfig(connectionTimeout: .seconds(1), reconnect: nil)
         )
-        let client = NostrClient(relayPoolConfig: poolConfig)
+        let client = NostrClient(config: NostrClient.Config(relayPool: poolConfig))
 
         await #expect(throws: RelayPool.Error.allConnectionsFailed) {
             try await client.relays.connect(to: [RelayURL("ws://127.0.0.1:9")!])

@@ -667,9 +667,15 @@ try await client.events.publish(.textNote("gm!", tags: [.publicKey(alice)]), rou
 Either falls back to the whole pool when the lists do not resolve, so no author or recipient is
 silently dropped.
 
-By default the client adds and connects resolved relays on demand (capped per resolve). Pass
-`gossipPolicy: .requirePresent` (a ``GossipRelayPolicy``) to `NostrClient(...)` to route only to
-relays already in the pool.
+By default the client adds and connects resolved relays on demand, at most
+``NostrClient/Config/maximumGossipRelaysPerResolve`` (8) new relays per resolution; relays already
+in the pool are always used. Set ``NostrClient/Config/gossipPolicy`` to
+``GossipRelayPolicy/requirePresent`` to route only to relays already in the pool:
+
+```swift
+let client = NostrClient(config: NostrClient.Config(gossipPolicy: .requirePresent))
+let capped = NostrClient(config: NostrClient.Config(maximumGossipRelaysPerResolve: 4))
+```
 
 ## Lightning Zaps (NIP-57)
 
@@ -758,8 +764,13 @@ let poolConfig = RelayPoolConfig(
     deduplication: .init(maximumCount: 10_000, timeToLive: .seconds(300)),
     queryTimeout: .seconds(10)
 )
-let client = NostrClient(relayPoolConfig: poolConfig)
+let client = NostrClient(config: NostrClient.Config(relayPool: poolConfig))
 ```
+
+``NostrClient/Config`` groups the pool configuration with the gossip settings, and
+``NostrClient/init(config:webSocketFactory:)`` takes an optional ``WebSocketSessionFactory`` for a
+platform-native socket or a test fake (the default is ``URLSessionWebSocketFactory``). The client
+exposes the configuration it was created with as ``NostrClient/config``.
 
 ``RelayPoolConfig/queryTimeout`` is how long a one-shot fetch or count waits for relays to
 finish when the call passes no `timeout:`; pass one to override it for a single call:

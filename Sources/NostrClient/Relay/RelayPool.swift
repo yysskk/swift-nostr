@@ -28,16 +28,20 @@ public actor RelayPool {
     /// The automatic AUTH-challenge responder applied to every relay (NIP-42)
     private var authenticationResponder: RelayConnection.AuthenticationResponder?
 
-    public init(config: RelayPoolConfig = .default) {
-        self.init(config: config, webSocketFactory: URLSessionWebSocketFactory(urlSession: .shared))
-    }
-
-    /// Creates a pool whose relay connections use the given WebSocket transport.
+    /// Creates a pool.
     ///
-    /// Supply a custom ``WebSocketSessionFactory`` to run on a platform without
-    /// `URLSession` WebSocket support (for example an OkHttp-backed factory on Android),
+    /// By default every relay connection's sockets come from a ``URLSessionWebSocketFactory`` over
+    /// `URLSession.shared`. Supply a custom ``WebSocketSessionFactory`` to run on a platform without
+    /// working `URLSession` WebSocket support (for example an OkHttp-backed factory on Android),
     /// or to inject a fake transport in tests so connections never touch the network.
-    public init(config: RelayPoolConfig = .default, webSocketFactory: any WebSocketSessionFactory) {
+    /// - Parameters:
+    ///   - config: Pool behavior, including each relay connection's default configuration.
+    ///   - webSocketFactory: Creates the transport for each relay connection (defaults to a
+    ///     ``URLSessionWebSocketFactory`` over `URLSession.shared`).
+    public init(
+        config: RelayPoolConfig = .default,
+        webSocketFactory: any WebSocketSessionFactory = URLSessionWebSocketFactory()
+    ) {
         self.config = config
         self.webSocketFactory = webSocketFactory
         self.eventCache = config.deduplication.map {
@@ -56,8 +60,8 @@ public actor RelayPool {
         }
         let connection = RelayConnection(
             url: url,
-            webSocketFactory: webSocketFactory,
-            config: config ?? self.config.defaultRelayConfig
+            config: config ?? self.config.defaultRelayConfig,
+            webSocketFactory: webSocketFactory
         )
         relays[url] = connection
         if let authenticationResponder {

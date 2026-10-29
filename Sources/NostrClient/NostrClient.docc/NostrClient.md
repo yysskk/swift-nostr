@@ -142,6 +142,11 @@ add NIP helpers and namespaces of your own; see <doc:ExtendingTheClient>.
 
 - ``NostrContentReference``
 
+### Client Configuration
+
+- ``NostrClient/init(config:webSocketFactory:)``
+- ``NostrClient/Config``
+
 ### Relay Pool
 
 - ``RelayPool``

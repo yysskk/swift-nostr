@@ -21,30 +21,23 @@ public actor RelayConnectionTransport: RelayTransport {
     private var generation = 0
 
     /// Creates a transport for the given relay URLs.
-    /// - Parameters:
-    ///   - relayURLs: The relays to connect to (typically the URLs from a connection URI).
-    ///   - urlSession: The URL session backing the WebSocket connections (defaults to `.shared`).
-    ///   - config: Timeout, keepalive, and reconnection behavior for each relay.
-    public init(relayURLs: [RelayURL], urlSession: URLSession = .shared, config: RelayConnectionConfig = .default) {
-        self.relays = relayURLs.map { RelayConnection(url: $0, urlSession: urlSession, config: config) }
-    }
-
-    /// Creates a transport whose relays run on the sockets `webSocketFactory` hands out.
     ///
-    /// Supply a custom ``WebSocketSessionFactory`` to put a session on a platform-native socket —
-    /// for example an OkHttp-backed factory on Android — or on an in-memory fake in tests, so the
-    /// session's relay round-trips never touch the network.
+    /// By default each relay's sockets come from a ``URLSessionWebSocketFactory`` over
+    /// `URLSession.shared`. Supply a custom ``WebSocketSessionFactory`` to put a session on a
+    /// platform-native socket — for example an OkHttp-backed factory on Android — or on an
+    /// in-memory fake in tests, so the session's relay round-trips never touch the network.
     /// - Parameters:
     ///   - relayURLs: The relays to connect to (typically the URLs from a connection URI).
-    ///   - webSocketFactory: Creates the transport for each relay's connection attempts.
     ///   - config: Timeout, keepalive, and reconnection behavior for each relay.
+    ///   - webSocketFactory: Creates the transport for each relay's connection attempts (defaults
+    ///     to a ``URLSessionWebSocketFactory`` over `URLSession.shared`).
     public init(
         relayURLs: [RelayURL],
-        webSocketFactory: any WebSocketSessionFactory,
-        config: RelayConnectionConfig = .default
+        config: RelayConnectionConfig = .default,
+        webSocketFactory: any WebSocketSessionFactory = URLSessionWebSocketFactory()
     ) {
         self.relays = relayURLs.map {
-            RelayConnection(url: $0, webSocketFactory: webSocketFactory, config: config)
+            RelayConnection(url: $0, config: config, webSocketFactory: webSocketFactory)
         }
     }
 

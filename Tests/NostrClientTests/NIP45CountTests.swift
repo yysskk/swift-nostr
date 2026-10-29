@@ -22,8 +22,8 @@ struct NIP45CountTests {
         let mock = MockWebSocketSession()
         let connection = RelayConnection(
             url: relayURL,
-            webSocketFactory: MockWebSocketSessionFactory(makeSession: { mock }),
-            config: noReconnectConfig
+            config: noReconnectConfig,
+            webSocketFactory: MockWebSocketSessionFactory(makeSession: { mock })
         )
         return (connection, mock)
     }
@@ -111,8 +111,8 @@ struct NIP45CountTests {
         let mock = MockWebSocketSession()
         let connection = RelayConnection(
             url: relayURL,
-            webSocketFactory: MockWebSocketSessionFactory(makeSession: { mock }),
-            config: config
+            config: config,
+            webSocketFactory: MockWebSocketSessionFactory(makeSession: { mock })
         )
         try await connection.connect()
 

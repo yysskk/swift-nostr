@@ -175,33 +175,23 @@ public actor RelayConnection {
         isAuthenticated || !pendingAuthentications.isEmpty || authenticationResponder != nil
     }
 
-    /// Creates a connection to `url` whose sockets come from `urlSession`.
-    /// - Parameters:
-    ///   - url: The relay's URL.
-    ///   - urlSession: The URL session backing the WebSocket (defaults to `.shared`).
-    ///   - config: Timeout, keepalive, and reconnection behavior (defaults to `.default`).
-    public init(url: RelayURL, urlSession: URLSession = .shared, config: RelayConnectionConfig = .default) {
-        self.init(
-            url: url,
-            webSocketFactory: URLSessionWebSocketFactory(urlSession: urlSession),
-            config: config
-        )
-    }
-
-    /// Designated initializer, creating a connection whose sockets come from `webSocketFactory`.
+    /// Creates a connection to `url`.
     ///
+    /// By default the sockets come from a `URLSession`-backed ``URLSessionWebSocketFactory`` over
+    /// `URLSession.shared`; pass `URLSessionWebSocketFactory(urlSession:)` to use another session.
     /// Supply a custom ``WebSocketSessionFactory`` to run the connection on a platform-native
-    /// socket — for example an OkHttp-backed factory on Android, whose Foundation has no WebSocket
-    /// support — or on an in-memory fake in tests. The whole connect/receive/keepalive/reconnect
-    /// state machine then runs on that transport, without a network.
+    /// socket — for example an OkHttp-backed factory on Android, whose Foundation has no working
+    /// WebSocket support — or on an in-memory fake in tests. The whole
+    /// connect/receive/keepalive/reconnect state machine then runs on that transport.
     /// - Parameters:
     ///   - url: The relay's URL.
-    ///   - webSocketFactory: Creates the transport for each connection attempt.
     ///   - config: Timeout, keepalive, and reconnection behavior (defaults to `.default`).
+    ///   - webSocketFactory: Creates the transport for each connection attempt (defaults to a
+    ///     ``URLSessionWebSocketFactory`` over `URLSession.shared`).
     public init(
         url: RelayURL,
-        webSocketFactory: any WebSocketSessionFactory,
-        config: RelayConnectionConfig = .default
+        config: RelayConnectionConfig = .default,
+        webSocketFactory: any WebSocketSessionFactory = URLSessionWebSocketFactory()
     ) {
         self.url = url
         self.webSocketFactory = webSocketFactory
@@ -213,8 +203,8 @@ public actor RelayConnection {
     /// system generator, so a test can assert the backoff bounds without depending on chance.
     init(
         url: RelayURL,
-        webSocketFactory: any WebSocketSessionFactory,
         config: RelayConnectionConfig,
+        webSocketFactory: any WebSocketSessionFactory,
         jitter: @escaping ReconnectJitter
     ) {
         self.url = url

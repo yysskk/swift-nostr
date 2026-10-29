@@ -82,12 +82,12 @@ struct RelayConnectionStreamTerminationTests {
     ) -> RelayConnection {
         RelayConnection(
             url: relayURL,
-            webSocketFactory: MockWebSocketSessionFactory(makeSession: { dispenser.next() }),
             config: RelayConnectionConfig(
                 connectionTimeout: .seconds(1),
                 pingInterval: .seconds(60),
                 reconnect: reconnect
-            )
+            ),
+            webSocketFactory: MockWebSocketSessionFactory(makeSession: { dispenser.next() })
         )
     }
 

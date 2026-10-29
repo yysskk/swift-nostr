@@ -82,11 +82,11 @@ struct RelayConnectionTransportTests {
     private func makeTransport(dispenser: SocketDispenser) -> RelayConnectionTransport {
         RelayConnectionTransport(
             relayURLs: Self.relayURLs,
-            webSocketFactory: MockWebSocketSessionFactory(makeSession: { dispenser.next() }),
             // No auto-reconnect and a long ping interval keep the test's background
             // tasks inert; the transport is torn down explicitly at the end.
             config: RelayConnectionConfig(
-                connectionTimeout: .seconds(1), pingInterval: .seconds(60), reconnect: nil)
+                connectionTimeout: .seconds(1), pingInterval: .seconds(60), reconnect: nil),
+            webSocketFactory: MockWebSocketSessionFactory(makeSession: { dispenser.next() })
         )
     }
 

@@ -128,10 +128,10 @@ struct RelayConnectionTests {
         let socket = GatedRequestSocket()
         let connection = RelayConnection(
             url: RelayURL("wss://relay.example.com")!,
-            webSocketFactory: GatedRequestSocketFactory(socket: socket),
             config: RelayConnectionConfig(
                 connectionTimeout: .seconds(1), sendTimeout: sendTimeout, pingInterval: .seconds(60),
-                reconnect: reconnect)
+                reconnect: reconnect),
+            webSocketFactory: GatedRequestSocketFactory(socket: socket)
         )
         return (connection, socket)
     }
@@ -148,14 +148,14 @@ struct RelayConnectionTests {
         let mock = MockWebSocketSession()
         let connection = RelayConnection(
             url: RelayURL("wss://relay.example.com")!,
-            webSocketFactory: MockWebSocketSessionFactory(makeSession: {
-                socketCount.increment()
-                return mock
-            }),
             // No auto-reconnect and a long ping interval keep the test's background
             // tasks inert; the connection is torn down explicitly at the end.
             config: RelayConnectionConfig(
-                connectionTimeout: .seconds(1), pingInterval: .seconds(60), reconnect: nil)
+                connectionTimeout: .seconds(1), pingInterval: .seconds(60), reconnect: nil),
+            webSocketFactory: MockWebSocketSessionFactory(makeSession: {
+                socketCount.increment()
+                return mock
+            })
         )
         return (connection, mock)
     }

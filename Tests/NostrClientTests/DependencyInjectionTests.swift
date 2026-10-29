@@ -53,9 +53,10 @@ struct DependencyInjectionTests {
 
     @Test("client connects through the public transport-factory initializer")
     func clientConnectsThroughPublicFactoryInit() async throws {
-        // Exercises the public NostrClient(relayPoolConfig:gossipPolicy:webSocketFactory:)
-        // seam a host (e.g. Android) uses to supply a non-URLSession transport.
-        let client = NostrClient(relayPoolConfig: noReconnectConfig, webSocketFactory: fakeFactory())
+        // Exercises the public NostrClient(config:webSocketFactory:) seam a host
+        // (e.g. Android) uses to supply a non-URLSession transport.
+        let config = NostrClient.Config(relayPool: noReconnectConfig)
+        let client = NostrClient(config: config, webSocketFactory: fakeFactory())
 
         try await client.relays.connect(to: [
             RelayURL("wss://relay.example.com")!, RelayURL("wss://relay2.example.com")!,
