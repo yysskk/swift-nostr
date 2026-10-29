@@ -852,7 +852,7 @@ User profile metadata (NIP-01) (struct: Codable, Hashable, Sendable).
 - `name: String?`
 - `about: String?`
 - `picture: String?`
-- `nip05: String?`
+- `nip05: String?` (`internetIdentifier: InternetIdentifier?` parses it)
 - `banner: String?`
 - `displayName: String?`
 - `website: String?`
@@ -1621,32 +1621,32 @@ try await client.events.publishReport(event: note, type: .spam, reason: "unsolic
 
 ## InternetIdentifier
 
-NIP-05 DNS-based internet identifier verification (struct: Sendable). `verify`, `lookupPublicKey`,
-`lookupRelays`, and the `String` extensions are `async throws(InternetIdentifier.VerificationError)`
-(`invalidIdentifier`, `networkError`, `invalidResponse`, `publicKeyNotFound`, `publicKeyMismatch`).
+A NIP-05 internet identifier (struct: Sendable, Hashable, Codable, LosslessStringConvertible).
+`InternetIdentifier(_:)` returns nil unless the string is `name@domain` (split on the last `@`,
+name in `a-z0-9-_.`) or a bare domain (the root identifier `_@domain`). `name` keeps its case,
+`domain` is lowercased, `description` is `name@domain`, and it encodes as that string.
+`wellKnownURL: URL` is `https://<domain>/.well-known/nostr.json?name=<name>`.
+`verify()` and `verify(expectedPublicKey:)` are `async throws(InternetIdentifier.VerificationError)`
+(`networkError`, `invalidResponse`, `publicKeyNotFound`, `publicKeyMismatch`).
 
 ```swift
-// Verify identifier
-let result = try await InternetIdentifier.verify("alice@example.com")
+guard let identifier = InternetIdentifier("alice@example.com") else { return }
+
+let result = try await identifier.verify()
 print(result.publicKey)   // PublicKey
 print(result.relays)   // [RelayURL]; entries that are not relay URLs are skipped
+// a nostr.json value that is not canonical hex throws publicKeyNotFound
 
-// Verify against expected public key; the catch needs no cast
-do {
-    try await InternetIdentifier.verify("alice@example.com", expectedPublicKey: alice)
-} catch .publicKeyMismatch {
-    // the identifier names a different key
-} catch {
-    // any other InternetIdentifier.VerificationError
+// Verify the identifier a profile claims; the catch needs no cast
+if let claimed = metadata.internetIdentifier {   // UserMetadata.nip05, parsed
+    do {
+        try await claimed.verify(expectedPublicKey: alice)
+    } catch .publicKeyMismatch {
+        // the identifier names a different key
+    } catch {
+        // any other InternetIdentifier.VerificationError
+    }
 }
-
-// Look up public key or relays; a nostr.json value that is not canonical hex throws publicKeyNotFound
-let publicKey = try await InternetIdentifier.lookupPublicKey("alice@example.com")   // PublicKey
-let relays = try await InternetIdentifier.lookupRelays("alice@example.com")   // [RelayURL]
-
-// String extensions
-"alice@example.com".isValidInternetIdentifier  // Bool
-try await "alice@example.com".verifyAsInternetIdentifier()
 ```
 
 ## RelayInformation

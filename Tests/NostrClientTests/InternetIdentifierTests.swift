@@ -12,41 +12,40 @@ struct InternetIdentifierTests {
 
     @Test("Parse standard identifier")
     func parseStandardIdentifier() {
-        let result = InternetIdentifier.parse("alice@example.com")
+        let identifier = InternetIdentifier("alice@example.com")
 
-        #expect(result?.name == "alice")
-        #expect(result?.domain == "example.com")
+        #expect(identifier?.name == "alice")
+        #expect(identifier?.domain == "example.com")
     }
 
     @Test("Parse underscore identifier")
     func parseUnderscoreIdentifier() {
-        let result = InternetIdentifier.parse("_@example.com")
+        let identifier = InternetIdentifier("_@example.com")
 
-        #expect(result?.name == "_")
-        #expect(result?.domain == "example.com")
+        #expect(identifier?.name == "_")
+        #expect(identifier?.domain == "example.com")
     }
 
-    @Test("Parse domain only")
+    @Test("A bare domain is the domain's root identifier")
     func parseDomainOnly() {
-        let result = InternetIdentifier.parse("example.com")
+        let identifier = InternetIdentifier("example.com")
 
-        #expect(result?.name == "_")
-        #expect(result?.domain == "example.com")
+        #expect(identifier?.name == "_")
+        #expect(identifier?.domain == "example.com")
+        #expect(identifier == InternetIdentifier("_@example.com"))
     }
 
     @Test("Parse identifier with subdomain")
     func parseSubdomain() {
-        let result = InternetIdentifier.parse("bob@nostr.example.com")
+        let identifier = InternetIdentifier("bob@nostr.example.com")
 
-        #expect(result?.name == "bob")
-        #expect(result?.domain == "nostr.example.com")
+        #expect(identifier?.name == "bob")
+        #expect(identifier?.domain == "nostr.example.com")
     }
 
     @Test("Parse empty string returns nil")
     func parseEmptyString() {
-        let result = InternetIdentifier.parse("")
-
-        #expect(result == nil)
+        #expect(InternetIdentifier("") == nil)
     }
 
     /// Splitting on the first `@` made this resolve against the host `domain@example.com`, which is
@@ -54,8 +53,7 @@ struct InternetIdentifierTests {
     /// local part, so an identifier carrying a second `@` is malformed however it is split.
     @Test("Parse identifier with multiple @ is rejected")
     func parseMultipleAt() {
-        #expect(InternetIdentifier.parse("user@domain@example.com") == nil)
-        #expect(!"user@domain@example.com".isValidInternetIdentifier)
+        #expect(InternetIdentifier("user@domain@example.com") == nil)
     }
 
     @Test(
@@ -63,7 +61,7 @@ struct InternetIdentifierTests {
         arguments: ["al ice@example.com", "al/ice@example.com", "@example.com", "ali:ce@example.com"]
     )
     func parseRejectsInvalidLocalPart(identifier: String) {
-        #expect(InternetIdentifier.parse(identifier) == nil)
+        #expect(InternetIdentifier(identifier) == nil)
     }
 
     @Test(
@@ -71,64 +69,100 @@ struct InternetIdentifierTests {
         arguments: ["alice@", "alice@exa mple.com", "alice@example.com/path", "alice@example.com:8080"]
     )
     func parseRejectsInvalidDomain(identifier: String) {
-        #expect(InternetIdentifier.parse(identifier) == nil)
+        #expect(InternetIdentifier(identifier) == nil)
     }
 
     @Test("Parse accepts the characters NIP-05 allows in a local part")
     func parseAcceptsAllowedLocalPart() {
-        #expect(InternetIdentifier.parse("a-b_c.d@example.com")?.name == "a-b_c.d")
-        #expect(InternetIdentifier.parse("Alice@example.com")?.name == "Alice")
-        #expect(InternetIdentifier.parse("bob123@example.com")?.name == "bob123")
+        #expect(InternetIdentifier("a-b_c.d@example.com")?.name == "a-b_c.d")
+        #expect(InternetIdentifier("Alice@example.com")?.name == "Alice")
+        #expect(InternetIdentifier("bob123@example.com")?.name == "bob123")
+    }
+
+    @Test("the domain is lowercased and the name keeps its case")
+    func domainIsLowercased() {
+        let identifier = InternetIdentifier("Alice@Example.COM")
+
+        #expect(identifier?.name == "Alice")
+        #expect(identifier?.domain == "example.com")
+        #expect(identifier == InternetIdentifier("Alice@example.com"))
+        #expect(identifier != InternetIdentifier("alice@example.com"))
+    }
+
+    // MARK: - String Form Tests
+
+    @Test(
+        "description is name@domain",
+        arguments: [
+            ("alice@example.com", "alice@example.com"),
+            ("_@example.com", "_@example.com"),
+            ("example.com", "_@example.com"),
+            ("Bob@Nostr.Example.com", "Bob@nostr.example.com"),
+        ])
+    func descriptionIsNameAtDomain(input: String, expected: String) {
+        #expect(InternetIdentifier(input)?.description == expected)
+    }
+
+    @Test("description parses back to an equal identifier")
+    func descriptionRoundTrips() throws {
+        let identifier = try #require(InternetIdentifier("alice@example.com"))
+
+        #expect(InternetIdentifier(identifier.description) == identifier)
+    }
+
+    @Test("encodes to and decodes from its string form")
+    func codableRoundTrip() throws {
+        let identifier = try #require(InternetIdentifier("alice@example.com"))
+
+        let data = try JSONEncoder().encode(identifier)
+        let decoded = try JSONDecoder().decode(InternetIdentifier.self, from: data)
+
+        #expect(String(decoding: data, as: UTF8.self) == "\"alice@example.com\"")
+        #expect(decoded == identifier)
+    }
+
+    @Test("decoding a malformed identifier throws")
+    func decodingMalformedThrows() {
+        #expect(throws: DecodingError.self) {
+            try JSONDecoder().decode(InternetIdentifier.self, from: Data("\"user@domain@example.com\"".utf8))
+        }
     }
 
     // MARK: - URL Construction Tests
 
-    @Test("Construct well-known URL")
-    func constructWellKnownURL() {
-        let url = InternetIdentifier.wellKnownURL(name: "alice", domain: "example.com")
-
-        #expect(url?.absoluteString == "https://example.com/.well-known/nostr.json?name=alice")
+    @Test(
+        "the well-known URL queries the name on the domain",
+        arguments: [
+            ("alice@example.com", "https://example.com/.well-known/nostr.json?name=alice"),
+            ("bob@nostr.example.com", "https://nostr.example.com/.well-known/nostr.json?name=bob"),
+            ("example.com", "https://example.com/.well-known/nostr.json?name=_"),
+        ])
+    func wellKnownURL(input: String, expected: String) {
+        #expect(InternetIdentifier(input)?.wellKnownURL.absoluteString == expected)
     }
 
-    @Test("Construct well-known URL with subdomain")
-    func constructWellKnownURLWithSubdomain() {
-        let url = InternetIdentifier.wellKnownURL(name: "bob", domain: "nostr.example.com")
+    // MARK: - UserMetadata Tests
 
-        #expect(url?.absoluteString == "https://nostr.example.com/.well-known/nostr.json?name=bob")
-    }
-
-    @Test("Construct well-known URL with underscore")
-    func constructWellKnownURLWithUnderscore() {
-        let url = InternetIdentifier.wellKnownURL(name: "_", domain: "example.com")
-
-        #expect(url?.absoluteString == "https://example.com/.well-known/nostr.json?name=_")
-    }
-
-    // MARK: - String Extension Tests
-
-    @Test("String isValidInternetIdentifier with valid identifier")
-    func stringIsValidInternetIdentifierValid() {
-        #expect("alice@example.com".isValidInternetIdentifier)
-        #expect("_@example.com".isValidInternetIdentifier)
-        #expect("example.com".isValidInternetIdentifier)
-    }
-
-    @Test("String isValidInternetIdentifier with empty string")
-    func stringIsValidInternetIdentifierEmpty() {
-        #expect(!"".isValidInternetIdentifier)
+    @Test("UserMetadata exposes its nip05 as an identifier when well formed")
+    func userMetadataInternetIdentifier() {
+        #expect(UserMetadata(nip05: "alice@example.com").internetIdentifier == InternetIdentifier("alice@example.com"))
+        #expect(UserMetadata(nip05: "user@domain@example.com").internetIdentifier == nil)
+        #expect(UserMetadata().internetIdentifier == nil)
     }
 
     // MARK: - Verification Result Tests
 
+    private let aliceIdentifier = InternetIdentifier("alice@example.com")!
+
     @Test("VerificationResult properties")
     func verificationResultProperties() {
         let result = InternetIdentifier.VerificationResult(
-            identifier: "alice@example.com",
+            identifier: aliceIdentifier,
             publicKey: .fixture("alice"),
             relays: [RelayURL("wss://relay1.com")!, RelayURL("wss://relay2.com")!]
         )
 
-        #expect(result.identifier == "alice@example.com")
+        #expect(result.identifier == aliceIdentifier)
         #expect(result.publicKey == .fixture("alice"))
         #expect(result.relays.count == 2)
     }
@@ -136,19 +170,19 @@ struct InternetIdentifierTests {
     @Test("VerificationResult equality")
     func verificationResultEquality() {
         let result1 = InternetIdentifier.VerificationResult(
-            identifier: "alice@example.com",
+            identifier: aliceIdentifier,
             publicKey: .fixture("alice"),
             relays: [RelayURL("wss://relay.com")!]
         )
 
         let result2 = InternetIdentifier.VerificationResult(
-            identifier: "alice@example.com",
+            identifier: aliceIdentifier,
             publicKey: .fixture("alice"),
             relays: [RelayURL("wss://relay.com")!]
         )
 
         let result3 = InternetIdentifier.VerificationResult(
-            identifier: "bob@example.com",
+            identifier: InternetIdentifier("bob@example.com")!,
             publicKey: .fixture("alice"),
             relays: [RelayURL("wss://relay.com")!]
         )
@@ -159,19 +193,10 @@ struct InternetIdentifierTests {
 
     @Test("VerificationResult hashable")
     func verificationResultHashable() {
-        let result1 = InternetIdentifier.VerificationResult(
-            identifier: "alice@example.com",
-            publicKey: .fixture("alice")
-        )
+        let result1 = InternetIdentifier.VerificationResult(identifier: aliceIdentifier, publicKey: .fixture("alice"))
+        let result2 = InternetIdentifier.VerificationResult(identifier: aliceIdentifier, publicKey: .fixture("alice"))
 
-        let result2 = InternetIdentifier.VerificationResult(
-            identifier: "alice@example.com",
-            publicKey: .fixture("alice")
-        )
-
-        var set: Set<InternetIdentifier.VerificationResult> = []
-        set.insert(result1)
-        set.insert(result2)
+        let set: Set<InternetIdentifier.VerificationResult> = [result1, result2]
 
         #expect(set.count == 1)
     }
@@ -180,38 +205,10 @@ struct InternetIdentifierTests {
 
     @Test("VerificationError descriptions")
     func verificationErrorDescriptions() {
-        #expect(InternetIdentifier.VerificationError.invalidIdentifier.errorDescription != nil)
+        #expect(InternetIdentifier.VerificationError.networkError("offline").errorDescription != nil)
         #expect(InternetIdentifier.VerificationError.invalidResponse.errorDescription != nil)
         #expect(InternetIdentifier.VerificationError.publicKeyNotFound.errorDescription != nil)
         #expect(InternetIdentifier.VerificationError.publicKeyMismatch.errorDescription != nil)
-    }
-
-    // MARK: - Integration Tests (require network)
-
-    @Test("Verify invalid identifier format throws the concrete VerificationError")
-    func verifyInvalidIdentifierFormat() async {
-        do {
-            _ = try await InternetIdentifier.verify("")
-            Issue.record("Expected error to be thrown")
-        } catch {
-            #expect(error == .invalidIdentifier)
-        }
-    }
-
-    @Test("lookup and String wrappers forward the concrete VerificationError")
-    func wrappersForwardVerificationError() async {
-        do {
-            _ = try await InternetIdentifier.lookupPublicKey("al ice@example.com")
-            Issue.record("Expected error to be thrown")
-        } catch {
-            #expect(error == .invalidIdentifier)
-        }
-        do {
-            _ = try await "al ice@example.com".verifyAsInternetIdentifier(expectedPublicKey: alice)
-            Issue.record("Expected error to be thrown")
-        } catch {
-            #expect(error == .invalidIdentifier)
-        }
     }
 
     // MARK: - nostr.json Resolution Tests
@@ -228,9 +225,9 @@ struct InternetIdentifierTests {
     func resolvesCanonicalKey() throws {
         let data = try nostrJSON(names: ["alice": alice.hex], relays: [alice.hex: ["wss://relay.example.com"]])
 
-        let result = try InternetIdentifier.result(for: "Alice@example.com", name: "Alice", in: data)
+        let result = try InternetIdentifier("Alice@example.com")!.result(in: data)
 
-        #expect(result.identifier == "Alice@example.com")
+        #expect(result.identifier == InternetIdentifier("Alice@example.com"))
         #expect(result.publicKey == alice)
         #expect(result.relays == [RelayURL("wss://relay.example.com")!])
     }
@@ -243,7 +240,7 @@ struct InternetIdentifierTests {
                 alice.hex: ["https://web.example.com", "WSS://B.Example.com/", "not a relay", "wss://a.example.com"]
             ])
 
-        let result = try InternetIdentifier.result(for: "alice@example.com", name: "alice", in: data)
+        let result = try aliceIdentifier.result(in: data)
 
         #expect(result.relays == [RelayURL("wss://b.example.com")!, RelayURL("wss://a.example.com")!])
     }
@@ -255,7 +252,7 @@ struct InternetIdentifierTests {
         let data = try nostrJSON(names: ["alice": value])
 
         #expect(throws: InternetIdentifier.VerificationError.publicKeyNotFound) {
-            try InternetIdentifier.result(for: "alice@example.com", name: "alice", in: data)
+            try aliceIdentifier.result(in: data)
         }
     }
 
@@ -264,7 +261,7 @@ struct InternetIdentifierTests {
         let data = try nostrJSON(names: ["alice": alice.hex.uppercased()])
 
         #expect(throws: InternetIdentifier.VerificationError.publicKeyNotFound) {
-            try InternetIdentifier.result(for: "alice@example.com", name: "alice", in: data)
+            try aliceIdentifier.result(in: data)
         }
     }
 
@@ -273,14 +270,14 @@ struct InternetIdentifierTests {
         let data = try nostrJSON(names: ["bob": alice.hex])
 
         #expect(throws: InternetIdentifier.VerificationError.publicKeyNotFound) {
-            try InternetIdentifier.result(for: "alice@example.com", name: "alice", in: data)
+            try aliceIdentifier.result(in: data)
         }
     }
 
     @Test("a document that is not nostr.json is an invalid response")
     func invalidDocumentIsInvalidResponse() {
         #expect(throws: InternetIdentifier.VerificationError.invalidResponse) {
-            try InternetIdentifier.result(for: "alice@example.com", name: "alice", in: Data("[]".utf8))
+            try aliceIdentifier.result(in: Data("[]".utf8))
         }
     }
 }

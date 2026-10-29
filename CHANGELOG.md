@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`UserMetadata.internetIdentifier`** parses `nip05` into an `InternetIdentifier`, or is `nil` when
+  it is absent or malformed.
 - **`RelaySubscription` is the common protocol of the subscription sequences**: `SubscriptionSequence`,
   its `events` view, `DirectMessagePayloadSequence`, and `DirectMessageSequence` conform, each with
   `id`, `expectedRelays`, and `close()`, so an app can keep subscriptions of different element types
@@ -69,6 +71,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`InternetIdentifier` is a value type** (breaking): `InternetIdentifier("alice@example.com")`
+  validates the string once and returns `nil` if it is malformed, and the value is `Hashable`,
+  `Codable` (as its string), and `LosslessStringConvertible`, with `name`, `domain` (lowercased), and
+  `wellKnownURL`. Verification moves onto the value:
+
+  | Old | New |
+  | --- | --- |
+  | `InternetIdentifier.verify("alice@example.com")` | `identifier.verify()` |
+  | `InternetIdentifier.verify(_:expectedPublicKey:)` | `identifier.verify(expectedPublicKey:)` |
+  | `InternetIdentifier.lookupPublicKey(_:)`, `lookupRelays(_:)` | `identifier.verify().publicKey`, `.relays` |
+  | `InternetIdentifier.parse(_:)` | `InternetIdentifier(_:)`, then `name` and `domain` |
+  | `InternetIdentifier.wellKnownURL(name:domain:)` | `identifier.wellKnownURL` |
+  | `String.isValidInternetIdentifier` | `InternetIdentifier(string) != nil` |
+  | `String.verifyAsInternetIdentifier(…)` | `identifier.verify(…)` |
+
+  `VerificationResult.identifier` is an `InternetIdentifier`, and `VerificationError.invalidIdentifier`
+  is removed, since a malformed identifier can no longer reach verification.
 - **`PublishRelayStatus` separates rejections from failures and compares by value** (breaking). A
   relay's OK `false` is now `.rejected(RelayRejection)`, and `.failed` carries a
   `RelayConnection.Error` instead of `any Error`: `.failed(error)` where `error` is a

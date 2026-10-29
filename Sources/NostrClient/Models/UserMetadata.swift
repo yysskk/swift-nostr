@@ -55,4 +55,16 @@ public struct UserMetadata: Codable, Hashable, Sendable {
         self.lud06 = lud06
         self.lud16 = lud16
     }
+
+    /// ``nip05`` as an ``InternetIdentifier`` to verify, or `nil` when it is absent or not a
+    /// well-formed identifier.
+    ///
+    /// ```swift
+    /// if let identifier = metadata.internetIdentifier {
+    ///     try await identifier.verify(expectedPublicKey: author)
+    /// }
+    /// ```
+    public var internetIdentifier: InternetIdentifier? {
+        nip05.flatMap(InternetIdentifier.init)
+    }
 }
