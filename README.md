@@ -222,7 +222,7 @@ let zap = try await connection.payZap(
 print(zap.preimage)
 ```
 
-`get_balance`, `get_info`, `make_invoice`, `lookup_invoice`, `list_transactions`, keysend, and multi-payments are available too, along with a `notifications()` stream; `send(_:)` sends any other single-response command defined as a `WalletConnectRequest`.
+`get_balance`, `get_info`, `make_invoice`, `lookup_invoice`, `list_transactions`, keysend, and multi-payments are available too, along with a `notifications()` stream (call `connect()` or send any command to start receiving); `send(_:)` sends any other single-response command defined as a `WalletConnectRequest`.
 
 ### Sign remotely with a bunker (NIP-46)
 
@@ -235,7 +235,7 @@ import NostrConnect
 let signer = RemoteSigner(bunker: try BunkerURI(string: "bunker://..."))
 
 // Prove the user's key and sign an event remotely — the signed event is verified locally.
-let userPublicKey = try await signer.userPublicKey()
+let userPublicKey = try await signer.publicKey
 let signed = try await signer.sign(.textNote("Signed by my bunker"))
 print(signed.publicKey == userPublicKey, signed.isValid)
 ```
@@ -251,7 +251,7 @@ try await signer.connect()                                  // returns once the 
 let remotePublicKey = await signer.remoteSignerPublicKey    // the signer's PublicKey, set by connect()
 ```
 
-`ping`, NIP-44/NIP-04 encrypt and decrypt, `switch_relays`, and `logout` are available too, along with an `authChallenges()` stream for `auth_url` approvals. `RemoteSignerMethod` is an open set, so `send(_:params:)` calls a method without a typed wrapper and returns its raw `result`.
+`ping`, NIP-44/NIP-04 encrypt and decrypt, `switch_relays`, and `logout` are available too, along with an `authChallenges()` stream for `auth_url` approvals. `fetchPreferredRelays()` asks the signer for its preferred relays (`switch_relays`); reconnecting on them is up to the caller. `RemoteSignerMethod` is an open set, so `send(_:params:)` calls a method without a typed wrapper and returns its raw `result`.
 
 A `RemoteSigner` can also drive a `NostrClient`: `client.identity.setSigner(_:)` accepts any `NostrSigning`, and every feature runs through that abstraction — `identity.sign(_:)`, `events.publish(_:)`, the convenience `publish*` helpers, NIP-17 direct messages, NIP-51 private list items, and NIP-42 authentication all work with a remote signer exactly as they do with a local key.
 

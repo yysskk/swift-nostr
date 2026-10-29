@@ -33,6 +33,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The NIP-46 and NIP-47 session surfaces are aligned** (breaking):
+  - `WalletConnection.notifications() async throws(WalletConnectError)` →
+    `notifications() -> AsyncStream<WalletConnectNotification>`, like `RemoteSigner.authChallenges()`:
+    it registers the stream and returns it without connecting. Call `connect()` (or send any command)
+    to start receiving: `try await connection.notifications()` → `await connection.notifications()`
+    followed by `try await connection.connect()`. The stream still ends when the connection ends.
+  - `RemoteSigner.userPublicKey()` → `publicKey`, the `NostrSigning` requirement it already backed:
+    `try await signer.userPublicKey()` → `try await signer.publicKey`. Concurrent first reads now
+    share one `get_public_key` request instead of each sending their own.
+  - `RemoteSigner.switchRelays()` → `fetchPreferredRelays()`, which says what it does: it only asks
+    the signer for its preferred relays, and the caller decides whether to reconnect on them. The
+    `RemoteSignerMethod.switchRelays` wire constant is unchanged.
+  - `WalletConnectURI.clientKeyPair()` → `clientKeyPair` and `clientSigner()` → `clientSigner`,
+    properties like `clientPublicKey`: each is derived from the URI's secret.
 - **The NIP-17 direct-message API is simplified** (breaking):
   - One way to read a gift wrap: `NostrMessaging.parsePayload(_:)` → `open(_:)`, which returns the
     `DirectMessagePayload` to switch on. The `client.messages` conveniences `parse(_:)`,

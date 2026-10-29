@@ -7,7 +7,7 @@ public import NostrCore
 /// ``NostrConnectURI`` invitation (shown to the user as a QR code or deep link), the signer scans it
 /// and replies, and the client discovers the signer's public key from that reply *after* validating the
 /// invitation secret the signer echoes back. ``connect()`` waits for that reply; once it returns, the
-/// typed commands (``sign(_:)-(UnsignedEvent)``, ``userPublicKey()``, …) work exactly as they do for
+/// typed commands (``sign(_:)-(UnsignedEvent)``, ``publicKey``, …) work exactly as they do for
 /// a `bunker://` session. A command issued before then waits for the reply itself.
 ///
 /// https://github.com/nostr-protocol/nips/blob/master/46.md

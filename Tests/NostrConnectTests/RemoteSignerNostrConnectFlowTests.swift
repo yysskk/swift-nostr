@@ -164,7 +164,7 @@ struct RemoteSignerNostrConnectFlowTests {
         try await connection.value
 
         // A follow-up command is sent to and answered by the discovered signer.
-        let publicKey = Task { try await remote.userPublicKey() }
+        let publicKey = Task { try await remote.publicKey }
         try await answerGetPublicKey(transport)
         #expect(try await publicKey.value == PublicKey.fixture("user"))
     }
@@ -175,7 +175,7 @@ struct RemoteSignerNostrConnectFlowTests {
         let transport = FakeRemoteSignerTransport()
         let remote = try makeSigner(invitation: invitation, transport: transport, requestTimeout: .seconds(20))
 
-        let publicKey = Task { try await remote.userPublicKey() }
+        let publicKey = Task { try await remote.publicKey }
         try await waitForConnectWaiters(remote, count: 1)
         // The ack can only be heard once the session has subscribed and is waiting for it.
         try await waitForConnectionWaiter(remote)

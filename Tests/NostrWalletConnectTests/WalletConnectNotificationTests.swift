@@ -14,8 +14,8 @@ struct WalletConnectNotificationTests {
         let connection = WalletConnection(
             uri: try NWCFixtures.uri(wallet: wallet, client: client), transport: transport)
 
-        // notifications() auto-connects — no explicit connect() needed.
-        var iterator = try await connection.notifications().makeAsyncIterator()
+        var iterator = await connection.notifications().makeAsyncIterator()
+        try await connection.connect()
 
         await transport.emit(
             try NWCFixtures.notification(
@@ -34,6 +34,49 @@ struct WalletConnectNotificationTests {
         let sent = await iterator.next()
         #expect(sent?.type == .paymentSent)
         #expect(sent?.transaction?.amount == 2000)
+    }
+
+    @Test("notifications() registers a stream without connecting", .timeLimit(.minutes(1)))
+    func notificationsDoesNotConnect() async throws {
+        let transport = FakeWalletConnectTransport()
+        let connection = WalletConnection(
+            uri: try NWCFixtures.uri(wallet: KeyPair(), client: KeyPair()), transport: transport)
+
+        _ = await connection.notifications()
+
+        #expect(await transport.connectCount == 0)
+        #expect(await transport.subscriptions.isEmpty)
+    }
+
+    @Test(
+        "connect() alone delivers notifications, and disconnect() ends the stream",
+        .timeLimit(.minutes(1)))
+    func connectAloneDeliversNotifications() async throws {
+        let wallet = KeyPair()
+        let client = KeyPair()
+        let transport = FakeWalletConnectTransport()
+        let connection = WalletConnection(
+            uri: try NWCFixtures.uri(wallet: wallet, client: client), transport: transport)
+        let notifications = await connection.notifications()
+
+        // connect() returns once the response-and-notification subscription is in place.
+        try await connection.connect()
+        let filters = try #require(await transport.subscriptions["nwc-responses"])
+        let kinds = filters.first?.kinds ?? []
+        #expect(kinds.contains(.walletConnectNotification))
+        #expect(kinds.contains(.walletConnectNotificationLegacy))
+
+        let notification = try NWCFixtures.notification(
+            notificationJSON: #"{"notification_type":"payment_received","notification":{"amount":1000}}"#,
+            kind: .walletConnectNotification, client: client, wallet: wallet, scheme: .nip44)
+        await transport.emit(notification)
+
+        var iterator = notifications.makeAsyncIterator()
+        #expect(await iterator.next()?.type == .paymentReceived)
+        #expect(await transport.sentEvents.isEmpty)
+
+        await connection.disconnect()
+        #expect(await iterator.next() == nil)
     }
 
     @Test("a notification type with no constant is kept, along with its raw payload")
@@ -207,8 +250,9 @@ struct WalletConnectNotificationTests {
         let transport = FakeWalletConnectTransport()
         let connection = WalletConnection(
             uri: try NWCFixtures.uri(wallet: KeyPair(), client: KeyPair()), transport: transport)
-        let first = try await connection.notifications()
-        let second = try await connection.notifications()
+        let first = await connection.notifications()
+        let second = await connection.notifications()
+        try await connection.connect()
         let drained = Task {
             var received = 0
             for await _ in first { received += 1 }
@@ -222,18 +266,23 @@ struct WalletConnectNotificationTests {
         #expect(await iterator.next() == nil)
     }
 
-    @Test("notifications() after the event stream ended reconnects and returns a live stream", .timeLimit(.minutes(1)))
+    @Test(
+        "a stream opened after the event stream ended is live once connect() reconnects",
+        .timeLimit(.minutes(1)))
     func notificationsAfterEventStreamEndedReconnects() async throws {
         let wallet = KeyPair()
         let client = KeyPair()
         let transport = FakeWalletConnectTransport()
         let connection = WalletConnection(
             uri: try NWCFixtures.uri(wallet: wallet, client: client), transport: transport)
-        let ended = try await connection.notifications()
+        let ended = await connection.notifications()
+        try await connection.connect()
         await transport.endEvents()
         for await _ in ended {}
 
-        var iterator = try await connection.notifications().makeAsyncIterator()
+        var iterator = await connection.notifications().makeAsyncIterator()
+        #expect(await transport.connectCount == 1)
+        try await connection.connect()
         #expect(await transport.connectCount == 2)
 
         await transport.emit(
@@ -250,13 +299,15 @@ struct WalletConnectNotificationTests {
         let transport = FakeWalletConnectTransport()
         let connection = WalletConnection(
             uri: try NWCFixtures.uri(wallet: wallet, client: client), transport: transport)
-        let old = try await connection.notifications()
+        let old = await connection.notifications()
+        try await connection.connect()
         await connection.disconnect()
         for await _ in old {}
 
-        var iterator = try await connection.notifications().makeAsyncIterator()
-        // Give the disconnected session's reader every chance to wake and finish the new stream.
-        try await Task.sleep(for: .milliseconds(200))
+        var iterator = await connection.notifications().makeAsyncIterator()
+        // Reconnecting waits for the disconnected session's reader to wind down, so it cannot
+        // finish the new stream afterwards.
+        try await connection.connect()
 
         await transport.emit(
             try NWCFixtures.notification(

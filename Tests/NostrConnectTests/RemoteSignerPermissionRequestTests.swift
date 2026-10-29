@@ -158,7 +158,7 @@ struct RemoteSignerPermissionRequestTests {
                 requestID: connectRequest.id, result: "ack", client: client, signer: signer))
         try await connectTask.value
 
-        let publicKey = Task { try await remote.userPublicKey() }
+        let publicKey = Task { try await remote.publicKey }
         let sent = try await RemoteSignerFixtures.waitForSentEvents(transport, count: 2)
         let request = try RemoteSignerFixtures.decryptRequest(sent[1], client: client, signer: signer)
 

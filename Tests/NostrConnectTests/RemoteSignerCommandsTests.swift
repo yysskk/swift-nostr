@@ -43,11 +43,11 @@ struct RemoteSignerCommandsTests {
 
     // MARK: - get_public_key
 
-    @Test("userPublicKey round-trips and caches the result")
-    func userPublicKeyRoundTripsAndCaches() async throws {
+    @Test("publicKey round-trips and caches the result")
+    func publicKeyRoundTripsAndCaches() async throws {
         let (remote, transport) = try await connected()
 
-        let first = Task { try await remote.userPublicKey() }
+        let first = Task { try await remote.publicKey }
         let request = try await nextRequest(transport)
         #expect(request.method == RemoteSignerMethod.getPublicKey.rawValue)
         #expect(request.params.isEmpty)
@@ -57,10 +57,33 @@ struct RemoteSignerCommandsTests {
         let resolved = try await first.value
         #expect(resolved == PublicKey.fixture("user"))
 
-        // The second call is served from cache — no new request event is sent.
-        let cached = try await remote.userPublicKey()
+        // The second read is served from cache — no new request event is sent.
+        let cached = try await remote.publicKey
         #expect(cached == PublicKey.fixture("user"))
         #expect(await transport.sentEvents.count == 2)
+    }
+
+    @Test("concurrent first publicKey reads share one get_public_key request", .timeLimit(.minutes(1)))
+    func concurrentPublicKeyReadsShareOneRequest() async throws {
+        let (remote, transport) = try await connected(requestTimeout: .seconds(5))
+
+        let first = Task { try await remote.publicKey }
+        let second = Task { try await remote.publicKey }
+        try await waitForBothPublicKeyReads(remote, transport: transport)
+        let request = try await nextRequest(transport)
+        #expect(request.method == RemoteSignerMethod.getPublicKey.rawValue)
+
+        let userKey = PublicKey.fixture("user")
+        let reply = try RemoteSignerFixtures.response(
+            requestID: request.id, result: userKey.hex, client: client, signer: signer)
+        await transport.deliver(reply)
+
+        let firstKey = try await first.value
+        // The connect handshake plus exactly one get_public_key.
+        #expect(await transport.sentEvents.count == 2)
+        let secondKey = try await second.value
+        #expect(firstKey == userKey)
+        #expect(secondKey == userKey)
     }
 
     // MARK: - sign_event
@@ -205,19 +228,19 @@ struct RemoteSignerCommandsTests {
     /// The reply is whatever the signer chose to send, so anything but a canonical key is rejected
     /// rather than handed back as the identity events would be authored under — and not cached.
     @Test(
-        "userPublicKey rejects a reply that is not a canonical hex public key",
+        "publicKey rejects a reply that is not a canonical hex public key",
         arguments: ["userpubhex", String(repeating: "A", count: 64), String(repeating: "0", count: 63)])
-    func userPublicKeyRejectsMalformedReply(reply: String) async throws {
+    func publicKeyRejectsMalformedReply(reply: String) async throws {
         let (remote, transport) = try await connected()
 
-        let first = Task { try await remote.userPublicKey() }
+        let first = Task { try await remote.publicKey }
         let request = try await nextRequest(transport)
         try await transport.deliver(
             RemoteSignerFixtures.response(requestID: request.id, result: reply, client: client, signer: signer))
         await #expect(throws: RemoteSignerError.responseValidationFailed) { try await first.value }
 
-        // Nothing was cached: the next call asks the signer again.
-        let second = Task { try await remote.userPublicKey() }
+        // Nothing was cached: the next read asks the signer again.
+        let second = Task { try await remote.publicKey }
         let sent = try await RemoteSignerFixtures.waitForSentEvents(transport, count: 3)
         let retry = try RemoteSignerFixtures.decryptRequest(sent[2], client: client, signer: signer)
         #expect(retry.method == RemoteSignerMethod.getPublicKey.rawValue)
@@ -295,11 +318,11 @@ struct RemoteSignerCommandsTests {
 
     // MARK: - switch_relays
 
-    @Test("switchRelays parses a JSON array of relay URLs")
-    func switchRelaysReturnsURLs() async throws {
+    @Test("fetchPreferredRelays parses a JSON array of relay URLs")
+    func fetchPreferredRelaysReturnsURLs() async throws {
         let (remote, transport) = try await connected()
 
-        let relays = Task { try await remote.switchRelays() }
+        let relays = Task { try await remote.fetchPreferredRelays() }
         let request = try await nextRequest(transport)
         #expect(request.method == RemoteSignerMethod.switchRelays.rawValue)
         try await transport.deliver(
@@ -313,12 +336,12 @@ struct RemoteSignerCommandsTests {
     }
 
     @Test(
-        "switchRelays rejects an entry that is not a relay URL instead of dropping it",
+        "fetchPreferredRelays rejects an entry that is not a relay URL instead of dropping it",
         arguments: [#"["wss://a.example","https://b.example"]"#, #"["wss://a.example","not a relay"]"#])
-    func switchRelaysRejectsMalformedEntry(result: String) async throws {
+    func fetchPreferredRelaysRejectsMalformedEntry(result: String) async throws {
         let (remote, transport) = try await connected()
 
-        let relays = Task { try await remote.switchRelays() }
+        let relays = Task { try await remote.fetchPreferredRelays() }
         let request = try await nextRequest(transport)
         try await transport.deliver(
             RemoteSignerFixtures.response(requestID: request.id, result: result, client: client, signer: signer))
@@ -328,11 +351,11 @@ struct RemoteSignerCommandsTests {
         }
     }
 
-    @Test("switchRelays returns nil when the signer keeps its relays")
-    func switchRelaysReturnsNil() async throws {
+    @Test("fetchPreferredRelays returns nil when the signer keeps its relays")
+    func fetchPreferredRelaysReturnsNil() async throws {
         let (remote, transport) = try await connected()
 
-        let relays = Task { try await remote.switchRelays() }
+        let relays = Task { try await remote.fetchPreferredRelays() }
         let request = try await nextRequest(transport)
         try await transport.deliver(
             RemoteSignerFixtures.response(
@@ -386,5 +409,20 @@ struct RemoteSignerCommandsTests {
         await #expect(throws: RemoteSignerError.signerError(message: "unsupported method")) {
             _ = try await result.value
         }
+    }
+
+    // MARK: - Helpers
+
+    /// Polls until two ``RemoteSigner/publicKey`` reads are in flight: both waiting on one shared
+    /// fetch, or — if they were not shared — each having sent its own request after the handshake.
+    private func waitForBothPublicKeyReads(
+        _ remote: RemoteSigner, transport: FakeRemoteSignerTransport
+    ) async throws {
+        for _ in 0..<400 {
+            if await remote.publicKeyWaiterCountForTesting == 2 { return }
+            if await transport.sentEvents.count >= 3 { return }
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        throw RemoteSignerError.timedOut
     }
 }

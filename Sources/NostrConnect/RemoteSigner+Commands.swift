@@ -3,30 +3,13 @@ public import NostrCore
 
 /// The typed NIP-46 commands.
 extension RemoteSigner {
-    /// Fetches (and caches) the user's public key (`get_public_key`).
-    ///
-    /// This may differ from ``remoteSignerPublicKey`` — a signer can hold a key distinct from its own
-    /// session identity. The result is cached, so subsequent calls return without another
-    /// round-trip.
-    /// - Returns: The user's public key, parsed from the signer's hex reply.
-    /// - Throws: ``RemoteSignerError/responseValidationFailed`` if the signer replies with anything
-    ///   but a canonical hex public key, or what ``send(_:params:)`` throws.
-    public func userPublicKey() async throws(RemoteSignerError) -> PublicKey {
-        if let cached = userPublicKeyIfCached { return cached }
-        guard let publicKey = PublicKey(try await send(.getPublicKey)) else {
-            throw RemoteSignerError.responseValidationFailed
-        }
-        cacheUserPublicKey(publicKey)
-        return publicKey
-    }
-
     /// Signs `event` remotely (`sign_event`).
     ///
     /// The signer returns a complete signed event; this validates the returned event's id and
     /// signature and confirms its `publicKey`, `kind`, `content`, `tags`, and `createdAt` match the
     /// request, so a signer cannot substitute a different event or sign under a different key.
     /// - Parameter event: The unsigned event to sign. Its `publicKey` must be the user's public key
-    ///   (from ``userPublicKey()``); the returned event is rejected unless the signer authored it
+    ///   (from ``publicKey``); the returned event is rejected unless the signer authored it
     ///   under that key.
     /// - Returns: The signed ``Event``.
     /// - Throws: ``RemoteSignerError/responseDecodingFailed`` if the reply is not an event,
@@ -119,10 +102,14 @@ extension RemoteSigner {
     }
 
     /// Asks the signer for its preferred relays (`switch_relays`).
+    ///
+    /// This only fetches the list: the session keeps using its current relays. The caller decides
+    /// whether to move — NIP-46 says the client SHOULD switch — typically by building a new
+    /// ``RemoteSigner`` on the returned relays with the same client key pair and connecting it.
     /// - Returns: The signer's preferred relays, or `nil` when it keeps the current set.
     /// - Throws: ``RemoteSignerError/responseDecodingFailed`` if the reply is neither a JSON array
     ///   of relay URLs nor `null`, or what ``send(_:params:)`` throws.
-    public func switchRelays() async throws(RemoteSignerError) -> [RelayURL]? {
+    public func fetchPreferredRelays() async throws(RemoteSignerError) -> [RelayURL]? {
         let result = try await send(.switchRelays)
         let trimmed = result.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed != "null" else { return nil }

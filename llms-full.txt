@@ -1953,9 +1953,10 @@ let remoteSignerPublicKey = await signer.remoteSignerPublicKey   // PublicKey? �
 ### Commands
 
 ```swift
-// PublicKey via get_public_key; cached; may differ from the signer's. A reply that is not canonical
-// hex throws RemoteSignerError.responseValidationFailed.
-let userPublicKey = try await signer.userPublicKey()  // the same value as `try await signer.publicKey`
+// The user's PublicKey via get_public_key (NostrSigning.publicKey); cached, and concurrent first
+// reads share one request; may differ from remoteSignerPublicKey. A reply that is not canonical hex
+// throws RemoteSignerError.responseValidationFailed.
+let userPublicKey = try await signer.publicKey
 
 // sign_event: signs remotely, then verifies the returned event and checks its kind/content/tags/
 // created_at match the request (throws RemoteSignerError.responseValidationFailed otherwise).
@@ -1966,7 +1967,8 @@ let ct = try await signer.nip44Encrypt("hi", to: thirdParty)   // PublicKey
 let pt = try await signer.nip44Decrypt(ct, from: thirdParty)
 let ct04 = try await signer.nip04Encrypt("hi", to: thirdParty)  // legacy NIP-04, PublicKey
 let pt04 = try await signer.nip04Decrypt(ct04, from: thirdParty)
-let relays = try await signer.switchRelays()                  // [RelayURL]? — nil when the signer keeps its set
+// switch_relays: only fetches the list; the caller decides whether to reconnect a new session on it.
+let relays = try await signer.fetchPreferredRelays()          // [RelayURL]? — nil when the signer keeps its set
 // Any method, including one the package does not model: returns the response's raw result string.
 // Throws RemoteSignerError.signerError(message:) on an error response, .responseDecodingFailed
 // when the response has no result, and .timedOut / .notConnected like the typed commands.
@@ -1980,7 +1982,8 @@ await signer.disconnect()                                      // tear down; fai
 ```swift
 // A signer may answer with an auth_url challenge instead of a result. The originating request stays
 // pending (its timeout extended to authChallengeTimeout) while the challenge URL is delivered here;
-// the real response arrives later with the same id.
+// the real response arrives later with the same id. authChallenges() only registers the stream; call
+// connect() (or send any command) to start receiving.
 for await challenge in await signer.authChallenges() {
     openInBrowser(challenge.url)  // challenge.method and challenge.requestID identify the pending request
 }

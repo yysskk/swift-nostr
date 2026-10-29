@@ -9,11 +9,15 @@ public import NostrCore
 extension RemoteSigner: NostrSigning {
     /// The user's public key (via `get_public_key`).
     ///
-    /// This is the user key the signer authors events under, not the client/session key. The value
-    /// is cached after the first fetch, shared with ``userPublicKey()``.
-    /// - Throws: What ``userPublicKey()`` throws.
+    /// This is the user key the signer authors events under, not the client/session key, and it may
+    /// differ from ``remoteSignerPublicKey`` — a signer can hold a key distinct from its own session
+    /// identity. The value is cached after the first fetch, so later reads return without another
+    /// round-trip, and concurrent first reads share one `get_public_key` request.
+    /// - Throws: ``RemoteSignerError/responseValidationFailed`` if the signer replies with anything
+    ///   but a canonical hex public key, ``RemoteSignerError/cancelled`` if the calling task is
+    ///   cancelled, or what ``send(_:params:)`` throws.
     public var publicKey: PublicKey {
-        get async throws(RemoteSignerError) { try await userPublicKey() }
+        get async throws(RemoteSignerError) { try await resolveUserPublicKey() }
     }
 
     /// Signs `template` as the user's public key (via `sign_event`).

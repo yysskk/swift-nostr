@@ -102,13 +102,13 @@ others.
 
 ## Prove the User's Public Key
 
-``RemoteSigner/userPublicKey()`` asks the signer which key it signs with. This may differ from
+``RemoteSigner/publicKey`` asks the signer which key it signs with. This may differ from
 ``RemoteSigner/remoteSignerPublicKey`` — the signer's session identity — and it is cached after the
-first call. A reply that is not a canonical hex key throws
+first read; concurrent first reads share one `get_public_key` request. A reply that is not a canonical hex key throws
 ``RemoteSignerError/responseValidationFailed``:
 
 ```swift
-let userPublicKey: PublicKey = try await signer.userPublicKey()
+let userPublicKey: PublicKey = try await signer.publicKey
 print("Signing as \(userPublicKey.npub)")
 ```
 
@@ -126,8 +126,9 @@ print(signed.id, signed.isValid)
 ## Handle Authentication Challenges
 
 A signer may answer a request with an `auth_url` challenge, asking the user to authorize the
-operation in a browser. Iterate ``RemoteSigner/authChallenges()`` and present each URL; the
-originating request stays pending — its timeout extended to
+operation in a browser. Iterate ``RemoteSigner/authChallenges()`` and present each URL; the stream
+is registered without connecting, so call ``RemoteSigner/connect()`` (or send any command) to start
+receiving. The originating request stays pending — its timeout extended to
 ``RemoteSigner/Config/authChallengeTimeout`` — until the signer answers:
 
 ```swift
