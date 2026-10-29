@@ -52,7 +52,7 @@ public struct PrivateKey: Sendable {
     ///   ``KeyPair/Error/invalidPrivateKey`` if they are not a valid secp256k1 scalar.
     public init(nsec: String) throws(KeyPair.Error) {
         let decoded: (hrp: String, data: Data)
-        do throws(Bech32.Error) {
+        do throws(Bech32Error) {
             decoded = try Bech32.decode(nsec)
         } catch {
             throw .invalidBech32(error)

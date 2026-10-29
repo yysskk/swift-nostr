@@ -46,7 +46,7 @@ public struct PublicKey: Sendable, Hashable {
     ///   ``PublicKey/Error/invalidLength(_:)`` if it does not hold exactly 32 bytes.
     public init(npub: String) throws(PublicKey.Error) {
         let decoded: (hrp: String, data: Data)
-        do throws(Bech32.Error) {
+        do throws(Bech32Error) {
             decoded = try Bech32.decode(npub)
         } catch {
             throw .invalidBech32(error)
@@ -108,7 +108,7 @@ extension PublicKey {
         /// The data is not 32 bytes (payload: its byte count).
         case invalidLength(Int)
         /// The `npub` string is not valid bech32.
-        case invalidBech32(Bech32.Error)
+        case invalidBech32(Bech32Error)
         /// The bech32 string carries a prefix other than `npub` (payload: the prefix found).
         case unexpectedPrefix(String)
 

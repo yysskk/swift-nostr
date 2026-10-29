@@ -132,7 +132,7 @@ enum TLV {
     /// Decodes a bech32 string, reporting a bech32 failure as a NIP-19 one.
     /// - Throws: ``NIP19Entity/Error/invalidBech32(_:)`` if `string` is not valid bech32.
     static func decodeBech32(_ string: String) throws(NIP19Entity.Error) -> (hrp: String, data: Data) {
-        do throws(Bech32.Error) {
+        do throws(Bech32Error) {
             return try Bech32.decode(string)
         } catch {
             throw .invalidBech32(error)
@@ -143,7 +143,7 @@ enum TLV {
     /// - Throws: ``NIP19Entity/Error/invalidBech32(_:)`` if `hrp` is not lowercase printable
     ///   ASCII, which never happens for the constant NIP-19 prefixes.
     static func encodeBech32(hrp: String, data: Data) throws(NIP19Entity.Error) -> String {
-        do throws(Bech32.Error) {
+        do throws(Bech32Error) {
             return try Bech32.encode(hrp: hrp, data: data)
         } catch {
             throw .invalidBech32(error)

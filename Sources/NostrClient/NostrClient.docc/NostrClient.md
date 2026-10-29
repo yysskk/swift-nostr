@@ -72,7 +72,7 @@ add NIP helpers and namespaces of your own; see <doc:ExtendingTheClient>.
 
 > The event model, keys, signing, encryption, encoding, relay protocol messages, and a single
 > `RelayConnection` are defined in `NostrCore`. See its documentation for `Event`, `KeyPair`,
-> `EventSigner`, `Filter`, `Bech32`, and the rest.
+> `EventSigner`, `Filter`, `NIP44Payload`, and the rest.
 
 ### Feature Namespaces
 

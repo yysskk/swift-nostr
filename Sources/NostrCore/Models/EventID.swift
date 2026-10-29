@@ -52,7 +52,7 @@ public struct EventID: Sendable, Hashable {
     ///   ``EventID/Error/invalidLength(_:)`` if it does not hold exactly 32 bytes.
     public init(note: String) throws(EventID.Error) {
         let decoded: (hrp: String, data: Data)
-        do throws(Bech32.Error) {
+        do throws(Bech32Error) {
             decoded = try Bech32.decode(note)
         } catch {
             throw .invalidBech32(error)
@@ -116,7 +116,7 @@ extension EventID {
         /// The data is not 32 bytes (payload: its byte count).
         case invalidLength(Int)
         /// The `note` string is not valid bech32.
-        case invalidBech32(Bech32.Error)
+        case invalidBech32(Bech32Error)
         /// The bech32 string carries a prefix other than `note` (payload: the prefix found).
         case unexpectedPrefix(String)
 

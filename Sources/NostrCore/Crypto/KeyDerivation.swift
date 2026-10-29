@@ -3,15 +3,15 @@ import Foundation
 import P256K
 
 /// Key derivation for NIP-06 using BIP-32/BIP-39
-public enum KeyDerivation {
+package enum KeyDerivation {
     /// The hardened offset for BIP-32 derivation (2^31)
-    public static let hardenedOffset: UInt32 = 0x8000_0000
+    package static let hardenedOffset: UInt32 = 0x8000_0000
 
     /// BIP-44 purpose
-    public static let bip44Purpose: UInt32 = 44
+    package static let bip44Purpose: UInt32 = 44
 
     /// SLIP-44 coin type for Nostr
-    public static let nostrCoinType: UInt32 = 1237
+    package static let nostrCoinType: UInt32 = 1237
 
     /// Derives a Nostr private key from a BIP-39 seed using the NIP-06 derivation path
     /// Path: m/44'/1237'/<account>'/0/0
@@ -21,7 +21,7 @@ public enum KeyDerivation {
     /// - Returns: The derived private key
     /// - Throws: ``KeyPair/Error/invalidPrivateKey`` in the vanishingly rare case (BIP-32) that a
     ///   derived key is not a valid secp256k1 scalar.
-    public static func deriveNostrKey(seed: Data, account: UInt32 = 0) throws(KeyPair.Error) -> PrivateKey {
+    package static func deriveNostrKey(seed: Data, account: UInt32 = 0) throws(KeyPair.Error) -> PrivateKey {
         // Generate master key from seed
         let (masterKey, masterChainCode) = try masterKeyFromSeed(seed)
 

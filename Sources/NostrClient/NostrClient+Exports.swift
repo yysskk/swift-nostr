@@ -1,6 +1,6 @@
 // This file makes `import NostrClient` the single import point for the library.
 //
-// NostrCore's primitives (`Event`, `KeyPair`, `EventSigner`, `Filter`, `Bech32`,
+// NostrCore's primitives (`Event`, `KeyPair`, `EventSigner`, `Filter`, `NIP44Payload`,
 // `RelayConnection`, `RelayRejection`, ...) are re-exported because the NostrClient API
 // surfaces them; Foundation is re-exported for the Foundation types (`Date`, `Data`,
 // `URL`, ...) that appear in the same API.

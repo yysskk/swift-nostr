@@ -847,7 +847,7 @@ let (mnemonic, kp) = try KeyPair.generate(wordCount: 12)  // random mnemonic
 ```
 
 The nsec and mnemonic initializers and `generate` throw `KeyPair.Error`: `invalidHex` (not 64
-hex digits), `invalidLength(Int)` (not 32 bytes), `invalidBech32(Bech32.Error)` or `unexpectedPrefix(String)`
+hex digits), `invalidLength(Int)` (not 32 bytes), `invalidBech32(Bech32Error)` or `unexpectedPrefix(String)`
 for an nsec, `invalidMnemonic(Mnemonic.Error)` for a bad phrase or word count, and `invalidPrivateKey` for
 bytes that are not a valid secp256k1 scalar.
 
@@ -872,7 +872,7 @@ one spelling, canonical lowercase hex (`PublicKey`/`EventID`: 64 digits = 32 byt
 digits = 64 bytes), which is also its `description` and its JSON encoding (a bare string). Uppercase,
 the wrong length, or non-hex is rejected: each type throws its own `Error` (`PublicKey.Error`,
 `EventID.Error`, `Signature.Error`) -- `invalidHex` for a string, `invalidLength(Int)` for data, and for an
-npub or note `invalidBech32(Bech32.Error)` or `unexpectedPrefix(String)` -- the failable
+npub or note `invalidBech32(Bech32Error)` or `unexpectedPrefix(String)` -- the failable
 `init?(_:)` returns nil, and decoding fails with `DecodingError.dataCorrupted`. `EventID` is `Comparable`
 (byte order, the NIP-01 tie-break).
 
@@ -1095,27 +1095,14 @@ let mnemonic = try Mnemonic.generate(wordCount: 12)  // 12, 15, 18, 21, or 24
 let mnemonic = try Mnemonic(phrase: "word1 word2 ...")
 let mnemonic = try Mnemonic(entropy: entropy)       // 16-32 bytes of BIP-39 entropy
 let seed = mnemonic.seed(passphrase: "optional")  // 64-byte seed
+let keyPair = try KeyPair(mnemonic: mnemonic, passphrase: "optional", account: 0)  // NIP-06 key
 ```
+
+`KeyPair(mnemonic:passphrase:account:)` and `KeyPair(mnemonicPhrase:passphrase:account:)` derive the key with
+BIP-32 along the NIP-06 path m/44'/1237'/<account>'/0/0; read `keyPair.privateKey` for the `PrivateKey`.
 
 Failures throw `Mnemonic.Error`: `invalidWordCount(Int)`, `unknownWord(String)`, `invalidChecksum`,
 `invalidEntropyLength(Int)`.
-
-## KeyDerivation
-
-BIP-32/BIP-39 key derivation for NIP-06 (enum).
-
-### Constants
-
-- `hardenedOffset: UInt32 = 0x80000000`
-- `bip44Purpose: UInt32 = 44`
-- `nostrCoinType: UInt32 = 1237`
-
-### Derivation
-
-```swift
-// Derives key using path m/44'/1237'/<account>'/0/0; returns a PrivateKey
-let privateKey = try KeyDerivation.deriveNostrKey(seed: seed, account: 0)
-```
 
 ## NIP44Payload
 
@@ -1154,7 +1141,7 @@ The 32-byte NIP-44 conversation key (struct: Sendable, Hashable). Secret materia
 let key = try ConversationKey(privateKey: myPrivateKey, publicKey: peerPublicKey)  // ECDH + HKDF; symmetric
 let shared = ConversationKey.random()                   // e.g. a group key
 let imported = try ConversationKey(data: bytes)         // throws NIP44Payload.Error.invalidConversationKey unless 32 bytes
-print(key.data)                                         // export the 32 bytes deliberately
+print(key.hex)                                          // export deliberately (`key.data` for the bytes)
 ```
 
 ## GiftWrap
@@ -1831,17 +1818,14 @@ let tuned = RelayConnectionTransport(relayURLs: relays, config: relayConfig)
 let injected = RelayConnectionTransport(relayURLs: relays, webSocketFactory: OkHttpWebSocketFactory())
 ```
 
-## Bech32
+## Bech32Error
 
-Bech32 encoding/decoding for NIP-19 (enum).
-
-```swift
-let encoded = try Bech32.encode(hrp: "npub", data: publicKeyData)
-let (hrp, data) = try Bech32.decode("npub1...")
-```
-
-Both throw `Bech32.Error`: `invalidHumanReadablePart`, `mixedCase`, `missingSeparator`, `invalidLength`,
-`invalidCharacter(Character)`, `invalidChecksum`, `invalidPadding`. Checking the prefix is the caller's job.
+Why a bech32 string could not be decoded (enum: Error, Sendable, Equatable), carried by the
+`invalidBech32(_:)` case of `PublicKey.Error`, `EventID.Error`, `KeyPair.Error`, `LNURL.Error`, and
+`NIP19Entity.Error`. Cases: `invalidHumanReadablePart`, `mixedCase`, `missingSeparator`, `invalidLength`,
+`invalidCharacter(Character)`, `invalidChecksum`, `invalidPadding`. Bech32 itself is reached through the
+typed APIs: `PublicKey(npub:)` / `.npub`, `PrivateKey(nsec:)` / `.nsec`, `EventID(note:)` / `.note`,
+`LNURL.decode(_:)` / `LNURL.encode(_:)`, and `NIP19Entity`.
 
 ## NIP19Entity
 
@@ -1857,7 +1841,7 @@ The TLV entities hold typed values: `NProfile(publicKey: PublicKey, relays:)`,
 record that is not a valid relay URL, and encoding writes each hint in canonical form.
 - `init(nostrURI: String) throws(NIP19Entity.Error)` -- decode a NIP-21 `nostr:` URI (case-insensitive scheme, tolerates `nostr://`, rejects `nsec`)
 
-Decoding, encoding, and the entity initializers throw `NIP19Entity.Error`: `invalidBech32(Bech32.Error)`,
+Decoding, encoding, and the entity initializers throw `NIP19Entity.Error`: `invalidBech32(Bech32Error)`,
 `unknownPrefix(String)` (not a NIP-19 prefix), `unexpectedPrefix(String)` (another entity's prefix
 given to `NProfile`/`NEvent`/`NAddr(bech32String:)`), `malformedTLV` (a truncated record),
 `missingPublicKey` / `missingEventID` / `missingIdentifier` / `missingAuthor` / `missingKind` (a

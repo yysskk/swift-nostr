@@ -29,7 +29,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `init(data:)`, which throws `NIP44Payload.Error.invalidConversationKey` for any other length.
   `init(privateKey:publicKey:)` derives the key two parties share with ECDH and HKDF, and `random()`
   generates one from the system CSPRNG for a group. Like `PrivateKey`, it compares in constant time
-  and redacts its `description`, `debugDescription`, and reflection; read `data` to export it.
+  and redacts its `description`, `debugDescription`, and reflection; read `data` or `hex` to export
+  it.
 
 ### Changed
 
@@ -177,6 +178,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     capabilities, where a later call failed the earlier one with `WalletConnectError.superseded`,
     which is removed. Cancelling one caller's task fails that call with `.cancelled` and leaves the
     attempt running for the others; the attempt is abandoned only when every caller is cancelled.
+- **Low-level encoding and derivation helpers are no longer public** (breaking): they were
+  implementation details of the typed APIs, and the `Data` extensions collided with same-named
+  extensions in apps and other packages.
+  - `Data(hexString:)` and `Data.hexEncodedString()` are removed from the public API. Use the typed
+    hex values: `PublicKey(hex:)` / `.hex`, `PrivateKey(hex:)` / `.hex`, `EventID(hex:)` / `.hex`,
+    `Signature(hex:)` / `.hex`, and `ConversationKey.hex`.
+  - `Bech32` (`encode(hrp:data:)`, `decode(_:)`, `decodeToWords(_:)`, `wordsToBytes(_:)`) is removed
+    from the public API. Use `PublicKey(npub:)` / `.npub`, `PrivateKey(nsec:)` / `.nsec`,
+    `EventID(note:)` / `.note`, `LNURL.decode(_:)` / `LNURL.encode(_:)`, and `NIP19Entity`.
+    `Bech32.Error` → `Bech32Error`, still the associated value of every `invalidBech32(_:)` case.
+  - `KeyDerivation` (`deriveNostrKey(seed:account:)` and its BIP-32/44 constants) is removed from
+    the public API. Use `KeyPair(mnemonic:passphrase:account:)` or
+    `KeyPair(mnemonicPhrase:passphrase:account:)` and read `privateKey`.
 
 ### Fixed
 

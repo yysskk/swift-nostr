@@ -234,9 +234,9 @@ let restored = try KeyPair(
 )
 
 // Work with Mnemonic directly
-let words = try Mnemonic.generate(wordCount: 12)
-let seed = words.seed(passphrase: "optional passphrase")
-let privateKey = try KeyDerivation.deriveNostrKey(seed: seed, account: 0)
+let mnemonic = try Mnemonic.generate(wordCount: 12)
+let account1 = try KeyPair(mnemonic: mnemonic, passphrase: "optional passphrase", account: 1)
+let privateKey = account1.privateKey
 ```
 
 ## NIP-05 Internet Identifier Verification
