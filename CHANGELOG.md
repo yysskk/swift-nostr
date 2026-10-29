@@ -71,6 +71,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`RelayConnectionState.failed` carries a typed `Failure`** (breaking): it was `failed(String)`, the
+  underlying error's description. `RelayConnectionState.Failure` (`Error`, `LocalizedError`,
+  `Hashable`) adds which operation failed (`.connect`, `.keepalive`, `.send`, or `.receive`) and keeps
+  the description as `reason`. `if case .failed = state` is unchanged; a match that bound the message
+  reads `failure.reason`, and `RelayConnectionState.Failure(operation:reason:)` builds one for a stub.
 - **`InternetIdentifier` is a value type** (breaking): `InternetIdentifier("alice@example.com")`
   validates the string once and returns `nil` if it is malformed, and the value is `Hashable`,
   `Codable` (as its string), and `LosslessStringConvertible`, with `name`, `domain` (lowercased), and

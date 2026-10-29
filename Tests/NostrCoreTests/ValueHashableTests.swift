@@ -36,8 +36,9 @@ struct ValueHashableTests {
         HashableSample(
             "NIP44Payload", NIP44Payload(base64: "AgAB"), NIP44Payload(base64: "AgAB"), NIP44Payload(base64: "AgAC")),
         HashableSample(
-            "RelayConnectionState", RelayConnectionState.failed("a"), RelayConnectionState.failed("a"),
-            RelayConnectionState.failed("b")),
+            "RelayConnectionState", RelayConnectionState.failed(.init(operation: .send, reason: "a")),
+            RelayConnectionState.failed(.init(operation: .send, reason: "a")),
+            RelayConnectionState.failed(.init(operation: .receive, reason: "a"))),
         HashableSample(
             "WebSocketMessage", WebSocketMessage.string("a"), WebSocketMessage.string("a"),
             WebSocketMessage.data(Data("a".utf8))),
