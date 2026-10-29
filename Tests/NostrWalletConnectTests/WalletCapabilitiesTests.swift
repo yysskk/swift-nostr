@@ -89,4 +89,22 @@ struct WalletCapabilitiesTests {
             signature: nil)
         #expect(WalletCapabilities(infoEvent: event) == nil)
     }
+
+    @Test("the memberwise initializer sets every field")
+    func memberwiseInit() {
+        let capabilities = WalletCapabilities(
+            methods: [.payInvoice, .getBalance], encryptions: [.nip44], notifications: [.paymentReceived])
+        #expect(capabilities.methods == [.payInvoice, .getBalance])
+        #expect(capabilities.encryptions == [.nip44])
+        #expect(capabilities.notifications == [.paymentReceived])
+        #expect(capabilities.negotiatedEncryption == .nip44)
+    }
+
+    @Test("the memberwise initializer treats no encryptions as NIP-04, like a missing tag")
+    func memberwiseInitDefaultsEncryption() {
+        let defaulted = WalletCapabilities(methods: [.payInvoice])
+        #expect(defaulted.encryptions == [.nip04])
+        #expect(defaulted.notifications.isEmpty)
+        #expect(WalletCapabilities(methods: [.payInvoice], encryptions: []).encryptions == [.nip04])
+    }
 }

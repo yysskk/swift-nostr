@@ -1,7 +1,7 @@
 import Foundation
 
 /// Configuration for relay connection behavior
-public struct RelayConnectionConfig: Sendable {
+public struct RelayConnectionConfig: Sendable, Hashable {
     /// How long opening the connection may take. Also bounds the pong wait of keepalive pings.
     public var connectionTimeout: Duration
 

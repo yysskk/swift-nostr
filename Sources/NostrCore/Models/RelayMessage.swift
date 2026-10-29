@@ -1,7 +1,7 @@
 import Foundation
 
 /// Messages sent from the client to a relay (NIP-01)
-public enum ClientMessage: Sendable {
+public enum ClientMessage: Sendable, Hashable {
     /// Used to publish events
     case event(Event)
 
@@ -62,7 +62,7 @@ public enum ClientMessage: Sendable {
 }
 
 /// Messages received from a relay (NIP-01)
-public enum RelayMessage: Sendable {
+public enum RelayMessage: Sendable, Hashable {
     /// Event sent by the relay
     case event(subscriptionID: SubscriptionID, event: Event)
 

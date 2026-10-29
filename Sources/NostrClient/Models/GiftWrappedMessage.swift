@@ -8,7 +8,7 @@ import NostrCore
 /// the identical unsigned rumor. Returned by ``DirectMessageBuilder``, and carried by
 /// ``SendDirectMessageResult`` once published.
 /// https://github.com/nostr-protocol/nips/blob/master/17.md
-public struct GiftWrappedMessage: Sendable {
+public struct GiftWrappedMessage: Sendable, Hashable {
     /// The unsigned rumor shared by both gift wraps — kind 14 for a message, kind 15 for a file,
     /// kind 7 for a reaction, or the caller's kind for ``NostrMessaging/sendGiftWrapped(_:to:expiration:strategy:)``
     /// (``Event/signature`` is `nil`; NIP-17 rumors must never be signed). Its `id` is the stable

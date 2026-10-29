@@ -105,4 +105,17 @@ struct RelayMessageResponsePrefixTests {
         let notice = try RelayMessage(json: noticeFrame)
         #expect(notice.responsePrefix == nil)
     }
+
+    @Test(
+        "Codable round-trips a prefix as its bare wire string, known or not",
+        arguments: [
+            (RelayResponsePrefix.authRequired, #""auth-required""#),
+            (RelayResponsePrefix(rawValue: "payment-required"), #""payment-required""#),
+        ]
+    )
+    func codableRoundTrip(prefix: RelayResponsePrefix, json: String) throws {
+        let encoded = try JSONEncoder().encode(prefix)
+        #expect(String(decoding: encoded, as: UTF8.self) == json)
+        #expect(try JSONDecoder().decode(RelayResponsePrefix.self, from: Data(json.utf8)) == prefix)
+    }
 }

@@ -8,7 +8,7 @@ import Foundation
 /// ``decrypt(from:using:)`` derive that key from a sender and recipient key pair, for one-to-one
 /// messages. ``encrypt(_:with:)`` and ``decrypt(with:)`` take the key directly, for a ciphertext
 /// shared by everyone who holds it. Both produce the same on-wire format.
-public struct NIP44Payload: Sendable {
+public struct NIP44Payload: Sendable, Hashable {
     /// The payload as base64 text, the form a Nostr event carries in its `content`.
     public let base64: String
 

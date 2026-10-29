@@ -326,7 +326,7 @@ extension Event.Kind: Codable {
 
 // MARK: - Unsigned Event
 /// An event before it has been signed
-public struct UnsignedEvent: Sendable {
+public struct UnsignedEvent: Sendable, Hashable {
     /// The creator's public key.
     public let publicKey: PublicKey
     /// When the event was created.

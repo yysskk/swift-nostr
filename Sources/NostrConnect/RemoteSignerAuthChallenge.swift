@@ -10,4 +10,18 @@ public struct RemoteSignerAuthChallenge: Sendable, Hashable {
     public let method: RemoteSignerMethod
     /// The id of the request that remains pending until the challenge is resolved.
     public let requestID: String
+
+    /// Creates a challenge from its parts.
+    ///
+    /// ``RemoteSigner/authChallenges()`` delivers the challenges a signer issues; create one
+    /// directly to drive an app's challenge handling in tests or previews.
+    /// - Parameters:
+    ///   - url: The URL to present to the user to complete authentication.
+    ///   - method: The method whose request triggered the challenge.
+    ///   - requestID: The id of the request that remains pending until the challenge is resolved.
+    public init(url: URL, method: RemoteSignerMethod, requestID: String) {
+        self.url = url
+        self.method = method
+        self.requestID = requestID
+    }
 }

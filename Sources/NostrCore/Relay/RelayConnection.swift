@@ -1062,7 +1062,7 @@ extension RelayConnection {
     ///
     /// A relay that answers a request with OK `false` or CLOSED throws a ``RelayRejection``
     /// instead, except for a rejected AUTH event, which is ``authenticationRejected(_:)``.
-    public enum Error: Swift.Error, LocalizedError, Sendable, Equatable {
+    public enum Error: Swift.Error, LocalizedError, Sendable, Hashable {
         /// The connection is not established, or was torn down while the operation waited.
         case notConnected
         /// The relay did not answer — a send, an OK, a COUNT, a ping, or an AUTH round-trip —

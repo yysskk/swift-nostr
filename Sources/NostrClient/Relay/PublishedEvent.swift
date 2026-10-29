@@ -7,7 +7,7 @@ import NostrCore
 /// ``NostrEventPublishing/publishTextNote(content:tags:strategy:)``). ``event`` is the
 /// signed event that was sent, and ``result`` is the ``PublishResult`` describing which
 /// relays accepted it.
-public struct PublishedEvent: Sendable {
+public struct PublishedEvent: Sendable, Hashable {
     /// The signed event that was sent.
     public let event: Event
 

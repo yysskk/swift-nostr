@@ -1,7 +1,7 @@
 import Foundation
 
 /// What became of one item in a `multi_pay_invoice` or `multi_pay_keysend` request.
-public enum MultiPayOutcome: Sendable {
+public enum MultiPayOutcome: Sendable, Hashable {
     /// The wallet answered for this item: the payment result, or the error it reported.
     case answered(Result<PaymentResult, WalletConnectError>)
     /// No response arrived that could be tied to this item.
@@ -24,7 +24,7 @@ public enum MultiPayOutcome: Sendable {
 }
 
 /// A response the wallet sent that could not be tied to a requested item.
-public struct UnmatchedMultiPayResponse: Sendable {
+public struct UnmatchedMultiPayResponse: Sendable, Hashable {
     /// The `d` tag the wallet correlated the response by, if it sent one.
     ///
     /// NIP-47 sets this to the item's `id` when the request supplied one, and otherwise to the
@@ -48,7 +48,7 @@ public struct UnmatchedMultiPayResponse: Sendable {
 /// caller would have to derive. Keying by it silently dropped a colliding result and left no way to
 /// tell which invoice a result belonged to; here nothing is lost, and anything that could not be
 /// tied back is reported in ``unmatched`` instead of being discarded.
-public struct MultiPayResults: Sendable {
+public struct MultiPayResults: Sendable, Hashable {
     /// One outcome per requested item, aligned to the order they were requested in.
     public let outcomes: [MultiPayOutcome]
 

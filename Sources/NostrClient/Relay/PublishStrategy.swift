@@ -4,7 +4,7 @@ import Foundation
 ///
 /// The event is always sent to every targeted relay regardless of the strategy;
 /// the strategy only controls how many acknowledgments to wait for before returning.
-public enum PublishStrategy: Sendable, Equatable {
+public enum PublishStrategy: Sendable, Hashable {
     /// Returns as soon as one relay acknowledges the event (OK with accepted: true).
     /// Sends to the remaining relays continue in the background for redundancy.
     case firstAck

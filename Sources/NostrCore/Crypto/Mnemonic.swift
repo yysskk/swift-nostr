@@ -208,6 +208,46 @@ public struct Mnemonic: Sendable {
     }
 }
 
+// MARK: - Equatable & Hashable
+extension Mnemonic: Hashable {
+    /// Compares every byte of the two phrases regardless of where they first differ, so the
+    /// comparison's duration does not reveal how much of a phrase matched — only, at most, whether
+    /// the phrases differ in length.
+    public static func == (lhs: Mnemonic, rhs: Mnemonic) -> Bool {
+        let lhsBytes = Array(lhs.phrase.utf8)
+        let rhsBytes = Array(rhs.phrase.utf8)
+        var difference: UInt8 = lhsBytes.count == rhsBytes.count ? 0 : 1
+        for index in 0..<max(lhsBytes.count, rhsBytes.count) {
+            let lhsByte = index < lhsBytes.count ? lhsBytes[index] : 0
+            let rhsByte = index < rhsBytes.count ? rhsBytes[index] : 0
+            difference |= lhsByte ^ rhsByte
+        }
+        return difference == 0
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(words)
+    }
+}
+
+// MARK: - Redaction
+extension Mnemonic: CustomStringConvertible, CustomDebugStringConvertible, CustomReflectable {
+    /// A placeholder that never contains the phrase. Read ``words`` or ``phrase`` to export it.
+    public var description: String {
+        "Mnemonic(<redacted>)"
+    }
+
+    /// A placeholder that never contains the phrase.
+    public var debugDescription: String {
+        description
+    }
+
+    /// A mirror with no children, so `dump` and other reflection show only ``description``.
+    public var customMirror: Mirror {
+        Mirror(self, children: [], displayStyle: .struct)
+    }
+}
+
 extension Mnemonic {
     /// The number of words in a BIP-39 mnemonic, which fixes how much entropy it encodes.
     public enum WordCount: Int, Sendable, Hashable, CaseIterable {

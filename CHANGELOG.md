@@ -42,9 +42,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   DM inbox) may add to the pool and connect; it was fixed at 8. Relays already in the pool are always
   used and never count against it. Zero or a negative value adds none, so gossip routing uses only
   pooled relays, as under `GossipRelayPolicy.requirePresent`.
+- **More value types are `Hashable`**, so they can be compared, deduplicated in a `Set`, or used as
+  dictionary keys like their peers:
+  - NostrCore: `UnsignedEvent`, `ClientMessage`, `RelayMessage`, `NIP44Payload`,
+    `RelayConnectionConfig`, `RelayConnectionState`, `WebSocketMessage`, `RelayConnection.Error`, and
+    `Mnemonic`, which compares its phrase in constant time like `PrivateKey` and `ConversationKey`.
+  - NostrClient: `PublishRelayStatus`, `PublishResult`, `PublishedEvent`, `SendDirectMessageResult`,
+    `GiftWrappedMessage`, `GiftWrap.UnwrappedMessage`, `SubscriptionEvent`, `UserMetadata`,
+    `PublishStrategy`, `RelayPoolConfig`, and `NostrClient.Config`.
+  - NostrWalletConnect: `WalletConnectError`, `MultiPayOutcome`, `UnmatchedMultiPayResponse`,
+    `MultiPayResults`, and `WalletConnection.Config`.
+  - NostrConnect: `RemoteSigner.Config`.
+- **`Timestamp` is `ExpressibleByIntegerLiteral`**: an integer literal is Unix seconds, so
+  `let createdAt: Timestamp = 1_700_000_000` is `Timestamp(rawValue: 1_700_000_000)`.
+- **`RelayResponsePrefix` is `Codable`**: it encodes as its bare wire string (`"auth-required"`), and
+  any string decodes, so a prefix this package has no constant for is preserved.
+- **`RemoteSignerAuthChallenge` and `WalletCapabilities` have public memberwise initializers**, so an
+  app can build the values it receives to drive its own tests and previews:
+  `RemoteSignerAuthChallenge(url:method:requestID:)` and
+  `WalletCapabilities(methods:encryptions:notifications:)`, where `encryptions` defaults to `[.nip04]`
+  and an empty list means NIP-04 only, as for an info event without an `encryption` tag.
 
 ### Changed
 
+- **`PublishRelayStatus` separates rejections from failures and compares by value** (breaking). A
+  relay's OK `false` is now `.rejected(RelayRejection)`, and `.failed` carries a
+  `RelayConnection.Error` instead of `any Error`: `.failed(error)` where `error` is a
+  `RelayRejection` → `.rejected(rejection)`. The custom `==` that compared the case only — so two
+  `.failed` statuses with different errors were equal — is replaced by synthesized `Equatable` and
+  `Hashable`, so `status == .failed(.timedOut)` no longer matches a `.notConnected` failure. To test
+  for a case regardless of its payload, match it: `if case .rejected = status`.
+  `PublishResult.failedRelays` holds both rejected and failed relays, as before.
+- **`Mnemonic` redacts its phrase when printed**: `description`, `debugDescription`, and reflection
+  (`dump`, `print`, string interpolation) show `Mnemonic(<redacted>)` instead of the words, like
+  `PrivateKey` and `ConversationKey`. Read `words` or `phrase` to export the phrase.
 - **`WebSocketSession` is a plain async API** (breaking for custom transports). `resume()` is now
   `open()`, `cancel(with:reason:)` is now `close(code:reason:)` with a `String?` UTF-8 reason
   instead of `Data?`, and `sendPing(pongReceiveHandler:)` is now `ping() async throws`, which

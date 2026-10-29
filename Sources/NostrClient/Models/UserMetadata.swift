@@ -2,7 +2,7 @@
 ///
 /// All fields are optional; only the ones a user has set are present. The
 /// `display_name` JSON key is mapped to ``displayName``.
-public struct UserMetadata: Codable, Sendable {
+public struct UserMetadata: Codable, Hashable, Sendable {
     /// Short username shown alongside the user's posts.
     public var name: String?
     /// Free-form biography or description.

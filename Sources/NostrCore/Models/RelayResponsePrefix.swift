@@ -97,6 +97,23 @@ extension RelayResponsePrefix: ExpressibleByStringLiteral {
     }
 }
 
+// MARK: - Codable
+extension RelayResponsePrefix: Codable {
+    /// Decodes a prefix from its wire string. Any string decodes, so a prefix this package has no
+    /// constant for is preserved rather than rejected.
+    /// - Throws: `DecodingError` if the value is not a string.
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        self.init(rawValue: try container.decode(String.self))
+    }
+
+    /// Encodes the prefix as its wire string, e.g. `"auth-required"`.
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
+    }
+}
+
 // MARK: - RelayMessage Convenience
 extension RelayMessage {
     /// The machine-readable prefix of this message's status string, for the

@@ -2,7 +2,7 @@ import Foundation
 import NostrCore
 
 /// High-level subscription events emitted by `NostrClient`.
-public enum SubscriptionEvent: Sendable {
+public enum SubscriptionEvent: Sendable, Hashable {
     /// An event delivered by a relay for the subscription.
     case event(relayURL: RelayURL, event: Event)
 

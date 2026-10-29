@@ -441,8 +441,8 @@ do {
 }
 ```
 
-Through ``NostrClient``, each relay's rejection is the error in its
-``PublishRelayStatus/failed(_:)`` status, and it is thrown when no relay accepted the event.
+Through ``NostrClient``, each relay's rejection is the payload of its
+``PublishRelayStatus/rejected(_:)`` status, and it is thrown when no relay accepted the event.
 
 ## Remote Signing (NIP-46)
 
