@@ -35,7 +35,7 @@ public enum LNURL {
     ///   ``LNURL/Error/invalidURL`` if its payload is not a UTF-8 URL.
     public static func decode(_ lnurl: String) throws(LNURL.Error) -> URL {
         let decoded: (hrp: String, data: Data)
-        do throws(Bech32.Error) {
+        do throws(Bech32Error) {
             decoded = try Bech32.decode(lnurl)
         } catch {
             throw .invalidBech32(error)
@@ -57,7 +57,7 @@ public enum LNURL {
     /// Why a string could not be decoded as an `lnurl`.
     public enum Error: Swift.Error, LocalizedError, Sendable, Equatable {
         /// The string is not valid bech32.
-        case invalidBech32(Bech32.Error)
+        case invalidBech32(Bech32Error)
         /// The bech32 string carries a prefix other than `lnurl` (payload: the prefix found).
         case unexpectedPrefix(String)
         /// The decoded payload is not a UTF-8 URL.

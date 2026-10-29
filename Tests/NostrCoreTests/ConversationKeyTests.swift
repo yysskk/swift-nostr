@@ -17,6 +17,13 @@ struct ConversationKeyTests {
         #expect(key.data == bytes)
     }
 
+    @Test("hex is the key's 64 lowercase hexadecimal digits")
+    func hexEncodesTheBytes() throws {
+        let key = try ConversationKey(data: Data((0..<32).map { UInt8($0) }))
+
+        #expect(key.hex == "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f")
+    }
+
     @Test("init(data:) rejects any length other than 32 bytes", arguments: [0, 16, 31, 33, 64])
     func rejectsWrongLength(byteCount: Int) {
         let bytes = Data(repeating: 0x01, count: byteCount)

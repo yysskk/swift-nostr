@@ -99,7 +99,7 @@ extension KeyPair {
         /// The data is not 32 bytes (payload: its byte count).
         case invalidLength(Int)
         /// The `nsec` string is not valid bech32.
-        case invalidBech32(Bech32.Error)
+        case invalidBech32(Bech32Error)
         /// The bech32 string carries a prefix other than `nsec` (payload: the prefix found).
         case unexpectedPrefix(String)
         /// The 32 bytes are not a valid secp256k1 private key: zero, or not below the curve order.

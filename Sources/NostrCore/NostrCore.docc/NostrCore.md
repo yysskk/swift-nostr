@@ -41,7 +41,6 @@ try event.verify()
 - ``PrivateKey``
 - ``PublicKey``
 - ``Mnemonic``
-- ``KeyDerivation``
 - ``BIP39WordList``
 
 ### Signing and Encryption
@@ -60,10 +59,6 @@ try event.verify()
 ### Relay-based Groups (NIP-29)
 
 - ``Groups``
-
-### Encoding
-
-- ``Bech32``
 
 ### Relay Protocol
 
@@ -106,7 +101,7 @@ try event.verify()
 ### Errors
 
 - ``RelayConnection/Error``
-- ``Bech32/Error``
+- ``Bech32Error``
 - ``PublicKey/Error``
 - ``EventID/Error``
 - ``Signature/Error``

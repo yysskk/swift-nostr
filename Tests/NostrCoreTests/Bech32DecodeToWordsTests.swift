@@ -17,14 +17,14 @@ struct Bech32DecodeToWordsTests {
     @Test("throws instead of trapping on a non-ASCII human-readable part")
     func nonASCIIHumanReadablePartThrows() {
         // A non-ASCII HRP must not reach `hrpExpand`'s `asciiValue` force-unwrap.
-        #expect(throws: Bech32.Error.invalidHumanReadablePart) {
+        #expect(throws: Bech32Error.invalidHumanReadablePart) {
             try Bech32.decodeToWords("é1qpzry9x8gf2tvdw0s3jn54khce6mua7lmqqqxw")
         }
     }
 
     @Test("throws on a string with no separator")
     func missingSeparatorThrows() {
-        #expect(throws: Bech32.Error.missingSeparator) {
+        #expect(throws: Bech32Error.missingSeparator) {
             try Bech32.decodeToWords("notbech32")
         }
     }

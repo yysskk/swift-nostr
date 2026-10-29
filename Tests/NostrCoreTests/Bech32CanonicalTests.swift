@@ -25,10 +25,10 @@ struct Bech32CanonicalTests {
     /// lowercase." The string was lowercased before any case check, so mixed case slipped through.
     @Test("mixed case is rejected by decode")
     func mixedCaseIsRejectedByDecode() {
-        #expect(throws: Bech32.Error.mixedCase) {
+        #expect(throws: Bech32Error.mixedCase) {
             _ = try Bech32.decode("NPUB180cvv07tjdrrgpa0j7j7tmnyl2yr6yr7l8j4s3evf6u64th6gkwsyjh6w6")
         }
-        #expect(throws: Bech32.Error.mixedCase) {
+        #expect(throws: Bech32Error.mixedCase) {
             _ = try Bech32.decode(
                 "npub180cvv07tjdrrgpa0j7j7tmnyl2yr6yr7l8j4s3evf6u64th6gkwsyjh6W6")
         }
@@ -42,7 +42,7 @@ struct Bech32CanonicalTests {
         let (_, upperWords) = try Bech32.decodeToWords(npub.uppercased())
         #expect(lowerWords == upperWords)
 
-        #expect(throws: Bech32.Error.mixedCase) {
+        #expect(throws: Bech32Error.mixedCase) {
             _ = try Bech32.decodeToWords(
                 "NPUB180cvv07tjdrrgpa0j7j7tmnyl2yr6yr7l8j4s3evf6u64th6gkwsyjh6w6")
         }
@@ -68,7 +68,7 @@ struct Bech32CanonicalTests {
             let (_, roundTripped) = try Bech32.decodeToWords(reencoded)
             #expect(roundTripped == mutated)
 
-            #expect(throws: Bech32.Error.invalidPadding) {
+            #expect(throws: Bech32Error.invalidPadding) {
                 _ = try Bech32.decode(reencoded)
             }
         }
@@ -83,7 +83,7 @@ struct Bech32CanonicalTests {
         let truncated = Array(words.prefix(51))
         let reencoded = TestBech32.encode(hrp: hrp, words: truncated)
 
-        #expect(throws: Bech32.Error.invalidPadding) {
+        #expect(throws: Bech32Error.invalidPadding) {
             _ = try Bech32.decode(reencoded)
         }
     }
@@ -103,13 +103,13 @@ struct Bech32CanonicalTests {
     /// lowercased string, so a non-lowercase HRP produced output that could never be decoded back.
     @Test("encode rejects a human-readable part it could not decode back")
     func encodeRejectsUnusableHRP() {
-        #expect(throws: Bech32.Error.invalidHumanReadablePart) {
+        #expect(throws: Bech32Error.invalidHumanReadablePart) {
             _ = try Bech32.encode(hrp: "", data: Data([0x01]))
         }
-        #expect(throws: Bech32.Error.invalidHumanReadablePart) {
+        #expect(throws: Bech32Error.invalidHumanReadablePart) {
             _ = try Bech32.encode(hrp: "NPUB", data: Data([0x01]))
         }
-        #expect(throws: Bech32.Error.invalidHumanReadablePart) {
+        #expect(throws: Bech32Error.invalidHumanReadablePart) {
             _ = try Bech32.encode(hrp: "np ub", data: Data([0x01]))
         }
     }

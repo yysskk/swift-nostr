@@ -78,7 +78,7 @@ public enum NIP19Entity: Sendable, Hashable {
     /// An error decoding or encoding a NIP-19 entity or a NIP-21 `nostr:` URI.
     public enum Error: Swift.Error, LocalizedError, Sendable, Equatable {
         /// The string is not valid bech32.
-        case invalidBech32(Bech32.Error)
+        case invalidBech32(Bech32Error)
         /// The bech32 prefix is not one NIP-19 defines (payload: the prefix found).
         case unknownPrefix(String)
         /// The bech32 prefix is not the one the entity type expects, such as an `npub` given to

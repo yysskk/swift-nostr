@@ -44,7 +44,7 @@ struct Bech32Tests {
 
     @Test("Invalid bech32 throws error")
     func invalidBech32() {
-        #expect(throws: Bech32.Error.missingSeparator) {
+        #expect(throws: Bech32Error.missingSeparator) {
             _ = try Bech32.decode("invalid")
         }
     }
@@ -52,7 +52,7 @@ struct Bech32Tests {
     @Test("Decoding reports why a string is not bech32")
     func decodingFailureReasons() {
         let npub = "npub180cvv07tjdrrgpa0j7j7tmnyl2yr6yr7l8j4s3evf6u64th6gkwsyjh6w6"
-        let cases: [(String, Bech32.Error)] = [
+        let cases: [(String, Bech32Error)] = [
             ("1qpzry9x8", .invalidLength),
             ("npub1qpzry", .invalidLength),
             ("npub1qpzrybqq", .invalidCharacter("b")),

@@ -12,10 +12,15 @@ import P256K
 /// A `ConversationKey` always holds exactly 32 bytes, so ``NIP44Payload/encrypt(_:with:)`` and
 /// ``NIP44Payload/decrypt(with:)`` never reject it. Like ``PrivateKey``, its `description`,
 /// `debugDescription`, and reflection are redacted, and equality compares every byte; read
-/// ``data`` to export it deliberately.
+/// ``data`` or ``hex`` to export it deliberately.
 public struct ConversationKey: Sendable {
     /// The key's 32 bytes.
     public let data: Data
+
+    /// The key as 64 lowercase hexadecimal digits.
+    public var hex: String {
+        data.hexEncodedString()
+    }
 
     /// The length of a conversation key, the HKDF-Extract output the message keys expand from.
     static let byteCount = 32

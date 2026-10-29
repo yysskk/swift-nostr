@@ -9,7 +9,7 @@ extension Data {
     /// `A`–`F`); decoding is case-insensitive. Returns `nil` if the string has an odd length or
     /// contains anything else — including a leading `+` or `-`, which the standard integer parser
     /// would otherwise accept.
-    public init?(hexString: String) {
+    package init?(hexString: String) {
         let hex = hexString.lowercased()
         guard hex.count % 2 == 0 else { return nil }
 
@@ -34,7 +34,7 @@ extension Data {
     }
 
     /// Returns the data as a lowercase hexadecimal string.
-    public func hexEncodedString() -> String {
+    package func hexEncodedString() -> String {
         map { String(format: "%02x", $0) }.joined()
     }
 }
