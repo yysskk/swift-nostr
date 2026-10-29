@@ -242,27 +242,28 @@ let privateKey = account1.privateKey
 ## NIP-05 Internet Identifier Verification
 
 ```swift
-// Verify an internet identifier
-let result = try await InternetIdentifier.verify("alice@example.com")
+// Parse an identifier; nil if it is not a well-formed `name@domain` (or bare domain)
+guard let identifier = InternetIdentifier("alice@example.com") else { return }
+
+// Ask the domain which key the name maps to
+let result = try await identifier.verify()
 print("Public key: \(result.publicKey)")
 print("Relays: \(result.relays)")
 
-// Verify against expected public key; errors are typed as `InternetIdentifier.VerificationError`
-let expectedPublicKey = try PublicKey(npub: "npub1...")
-do {
-    try await InternetIdentifier.verify("alice@example.com", expectedPublicKey: expectedPublicKey)
-} catch .publicKeyMismatch {
-    print("alice@example.com names a different key")
-} catch {
-    print("Verification failed: \(error.localizedDescription)")
+// Check the identifier a profile claims; errors are typed as `InternetIdentifier.VerificationError`
+if let claimed = metadata.internetIdentifier {
+    do {
+        try await claimed.verify(expectedPublicKey: author)
+    } catch .publicKeyMismatch {
+        print("\(claimed) names a different key")
+    } catch {
+        print("Verification failed: \(error.localizedDescription)")
+    }
 }
-
-// Look up public key only
-let publicKey = try await InternetIdentifier.lookupPublicKey("alice@example.com")
 ```
 
-A `nostr.json` entry that is not a canonical hex key (64 lowercase hex digits) names no key, so the
-lookup throws ``InternetIdentifier/VerificationError/publicKeyNotFound``.
+A `nostr.json` entry that is not a canonical hex key (64 lowercase hex digits) names no key, so
+``InternetIdentifier/verify()`` throws ``InternetIdentifier/VerificationError/publicKeyNotFound``.
 
 ## NIP-19 Entities
 

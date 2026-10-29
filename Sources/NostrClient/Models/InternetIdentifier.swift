@@ -5,42 +5,38 @@ import NostrCore
     import FoundationNetworking
 #endif
 
-/// Internet Identifier verification (NIP-05)
+/// A NIP-05 internet identifier, such as `alice@example.com`, which a domain maps to a public key.
 /// https://github.com/nostr-protocol/nips/blob/master/05.md
 ///
-/// Provides DNS-based verification of Nostr identities using
-/// human-readable identifiers like "alice@example.com"
-public struct InternetIdentifier: Sendable {
+/// Creating one validates the string; ``verify()`` then asks the domain which key the name maps to:
+///
+/// ```swift
+/// guard let identifier = InternetIdentifier("alice@example.com") else { return }
+/// let result = try await identifier.verify()
+/// print(result.publicKey, result.relays)
+/// ```
+///
+/// The separator is the *last* `@`, and the local part (``name``) must use the `a-z0-9-_.` NIP-05
+/// allows (uppercase included, since ``verify()`` looks the name up both as written and
+/// lowercased). A string carrying more than one `@` is therefore rejected rather than resolved:
+/// `alice@evil.com@example.com` would otherwise name a different server than a reader expects.
+/// A domain alone, such as `example.com`, is the root identifier `_@example.com`.
+///
+/// The ``domain`` is lowercased, since hosts are case-insensitive; ``name`` keeps its case.
+/// ``description`` is `name@domain`, and the value encodes to and from JSON as that string.
+public struct InternetIdentifier: Sendable, Hashable {
+    /// The local part, such as `alice`; `_` for the root identifier of a domain.
+    public let name: String
 
-    /// A verified internet identifier result
-    public struct VerificationResult: Sendable, Hashable {
-        /// The full identifier (e.g., "alice@example.com")
-        public let identifier: String
+    /// The domain that serves the identifier's `nostr.json`, lowercased.
+    public let domain: String
 
-        /// The verified public key
-        public let publicKey: PublicKey
-
-        /// Relay URLs the server recommends for this user, in the order listed. The server's
-        /// `relays` entries are third-party content, so one that is not a valid relay URL is
-        /// skipped.
-        public let relays: [RelayURL]
-
-        /// Creates a verification result.
-        /// - Parameters:
-        ///   - identifier: The full identifier (e.g., "alice@example.com").
-        ///   - publicKey: The public key the identifier resolved to.
-        ///   - relays: Relay URLs the server recommends for this user.
-        public init(identifier: String, publicKey: PublicKey, relays: [RelayURL] = []) {
-            self.identifier = identifier
-            self.publicKey = publicKey
-            self.relays = relays
-        }
-    }
+    /// The URL of the `nostr.json` document that resolves ``name``:
+    /// `https://<domain>/.well-known/nostr.json?name=<name>`.
+    public let wellKnownURL: URL
 
     /// Errors that can occur during verification
     public enum VerificationError: Error, LocalizedError, Sendable, Equatable {
-        /// The identifier is not a well-formed `name@domain`.
-        case invalidIdentifier
         /// The `nostr.json` request failed; carries the underlying error's description.
         case networkError(String)
         /// The server answered with a non-2xx status or a body that is not a `nostr.json` document.
@@ -52,8 +48,6 @@ public struct InternetIdentifier: Sendable {
 
         public var errorDescription: String? {
             switch self {
-            case .invalidIdentifier:
-                return "Invalid internet identifier format"
             case .networkError(let message):
                 return "Network error: \(message)"
             case .invalidResponse:
@@ -66,39 +60,144 @@ public struct InternetIdentifier: Sendable {
         }
     }
 
-    /// Parses an internet identifier into name and domain components.
-    ///
-    /// The separator is the *last* `@`, matching how `LNURL` resolves the same identifier shape, and
-    /// the local part must be the `a-z0-9-_.` NIP-05 allows (uppercase included, since
-    /// ``verify(_:)`` looks the name up in both cases). A string carrying more than one `@` is
-    /// therefore rejected rather than resolved: splitting on the first one made
-    /// `alice@evil.com@example.com` look like the host `evil.com@example.com`, which names a
-    /// different server than a reader of that identifier would expect.
-    /// - Parameter identifier: The identifier (e.g., "alice@example.com" or "_@example.com")
-    /// - Returns: Tuple of (name, domain), or nil if the identifier is not well formed.
-    public static func parse(_ identifier: String) -> (name: String, domain: String)? {
-        let name: String
-        let domain: String
+    /// A verified internet identifier result
+    public struct VerificationResult: Sendable, Hashable {
+        /// The identifier that was verified.
+        public let identifier: InternetIdentifier
 
-        if let separator = identifier.lastIndex(of: "@") {
-            name = String(identifier[identifier.startIndex..<separator])
-            domain = String(identifier[identifier.index(after: separator)...])
-        } else {
-            // Domain only, use "_" as name
-            name = "_"
-            domain = identifier
+        /// The verified public key
+        public let publicKey: PublicKey
+
+        /// Relay URLs the server recommends for this user, in the order listed. The server's
+        /// `relays` entries are third-party content, so one that is not a valid relay URL is
+        /// skipped.
+        public let relays: [RelayURL]
+
+        /// Creates a verification result.
+        /// - Parameters:
+        ///   - identifier: The identifier that was verified.
+        ///   - publicKey: The public key the identifier resolved to.
+        ///   - relays: Relay URLs the server recommends for this user.
+        public init(identifier: InternetIdentifier, publicKey: PublicKey, relays: [RelayURL] = []) {
+            self.identifier = identifier
+            self.publicKey = publicKey
+            self.relays = relays
+        }
+    }
+
+    /// Asks ``domain`` which public key ``name`` maps to.
+    ///
+    /// The server's `names` entry must be a canonical hex public key (64 lowercase hex digits, as
+    /// NIP-05 requires); any other value names no key, so it is reported as
+    /// ``VerificationError/publicKeyNotFound``.
+    /// - Returns: The public key and the relays the server recommends for it.
+    /// - Throws: ``VerificationError/networkError(_:)``, ``VerificationError/invalidResponse``, or
+    ///   ``VerificationError/publicKeyNotFound``.
+    public func verify() async throws(VerificationError) -> VerificationResult {
+        let data: Data
+        do {
+            let (body, urlResponse) = try await URLSession.shared.data(from: wellKnownURL)
+
+            guard let httpResponse = urlResponse as? HTTPURLResponse,
+                (200...299).contains(httpResponse.statusCode)
+            else {
+                throw VerificationError.invalidResponse
+            }
+            data = body
+        } catch let error as VerificationError {
+            throw error
+        } catch {
+            throw VerificationError.networkError(error.localizedDescription)
         }
 
-        guard isValidLocalPart(name), isValidDomain(domain) else {
+        return try result(in: data)
+    }
+
+    /// Verifies that the identifier maps to `expectedPublicKey`, as when checking the `nip05` a
+    /// profile claims.
+    /// - Parameter expectedPublicKey: The key the identifier must resolve to.
+    /// - Returns: The verification result.
+    /// - Throws: Anything ``verify()`` throws, or ``VerificationError/publicKeyMismatch`` when the
+    ///   identifier resolves to a different key.
+    public func verify(expectedPublicKey: PublicKey) async throws(VerificationError) -> VerificationResult {
+        let result = try await verify()
+
+        guard result.publicKey == expectedPublicKey else {
+            throw VerificationError.publicKeyMismatch
+        }
+
+        return result
+    }
+
+    /// Resolves ``name`` in a `nostr.json` document served for this identifier.
+    ///
+    /// The document is third-party data: a `names` value that is not a canonical hex public key
+    /// is treated as absent.
+    /// - Throws: ``VerificationError/invalidResponse`` if `data` is not a `nostr.json` document, or
+    ///   ``VerificationError/publicKeyNotFound`` if it has no usable key for ``name``.
+    func result(in data: Data) throws(VerificationError) -> VerificationResult {
+        let response: InternetIdentifierResponse
+        do {
+            response = try JSONDecoder().decode(InternetIdentifierResponse.self, from: data)
+        } catch {
+            throw VerificationError.invalidResponse
+        }
+
+        guard let hex = response.names[name.lowercased()] ?? response.names[name],
+            let publicKey = PublicKey(hex)
+        else {
+            throw VerificationError.publicKeyNotFound
+        }
+
+        return VerificationResult(
+            identifier: self,
+            publicKey: publicKey,
+            relays: (response.relays?[publicKey.hex] ?? []).compactMap(RelayURL.init)
+        )
+    }
+}
+
+extension InternetIdentifier: CustomStringConvertible, LosslessStringConvertible {
+    /// The identifier as `name@domain`; the root identifier of a domain is `_@domain`.
+    public var description: String {
+        "\(name)@\(domain)"
+    }
+
+    /// Creates an identifier from `name@domain`, or from a bare domain for its root identifier
+    /// `_@domain`, or returns `nil` if the string is not a well-formed identifier.
+    /// - Parameter description: The identifier, such as `alice@example.com` or `example.com`.
+    public init?(_ description: String) {
+        let name: String
+        let domain: String
+        if let separator = description.lastIndex(of: "@") {
+            name = String(description[..<separator])
+            domain = String(description[description.index(after: separator)...])
+        } else {
+            name = "_"
+            domain = description
+        }
+
+        guard Self.isValidName(name), Self.isValidDomain(domain) else {
             return nil
         }
 
-        return (name, domain)
+        var components = URLComponents()
+        components.scheme = "https"
+        components.host = domain.lowercased()
+        components.path = "/.well-known/nostr.json"
+        components.queryItems = [URLQueryItem(name: "name", value: name)]
+        guard let url = components.url else {
+            return nil
+        }
+
+        self.name = name
+        self.domain = domain.lowercased()
+        self.wellKnownURL = url
     }
 
     /// NIP-05 restricts the local part to `a-z0-9-_.`; uppercase is tolerated here because
-    /// ``verify(_:)`` looks the name up both as written and lowercased.
-    private static func isValidLocalPart(_ name: String) -> Bool {
+    /// ``verify()`` looks the name up both as written and lowercased.
+    private static func isValidName(_ name: String) -> Bool {
         !name.isEmpty
             && name.allSatisfy { character in
                 character.isASCII
@@ -115,122 +214,24 @@ public struct InternetIdentifier: Sendable {
             && !domain.contains(":")
             && domain.allSatisfy { $0.isASCII && !$0.isWhitespace }
     }
+}
 
-    /// Constructs the well-known URL for verification
-    /// - Parameters:
-    ///   - name: The local part of the identifier
-    ///   - domain: The domain
-    /// - Returns: The URL to query
-    public static func wellKnownURL(name: String, domain: String) -> URL? {
-        var components = URLComponents()
-        components.scheme = "https"
-        components.host = domain
-        components.path = "/.well-known/nostr.json"
-        components.queryItems = [URLQueryItem(name: "name", value: name)]
-        return components.url
+extension InternetIdentifier: Codable {
+    /// Decodes an identifier from its string form.
+    /// - Throws: `DecodingError.dataCorrupted` if the string is not a well-formed identifier.
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        guard let value = InternetIdentifier(try container.decode(String.self)) else {
+            throw DecodingError.dataCorruptedError(
+                in: container, debugDescription: "An internet identifier must be name@domain or a domain")
+        }
+        self = value
     }
 
-    /// Verifies an internet identifier and returns the associated public key
-    ///
-    /// The server's `names` entry must be a canonical hex public key (64 lowercase hex digits, as
-    /// NIP-05 requires); any other value names no key, so it is reported as
-    /// ``VerificationError/publicKeyNotFound``.
-    /// - Parameter identifier: The identifier (e.g., "alice@example.com")
-    /// - Returns: The verification result containing public key and optional relays
-    /// - Throws: ``VerificationError/invalidIdentifier``, ``VerificationError/networkError(_:)``,
-    ///   ``VerificationError/invalidResponse``, or ``VerificationError/publicKeyNotFound``.
-    public static func verify(_ identifier: String) async throws(VerificationError) -> VerificationResult {
-        guard let (name, domain) = parse(identifier) else {
-            throw VerificationError.invalidIdentifier
-        }
-
-        guard let url = wellKnownURL(name: name, domain: domain) else {
-            throw VerificationError.invalidIdentifier
-        }
-
-        let data: Data
-        do {
-            let (body, urlResponse) = try await URLSession.shared.data(from: url)
-
-            guard let httpResponse = urlResponse as? HTTPURLResponse,
-                (200...299).contains(httpResponse.statusCode)
-            else {
-                throw VerificationError.invalidResponse
-            }
-            data = body
-        } catch let error as VerificationError {
-            throw error
-        } catch {
-            throw VerificationError.networkError(error.localizedDescription)
-        }
-
-        return try result(for: identifier, name: name, in: data)
-    }
-
-    /// Resolves `name` in a `nostr.json` document served for `identifier`.
-    ///
-    /// The document is third-party data: a `names` value that is not a canonical hex public key
-    /// is treated as absent.
-    /// - Throws: ``VerificationError/invalidResponse`` if `data` is not a `nostr.json` document, or
-    ///   ``VerificationError/publicKeyNotFound`` if it has no usable key for `name`.
-    static func result(
-        for identifier: String, name: String, in data: Data
-    ) throws(VerificationError) -> VerificationResult {
-        let response: InternetIdentifierResponse
-        do {
-            response = try JSONDecoder().decode(InternetIdentifierResponse.self, from: data)
-        } catch {
-            throw VerificationError.invalidResponse
-        }
-
-        guard let hex = response.names[name.lowercased()] ?? response.names[name],
-            let publicKey = PublicKey(hex)
-        else {
-            throw VerificationError.publicKeyNotFound
-        }
-
-        return VerificationResult(
-            identifier: identifier,
-            publicKey: publicKey,
-            relays: (response.relays?[publicKey.hex] ?? []).compactMap(RelayURL.init)
-        )
-    }
-
-    /// Verifies an internet identifier matches an expected public key
-    /// - Parameters:
-    ///   - identifier: The identifier
-    ///   - expectedPublicKey: The expected public key
-    /// - Returns: The verification result if successful
-    /// - Throws: Anything ``verify(_:)`` throws, or ``VerificationError/publicKeyMismatch`` when the
-    ///   identifier resolves to a different key.
-    public static func verify(
-        _ identifier: String, expectedPublicKey: PublicKey
-    ) async throws(VerificationError) -> VerificationResult {
-        let result = try await verify(identifier)
-
-        guard result.publicKey == expectedPublicKey else {
-            throw VerificationError.publicKeyMismatch
-        }
-
-        return result
-    }
-
-    /// Looks up a public key from an internet identifier
-    /// - Parameter identifier: The identifier
-    /// - Returns: The public key the identifier resolves to
-    /// - Throws: Anything ``verify(_:)`` throws.
-    public static func lookupPublicKey(_ identifier: String) async throws(VerificationError) -> PublicKey {
-        let result = try await verify(identifier)
-        return result.publicKey
-    }
-
-    /// Looks up recommended relays for an internet identifier
-    /// - Parameter identifier: The identifier
-    /// - Returns: The valid relay URLs the server recommends, in the order listed
-    /// - Throws: Anything ``verify(_:)`` throws.
-    public static func lookupRelays(_ identifier: String) async throws(VerificationError) -> [RelayURL] {
-        let result = try await verify(identifier)
-        return result.relays
+    /// Encodes the identifier as ``description``.
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(description)
     }
 }
 
@@ -240,29 +241,4 @@ public struct InternetIdentifier: Sendable {
 private struct InternetIdentifierResponse: Codable {
     let names: [String: String]
     let relays: [String: [String]]?
-}
-
-// MARK: - String Extension
-
-extension String {
-    /// Returns true if this string appears to be a valid internet identifier format
-    public var isValidInternetIdentifier: Bool {
-        InternetIdentifier.parse(self) != nil
-    }
-
-    /// Verifies this string as an internet identifier
-    /// - Throws: Anything ``InternetIdentifier/verify(_:)`` throws.
-    public func verifyAsInternetIdentifier() async throws(InternetIdentifier.VerificationError)
-        -> InternetIdentifier.VerificationResult
-    {
-        try await InternetIdentifier.verify(self)
-    }
-
-    /// Verifies this string as an internet identifier against an expected public key
-    /// - Throws: Anything ``InternetIdentifier/verify(_:expectedPublicKey:)`` throws.
-    public func verifyAsInternetIdentifier(
-        expectedPublicKey: PublicKey
-    ) async throws(InternetIdentifier.VerificationError) -> InternetIdentifier.VerificationResult {
-        try await InternetIdentifier.verify(self, expectedPublicKey: expectedPublicKey)
-    }
 }
