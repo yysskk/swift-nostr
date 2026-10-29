@@ -8,7 +8,7 @@ import NostrCore
 /// Pairs the published ``GiftWrappedMessage`` with the per-relay outcome of each wrap.
 /// `message.rumor.id` is the key for matching the payload when it echoes back from a relay.
 /// https://github.com/nostr-protocol/nips/blob/master/17.md
-public struct SendDirectMessageResult: Sendable {
+public struct SendDirectMessageResult: Sendable, Hashable {
     /// The shared rumor and both gift wraps that were published.
     public let message: GiftWrappedMessage
 

@@ -187,4 +187,11 @@ struct TimestampTests {
         #expect(span == .seconds(Int64.max) + .seconds(Int64.max) + .seconds(1))
         #expect(Timestamp(rawValue: .min).advanced(by: span) == Timestamp(rawValue: .max))
     }
+
+    @Test("an integer literal is Unix seconds")
+    func integerLiteral() {
+        let literal: Timestamp = 1_700_000_000
+        #expect(literal == Timestamp(rawValue: 1_700_000_000))
+        #expect(literal.date == Date(timeIntervalSince1970: 1_700_000_000))
+    }
 }

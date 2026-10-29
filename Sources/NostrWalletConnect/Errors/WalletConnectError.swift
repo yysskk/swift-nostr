@@ -2,7 +2,7 @@ import Foundation
 public import NostrCore
 
 /// Errors raised by the NostrWalletConnect module.
-public enum WalletConnectError: Error, LocalizedError, Sendable, Equatable {
+public enum WalletConnectError: Error, LocalizedError, Sendable, Hashable {
     /// A `nostr+walletconnect://` connection string could not be parsed or failed validation.
     case invalidURI(reason: String)
 

@@ -217,7 +217,7 @@ public actor RelayPool {
                 statuses[relayURL] = .accepted
             case .failure(let error):
                 lastError = error
-                statuses[relayURL] = .failed(error)
+                statuses[relayURL] = Self.publishStatus(for: error)
             }
 
             if let requiredAcks, successCount >= requiredAcks {
@@ -240,6 +240,20 @@ public actor RelayPool {
             throw error
         }
         return PublishResult(statuses: statuses)
+    }
+
+    /// The status of a relay whose publish threw `error`.
+    ///
+    /// ``RelayConnection/publish(_:)`` throws only a ``RelayRejection`` or a
+    /// ``RelayConnection/Error``; anything else is reported as
+    /// ``RelayConnection/Error/notConnected``, as ``RelayConnection/send(_:)`` reports a socket
+    /// failure.
+    static func publishStatus(for error: any Swift.Error) -> PublishRelayStatus {
+        switch error {
+        case let rejection as RelayRejection: .rejected(rejection)
+        case let error as RelayConnection.Error: .failed(error)
+        default: .failed(.notConnected)
+        }
     }
 
     /// Decides whether a fully settled publish failed.

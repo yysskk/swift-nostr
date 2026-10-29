@@ -9,7 +9,7 @@ import Foundation
 /// Mirrors the two frame kinds a relay can send or receive. Nostr's relay protocol is
 /// entirely text (JSON), so ``string(_:)`` carries every protocol message; ``data(_:)``
 /// is modeled for completeness.
-public enum WebSocketMessage: Sendable, Equatable {
+public enum WebSocketMessage: Sendable, Hashable {
     /// A UTF-8 text frame.
     case string(String)
     /// A binary frame.

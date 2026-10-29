@@ -11,7 +11,7 @@ import NostrCore
 public struct GiftWrap: Sendable {
 
     /// Unwrapped gift wrap result containing the sender and the original event
-    public struct UnwrappedMessage: Sendable {
+    public struct UnwrappedMessage: Sendable, Hashable {
         /// The actual sender's public key (from the seal)
         public let senderPublicKey: PublicKey
         /// The original unwrapped event (rumor)

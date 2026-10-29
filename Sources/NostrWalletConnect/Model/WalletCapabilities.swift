@@ -22,6 +22,23 @@ public struct WalletCapabilities: Sendable, Hashable {
     /// constant for.
     public let notifications: [WalletConnectNotificationType]
 
+    /// Creates capabilities from their parts, for example to stand in for a wallet in tests or
+    /// previews.
+    /// - Parameters:
+    ///   - methods: The commands the wallet advertises.
+    ///   - encryptions: The encryption schemes the wallet supports. An empty list means NIP-04 only,
+    ///     as for an info event without an `encryption` tag.
+    ///   - notifications: The notification types the wallet emits.
+    public init(
+        methods: [WalletConnectMethod],
+        encryptions: [WalletConnectEncryption] = [.nip04],
+        notifications: [WalletConnectNotificationType] = []
+    ) {
+        self.methods = methods
+        self.encryptions = encryptions.isEmpty ? [.nip04] : encryptions
+        self.notifications = notifications
+    }
+
     /// Parses a wallet info event.
     /// - Parameter infoEvent: A kind-13194 event. Returns `nil` for any other kind.
     public init?(infoEvent: Event) {

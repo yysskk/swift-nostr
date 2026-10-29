@@ -17,7 +17,7 @@ public import NostrCore
 /// https://github.com/nostr-protocol/nips/blob/master/47.md
 public actor WalletConnection {
     /// Connection behavior.
-    public struct Config: Sendable {
+    public struct Config: Sendable, Hashable {
         /// How long to wait for a response before failing a request. Default: 30 seconds.
         public var requestTimeout: Duration
 

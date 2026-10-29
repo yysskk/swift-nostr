@@ -2,7 +2,7 @@ import Foundation
 import NostrCore
 
 /// Configuration for relay pool behavior
-public struct RelayPoolConfig: Sendable {
+public struct RelayPoolConfig: Sendable, Hashable {
     /// Default connection configuration for new relays
     public var defaultRelayConfig: RelayConnectionConfig
 

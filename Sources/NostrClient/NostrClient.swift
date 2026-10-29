@@ -22,7 +22,7 @@ import NostrCore
 /// which live in separate files, can reach them.
 public actor NostrClient {
     /// Client behavior: the relay pool, how gossip routing brings relays into it, and how far.
-    public struct Config: Sendable {
+    public struct Config: Sendable, Hashable {
         /// The relay pool's configuration. Default: ``RelayPoolConfig/default``.
         public var relayPool: RelayPoolConfig
 

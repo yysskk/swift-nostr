@@ -103,6 +103,15 @@ extension Timestamp {
     }
 }
 
+extension Timestamp: ExpressibleByIntegerLiteral {
+    /// Creates a timestamp from an integer literal of seconds since the Unix epoch:
+    /// `let createdAt: Timestamp = 1_700_000_000`.
+    /// - Parameter value: The seconds since the Unix epoch.
+    public init(integerLiteral value: Int64) {
+        self.init(rawValue: value)
+    }
+}
+
 extension Timestamp: Comparable {
     /// Orders timestamps chronologically.
     public static func < (lhs: Timestamp, rhs: Timestamp) -> Bool {
