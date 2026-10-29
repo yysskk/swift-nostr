@@ -19,9 +19,9 @@ import NostrCore
 /// instead of silently dropping messages. Resubscribe to resume. Use
 /// ``DirectMessagePayloadSequence/giftWraps`` for the raw gift-wrap events instead.
 ///
-/// Like ``SubscriptionSequence``, ending iteration, cancelling the consuming
+/// Like every ``RelaySubscription``, ending iteration, cancelling the consuming
 /// task, or calling ``close()`` sends CLOSE to the relays. Single-consumer.
-public struct DirectMessageSequence: AsyncSequence, Sendable {
+public struct DirectMessageSequence: RelaySubscription {
     public typealias Element = DirectMessage
 
     let base: SubscriptionSequence
@@ -34,13 +34,9 @@ public struct DirectMessageSequence: AsyncSequence, Sendable {
         self.parser = payloads.parser
     }
 
-    /// The subscription ID, usable with ``NostrSubscriptionsAPI/unsubscribe(id:)``.
     public var id: SubscriptionID { base.id }
-
-    /// The relays that accepted the REQ.
     public var expectedRelays: Set<RelayURL> { base.expectedRelays }
 
-    /// Closes the subscription: sends CLOSE to the relays and ends iteration.
     public func close() async {
         await base.close()
     }
@@ -54,8 +50,7 @@ public struct DirectMessageSequence: AsyncSequence, Sendable {
         let parser: DirectMessageParser
 
         public mutating func next() async throws -> DirectMessage? {
-            while let item = await base.next() {
-                guard case .event(_, let event) = item else { continue }
+            while let event = await base.nextEvent() {
                 if let message = try await parser.openMessageIfReadable(event) {
                     return message
                 }

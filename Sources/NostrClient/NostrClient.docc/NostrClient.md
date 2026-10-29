@@ -104,6 +104,7 @@ add NIP helpers and namespaces of your own; see <doc:ExtendingTheClient>.
 
 ### Subscriptions
 
+- ``RelaySubscription``
 - ``SubscriptionSequence``
 - ``SubscriptionEvent``
 

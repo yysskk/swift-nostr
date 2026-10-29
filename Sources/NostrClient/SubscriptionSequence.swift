@@ -20,22 +20,17 @@ import NostrCore
 ///
 /// Use ``events`` to iterate only event payloads, skipping eose/closed/notice/auth.
 ///
-/// The underlying REQ is closed (CLOSE is sent to the relays) when iteration
-/// stops, the consuming task is cancelled, ``close()`` is called, or the
+/// Like every ``RelaySubscription``, the underlying REQ is closed (CLOSE is sent to the relays)
+/// when iteration stops, the consuming task is cancelled, ``close()`` is called, or the
 /// sequence is discarded without being consumed.
 ///
 /// - Important: The sequence is single-consumer: create one iterator — either
 ///   on this sequence or on ``events``, not both. Multiple iterators race for
 ///   elements.
-public struct SubscriptionSequence: AsyncSequence, Sendable {
+public struct SubscriptionSequence: RelaySubscription {
     public typealias Element = SubscriptionEvent
 
-    /// The id the pool generated for the subscription, usable with
-    /// ``NostrSubscriptionsAPI/unsubscribe(id:)``.
     public let id: SubscriptionID
-
-    /// The relays that accepted the REQ. EOSE completion is measured against
-    /// this set (see ``NostrEventFetching/fetch(filters:route:timeout:)``).
     public let expectedRelays: Set<RelayURL>
 
     let stream: AsyncStream<SubscriptionEvent>
@@ -60,8 +55,6 @@ public struct SubscriptionSequence: AsyncSequence, Sendable {
         self.onClose = onClose
     }
 
-    /// Closes the subscription: sends CLOSE to the relays and ends iteration.
-    /// Calling it more than once is harmless.
     public func close() async {
         await onClose()
     }
@@ -77,6 +70,17 @@ public struct SubscriptionSequence: AsyncSequence, Sendable {
         public mutating func next() async -> SubscriptionEvent? {
             await base.next()
         }
+
+        /// The next event payload, skipping eose, closed, notice, and auth items; nil once the
+        /// subscription ends.
+        mutating func nextEvent() async -> Event? {
+            while let item = await base.next() {
+                if case .event(_, let event) = item {
+                    return event
+                }
+            }
+            return nil
+        }
     }
 
     /// A view of this subscription that yields only event payloads,
@@ -86,18 +90,14 @@ public struct SubscriptionSequence: AsyncSequence, Sendable {
     }
 
     /// An event-payload-only view of a ``SubscriptionSequence``.
-    public struct Events: AsyncSequence, Sendable {
+    public struct Events: RelaySubscription {
         public typealias Element = Event
 
         let base: SubscriptionSequence
 
-        /// The subscription ID, usable with ``NostrSubscriptionsAPI/unsubscribe(id:)``.
         public var id: SubscriptionID { base.id }
-
-        /// The relays that accepted the REQ.
         public var expectedRelays: Set<RelayURL> { base.expectedRelays }
 
-        /// Closes the subscription: sends CLOSE to the relays and ends iteration.
         public func close() async {
             await base.close()
         }
@@ -111,12 +111,7 @@ public struct SubscriptionSequence: AsyncSequence, Sendable {
             var base: SubscriptionSequence.AsyncIterator
 
             public mutating func next() async -> Event? {
-                while let item = await base.next() {
-                    if case .event(_, let event) = item {
-                        return event
-                    }
-                }
-                return nil
+                await base.nextEvent()
             }
         }
     }

@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`RelaySubscription` is the common protocol of the subscription sequences**: `SubscriptionSequence`,
+  its `events` view, `DirectMessagePayloadSequence`, and `DirectMessageSequence` conform, each with
+  `id`, `expectedRelays`, and `close()`, so an app can keep subscriptions of different element types
+  in one `[any RelaySubscription]` and close them together.
 - **`FileAttachment` describes a NIP-17 kind-15 file**: the URL, MIME type, decryption key and
   nonce, `x`/`ox` hashes, size, dimensions, and blurhash in one value that a file message both sends
   and receives. `init(url:mimeType:encryption:size:dimensions:blurhash:)` fills the key, nonce, and

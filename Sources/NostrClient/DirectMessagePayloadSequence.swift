@@ -24,12 +24,12 @@ import NostrCore
 /// dropping payloads. Resubscribe to resume. Iterate ``messages`` for messages only, or
 /// ``giftWraps`` for the raw gift-wrap events.
 ///
-/// Like ``SubscriptionSequence``, ending iteration, cancelling the consuming task, or calling
+/// Like every ``RelaySubscription``, ending iteration, cancelling the consuming task, or calling
 /// ``close()`` sends CLOSE to the relays.
 ///
 /// - Important: The sequence is single-consumer: create one iterator — on this sequence, on
 ///   ``messages``, or on ``giftWraps``, not more. Multiple iterators race for elements.
-public struct DirectMessagePayloadSequence: AsyncSequence, Sendable {
+public struct DirectMessagePayloadSequence: RelaySubscription {
     public typealias Element = DirectMessagePayload
 
     let base: SubscriptionSequence
@@ -45,13 +45,9 @@ public struct DirectMessagePayloadSequence: AsyncSequence, Sendable {
         self.parser = parser
     }
 
-    /// The subscription ID, usable with ``NostrSubscriptionsAPI/unsubscribe(id:)``.
     public var id: SubscriptionID { base.id }
-
-    /// The relays that accepted the REQ.
     public var expectedRelays: Set<RelayURL> { base.expectedRelays }
 
-    /// Closes the subscription: sends CLOSE to the relays and ends iteration.
     public func close() async {
         await base.close()
     }
@@ -77,8 +73,7 @@ public struct DirectMessagePayloadSequence: AsyncSequence, Sendable {
         let parser: DirectMessageParser
 
         public mutating func next() async throws -> DirectMessagePayload? {
-            while let item = await base.next() {
-                guard case .event(_, let event) = item else { continue }
+            while let event = await base.nextEvent() {
                 if let payload = try await parser.openIfReadable(event) {
                     return payload
                 }
