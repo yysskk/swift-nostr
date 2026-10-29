@@ -193,10 +193,14 @@ one whose `result_type` names another method with
 `payment_received` / `payment_sent` notifications expose a parsed ``WalletConnectTransaction`` via
 ``WalletConnectNotification/transaction``; the full payload is always available as
 ``WalletConnectNotification/raw`` for other notification types. ``WalletConnectNotificationType``,
-like ``WalletConnectMethod`` and ``TransactionState``, keeps values it has no constant for:
+like ``WalletConnectMethod`` and ``TransactionState``, keeps values it has no constant for. The
+stream is registered without connecting; call ``WalletConnection/connect()`` (or send any command)
+to start receiving:
 
 ```swift
-for await notification in try await connection.notifications() {
+let notifications = await connection.notifications()
+try await connection.connect()
+for await notification in notifications {
     switch notification.type {
     case .paymentReceived:
         if let tx = notification.transaction { print("received \(tx.amount) msat") }

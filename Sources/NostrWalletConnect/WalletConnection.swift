@@ -67,7 +67,7 @@ public actor WalletConnection {
     ///     relays; inject a custom one (e.g. for tests).
     ///   - config: Connection behavior.
     public init(uri: WalletConnectURI, transport: (any RelayTransport)? = nil, config: Config = Config()) {
-        let keyPair = uri.clientKeyPair()
+        let keyPair = uri.clientKeyPair
         self.config = config
         self.keyPair = keyPair
         self.signer = EventSigner(keyPair: keyPair)
@@ -207,16 +207,14 @@ public actor WalletConnection {
 
     /// A stream of wallet notifications (kinds 23196 / 23197), decrypted and parsed.
     ///
-    /// Starts the connection if it isn't already, so a caller can subscribe to notifications without
-    /// first issuing a command or calling ``connect()``.
+    /// This registers the stream and returns it without connecting. Call ``connect()`` (or send any
+    /// command) to start receiving; notifications that arrive while no stream is open are dropped.
     ///
-    /// The stream finishes when the connection ends — on ``disconnect()``, or when the relays'
-    /// streams end because automatic reconnection gave up. Call this again for a fresh stream: it
-    /// reconnects first.
-    /// - Throws: ``WalletConnectError/transportFailed(_:)`` if the relay cannot be connected to or
-    ///   subscribed on.
-    public func notifications() async throws(WalletConnectError) -> AsyncStream<WalletConnectNotification> {
-        try await ensureStarted()
+    /// Multiple concurrent streams are supported; each finishes when its task is cancelled or the
+    /// connection ends — on ``disconnect()``, or when the relays' streams end because automatic
+    /// reconnection gave up. Call this again for a fresh stream, then ``connect()`` again to
+    /// reconnect.
+    public func notifications() -> AsyncStream<WalletConnectNotification> {
         let id = UUID()
         let (stream, continuation) = AsyncStream<WalletConnectNotification>.makeStream()
         notificationStreams[id] = continuation

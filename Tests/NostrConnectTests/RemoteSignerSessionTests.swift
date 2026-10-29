@@ -180,7 +180,7 @@ struct RemoteSignerSessionTests {
         let remote = try makeSigner(transport: transport)
         try await connectHandshake(remote, transport: transport)
 
-        let publicKey = Task { try await remote.userPublicKey() }
+        let publicKey = Task { try await remote.publicKey }
         let pong = Task { try await remote.ping() }
 
         let sent = try await RemoteSignerFixtures.waitForSentEvents(transport, count: 3)
@@ -289,7 +289,7 @@ struct RemoteSignerSessionTests {
 
         let challenges = await remote.authChallenges()
 
-        let publicKey = Task { try await remote.userPublicKey() }
+        let publicKey = Task { try await remote.publicKey }
         let sent = try await RemoteSignerFixtures.waitForSentEvents(transport, count: 2)
         // The request's timer started before it was sent, so it is due no later than this.
         let requestTimeoutDue = ContinuousClock.now + .seconds(2)

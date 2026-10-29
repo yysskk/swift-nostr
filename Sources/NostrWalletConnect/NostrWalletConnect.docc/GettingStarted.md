@@ -114,11 +114,15 @@ let balance = try await connection.send(GetBalanceRequest())
 ## Listen for Notifications
 
 ``WalletConnection/notifications()`` streams wallet notifications (e.g. `payment_received`,
-`payment_sent`) as they arrive. Standard payment notifications expose a parsed
-``WalletConnectTransaction`` via ``WalletConnectNotification/transaction``:
+`payment_sent`) as they arrive. It returns the stream without connecting: call
+``WalletConnection/connect()`` (or send any command) to start receiving. Standard payment
+notifications expose a parsed ``WalletConnectTransaction`` via
+``WalletConnectNotification/transaction``:
 
 ```swift
-for await notification in try await connection.notifications() {
+let notifications = await connection.notifications()
+try await connection.connect()
+for await notification in notifications {
     print("Notification: \(notification.type)")
     if let tx = notification.transaction {
         print("\(tx.type) \(tx.amount) msat")

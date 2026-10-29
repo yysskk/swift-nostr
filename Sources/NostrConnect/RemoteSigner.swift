@@ -97,6 +97,8 @@ public actor RemoteSigner {
     var authChallengeDeadlineCount: Int { authChallengeDeadlines.count }
     /// The user's public key (`get_public_key`), cached after the first fetch.
     private var cachedUserPublicKey: PublicKey?
+    /// The first ``publicKey`` fetch in flight, which concurrent reads join rather than repeat.
+    private let userPublicKeyOperation = SharedOperation<PublicKey, RemoteSignerError>(cancelledError: .cancelled)
 
     /// The waiter of the `nostrconnect://` discovery ``connect()`` runs, resolved once a valid
     /// connect response (echoing the invitation secret) arrives, or the wait times out. `nil` when
@@ -171,7 +173,7 @@ public actor RemoteSigner {
 
     /// The remote signer's public key, or `nil` for a client-initiated `nostrconnect://` session
     /// before ``connect()`` has discovered it. Known immediately for a `bunker://` session.
-    /// Not necessarily the user's key (see ``userPublicKey()``).
+    /// Not necessarily the user's key (see ``publicKey``).
     public var remoteSignerPublicKey: PublicKey? {
         signerPublicKey
     }
@@ -325,8 +327,11 @@ public actor RemoteSigner {
     ///
     /// Multiple concurrent streams are supported; each finishes when its task is cancelled or the
     /// session ends — on ``disconnect()``, or when the relays' streams end because automatic
-    /// reconnection gave up. Call this again for a fresh stream: it receives the challenges of the
-    /// next request, which reconnects.
+    /// reconnection gave up.
+    ///
+    /// This registers the stream and returns it without connecting. Call ``connect()`` (or send any
+    /// command) to start receiving; a stream obtained after the session ended receives the
+    /// challenges of the next request, which reconnects.
     public func authChallenges() -> AsyncStream<RemoteSignerAuthChallenge> {
         let id = UUID()
         let (stream, continuation) = AsyncStream<RemoteSignerAuthChallenge>.makeStream()
@@ -611,14 +616,31 @@ public actor RemoteSigner {
 
     // MARK: - Commands support
 
-    /// The user's public key if it has already been fetched by ``userPublicKey()``.
-    var userPublicKeyIfCached: PublicKey? {
-        cachedUserPublicKey
+    /// The user's public key: the cached value, or the result of one `get_public_key` request that
+    /// concurrent first reads share. Backs ``publicKey``.
+    func resolveUserPublicKey() async throws(RemoteSignerError) -> PublicKey {
+        if let cachedUserPublicKey { return cachedUserPublicKey }
+        return try await userPublicKeyOperation.run { [weak self] in
+            guard let self else { return .failure(.notConnected) }
+            return await self.fetchUserPublicKey()
+        }
     }
 
-    /// Records the user's public key so later calls return it without another round-trip.
-    func cacheUserPublicKey(_ publicKey: PublicKey) {
-        cachedUserPublicKey = publicKey
+    /// One shared `get_public_key` fetch, caching the key it validates.
+    private func fetchUserPublicKey() async -> Result<PublicKey, RemoteSignerError> {
+        // A read that missed the cache just before an earlier fetch finished starts a new attempt;
+        // the key is cached by then, so nothing is sent again.
+        if let cachedUserPublicKey { return .success(cachedUserPublicKey) }
+        do throws(RemoteSignerError) {
+            let reply = try await send(.getPublicKey)
+            guard let publicKey = PublicKey(reply) else {
+                return .failure(.responseValidationFailed)
+            }
+            cachedUserPublicKey = publicKey
+            return .success(publicKey)
+        } catch {
+            return .failure(error)
+        }
     }
 
     // MARK: - Filters
@@ -647,6 +669,11 @@ public actor RemoteSigner {
     /// How many ``connect()`` callers are waiting on the attempt in flight. Exposed for tests.
     var connectWaiterCountForTesting: Int {
         get async { await connectOperation.waiterCount }
+    }
+
+    /// How many ``publicKey`` readers are waiting on the fetch in flight. Exposed for tests.
+    var publicKeyWaiterCountForTesting: Int {
+        get async { await userPublicKeyOperation.waiterCount }
     }
 }
 
