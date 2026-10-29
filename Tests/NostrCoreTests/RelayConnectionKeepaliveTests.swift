@@ -25,12 +25,10 @@ struct RelayConnectionKeepaliveTests {
         )
     }
 
-    /// Connects through `socket`, answering the handshake ping.
+    /// Connects through `socket`, whose handshake ping is answered at once (`immediatePings: 1`),
+    /// so a short pong timeout bounds only the keepalive pings the test answers by hand.
     private func connect(_ connection: RelayConnection, through socket: MockWebSocketSession) async throws {
-        let connectTask = Task { try await connection.connect() }
-        await socket.waitForPing()
-        socket.completePing()
-        try await connectTask.value
+        try await connection.connect()
     }
 
     /// Suspends until `connection` reports a state matching `predicate`.
@@ -50,7 +48,7 @@ struct RelayConnectionKeepaliveTests {
 
     @Test("an answered keepalive ping keeps the connection up", .timeLimit(.minutes(1)))
     func answeredPingStaysConnected() async throws {
-        let socket = MockWebSocketSession(defersPing: true)
+        let socket = MockWebSocketSession(defersPing: true, immediatePings: 1)
         let connection = makeConnection(pongTimeout: .seconds(30)) { socket }
         try await connect(connection, through: socket)
 
@@ -67,7 +65,7 @@ struct RelayConnectionKeepaliveTests {
 
     @Test("a failed keepalive ping drops the connection", .timeLimit(.minutes(1)))
     func failedPingDropsConnection() async throws {
-        let socket = MockWebSocketSession(defersPing: true)
+        let socket = MockWebSocketSession(defersPing: true, immediatePings: 1)
         let connection = makeConnection(pongTimeout: .seconds(30)) { socket }
         try await connect(connection, through: socket)
 
@@ -82,7 +80,7 @@ struct RelayConnectionKeepaliveTests {
     /// the whole time: only the connection's own timeout can end the wait.
     @Test("a keepalive ping that never returns still times out", .timeLimit(.minutes(1)))
     func unansweredPingTimesOut() async throws {
-        let socket = MockWebSocketSession(defersPing: true)
+        let socket = MockWebSocketSession(defersPing: true, immediatePings: 1)
         let connection = makeConnection(pongTimeout: .milliseconds(100)) { socket }
         try await connect(connection, through: socket)
 
@@ -96,7 +94,7 @@ struct RelayConnectionKeepaliveTests {
 
     @Test("a keepalive timeout reconnects on a fresh socket", .timeLimit(.minutes(1)))
     func unansweredPingReconnects() async throws {
-        let first = MockWebSocketSession(defersPing: true)
+        let first = MockWebSocketSession(defersPing: true, immediatePings: 1)
         let replacements = SocketCounter()
         let reconnect = ReconnectPolicy(initialDelay: .milliseconds(10))
         let connection = makeConnection(pongTimeout: .milliseconds(100), reconnect: reconnect) {

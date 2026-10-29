@@ -16,6 +16,7 @@ public final class MockWebSocketSession: WebSocketSession, @unchecked Sendable {
     private var closed = false
     private let pingError: (any Error)?
     private let defersPing: Bool
+    private var immediatePingsLeft: Int
     private var pendingPings: [CheckedContinuation<Void, any Error>] = []
     private var pingWaiters: [CheckedContinuation<Void, Never>] = []
 
@@ -24,9 +25,12 @@ public final class MockWebSocketSession: WebSocketSession, @unchecked Sendable {
     /// With `defersPing`, `ping()` suspends until ``completePing(error:)`` answers it, so a test can
     /// suspend a connection attempt mid-handshake and act while it waits. A deferred ping ignores
     /// cancellation and closing the socket, like a transport whose pong callback never fires.
-    public init(pingError: (any Error)? = nil, defersPing: Bool = false) {
+    /// `immediatePings` pings are answered at once before deferring starts — pass 1 to complete
+    /// the connect handshake without racing its timeout and defer only the keepalive pings.
+    public init(pingError: (any Error)? = nil, defersPing: Bool = false, immediatePings: Int = 0) {
         self.pingError = pingError
         self.defersPing = defersPing
+        self.immediatePingsLeft = immediatePings
     }
 
     // MARK: - WebSocketSession
@@ -71,7 +75,12 @@ public final class MockWebSocketSession: WebSocketSession, @unchecked Sendable {
     }
 
     public func ping() async throws {
-        guard defersPing else {
+        let answersNow: Bool = lock.withLock {
+            guard immediatePingsLeft > 0 else { return false }
+            immediatePingsLeft -= 1
+            return true
+        }
+        guard defersPing, !answersNow else {
             if let pingError { throw pingError }
             return
         }

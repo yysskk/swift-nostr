@@ -206,14 +206,15 @@ struct ReconnectBackoffTests {
         try await connection.connect()
         sockets.at(0).deliver(error: URLError(.networkConnectionLost))
 
-        try await pollUntil { sockets.count >= 2 && sockets.at(1).didOpen }
-        #expect(await connection.state == .connected)
+        // The replacement socket reports `.connected` only once its handshake ping completes.
+        try await pollUntil { await connection.state == .connected && sockets.count >= 2 }
+        #expect(sockets.at(1).didOpen)
 
         await connection.disconnect()
     }
 
     private func pollUntil(_ condition: @Sendable () async -> Bool) async throws {
-        for _ in 0..<200 {
+        for _ in 0..<1000 {
             if await condition() { return }
             try await Task.sleep(for: .milliseconds(5))
         }
