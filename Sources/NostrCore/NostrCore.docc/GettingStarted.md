@@ -192,3 +192,9 @@ let relay = RelayConnection(
 )
 try await relay.connect()
 ```
+
+A ``WebSocketSession`` is a small async API over the platform socket: ``WebSocketSession/open()``
+starts the handshake, ``WebSocketSession/close(code:reason:)`` closes the socket,
+``WebSocketSession/send(_:)`` and ``WebSocketSession/receive()`` move frames, and
+``WebSocketSession/ping()`` returns when the pong arrives. Bridge a callback-based ping with
+`withCheckedThrowingContinuation`; the connection applies the pong timeout itself.

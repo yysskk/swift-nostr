@@ -268,7 +268,7 @@ public actor RelayConnection {
     /// live connection nobody closes, and its receive loop would keep running against a relay that
     /// still believes the session is open.
     private func installSocket(_ socket: any WebSocketSession) -> UInt64 {
-        webSocketTask?.cancel(with: .abnormalClosure, reason: nil)
+        webSocketTask?.close(code: .abnormalClosure, reason: nil)
         socketGeneration &+= 1
         webSocketTask = socket
         return socketGeneration
@@ -293,7 +293,7 @@ public actor RelayConnection {
 
         let task = webSocketFactory.makeWebSocket(with: request)
         let generation = installSocket(task)
-        task.resume()
+        task.open()
 
         // Verify connection with ping before marking as connected (with timeout)
         do {
@@ -326,7 +326,7 @@ public actor RelayConnection {
     /// Cancels and clears the installed socket, retiring its generation so anything still holding
     /// the old one stops short instead of acting on the next session.
     func discardSocket() {
-        webSocketTask?.cancel(with: .abnormalClosure, reason: nil)
+        webSocketTask?.close(code: .abnormalClosure, reason: nil)
         webSocketTask = nil
         socketGeneration &+= 1
     }
@@ -374,7 +374,7 @@ public actor RelayConnection {
         let wasLive = state == .connected || state == .connecting
         if wasLive {
             updateState(.disconnecting)
-            webSocketTask?.cancel(with: .normalClosure, reason: nil)
+            webSocketTask?.close(code: .normalClosure, reason: nil)
             webSocketTask = nil
             socketGeneration &+= 1
         } else {

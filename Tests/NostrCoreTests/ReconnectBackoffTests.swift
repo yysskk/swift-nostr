@@ -185,7 +185,7 @@ struct ReconnectBackoffTests {
         sockets.at(0).deliver(error: URLError(.networkConnectionLost))
 
         // The reconnect establishes a second socket, so the floored delay still elapses in a test.
-        try await pollUntil { sockets.count >= 2 && sockets.at(1).didResume }
+        try await pollUntil { sockets.count >= 2 && sockets.at(1).didOpen }
 
         #expect(ranges.recorded == [0.5...1.0])
         await connection.disconnect()
@@ -206,7 +206,7 @@ struct ReconnectBackoffTests {
         try await connection.connect()
         sockets.at(0).deliver(error: URLError(.networkConnectionLost))
 
-        try await pollUntil { sockets.count >= 2 && sockets.at(1).didResume }
+        try await pollUntil { sockets.count >= 2 && sockets.at(1).didOpen }
         #expect(await connection.state == .connected)
 
         await connection.disconnect()

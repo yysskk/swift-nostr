@@ -170,8 +170,8 @@ struct RelayConnectionTransportTests {
         try await transport.connect()
 
         #expect(dispenser.count == Self.relayURLs.count)
-        #expect(dispenser.socket(at: 0)?.didResume == true)
-        #expect(dispenser.socket(at: 1)?.didResume == true)
+        #expect(dispenser.socket(at: 0)?.didOpen == true)
+        #expect(dispenser.socket(at: 1)?.didOpen == true)
         await transport.disconnect()
     }
 
@@ -277,7 +277,7 @@ struct RelayConnectionTransportTests {
         try await transport.connect()
 
         #expect(dispenser.count == Self.relayURLs.count)
-        #expect(dispenser.socket(at: 1)?.didResume == true)
+        #expect(dispenser.socket(at: 1)?.didOpen == true)
         await transport.disconnect()
     }
 

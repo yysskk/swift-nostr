@@ -1759,6 +1759,11 @@ Manages WebSocket connection to a single relay (actor).
 - `url: RelayURL` -- the relay's URL; `RelayConnection(url:config:webSocketFactory:)` takes a
   `RelayURL` (`config` defaults to `.default`, `webSocketFactory` to `URLSessionWebSocketFactory()`;
   pass `URLSessionWebSocketFactory(urlSession:)` for a custom `URLSession`)
+- A custom transport conforms to `WebSocketSession` (`Sendable`): `open()` starts the handshake
+  without waiting for it, `close(code: WebSocketCloseCode, reason: String?)`,
+  `send(_: WebSocketMessage) async throws`, `receive() async throws -> WebSocketMessage`, and
+  `ping() async throws`, which returns when the pong arrives; the connection bounds it with
+  `connectionTimeout`, so `ping()` needs no timer and may ignore cancellation
 - `state: RelayConnectionState` -- current connection state
 - `config: RelayConnectionConfig`
 - `authenticationChallenge: String?` -- latest NIP-42 AUTH challenge (session-scoped)

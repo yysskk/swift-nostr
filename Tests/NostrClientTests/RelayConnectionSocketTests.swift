@@ -56,7 +56,7 @@ struct RelayConnectionSocketTests {
         try await connection.connect()
 
         #expect(await connection.state == .connected)
-        #expect(mock.didResume)
+        #expect(mock.didOpen)
         await connection.disconnect()
     }
 

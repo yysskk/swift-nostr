@@ -12,17 +12,18 @@ public final class MockWebSocketSession: WebSocketSession, @unchecked Sendable {
     private var queued: [Result<WebSocketMessage, any Error>] = []
     private var receiveWaiters: [CheckedContinuation<WebSocketMessage, any Error>] = []
     private var sent: [WebSocketMessage] = []
-    private var resumed = false
-    private var cancelled = false
+    private var opened = false
+    private var closed = false
     private let pingError: (any Error)?
     private let defersPing: Bool
-    private var pendingPingHandlers: [@Sendable ((any Error)?) -> Void] = []
+    private var pendingPings: [CheckedContinuation<Void, any Error>] = []
     private var pingWaiters: [CheckedContinuation<Void, Never>] = []
 
     /// Creates a socket whose keepalive pings fail with `pingError`, or succeed when it is nil.
     ///
-    /// With `defersPing`, `sendPing` holds its handler until ``completePing(error:)`` fires it,
-    /// so a test can suspend a connection attempt mid-handshake and act while it waits.
+    /// With `defersPing`, `ping()` suspends until ``completePing(error:)`` answers it, so a test can
+    /// suspend a connection attempt mid-handshake and act while it waits. A deferred ping ignores
+    /// cancellation and closing the socket, like a transport whose pong callback never fires.
     public init(pingError: (any Error)? = nil, defersPing: Bool = false) {
         self.pingError = pingError
         self.defersPing = defersPing
@@ -30,15 +31,15 @@ public final class MockWebSocketSession: WebSocketSession, @unchecked Sendable {
 
     // MARK: - WebSocketSession
 
-    public func resume() {
+    public func open() {
         lock.lock()
-        resumed = true
+        opened = true
         lock.unlock()
     }
 
-    public func cancel(with closeCode: WebSocketCloseCode, reason: Data?) {
+    public func close(code: WebSocketCloseCode, reason: String?) {
         lock.lock()
-        cancelled = true
+        closed = true
         let waiters = receiveWaiters
         receiveWaiters.removeAll()
         lock.unlock()
@@ -69,18 +70,20 @@ public final class MockWebSocketSession: WebSocketSession, @unchecked Sendable {
         }
     }
 
-    public func sendPing(pongReceiveHandler: @escaping @Sendable ((any Error)?) -> Void) {
+    public func ping() async throws {
         guard defersPing else {
-            pongReceiveHandler(pingError)
+            if let pingError { throw pingError }
             return
         }
-        lock.lock()
-        pendingPingHandlers.append(pongReceiveHandler)
-        let waiters = pingWaiters
-        pingWaiters.removeAll()
-        lock.unlock()
-        for waiter in waiters {
-            waiter.resume()
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
+            lock.lock()
+            pendingPings.append(continuation)
+            let waiters = pingWaiters
+            pingWaiters.removeAll()
+            lock.unlock()
+            for waiter in waiters {
+                waiter.resume()
+            }
         }
     }
 
@@ -123,29 +126,29 @@ public final class MockWebSocketSession: WebSocketSession, @unchecked Sendable {
         }
     }
 
-    /// Whether the handshake was started, i.e. `resume()` has been called.
-    public var didResume: Bool {
+    /// Whether the handshake was started, i.e. `open()` has been called.
+    public var didOpen: Bool {
         lock.lock()
         defer { lock.unlock() }
-        return resumed
+        return opened
     }
 
-    /// Whether `cancel(with:reason:)` has been called, i.e. the socket was closed rather than
+    /// Whether `close(code:reason:)` has been called, i.e. the socket was closed rather than
     /// dropped while still open.
-    public var didCancel: Bool {
+    public var didClose: Bool {
         lock.lock()
         defer { lock.unlock() }
-        return cancelled
+        return closed
     }
 
     // MARK: - Deferred ping
 
-    /// Suspends until a deferred `sendPing` has registered its handler, so a test can act at the
-    /// exact point a connection attempt is waiting on its pong.
+    /// Suspends until a deferred `ping()` is waiting for its pong, so a test can act at the exact
+    /// point a connection attempt or keepalive is waiting on it.
     public func waitForPing() async {
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
             lock.lock()
-            if !pendingPingHandlers.isEmpty {
+            if !pendingPings.isEmpty {
                 lock.unlock()
                 continuation.resume()
             } else {
@@ -155,14 +158,26 @@ public final class MockWebSocketSession: WebSocketSession, @unchecked Sendable {
         }
     }
 
-    /// Fires every handler a deferred `sendPing` is holding, completing the pong.
+    /// How many deferred `ping()` calls are still waiting for their pong.
+    public var pendingPingCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return pendingPings.count
+    }
+
+    /// Answers every deferred `ping()` waiting for its pong, failing them with `error` when one is
+    /// given.
     public func completePing(error: (any Error)? = nil) {
         lock.lock()
-        let handlers = pendingPingHandlers
-        pendingPingHandlers.removeAll()
+        let pings = pendingPings
+        pendingPings.removeAll()
         lock.unlock()
-        for handler in handlers {
-            handler(error)
+        for ping in pings {
+            if let error {
+                ping.resume(throwing: error)
+            } else {
+                ping.resume()
+            }
         }
     }
 }

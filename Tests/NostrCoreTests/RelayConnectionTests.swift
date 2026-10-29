@@ -54,10 +54,10 @@ struct RelayConnectionTests {
         private let lock = NSLock()
         private var held: [(id: UUID, continuation: CheckedContinuation<Void, any Swift.Error>)] = []
 
-        func resume() { mock.resume() }
+        func open() { mock.open() }
 
-        func cancel(with closeCode: WebSocketCloseCode, reason: Data?) {
-            mock.cancel(with: closeCode, reason: reason)
+        func close(code: WebSocketCloseCode, reason: String?) {
+            mock.close(code: code, reason: reason)
         }
 
         func send(_ message: WebSocketMessage) async throws {
@@ -101,8 +101,8 @@ struct RelayConnectionTests {
             try await mock.receive()
         }
 
-        func sendPing(pongReceiveHandler: @escaping @Sendable ((any Swift.Error)?) -> Void) {
-            mock.sendPing(pongReceiveHandler: pongReceiveHandler)
+        func ping() async throws {
+            try await mock.ping()
         }
 
         /// How many REQ sends are suspended.
@@ -204,7 +204,7 @@ struct RelayConnectionTests {
         try await connection.connect()
 
         #expect(await connection.state == .connected)
-        #expect(mock.didResume)
+        #expect(mock.didOpen)
         await connection.disconnect()
     }
 
@@ -380,7 +380,7 @@ struct RelayConnectionTests {
             Issue.record("a socket send error should fail the connection")
             return
         }
-        #expect(socket.mock.didCancel)
+        #expect(socket.mock.didClose)
         await connection.disconnect()
     }
 
@@ -397,7 +397,7 @@ struct RelayConnectionTests {
             Issue.record("a timed-out send should fail the connection")
             return
         }
-        #expect(socket.mock.didCancel)
+        #expect(socket.mock.didClose)
         #expect(await !connection.hasSubscription(Self.subscriptionID))
         await connection.disconnect()
     }
@@ -421,7 +421,7 @@ struct RelayConnectionTests {
 
         #expect(Self.sentFrame("REQ", in: socket.mock) != nil)
         #expect(await connection.state == .connected)
-        #expect(!socket.mock.didCancel)
+        #expect(!socket.mock.didClose)
         #expect(await connection.hasSubscription(Self.subscriptionID))
         await connection.disconnect()
     }
@@ -441,7 +441,7 @@ struct RelayConnectionTests {
 
         #expect(Self.sentFrame("REQ", in: socket.mock) != nil)
         #expect(await connection.state == .connected)
-        #expect(!socket.mock.didCancel)
+        #expect(!socket.mock.didClose)
         #expect(await connection.hasSubscription(Self.subscriptionID))
         await connection.disconnect()
     }

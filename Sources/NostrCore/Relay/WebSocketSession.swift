@@ -49,12 +49,57 @@ public enum WebSocketCloseCode: Int, Sendable {
 /// The protocol deliberately avoids `URLSessionWebSocketTask` types (``WebSocketMessage``
 /// and ``WebSocketCloseCode`` stand in for them) so it compiles on platforms whose
 /// Foundation lacks WebSocket support, such as Android.
+///
+/// ## Implementing a transport
+///
+/// A relay connection calls ``open()`` once, right after the factory creates the session, and
+/// then verifies the handshake with ``ping()`` before it reports itself connected. Callback-based
+/// platform sockets bridge into the async requirements with a checked continuation:
+///
+/// ```swift
+/// final class PlatformWebSocket: WebSocketSession, @unchecked Sendable {
+///     private let socket: PlatformSocket  // the platform's own WebSocket client
+///
+///     func open() { socket.connect() }
+///
+///     func close(code: WebSocketCloseCode, reason: String?) {
+///         socket.close(code: code.rawValue, reason: reason)
+///     }
+///
+///     func send(_ message: WebSocketMessage) async throws { /* … */ }
+///
+///     func receive() async throws -> WebSocketMessage { /* … */ }
+///
+///     func ping() async throws {
+///         try await withCheckedThrowingContinuation { continuation in
+///             socket.ping { error in  // called once, when the pong arrives or the ping fails
+///                 if let error {
+///                     continuation.resume(throwing: error)
+///                 } else {
+///                     continuation.resume()
+///                 }
+///             }
+///         }
+///     }
+/// }
+/// ```
+///
+/// ``ping()`` needs no timeout of its own: the connection bounds every ping with
+/// ``RelayConnectionConfig/connectionTimeout`` and stops waiting when it expires, even if the
+/// call never returns.
 public protocol WebSocketSession: Sendable {
-    /// Begins the WebSocket handshake.
-    func resume()
+    /// Starts the WebSocket handshake.
+    ///
+    /// Returns without waiting for the handshake to finish; the connection learns that the socket
+    /// is up from the first ``ping()`` that succeeds, and a failed handshake surfaces as an error
+    /// from that ping or from ``send(_:)`` and ``receive()``.
+    func open()
 
-    /// Closes the socket with the given close code and optional reason.
-    func cancel(with closeCode: WebSocketCloseCode, reason: Data?)
+    /// Closes the socket with the given close code and optional UTF-8 reason.
+    ///
+    /// Any ``receive()`` still pending must then fail rather than stay suspended. RFC 6455 limits
+    /// the reason to 123 bytes of UTF-8.
+    func close(code: WebSocketCloseCode, reason: String?)
 
     /// Sends a single WebSocket frame.
     func send(_ message: WebSocketMessage) async throws
@@ -62,8 +107,11 @@ public protocol WebSocketSession: Sendable {
     /// Receives the next WebSocket frame, suspending until one arrives or the socket fails.
     func receive() async throws -> WebSocketMessage
 
-    /// Sends a ping; `pongReceiveHandler` is invoked when the pong arrives or the ping fails.
-    func sendPing(pongReceiveHandler: @escaping @Sendable ((any Error)?) -> Void)
+    /// Sends a ping and returns once the matching pong arrives, throwing if the ping fails.
+    ///
+    /// The connection enforces the pong timeout itself and abandons a ping that outlives it, so an
+    /// implementation needs neither a timer nor cancellation support.
+    func ping() async throws
 }
 
 /// Creates a ``WebSocketSession`` for a request.
@@ -100,16 +148,17 @@ final class URLSessionWebSocket: WebSocketSession, @unchecked Sendable {
         self.task = task
     }
 
-    func resume() {
+    func open() {
         task.resume()
     }
 
-    func cancel(with closeCode: WebSocketCloseCode, reason: Data?) {
+    func close(code: WebSocketCloseCode, reason: String?) {
         // Every current WebSocketCloseCode raw value is a valid URLSession close code;
         // if that invariant is ever broken, close without a status code (.invalid is
         // URLSession's "no close code") rather than crash mid-teardown.
-        let nativeCode = URLSessionWebSocketTask.CloseCode(rawValue: closeCode.rawValue) ?? .invalid
-        task.cancel(with: nativeCode, reason: reason)
+        let nativeCode = URLSessionWebSocketTask.CloseCode(rawValue: code.rawValue) ?? .invalid
+        let reasonData = reason.map { Data($0.utf8) }
+        task.cancel(with: nativeCode, reason: reasonData)
     }
 
     func send(_ message: WebSocketMessage) async throws {
@@ -120,8 +169,22 @@ final class URLSessionWebSocket: WebSocketSession, @unchecked Sendable {
         try WebSocketMessage(await task.receive())
     }
 
-    func sendPing(pongReceiveHandler: @escaping @Sendable ((any Error)?) -> Void) {
-        task.sendPing(pongReceiveHandler: pongReceiveHandler)
+    /// Bridges `sendPing(pongReceiveHandler:)`, which can call its handler more than once when
+    /// the socket is cancelled or aborted; ``ResumeOnceGuard`` keeps the continuation to a single
+    /// resume. Cancelling the caller does not cancel the ping — the connection abandons a ping it
+    /// has stopped waiting for, and closing the socket makes URLSession fail the pending handler.
+    func ping() async throws {
+        let resumeGuard = ResumeOnceGuard()
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
+            task.sendPing { error in
+                guard resumeGuard.claim() else { return }
+                if let error {
+                    continuation.resume(throwing: error)
+                } else {
+                    continuation.resume()
+                }
+            }
+        }
     }
 }
 
