@@ -21,6 +21,53 @@ import NostrCore
 /// reading it directly. The remaining shared stored properties are `internal` so those façades,
 /// which live in separate files, can reach them.
 public actor NostrClient {
+    /// Client behavior: the relay pool, how gossip routing brings relays into it, and how far.
+    public struct Config: Sendable {
+        /// The relay pool's configuration. Default: ``RelayPoolConfig/default``.
+        public var relayPool: RelayPoolConfig
+
+        /// How outbox/inbox routing brings a user's declared relays into the pool. Default:
+        /// ``GossipRelayPolicy/addAndConnect``.
+        public var gossipPolicy: GossipRelayPolicy
+
+        /// The most relays a single gossip resolution may add to the pool and connect. Default: 8.
+        ///
+        /// One resolution is the relay set computed for one outbox publish or read, or for one
+        /// recipient's NIP-17 DM inbox. Relays already in the pool are always used and never count
+        /// against this limit; it bounds only how many *new* sockets routing across many users'
+        /// relay lists may open at once. Which of the surplus relays are skipped is unspecified.
+        ///
+        /// Zero or a negative value adds no relays, so gossip resolution uses only relays already
+        /// in the pool — the same outcome as ``GossipRelayPolicy/requirePresent``. Under
+        /// ``GossipRelayPolicy/requirePresent`` this limit has no effect.
+        public var maximumGossipRelaysPerResolve: Int
+
+        /// The default configuration: ``RelayPoolConfig/default``, ``GossipRelayPolicy/addAndConnect``,
+        /// and at most 8 new relays per gossip resolution.
+        public static let `default` = Config()
+
+        /// Creates a client configuration.
+        /// - Parameters:
+        ///   - relayPool: The relay pool's configuration.
+        ///   - gossipPolicy: How outbox/inbox routing brings declared relays into the pool.
+        ///   - maximumGossipRelaysPerResolve: The most relays one gossip resolution may add and
+        ///     connect; zero or less adds none.
+        public init(
+            relayPool: RelayPoolConfig = .default,
+            gossipPolicy: GossipRelayPolicy = .addAndConnect,
+            maximumGossipRelaysPerResolve: Int = 8
+        ) {
+            self.relayPool = relayPool
+            self.gossipPolicy = gossipPolicy
+            self.maximumGossipRelaysPerResolve = maximumGossipRelaysPerResolve
+        }
+    }
+
+    /// The configuration this client was created with.
+    ///
+    /// ``Config/relayPool`` mirrors the pool's own ``RelayPool/config``.
+    public nonisolated let config: Config
+
     /// The relay pool managing all connections, reached publicly as ``NostrRelaysAPI/pool``.
     ///
     /// Immutable and `Sendable`, so the façades read it without hopping onto the actor.
@@ -49,36 +96,47 @@ public actor NostrClient {
     /// Per-public-key NIP-17 DM relay list (kind 10050) cache and inbox resolver
     let dmRelayListStore: DirectMessageRelayListStore
 
-    public init(
-        relayPoolConfig: RelayPoolConfig = .default,
-        gossipPolicy: GossipRelayPolicy = .addAndConnect
-    ) {
-        self.init(relayPool: RelayPool(config: relayPoolConfig), gossipPolicy: gossipPolicy)
-    }
-
-    /// Creates a client whose relays use the given WebSocket transport.
+    /// Creates a client.
     ///
-    /// Supply a custom ``WebSocketSessionFactory`` to run on a platform without
-    /// `URLSession` WebSocket support — for example an OkHttp-backed factory on Android.
-    /// On Apple platforms the default ``init(relayPoolConfig:gossipPolicy:)`` already uses
-    /// `URLSession`, so this initializer is only needed when overriding the transport.
+    /// By default every relay connection's sockets come from a ``URLSessionWebSocketFactory`` over
+    /// `URLSession.shared`. Supply a custom ``WebSocketSessionFactory`` to run on a platform without
+    /// working `URLSession` WebSocket support — for example an OkHttp-backed factory on Android.
+    /// - Parameters:
+    ///   - config: The relay pool, gossip policy, and gossip relay limit.
+    ///   - webSocketFactory: Creates the transport for each relay connection (defaults to a
+    ///     ``URLSessionWebSocketFactory`` over `URLSession.shared`).
     public init(
-        relayPoolConfig: RelayPoolConfig = .default,
-        gossipPolicy: GossipRelayPolicy = .addAndConnect,
-        webSocketFactory: any WebSocketSessionFactory
+        config: Config = .default,
+        webSocketFactory: any WebSocketSessionFactory = URLSessionWebSocketFactory()
     ) {
+        let pool = RelayPool(config: config.relayPool, webSocketFactory: webSocketFactory)
         self.init(
-            relayPool: RelayPool(config: relayPoolConfig, webSocketFactory: webSocketFactory),
-            gossipPolicy: gossipPolicy
+            relayPool: pool,
+            gossipPolicy: config.gossipPolicy,
+            maximumGossipRelaysPerResolve: config.maximumGossipRelaysPerResolve
         )
     }
 
     /// Designated initializer shared by the public initializer and by tests, which inject a
     /// ``RelayPool`` built with a fake transport so the client can be exercised without a network.
-    init(relayPool: RelayPool, gossipPolicy: GossipRelayPolicy = .addAndConnect) {
+    ///
+    /// ``config`` takes its ``Config/relayPool`` from `relayPool`, so it describes the injected pool.
+    init(
+        relayPool: RelayPool,
+        gossipPolicy: GossipRelayPolicy = Config.default.gossipPolicy,
+        maximumGossipRelaysPerResolve: Int = Config.default.maximumGossipRelaysPerResolve
+    ) {
+        self.config = Config(
+            relayPool: relayPool.config,
+            gossipPolicy: gossipPolicy,
+            maximumGossipRelaysPerResolve: maximumGossipRelaysPerResolve
+        )
+        let limit = maximumGossipRelaysPerResolve
         self.pool = relayPool
-        self.relayListStore = RelayListStore(pool: relayPool, policy: gossipPolicy)
-        self.dmRelayListStore = DirectMessageRelayListStore(pool: relayPool, policy: gossipPolicy)
+        self.relayListStore = RelayListStore(
+            pool: relayPool, policy: gossipPolicy, maximumGossipRelaysPerResolve: limit)
+        self.dmRelayListStore = DirectMessageRelayListStore(
+            pool: relayPool, policy: gossipPolicy, maximumGossipRelaysPerResolve: limit)
     }
 
     // MARK: - Signer

@@ -17,8 +17,8 @@ struct RelayConnectionSocketGenerationTests {
     ) -> RelayConnection {
         RelayConnection(
             url: relayURL,
-            webSocketFactory: MockWebSocketSessionFactory(makeSession: sockets),
-            config: RelayConnectionConfig(reconnect: nil)
+            config: RelayConnectionConfig(reconnect: nil),
+            webSocketFactory: MockWebSocketSessionFactory(makeSession: sockets)
         )
     }
 

@@ -33,9 +33,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   it.
 - **`Mnemonic.WordCount` names the BIP-39 mnemonic lengths**: `.twelve`, `.fifteen`, `.eighteen`,
   `.twentyOne`, and `.twentyFour` (128 to 256 bits of entropy), with the word count as `rawValue`.
+- **`NostrClient.Config` groups the client's settings**: `relayPool` (`RelayPoolConfig.default`
+  unless set), `gossipPolicy` (`.addAndConnect`), and the new `maximumGossipRelaysPerResolve` (8), with
+  `NostrClient.Config.default`. The client exposes the configuration it was created with as the
+  read-only `NostrClient.config`.
+- **The gossip relay limit is configurable**: `NostrClient.Config.maximumGossipRelaysPerResolve`
+  bounds how many relays one gossip resolution (an outbox publish or read, or one recipient's NIP-17
+  DM inbox) may add to the pool and connect; it was fixed at 8. Relays already in the pool are always
+  used and never count against it. Zero or a negative value adds none, so gossip routing uses only
+  pooled relays, as under `GossipRelayPolicy.requirePresent`.
 
 ### Changed
 
+- **One initializer per relay layer, with the socket source as a defaulted trailing parameter**
+  (breaking). `webSocketFactory:` now follows `config:` everywhere and defaults to
+  `URLSessionWebSocketFactory()` (over `URLSession.shared`); a custom session is
+  `webSocketFactory: URLSessionWebSocketFactory(urlSession: session)`:
+  - `NostrClient(relayPoolConfig:gossipPolicy:)` and
+    `NostrClient(relayPoolConfig:gossipPolicy:webSocketFactory:)` →
+    `NostrClient(config: NostrClient.Config = .default, webSocketFactory:)`:
+    `NostrClient(relayPoolConfig: poolConfig, gossipPolicy: .requirePresent)` →
+    `NostrClient(config: NostrClient.Config(relayPool: poolConfig, gossipPolicy: .requirePresent))`.
+  - `RelayPool(config:)` and `RelayPool(config:webSocketFactory:)` → `RelayPool(config:webSocketFactory:)`,
+    both parameters defaulted.
+  - `RelayConnection(url:urlSession:config:)` and `RelayConnection(url:webSocketFactory:config:)` →
+    `RelayConnection(url:config:webSocketFactory:)`:
+    `RelayConnection(url: url, urlSession: session)` →
+    `RelayConnection(url: url, webSocketFactory: URLSessionWebSocketFactory(urlSession: session))`, and
+    `RelayConnection(url: url, webSocketFactory: factory, config: config)` →
+    `RelayConnection(url: url, config: config, webSocketFactory: factory)`.
+  - `RelayConnectionTransport(relayURLs:urlSession:config:)` and
+    `RelayConnectionTransport(relayURLs:webSocketFactory:config:)` →
+    `RelayConnectionTransport(relayURLs:config:webSocketFactory:)`, with the same migrations.
 - **Mnemonic generation takes a `Mnemonic.WordCount` and cannot fail** (breaking):
   - `Mnemonic.generate(wordCount: Int = 12) throws(Mnemonic.Error)` →
     `generate(wordCount: Mnemonic.WordCount = .twelve)`, which no longer throws:

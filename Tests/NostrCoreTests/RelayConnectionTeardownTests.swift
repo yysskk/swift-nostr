@@ -15,8 +15,8 @@ struct RelayConnectionTeardownTests {
     private func makeConnection(socket: MockWebSocketSession) -> RelayConnection {
         RelayConnection(
             url: relayURL,
-            webSocketFactory: MockWebSocketSessionFactory(makeSession: { socket }),
-            config: RelayConnectionConfig(publishAckTimeout: .seconds(30), reconnect: nil)
+            config: RelayConnectionConfig(publishAckTimeout: .seconds(30), reconnect: nil),
+            webSocketFactory: MockWebSocketSessionFactory(makeSession: { socket })
         )
     }
 

@@ -22,8 +22,8 @@ struct NIP42AutomaticAuthenticationTests {
         let mock = MockWebSocketSession()
         let connection = RelayConnection(
             url: relayURL,
-            webSocketFactory: MockWebSocketSessionFactory(makeSession: { mock }),
-            config: noReconnectConfig
+            config: noReconnectConfig,
+            webSocketFactory: MockWebSocketSessionFactory(makeSession: { mock })
         )
         return (connection, mock)
     }
@@ -205,13 +205,13 @@ struct NIP42AutomaticAuthenticationTests {
         let mock = MockWebSocketSession()
         let connection = RelayConnection(
             url: relayURL,
-            webSocketFactory: MockWebSocketSessionFactory(makeSession: { mock }),
             config: RelayConnectionConfig(
                 connectionTimeout: .seconds(1),
                 publishAckTimeout: .milliseconds(50),
                 pingInterval: .seconds(60),
                 reconnect: nil
-            )
+            ),
+            webSocketFactory: MockWebSocketSessionFactory(makeSession: { mock })
         )
         let signer = EventSigner(keyPair: KeyPair())
         await connection.setAuthenticationResponder { relayURL, challenge in

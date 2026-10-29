@@ -81,7 +81,7 @@ try event.verify()
 
 ### WebSocket Transport Seam
 
-- ``RelayConnection/init(url:webSocketFactory:config:)``
+- ``RelayConnection/init(url:config:webSocketFactory:)``
 - ``WebSocketSession``
 - ``WebSocketSessionFactory``
 - ``URLSessionWebSocketFactory``

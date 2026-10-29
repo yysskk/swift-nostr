@@ -70,6 +70,24 @@ for await item in feed {
 
 The main entry point for the library. Manages relays, publishing, and subscriptions.
 
+### Initialization
+
+```swift
+let client = NostrClient()   // NostrClient.Config.default, URLSession-backed sockets
+let tuned = NostrClient(config: NostrClient.Config(
+    relayPool: RelayPoolConfig(queryTimeout: .seconds(5)),  // RelayPoolConfig.default
+    gossipPolicy: .requirePresent,                          // .addAndConnect
+    maximumGossipRelaysPerResolve: 4                        // 8; 0 or less adds no relays
+))
+// Or run every relay on a platform-native socket (OkHttp on Android) or an in-memory test fake.
+let injected = NostrClient(webSocketFactory: OkHttpWebSocketFactory())
+```
+
+`NostrClient(config:webSocketFactory:)` is the only initializer; `client.config` is the
+`NostrClient.Config` it was created with. `maximumGossipRelaysPerResolve` bounds how many relays one
+gossip resolution (one outbox publish or read, or one recipient's DM inbox) may add to the pool and
+connect; relays already in the pool are always used and never count against it.
+
 ### Feature namespaces
 
 Every operation is reached through one of eight namespaces on the client, not as a flat method
@@ -305,7 +323,8 @@ try await client.events.publish(signedEvent, route: .pool, strategy: .allSettled
 - `.pool` -- every relay in the pool
 - `.relays(Set<RelayURL>)` -- exactly these; relays not in the pool are skipped, and when none is
   pooled (an empty set included) the call throws `RelayPool.Error.noMatchingRelays`
-- `.outbox` -- NIP-65, relay lists fetched when not cached and connected per `GossipRelayPolicy`.
+- `.outbox` -- NIP-65, relay lists fetched when not cached and connected per `GossipRelayPolicy`
+  (at most `NostrClient.Config.maximumGossipRelaysPerResolve` new relays per resolution).
   A publish goes to the author's WRITE relays plus the READ relays of its "p"-tagged keys; a
   fetch, count, or subscription goes to the WRITE relays of the filters' authors. Falls back to the
   whole pool when nothing resolves (reads also when a filter has no authors or any author has no
@@ -1689,6 +1708,8 @@ let config = RelayPoolConfig(
     deduplication: .init(maximumCount: 10_000, timeToLive: .seconds(300)),  // nil delivers every copy
     queryTimeout: .seconds(10)   // one-shot fetch/count wait when the call passes no timeout
 )
+let pool = RelayPool(config: config)                                   // URLSession sockets
+let injected = RelayPool(config: config, webSocketFactory: OkHttpWebSocketFactory())
 ```
 
 ### Methods
@@ -1735,7 +1756,9 @@ Manages WebSocket connection to a single relay (actor).
 
 ### Properties
 
-- `url: RelayURL` -- the relay's URL; `RelayConnection(url:)` takes a `RelayURL`
+- `url: RelayURL` -- the relay's URL; `RelayConnection(url:config:webSocketFactory:)` takes a
+  `RelayURL` (`config` defaults to `.default`, `webSocketFactory` to `URLSessionWebSocketFactory()`;
+  pass `URLSessionWebSocketFactory(urlSession:)` for a custom `URLSession`)
 - `state: RelayConnectionState` -- current connection state
 - `config: RelayConnectionConfig`
 - `authenticationChallenge: String?` -- latest NIP-42 AUTH challenge (session-scoped)
@@ -1816,7 +1839,8 @@ thrown when an operation reaches no relay.
 let transport = RelayConnectionTransport(relayURLs: relays)                 // [RelayURL], URLSession sockets
 let tuned = RelayConnectionTransport(relayURLs: relays, config: relayConfig)
 // Or run the relays on a platform-native socket (OkHttp on Android) or an in-memory test fake.
-let injected = RelayConnectionTransport(relayURLs: relays, webSocketFactory: OkHttpWebSocketFactory())
+let injected = RelayConnectionTransport(
+    relayURLs: relays, config: relayConfig, webSocketFactory: OkHttpWebSocketFactory())
 ```
 
 ## Bech32Error

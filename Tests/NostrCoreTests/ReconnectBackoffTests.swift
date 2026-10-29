@@ -173,8 +173,8 @@ struct ReconnectBackoffTests {
         let sockets = ReconnectSocketSequence()
         let connection = RelayConnection(
             url: RelayURL("wss://relay.example.com")!,
-            webSocketFactory: MockWebSocketSessionFactory(makeSession: { sockets.next() }),
             config: RelayConnectionConfig(reconnect: ReconnectPolicy(initialDelay: .zero)),
+            webSocketFactory: MockWebSocketSessionFactory(makeSession: { sockets.next() }),
             jitter: { range in
                 ranges.record(range)
                 return range.lowerBound
@@ -198,8 +198,8 @@ struct ReconnectBackoffTests {
         let sockets = ReconnectSocketSequence()
         let connection = RelayConnection(
             url: RelayURL("wss://relay.example.com")!,
-            webSocketFactory: MockWebSocketSessionFactory(makeSession: { sockets.next() }),
             config: RelayConnectionConfig(reconnect: ReconnectPolicy(initialDelay: .zero, backoffMultiplier: 0)),
+            webSocketFactory: MockWebSocketSessionFactory(makeSession: { sockets.next() }),
             jitter: { $0.lowerBound }
         )
 

@@ -19,8 +19,13 @@ actor RelayListStore {
     private var resolvedWithoutList: Set<PublicKey> = []
     private let connector: RelayConnector
 
-    init(pool: RelayPool, policy: GossipRelayPolicy = .addAndConnect, maximumRelaysPerResolve: Int = 8) {
-        self.connector = RelayConnector(pool: pool, policy: policy, maximumRelaysPerResolve: maximumRelaysPerResolve)
+    init(
+        pool: RelayPool,
+        policy: GossipRelayPolicy = .addAndConnect,
+        maximumGossipRelaysPerResolve: Int = NostrClient.Config.default.maximumGossipRelaysPerResolve
+    ) {
+        self.connector = RelayConnector(
+            pool: pool, policy: policy, maximumGossipRelaysPerResolve: maximumGossipRelaysPerResolve)
     }
 
     /// Stores a relay list if it is newer than the cached one (replaceable-event semantics: newer wins).

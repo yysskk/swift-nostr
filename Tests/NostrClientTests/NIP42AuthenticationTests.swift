@@ -92,7 +92,6 @@ struct NIP42RelayConnectionTests {
         let mock = MockWebSocketSession()
         let connection = RelayConnection(
             url: relayURL,
-            webSocketFactory: MockWebSocketSessionFactory(makeSession: { mock }),
             // No auto-reconnect and a long ping interval keep the test's background
             // tasks inert; the connection is torn down explicitly at the end.
             config: RelayConnectionConfig(
@@ -100,7 +99,8 @@ struct NIP42RelayConnectionTests {
                 publishAckTimeout: publishAckTimeout,
                 pingInterval: .seconds(60),
                 reconnect: nil
-            )
+            ),
+            webSocketFactory: MockWebSocketSessionFactory(makeSession: { mock })
         )
         return (connection, mock)
     }
