@@ -37,7 +37,8 @@ extension WalletConnection {
     ///
     /// - Parameters:
     ///   - lnurlPay: The recipient's resolved LNURL-pay response.
-    ///   - amountMillisats: The amount to zap, in millisatoshis. Must be within the endpoint's
+    ///   - amount: The amount to zap, in millisatoshis like every amount in NIP-47. Must be within
+    ///     the endpoint's
     ///     `minimumSendable...maximumSendable` range.
     ///   - zapRequest: The signed kind-9734 zap request.
     ///   - lnurl: The recipient's bech32 `lnurl`, forwarded to the callback when provided.
@@ -48,13 +49,13 @@ extension WalletConnection {
     ///   the payment fails.
     public func payZap(
         lnurlPay: LNURLPayResponse,
-        amountMillisats: Int64,
+        amount: Int64,
         zapRequest: Event,
         lnurl: String? = nil,
         urlSession: URLSession = .shared
     ) async throws -> ZapResult {
         let invoice = try await lnurlPay.fetchInvoice(
-            amountMillisats: amountMillisats,
+            amountMillisats: amount,
             zapRequest: zapRequest,
             lnurl: lnurl,
             urlSession: urlSession)

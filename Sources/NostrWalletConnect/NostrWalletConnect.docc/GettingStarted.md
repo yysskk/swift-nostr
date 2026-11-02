@@ -63,7 +63,7 @@ print("Fees paid: \(payment.feesPaid ?? 0) msat")
 ## Pay a Zap End to End
 
 The headline use case: hand the connection a recipient's resolved LNURL-pay response and a signed
-zap request, and ``WalletConnection/payZap(lnurlPay:amountMillisats:zapRequest:lnurl:urlSession:)``
+zap request, and ``WalletConnection/payZap(lnurlPay:amount:zapRequest:lnurl:urlSession:)``
 fetches the invoice and pays it in one step. Build the zap request with `NostrCore`
 (`LNURL`, `KeyPair`, and `EventSigner` come from there):
 
@@ -86,7 +86,7 @@ let zapRequest = try signer.sign(.zapRequest(
 // Fetch the invoice and pay it through the wallet in one call.
 let zap = try await connection.payZap(
     lnurlPay: lnurlPay,
-    amountMillisats: 21_000,
+    amount: 21_000,
     zapRequest: zapRequest,
     lnurl: LNURL.encode(serviceURL))
 print("Zap preimage: \(zap.preimage)")

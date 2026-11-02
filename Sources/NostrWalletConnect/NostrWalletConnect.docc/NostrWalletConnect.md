@@ -85,7 +85,7 @@ print(payment.preimage)
 
 ### Lightning Zaps (NIP-57)
 
-- ``WalletConnection/payZap(lnurlPay:amountMillisats:zapRequest:lnurl:urlSession:)``
+- ``WalletConnection/payZap(lnurlPay:amount:zapRequest:lnurl:urlSession:)``
 - ``ZapResult``
 
 ### Supporting Types

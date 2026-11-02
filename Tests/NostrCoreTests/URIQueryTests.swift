@@ -33,12 +33,4 @@ struct URIQueryTests {
         let decoded = components.queryItems?.compactMap(\.value)
         #expect(decoded == values)
     }
-
-    @Test("randomHex returns lowercase hex of the requested byte count")
-    func randomHex() {
-        let hex = URIQuery.randomHex(byteCount: 16)
-        #expect(hex.count == 32)
-        #expect(hex.isCanonicalHex(byteCount: 16))
-        #expect(hex != URIQuery.randomHex(byteCount: 16))
-    }
 }

@@ -200,8 +200,12 @@ extension Filter {
         )
     }
 
-    /// Create a filter for a global feed
-    public static func globalFeed(limit: Int = 100) -> Filter {
+    /// Create a filter for a global feed: text notes from every author.
+    ///
+    /// Unlike the other helpers, the limit defaults to 100, since a global feed without one asks
+    /// each relay for its whole history. Pass `nil` to leave the cap to the relay.
+    /// - Parameter limit: The maximum number of events each relay returns initially.
+    public static func globalFeed(limit: Int? = 100) -> Filter {
         Filter(
             kinds: [.textNote],
             limit: limit

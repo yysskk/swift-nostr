@@ -71,6 +71,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Argument labels match their peers** (breaking):
+  - `RemoteSigner(bunker:clientKeyPair:requesting:transport:config:)` is
+    `RemoteSigner(bunker:clientKeyPair:permissions:transport:config:)`, the label
+    `NostrConnectURI(…permissions:…)` already uses.
+  - `WalletConnection.payZap(lnurlPay:amountMillisats:…)` is `payZap(lnurlPay:amount:…)`, like
+    `payInvoice`, `payKeysend`, and `makeInvoice`; every NIP-47 amount is in millisatoshis.
+- **`Filter.globalFeed(limit:)` takes an optional limit**: it still defaults to 100, and `nil` now
+  leaves the cap to the relay, like the other `Filter` helpers.
 - **`RelayConnectionState.failed` carries a typed `Failure`** (breaking): it was `failed(String)`, the
   underlying error's description. `RelayConnectionState.Failure` (`Error`, `LocalizedError`,
   `Hashable`) adds which operation failed (`.connect`, `.keepalive`, `.send`, or `.receive`) and keeps

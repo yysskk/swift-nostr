@@ -92,10 +92,17 @@ struct FilterTests {
 
     @Test("Global feed convenience filter")
     func globalFeedFilter() {
-        let filter = Filter.globalFeed(limit: 100)
+        let filter = Filter.globalFeed(limit: 50)
 
         #expect(filter.kinds == [1])
-        #expect(filter.limit == 100)
+        #expect(filter.limit == 50)
+        #expect(filter.authors == nil)
+    }
+
+    @Test("Global feed caps the initial events at 100 unless told otherwise")
+    func globalFeedDefaultLimit() {
+        #expect(Filter.globalFeed().limit == 100)
+        #expect(Filter.globalFeed(limit: nil).limit == nil)
     }
 
     @Test("Filter JSON encoding")

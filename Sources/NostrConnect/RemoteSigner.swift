@@ -127,7 +127,7 @@ public actor RemoteSigner {
     public init(
         bunker: BunkerURI,
         clientKeyPair: KeyPair? = nil,
-        requesting permissions: [RemoteSignerPermission] = [],
+        permissions: [RemoteSignerPermission] = [],
         transport: (any RelayTransport)? = nil,
         config: Config = Config()
     ) {

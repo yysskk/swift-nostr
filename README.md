@@ -217,7 +217,7 @@ print(payment.preimage)
 // Or complete a zap end to end: fetch the recipient's invoice and pay it.
 let zap = try await connection.payZap(
     lnurlPay: lnurlPay,            // resolved LNURLPayResponse
-    amountMillisats: 21_000,
+    amount: 21_000,
     zapRequest: zapRequest)        // try await signer.sign(.zapRequest(to: recipient, relays: relays))
 print(zap.preimage)
 ```

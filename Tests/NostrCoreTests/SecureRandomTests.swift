@@ -28,4 +28,13 @@ struct SecureRandomTests {
         // A collision between two 32-byte CSPRNG draws is astronomically unlikely.
         #expect(first != second)
     }
+
+    @Test("hex returns lowercase hex of the requested byte count")
+    func hexOfByteCount() {
+        let hex = SecureRandom.hex(byteCount: 16)
+
+        #expect(hex.count == 32)
+        #expect(hex.isCanonicalHex(byteCount: 16))
+        #expect(hex != SecureRandom.hex(byteCount: 16))
+    }
 }
