@@ -603,9 +603,9 @@ published.result.status(for: try RelayURL(string: "wss://Relay.Example.com/"))  
 ```
 
 `PublishRelayStatus` (enum: Sendable, Hashable) is `.accepted`, `.rejected(RelayRejection)` (OK `false`),
-`.failed(RelayConnection.Error)` (e.g. `.timedOut`, `.notConnected`), or `.pending`. Statuses compare by
-value, payload included; match a case to ignore it: `if case .rejected = status`. `failedRelays` holds
-both rejected and failed relays. `PublishResult` and `PublishedEvent` are `Hashable` too.
+`.failed(RelayConnection.Error)` (e.g. `.timedOut`, `.notConnected`), `.cancelled`, or `.pending`. Statuses
+compare by value, payload included; match a case to ignore it: `if case .rejected = status`. `failedRelays`
+holds rejected, failed, and cancelled relays. `PublishResult` and `PublishedEvent` are `Hashable` too.
 
 ## EventTemplate
 
