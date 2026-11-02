@@ -74,6 +74,11 @@ struct RelayConnectionKeepaliveTests {
 
         await waitForState(of: connection, where: Self.isFailed)
         #expect(socket.didClose)
+        guard case .failed(let failure) = await connection.state else {
+            Issue.record("a failed ping should leave the connection failed")
+            return
+        }
+        #expect(failure.operation == .keepalive)
     }
 
     /// The mock's deferred ping ignores cancellation and the socket closing, so it stays suspended
@@ -87,6 +92,9 @@ struct RelayConnectionKeepaliveTests {
         await socket.waitForPing()
         await waitForState(of: connection, where: Self.isFailed)
 
+        let timedOut = RelayConnectionState.Failure(
+            operation: .keepalive, reason: RelayConnection.Error.timedOut.localizedDescription)
+        #expect(await connection.state == .failed(timedOut))
         #expect(socket.didClose)
         #expect(socket.pendingPingCount == 1)
         socket.completePing()

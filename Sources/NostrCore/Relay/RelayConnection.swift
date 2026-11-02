@@ -317,7 +317,7 @@ public actor RelayConnection {
             guard isCurrentSocket(generation) else {
                 throw .notConnected
             }
-            updateState(.failed(error.localizedDescription))
+            updateState(.failed(RelayConnectionState.Failure(.connect, error: error)))
             discardSocket()
             throw .connectionFailed
         }
@@ -534,7 +534,7 @@ public actor RelayConnection {
             // otherwise the next connect would overwrite a live connection nobody closes, and its
             // receive loop would go on running beside the new one.
             if isCurrentSocket(generation) {
-                updateState(.failed(error.localizedDescription))
+                updateState(.failed(RelayConnectionState.Failure(.send, error: error)))
                 discardSocket()
                 scheduleReconnectIfNeeded()
             }
@@ -1069,7 +1069,8 @@ extension RelayConnection {
         /// within its configured timeout.
         case timedOut
         /// A connection attempt failed: the socket could not be opened or did not answer the
-        /// verifying ping in time. ``RelayConnection/state`` describes the underlying failure.
+        /// verifying ping in time. ``RelayConnection/state`` is then
+        /// ``RelayConnectionState/failed(_:)``, whose ``RelayConnectionState/Failure`` carries the cause.
         case connectionFailed
         /// The relay has not sent an AUTH challenge to answer (NIP-42).
         case missingAuthenticationChallenge
