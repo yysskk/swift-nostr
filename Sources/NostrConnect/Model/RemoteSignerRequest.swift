@@ -1,3 +1,5 @@
+import NostrCore
+
 /// The JSON body of a NIP-46 request: `{"id": ..., "method": ..., "params": [...]}`.
 ///
 /// Every parameter is a string; the meaning of each position depends on ``method``. The body is
@@ -18,8 +20,6 @@ struct RemoteSignerRequest: Codable, Sendable, Hashable {
 
     /// A random request id (16 random bytes, hex-encoded).
     static func makeID() -> String {
-        var generator = SystemRandomNumberGenerator()
-        let bytes = (0..<16).map { _ in UInt8.random(in: .min ... .max, using: &generator) }
-        return bytes.map { String(format: "%02x", $0) }.joined()
+        SecureRandom.hex(byteCount: 16)
     }
 }

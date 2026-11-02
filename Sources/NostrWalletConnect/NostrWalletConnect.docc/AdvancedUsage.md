@@ -218,7 +218,7 @@ keys exactly as they appear on the wire.
 
 ## Lightning Zap Capstone (NIP-57)
 
-``WalletConnection/payZap(lnurlPay:amountMillisats:zapRequest:lnurl:urlSession:)`` completes a zap
+``WalletConnection/payZap(lnurlPay:amount:zapRequest:lnurl:urlSession:)`` completes a zap
 that `NostrCore` can only prepare: it fetches the BOLT-11 invoice from the recipient's LNURL
 endpoint and pays it through the wallet in one step. Build the inputs with `NostrCore`:
 
@@ -237,7 +237,7 @@ let zapRequest = try signer.sign(.zapRequest(
 
 let zap = try await connection.payZap(
     lnurlPay: lnurlPay,
-    amountMillisats: 21_000,
+    amount: 21_000,
     zapRequest: zapRequest,
     lnurl: LNURL.encode(serviceURL))
 print(zap.invoice, zap.preimage, zap.feesPaid ?? 0)

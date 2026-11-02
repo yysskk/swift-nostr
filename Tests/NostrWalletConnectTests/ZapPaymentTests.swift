@@ -36,7 +36,7 @@ struct ZapPaymentTests {
 
         async let result = connection.payZap(
             lnurlPay: payResponse(),
-            amountMillisats: 21000,
+            amount: 21000,
             zapRequest: zapRequest,
             urlSession: MockURLProtocol.makeSession())
 
@@ -76,7 +76,7 @@ struct ZapPaymentTests {
 
         async let result = connection.payZap(
             lnurlPay: payResponse(),
-            amountMillisats: 21000,
+            amount: 21000,
             zapRequest: zapRequest,
             urlSession: MockURLProtocol.makeSession())
 
@@ -112,7 +112,7 @@ struct ZapPaymentTests {
         await #expect(throws: LNURLPayResponse.InvoiceError.self) {
             _ = try await connection.payZap(
                 lnurlPay: payResponse(),
-                amountMillisats: 1,  // below minimumSendable
+                amount: 1,  // below minimumSendable
                 zapRequest: zapRequest,
                 urlSession: MockURLProtocol.makeSession())
         }

@@ -29,11 +29,4 @@ package enum URIQuery {
         }
         .joined(separator: "&")
     }
-
-    /// Returns `count` random bytes from the system CSPRNG as a lowercase hex string.
-    ///
-    /// Used to mint connection secrets.
-    package static func randomHex(byteCount count: Int) -> String {
-        SecureRandom.generateBytes(count: count).hexEncodedString()
-    }
 }

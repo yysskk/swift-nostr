@@ -63,7 +63,7 @@ default) leaves them out:
 ```swift
 let signer = RemoteSigner(
     bunker: bunker,
-    requesting: [.signEvent(kind: .textNote), .nip44Encrypt, .nip44Decrypt])
+    permissions: [.signEvent(kind: .textNote), .nip44Encrypt, .nip44Decrypt])
 ```
 
 A `nostrconnect://` invitation carries its permissions in the URI instead (see below).

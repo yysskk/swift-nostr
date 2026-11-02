@@ -96,7 +96,7 @@ public struct NostrConnectURI: Sendable, Hashable {
         try NostrConnectURI(
             clientPublicKey: clientKeyPair.publicKey,
             relays: relays,
-            secret: URIQuery.randomHex(byteCount: 16),
+            secret: SecureRandom.hex(byteCount: 16),
             permissions: permissions,
             name: name,
             url: url,

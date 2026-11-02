@@ -26,7 +26,7 @@ struct RemoteSignerPermissionRequestTests {
         try RemoteSigner(
             bunker: RemoteSignerFixtures.bunker(signer: signer, secret: secret),
             clientKeyPair: client,
-            requesting: permissions,
+            permissions: permissions,
             transport: transport,
             config: .init(requestTimeout: .seconds(1)))
     }
