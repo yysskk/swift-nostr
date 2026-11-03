@@ -71,6 +71,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **NIP-19 entities decode through `init(bech32:)`** (breaking): `NIP19Entity.decode(_:)` is
+  `NIP19Entity(bech32:)`, like `init(nostrURI:)`, and `NProfile`, `NEvent`, and `NAddr`'s
+  `init(bech32String:)` is `init(bech32:)`, like `PublicKey(npub:)` and `EventID(note:)`.
 - **Argument labels match their peers** (breaking):
   - `RemoteSigner(bunker:clientKeyPair:requesting:transport:config:)` is
     `RemoteSigner(bunker:clientKeyPair:permissions:transport:config:)`, the label

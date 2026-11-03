@@ -59,7 +59,7 @@ public struct NostrContentReference: Sendable, Hashable {
 
             let matchRange = schemeRange.lowerBound..<tokenEnd
             let token = String(content[schemeRange.upperBound..<tokenEnd])
-            guard let entity = try? NIP19Entity.decode(token),
+            guard let entity = try? NIP19Entity(bech32: token),
                 let reference = NostrContentReference(
                     text: String(content[matchRange]),
                     range: matchRange,

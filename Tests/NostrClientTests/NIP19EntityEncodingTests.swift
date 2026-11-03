@@ -20,7 +20,7 @@ struct NIP19EntityEncodingTests {
         ]
         for entity in entities {
             let encoded = try entity.encoded
-            #expect(try NIP19Entity.decode(encoded) == entity)
+            #expect(try NIP19Entity(bech32: encoded) == entity)
         }
     }
 
@@ -33,7 +33,7 @@ struct NIP19EntityEncodingTests {
 
     @Test("the NIP-19 nsec vector decodes to its private key and encodes back")
     func nsecVectorRoundTrips() throws {
-        let entity = try NIP19Entity.decode(nsecVector)
+        let entity = try NIP19Entity(bech32: nsecVector)
         #expect(entity == .nsec(try PrivateKey(hex: nsecVectorHex)))
         #expect(try entity.encoded == nsecVector)
     }
@@ -47,12 +47,12 @@ struct NIP19EntityEncodingTests {
     )
     func invalidScalarNsecThrows(hex: String) throws {
         let encoded = try Bech32.encode(hrp: "nsec", data: Data(hexString: hex)!)
-        #expect(throws: NIP19Entity.Error.invalidPrivateKey) { _ = try NIP19Entity.decode(encoded) }
+        #expect(throws: NIP19Entity.Error.invalidPrivateKey) { _ = try NIP19Entity(bech32: encoded) }
     }
 
     @Test("an nsec entity's description and reflection do not show the key")
     func nsecDescriptionIsRedacted() throws {
-        let entity = try NIP19Entity.decode(nsecVector)
+        let entity = try NIP19Entity(bech32: nsecVector)
         var dumped = ""
         dump(entity, to: &dumped)
         for output in [String(describing: entity), String(reflecting: entity), "\(entity)", dumped] {
