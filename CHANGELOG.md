@@ -71,6 +71,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`ClientMessage.serialize()` is the property `json`** (breaking), the counterpart of
+  `RelayMessage(json:)`.
 - **NIP-19 entities decode through `init(bech32:)`** (breaking): `NIP19Entity.decode(_:)` is
   `NIP19Entity(bech32:)`, like `init(nostrURI:)`, and `NProfile`, `NEvent`, and `NAddr`'s
   `init(bech32String:)` is `init(bech32:)`, like `PublicKey(npub:)` and `EventID(note:)`.

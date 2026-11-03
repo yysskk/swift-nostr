@@ -34,12 +34,12 @@ struct SubscriptionIDTests {
     func clientMessagesSerializeTheID() {
         let filter = Filter(kinds: [.textNote])
         #expect(
-            ClientMessage.request(subscriptionID: "sub1", filters: [filter]).serialize()
+            ClientMessage.request(subscriptionID: "sub1", filters: [filter]).json
                 == #"["REQ","sub1",{"kinds":[1]}]"#)
         #expect(
-            ClientMessage.count(subscriptionID: "sub1", filters: [filter]).serialize()
+            ClientMessage.count(subscriptionID: "sub1", filters: [filter]).json
                 == #"["COUNT","sub1",{"kinds":[1]}]"#)
-        #expect(ClientMessage.close(subscriptionID: "sub1").serialize() == #"["CLOSE","sub1"]"#)
+        #expect(ClientMessage.close(subscriptionID: "sub1").json == #"["CLOSE","sub1"]"#)
     }
 
     @Test("EVENT, EOSE, CLOSED, and COUNT parse the id from its bare string")

@@ -802,7 +802,7 @@ Messages sent to relay (NIP-01) (enum: Sendable, Hashable).
 - `.count(subscriptionID: SubscriptionID, filters: [Filter])` -- event count request (NIP-45)
 
 ```swift
-let json = clientMessage.serialize()  // JSON array string
+let json = clientMessage.json  // JSON array string; RelayMessage(json:) parses incoming frames
 ```
 
 ## EventCount

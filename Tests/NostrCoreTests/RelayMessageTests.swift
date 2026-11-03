@@ -224,7 +224,7 @@ struct ClientMessageTests {
         )
 
         let message = ClientMessage.event(event)
-        let serialized = message.serialize()
+        let serialized = message.json
 
         #expect(serialized.contains("EVENT"))
         #expect(serialized.contains(event.id.hex))
@@ -235,7 +235,7 @@ struct ClientMessageTests {
     func serializeReqMessage() throws {
         let filter = Filter(kinds: [1], limit: 10)
         let message = ClientMessage.request(subscriptionID: "sub1", filters: [filter])
-        let serialized = message.serialize()
+        let serialized = message.json
 
         #expect(serialized.contains("REQ"))
         #expect(serialized.contains("sub1"))
@@ -246,7 +246,7 @@ struct ClientMessageTests {
     func serializeReqMessageWithSearch() throws {
         let filter = Filter.search("nostr", kinds: [.textNote], limit: 20)
         let message = ClientMessage.request(subscriptionID: "sub1", filters: [filter])
-        let serialized = message.serialize()
+        let serialized = message.json
 
         #expect(serialized.contains("REQ"))
         #expect(serialized.contains("sub1"))
@@ -256,7 +256,7 @@ struct ClientMessageTests {
     @Test("Serialize CLOSE message")
     func serializeCloseMessage() throws {
         let message = ClientMessage.close(subscriptionID: "sub1")
-        let serialized = message.serialize()
+        let serialized = message.json
 
         #expect(serialized == #"["CLOSE","sub1"]"#)
     }
@@ -265,7 +265,7 @@ struct ClientMessageTests {
     func serializeCountMessage() throws {
         let filter = Filter(kinds: [.textNote])
         let message = ClientMessage.count(subscriptionID: "sub1", filters: [filter])
-        let serialized = message.serialize()
+        let serialized = message.json
 
         #expect(serialized.hasPrefix(#"["COUNT","sub1",{"#))
         #expect(serialized.contains("kinds"))

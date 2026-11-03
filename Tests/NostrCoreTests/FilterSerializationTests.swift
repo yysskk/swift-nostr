@@ -9,7 +9,7 @@ import Testing
 @Suite("Filter Wire Serialization Tests")
 struct FilterSerializationTests {
     private func serializedFilter(_ filter: Filter) throws -> [String: Any] {
-        let json = try ClientMessage.request(subscriptionID: "sub", filters: [filter]).serialize()
+        let json = ClientMessage.request(subscriptionID: "sub", filters: [filter]).json
         let array = try #require(
             JSONSerialization.jsonObject(with: Data(json.utf8)) as? [Any]
         )
@@ -68,7 +68,7 @@ struct FilterSerializationTests {
             kinds: [1], eventReferences: [referencedEvent], publicKeyReferences: [referencedPublicKey])
 
         for filter in [viaSubscript, viaProperties] {
-            let json = try ClientMessage.request(subscriptionID: "sub", filters: [filter]).serialize()
+            let json = ClientMessage.request(subscriptionID: "sub", filters: [filter]).json
             #expect(json.components(separatedBy: "\"#e\"").count == 2)
             #expect(json.components(separatedBy: "\"#p\"").count == 2)
             let dictionary = try serializedFilter(filter)
@@ -116,7 +116,7 @@ struct FilterSerializationTests {
         var filter = Filter(kinds: [1111])
         filter[tag: "K"] = ["30023"]
 
-        let json = try ClientMessage.count(subscriptionID: "sub", filters: [filter]).serialize()
+        let json = ClientMessage.count(subscriptionID: "sub", filters: [filter]).json
         let array = try #require(JSONSerialization.jsonObject(with: Data(json.utf8)) as? [Any])
         let dictionary = try #require(array.last as? [String: Any])
 
@@ -130,7 +130,7 @@ struct FilterSerializationTests {
         let signer = EventSigner(privateKey: privateKey)
         let event = signer.sign(.textNote("gm"))
 
-        let json = ClientMessage.event(event).serialize()
+        let json = ClientMessage.event(event).json
         let array = try #require(JSONSerialization.jsonObject(with: Data(json.utf8)) as? [Any])
         let dictionary = try #require(array.last as? [String: Any])
 
