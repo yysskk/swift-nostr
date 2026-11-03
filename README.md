@@ -234,6 +234,7 @@ import NostrConnect
 // Start a session from the signer's bunker:// token.
 let signer = RemoteSigner(bunker: try BunkerURI(string: "bunker://..."))
 
+// The first command connects and presents the token's secret.
 // Prove the user's key and sign an event remotely — the signed event is verified locally.
 let userPublicKey = try await signer.publicKey
 let signed = try await signer.sign(.textNote("Signed by my bunker"))

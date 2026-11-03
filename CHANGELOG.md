@@ -76,6 +76,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`RemoteSigner` commands run the `connect` handshake themselves** (breaking): on a `bunker://`
+  session the first command now connects first, presenting the token's secret and the requested
+  permissions, which it used to leave out unless `connect()` had been called. A failed handshake
+  fails the command, which is then not sent. To resume with a persisted client key pair, whose
+  single-use secret was already spent, set the new `RemoteSigner.Config.connectsAutomatically` to
+  `false`.
 - **`ClientMessage.serialize()` is the property `json`** (breaking), the counterpart of
   `RelayMessage(json:)`.
 - **NIP-19 entities decode through `init(bech32:)`** (breaking): `NIP19Entity.decode(_:)` is

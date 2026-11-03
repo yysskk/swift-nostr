@@ -1960,7 +1960,9 @@ let authorized = RemoteSigner(
     permissions: [.signEvent(kind: .textNote), .nip44Encrypt, .nip44Decrypt])
 
 // Connect, subscribe to responses, and perform the connect handshake (presents the bunker secret
-// when present). Commands start the relay session on first use but do not send the handshake.
+// when present). The first command does this by itself; call connect() to surface errors up front.
+// To resume with a persisted client key pair, whose single-use secret was already spent, pass
+// config: .init(connectsAutomatically: false) to skip the automatic handshake.
 // Concurrent connect() calls share one handshake (one connect request) and all get its result;
 // cancelling one caller fails only that call with .cancelled. Repeat calls after success are no-ops.
 try await signer.connect()

@@ -42,18 +42,23 @@ The token's host is the signer's public key, held as a `PublicKey` in
 included, throws ``RemoteSignerError/invalidURI(reason:)``.
 
 The session signs and encrypts with a *client* identity — a fresh random keypair by default — so the
-user's main Nostr key never leaves the signer. Call ``RemoteSigner/connect()`` to connect to the
-relay and perform the `connect` handshake, which presents the token's secret. Commands connect to
-the relay on first use but do not send the handshake themselves.
+user's main Nostr key never leaves the signer. The first command connects to the relay and performs
+the `connect` handshake, which presents the token's secret and any requested permissions. Call
+``RemoteSigner/connect()`` to do this earlier and surface connection errors up front:
 
 ```swift
 try await signer.connect()
 ```
 
-To resume a previously authorized session, persist the client keypair and pass it back in:
+To resume a previously authorized session, persist the client keypair and pass it back in. A bunker
+secret is single-use, so a signer may refuse or ignore a second `connect` that presents it; turn off
+the automatic handshake with ``RemoteSigner/Config/connectsAutomatically``:
 
 ```swift
-let signer = RemoteSigner(bunker: bunker, clientKeyPair: savedClientKeyPair)
+let signer = RemoteSigner(
+    bunker: bunker,
+    clientKeyPair: savedClientKeyPair,
+    config: .init(connectsAutomatically: false))
 ```
 
 To have the signer grant operations up front rather than challenging the user for each, list them
