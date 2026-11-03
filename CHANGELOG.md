@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`GiftWrap.UnwrappedMessage` has a public initializer**, so an app can rebuild a stored message or
+  create a fixture for its own tests. Only `GiftWrap.unwrap(giftWrap:recipient:)` attests the sender.
 - **`Bolt11Invoice.paymentHashHex` and `descriptionHashHex`** give the invoice's hashes as the
   lowercase hex NIP-47 uses, so a decoded invoice can be looked up with
   `lookupInvoice(.paymentHash(_:))` without converting the bytes by hand.
