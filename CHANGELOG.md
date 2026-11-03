@@ -321,6 +321,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the send timeout fails the connection. Subscribing, unsubscribing, publishing, counting, and
   authenticating all send this way, so the 0.9.0 workaround that let a timed-out fetch finish its
   `CLOSE` frames is no longer needed and is removed.
+- **`RelayConnectionTransport.events()` is attached to every relay when it returns**: it attached on
+  background tasks, so a frame arriving right after the call could be lost, and a relay dropping in
+  that window left the merged stream open forever, as a stream taken after a drop waits for the next
+  session. A response to a request sent right after starting a session could be missed the same way.
+  The method is now `async`, as `RelayTransport` already declares it; callers already `await` it.
 - **`WalletConnectURI.stringValue` percent-encodes its query values and can no longer crash**: it was
   built with `URLComponents`, which leaves `:` and `/` unescaped inside values, and trapped with
   `fatalError` if serialization ever failed. It now encodes the query the same way as `BunkerURI` and
