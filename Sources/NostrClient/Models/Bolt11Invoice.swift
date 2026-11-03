@@ -28,6 +28,25 @@ public struct Bolt11Invoice: Sendable, Hashable {
     /// How long after ``timestamp`` the invoice expires (the `x` field), if present.
     public let expiry: Duration?
 
+    /// ``paymentHash`` as 64 lowercase hex digits, if present.
+    ///
+    /// NIP-47 wallets identify a payment by this form, so it can look the invoice up directly:
+    ///
+    /// ```swift
+    /// if let hash = invoice.paymentHashHex {
+    ///     let status = try await connection.lookupInvoice(.paymentHash(hash))
+    /// }
+    /// ```
+    public var paymentHashHex: String? {
+        paymentHash?.hexEncodedString()
+    }
+
+    /// ``descriptionHash`` as 64 lowercase hex digits, if present — the form NIP-47's
+    /// `make_invoice` takes as its `description_hash`.
+    public var descriptionHashHex: String? {
+        descriptionHash?.hexEncodedString()
+    }
+
     /// Parses a BOLT-11 invoice string (e.g. `lnbc2500u1...`).
     ///
     /// An optional field that is present but malformed (e.g. a payment or description hash whose

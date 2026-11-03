@@ -57,6 +57,25 @@ struct Bolt11InvoiceTests {
         #expect(invoice.description == nil)
     }
 
+    @Test("exposes the hashes as lowercase hex, or nil when absent")
+    func hashesAsHex() throws {
+        let coffee = try #require(
+            Bolt11Invoice(
+                "lnbc2500u1pvjluezsp5zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zygspp5qqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqypqdq5xysxxatsyp3k7enxv4jsxqzpu9qrsgquk0rl77nj30yxdy8j9vdx85fkpmdla2087ne0xh8nhedh8w27kyke0lp53ut353s06fv3qfegext0eh0ymjpf39tuven09sam30g4vgpfna3rh"
+            ))
+        #expect(coffee.paymentHashHex == paymentHashHex)
+        #expect(coffee.descriptionHashHex == nil)
+
+        let withDescriptionHash = try #require(
+            Bolt11Invoice(
+                "lnbc20m1pvjluezsp5zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zyg3zygspp5qqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqqqsyqcyq5rqwzqfqypqhp58yjmdan79s6qqdhdzgynm4zwqd5d7xmw5fk98klysy043l2ahrqs9qrsgq7ea976txfraylvgzuxs8kgcw23ezlrszfnh8r6qtfpr6cxga50aj6txm9rxrydzd06dfeawfk6swupvz4erwnyutnjq7x39ymw6j38gp7ynn44"
+            ))
+        // SHA-256 of `descriptionHashSource`, as the BOLT-11 test vector gives it.
+        #expect(
+            withDescriptionHash.descriptionHashHex
+                == "3925b6f67e2c340036ed12093dd44e0368df1b6ea26c53dbe4811f58fd5db8c1")
+    }
+
     @Test("decodes the pico-multiplier amount (divides by 10)")
     func picoMultiplier() throws {
         // 9678785340p ÷ 10 = 967878534 msats.

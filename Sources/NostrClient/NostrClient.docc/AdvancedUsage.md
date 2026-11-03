@@ -708,7 +708,8 @@ let bolt11 = try await pay.fetchInvoice(
     amountMillisats: 21_000, zapRequest: zapRequest, lnurl: LNURL.encode(serviceURL))
 // …pay `bolt11` with your wallet. You can also decode it on its own (the initializer is failable):
 if let invoice = Bolt11Invoice(bolt11) {
-    // invoice.amountMillisats, .timestamp (a Timestamp), .paymentHash, .descriptionHash, .expiry (a Duration)
+    // invoice.amountMillisats, .timestamp (a Timestamp), .paymentHash, .descriptionHash, .expiry (a Duration);
+    // .paymentHashHex and .descriptionHashHex give the hashes as the lowercase hex NIP-47 uses
 }
 
 // 4. When the kind-9735 zap receipt arrives over relays, verify it is authentic.
