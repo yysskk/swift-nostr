@@ -26,8 +26,8 @@ public struct NProfile: Sendable, Hashable {
     ///   ``NIP19Entity/Error/malformedTLV`` if a record is truncated,
     ///   ``NIP19Entity/Error/missingPublicKey`` if it has no public key, or
     ///   ``NIP19Entity/Error/invalidLength(_:)`` if the public key is not 32 bytes.
-    public init(bech32String: String) throws(NIP19Entity.Error) {
-        try self.init(tlvData: TLV.payload(fromBech32: bech32String, prefix: "nprofile"))
+    public init(bech32: String) throws(NIP19Entity.Error) {
+        try self.init(tlvData: TLV.payload(fromBech32: bech32, prefix: "nprofile"))
     }
 
     init(tlvData: Data) throws(NIP19Entity.Error) {

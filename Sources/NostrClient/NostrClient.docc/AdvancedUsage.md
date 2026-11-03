@@ -295,7 +295,7 @@ Decode an arbitrary entity through the unified entry point, or a known type
 directly:
 
 ```swift
-switch try NIP19Entity.decode(nprofile) {
+switch try NIP19Entity(bech32: nprofile) {
 case .nprofile(let p):
     print("publicKey: \(p.publicKey), relays: \(p.relays)")
 case .nevent(let e):
@@ -311,7 +311,7 @@ case .nsec:
 }
 
 // Typed decode (throws if the prefix does not match)
-let parsed = try NEvent(bech32String: nevent)
+let parsed = try NEvent(bech32: nevent)
 ```
 
 ## Follow Lists (NIP-02)

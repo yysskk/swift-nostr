@@ -173,7 +173,7 @@ struct NIP23LongFormTests {
         let event = signer.sign(.longFormContent(article, draft: false))
 
         let naddr = try article.naddr(author: signer.publicKey)
-        let decoded = try NAddr(bech32String: naddr.encoded)
+        let decoded = try NAddr(bech32: naddr.encoded)
         #expect(decoded.identifier == "addressable-id")
         #expect(decoded.author == signer.publicKey)
         #expect(decoded.kind == .longFormContent)

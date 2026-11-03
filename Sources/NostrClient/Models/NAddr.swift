@@ -44,8 +44,8 @@ public struct NAddr: Sendable, Hashable {
     ///   ``NIP19Entity/Error/missingKind`` if it lacks that record, or
     ///   ``NIP19Entity/Error/invalidLength(_:)`` if the author is not 32 bytes or the kind is not
     ///   1–4 bytes.
-    public init(bech32String: String) throws(NIP19Entity.Error) {
-        try self.init(tlvData: TLV.payload(fromBech32: bech32String, prefix: "naddr"))
+    public init(bech32: String) throws(NIP19Entity.Error) {
+        try self.init(tlvData: TLV.payload(fromBech32: bech32, prefix: "naddr"))
     }
 
     /// Builds an `naddr` coordinate from an addressable event, extracting its `d` tag.

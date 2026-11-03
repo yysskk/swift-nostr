@@ -38,8 +38,8 @@ public struct NEvent: Sendable, Hashable {
     ///   ``NIP19Entity/Error/missingEventID`` if it has no event id, or
     ///   ``NIP19Entity/Error/invalidLength(_:)`` if the event id or author is not 32 bytes or the
     ///   kind is not 1–4 bytes.
-    public init(bech32String: String) throws(NIP19Entity.Error) {
-        try self.init(tlvData: TLV.payload(fromBech32: bech32String, prefix: "nevent"))
+    public init(bech32: String) throws(NIP19Entity.Error) {
+        try self.init(tlvData: TLV.payload(fromBech32: bech32, prefix: "nevent"))
     }
 
     /// Builds an `nevent` reference from a known event, capturing its id, author, and kind.

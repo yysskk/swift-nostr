@@ -10,7 +10,7 @@ extension NIP19Entity {
     /// https://github.com/nostr-protocol/nips/blob/master/21.md
     /// - Throws: ``NIP19Entity/Error/missingNostrScheme`` if the string does not start with
     ///   `nostr:`, ``NIP19Entity/Error/privateKeyInURI`` if it holds an `nsec`, or the errors of
-    ///   ``NIP19Entity/decode(_:)``.
+    ///   ``NIP19Entity/init(bech32:)``.
     public init(nostrURI: String) throws(NIP19Entity.Error) {
         let trimmed = nostrURI.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.lowercased().hasPrefix("nostr:") else {
@@ -20,7 +20,7 @@ extension NIP19Entity {
         if remainder.hasPrefix("//") {
             remainder = String(remainder.dropFirst("//".count))
         }
-        let entity = try NIP19Entity.decode(remainder)
+        let entity = try NIP19Entity(bech32: remainder)
         if case .nsec = entity {
             throw .privateKeyInURI
         }

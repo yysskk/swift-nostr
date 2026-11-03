@@ -28,27 +28,27 @@ public enum NIP19Entity: Sendable, Hashable {
     ///   ``NIP19Entity/Error/invalidLength(_:)`` if an `npub`, `nsec`, or `note` payload is not
     ///   32 bytes, ``NIP19Entity/Error/invalidPrivateKey`` if an `nsec` payload is not a valid
     ///   secp256k1 scalar, or the errors of decoding an `nprofile`, `nevent`, or `naddr` payload.
-    public static func decode(_ bech32String: String) throws(NIP19Entity.Error) -> NIP19Entity {
-        let (hrp, data) = try TLV.decodeBech32(bech32String)
+    public init(bech32: String) throws(NIP19Entity.Error) {
+        let (hrp, data) = try TLV.decodeBech32(bech32)
         switch hrp {
         case "npub":
-            return .npub(try TLV.publicKey(data))
+            self = .npub(try TLV.publicKey(data))
         case "nsec":
             do throws(KeyPair.Error) {
-                return .nsec(try PrivateKey(data: data))
+                self = .nsec(try PrivateKey(data: data))
             } catch .invalidLength(let count) {
                 throw .invalidLength(count)
             } catch {
                 throw .invalidPrivateKey
             }
         case "note":
-            return .note(try TLV.eventID(data))
+            self = .note(try TLV.eventID(data))
         case "nprofile":
-            return .nprofile(try NProfile(tlvData: data))
+            self = .nprofile(try NProfile(tlvData: data))
         case "nevent":
-            return .nevent(try NEvent(tlvData: data))
+            self = .nevent(try NEvent(tlvData: data))
         case "naddr":
-            return .naddr(try NAddr(tlvData: data))
+            self = .naddr(try NAddr(tlvData: data))
         default:
             throw .unknownPrefix(hrp)
         }
@@ -82,7 +82,7 @@ public enum NIP19Entity: Sendable, Hashable {
         /// The bech32 prefix is not one NIP-19 defines (payload: the prefix found).
         case unknownPrefix(String)
         /// The bech32 prefix is not the one the entity type expects, such as an `npub` given to
-        /// ``NProfile/init(bech32String:)`` (payload: the prefix found).
+        /// ``NProfile/init(bech32:)`` (payload: the prefix found).
         case unexpectedPrefix(String)
         /// A TLV record runs past the end of the payload.
         case malformedTLV

@@ -261,7 +261,7 @@ struct NIP51SetTests {
         #expect(naddr.kind == 30003)
 
         // Round-trips through its bech32 encoding.
-        let decoded = try NAddr(bech32String: naddr.encoded)
+        let decoded = try NAddr(bech32: naddr.encoded)
         #expect(decoded == naddr)
 
         // Matches the coordinate derived directly from the signed event.

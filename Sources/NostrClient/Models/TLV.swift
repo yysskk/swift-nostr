@@ -151,7 +151,7 @@ enum TLV {
     }
 
     /// Decodes a bech32 string into its TLV payload, verifying the human-readable prefix.
-    /// Shared by the `nprofile`/`nevent`/`naddr` `init(bech32String:)` initializers.
+    /// Shared by the `nprofile`/`nevent`/`naddr` `init(bech32:)` initializers.
     /// - Throws: ``NIP19Entity/Error/invalidBech32(_:)`` if `string` is not valid bech32, or
     ///   ``NIP19Entity/Error/unexpectedPrefix(_:)`` if its prefix is not `prefix`.
     static func payload(fromBech32 string: String, prefix: String) throws(NIP19Entity.Error) -> Data {

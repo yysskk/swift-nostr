@@ -79,7 +79,7 @@ public struct GroupReference: Sendable, Hashable {
         let inviteCode = parts.count == 2 ? Self.inviteCode(fromQuery: String(parts[1])) : nil
         let naddr: NAddr
         do throws(NIP19Entity.Error) {
-            naddr = try NAddr(bech32String: String(parts[0]))
+            naddr = try NAddr(bech32: String(parts[0]))
         } catch {
             throw .invalidCoordinate(error)
         }
