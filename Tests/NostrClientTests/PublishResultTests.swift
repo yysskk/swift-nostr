@@ -11,6 +11,7 @@ struct PublishResultTests {
     private let urlB = RelayURL("wss://b.example.com")!
     private let urlC = RelayURL("wss://c.example.com")!
     private let urlD = RelayURL("wss://d.example.com")!
+    private let urlE = RelayURL("wss://e.example.com")!
 
     @Test("accessors partition relays by status")
     func accessorsPartitionByStatus() {
@@ -19,10 +20,11 @@ struct PublishResultTests {
             urlB: .failed(.timedOut),
             urlC: .pending,
             urlD: .rejected(RelayRejection(status: "blocked: banned")),
+            urlE: .cancelled,
         ])
 
         #expect(result.acceptedRelays == [urlA])
-        #expect(result.failedRelays == [urlB, urlD])
+        #expect(result.failedRelays == [urlB, urlD, urlE])
         #expect(result.pendingRelays == [urlC])
         #expect(result.statuses[urlA] == .accepted)
         #expect(result.statuses[urlC] == .pending)
@@ -35,6 +37,8 @@ struct PublishResultTests {
         #expect(PublishRelayStatus.pending == .pending)
         #expect(PublishRelayStatus.accepted != .pending)
         #expect(PublishRelayStatus.failed(.timedOut) != .accepted)
+        #expect(PublishRelayStatus.cancelled == .cancelled)
+        #expect(PublishRelayStatus.cancelled != .failed(.notConnected))
 
         // The same case with the same payload is equal, and hashes alike.
         #expect(PublishRelayStatus.failed(.timedOut) == .failed(.timedOut))
@@ -52,7 +56,13 @@ struct PublishResultTests {
         let rejection = RelayRejection(status: "auth-required: sign in")
         #expect(RelayPool.publishStatus(for: rejection) == .rejected(rejection))
         #expect(RelayPool.publishStatus(for: RelayConnection.Error.timedOut) == .failed(.timedOut))
-        #expect(RelayPool.publishStatus(for: CancellationError()) == .failed(.notConnected))
+        #expect(RelayPool.publishStatus(for: CancellationError()) == .cancelled)
+    }
+
+    @Test("an error a relay's publish never throws is still reported as notConnected")
+    func statusForUnknownError() {
+        struct UnknownError: Error {}
+        #expect(RelayPool.publishStatus(for: UnknownError()) == .failed(.notConnected))
     }
 
     @Test("accessors are empty for an empty result")

@@ -245,13 +245,15 @@ public actor RelayPool {
     /// The status of a relay whose publish threw `error`.
     ///
     /// ``RelayConnection/publish(_:)`` throws only a ``RelayRejection`` or a
-    /// ``RelayConnection/Error``; anything else is reported as
+    /// ``RelayConnection/Error``; a `CancellationError` is reported as
+    /// ``PublishRelayStatus/cancelled``, and anything else as
     /// ``RelayConnection/Error/notConnected``, as ``RelayConnection/send(_:)`` reports a socket
     /// failure.
     static func publishStatus(for error: any Swift.Error) -> PublishRelayStatus {
         switch error {
         case let rejection as RelayRejection: .rejected(rejection)
         case let error as RelayConnection.Error: .failed(error)
+        case is CancellationError: .cancelled
         default: .failed(.notConnected)
         }
     }

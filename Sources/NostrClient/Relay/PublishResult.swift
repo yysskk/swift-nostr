@@ -18,6 +18,9 @@ public enum PublishRelayStatus: Sendable, Hashable {
     /// ``RelayConnection/Error/timedOut`` or ``RelayConnection/Error/notConnected``.
     case failed(RelayConnection.Error)
 
+    /// The relay's publish was cancelled before it settled, so the relay's outcome is unknown.
+    case cancelled
+
     /// The relay had not settled yet when the publish strategy was satisfied.
     /// The send continues in the background; only its outcome is unobserved.
     case pending
@@ -44,11 +47,12 @@ public struct PublishResult: Sendable, Hashable {
     }
 
     /// Relays that had rejected the event or failed before the call returned: every relay whose
-    /// status is ``PublishRelayStatus/rejected(_:)`` or ``PublishRelayStatus/failed(_:)``.
+    /// status is ``PublishRelayStatus/rejected(_:)``, ``PublishRelayStatus/failed(_:)``, or
+    /// ``PublishRelayStatus/cancelled``.
     public var failedRelays: Set<RelayURL> {
         relays {
             switch $0 {
-            case .rejected, .failed: true
+            case .rejected, .failed, .cancelled: true
             case .accepted, .pending: false
             }
         }

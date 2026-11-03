@@ -109,6 +109,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Hashable`, so `status == .failed(.timedOut)` no longer matches a `.notConnected` failure. To test
   for a case regardless of its payload, match it: `if case .rejected = status`.
   `PublishResult.failedRelays` holds both rejected and failed relays, as before.
+- **`PublishRelayStatus.cancelled` reports a cancelled relay publish** (breaking for exhaustive
+  switches): a `CancellationError` from a relay's publish was reported as `.failed(.notConnected)`,
+  so it looked like a relay that was never connected. `PublishResult.failedRelays` includes it.
 - **`Mnemonic` redacts its phrase when printed**: `description`, `debugDescription`, and reflection
   (`dump`, `print`, string interpolation) show `Mnemonic(<redacted>)` instead of the words, like
   `PrivateKey` and `ConversationKey`. Read `words` or `phrase` to export the phrase.
