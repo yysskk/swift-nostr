@@ -16,6 +16,19 @@ public struct GiftWrap: Sendable {
         public let senderPublicKey: PublicKey
         /// The original unwrapped event (rumor)
         public let event: Event
+
+        /// Creates a message from values already known, such as a stored message or a test fixture.
+        ///
+        /// This checks nothing: only ``GiftWrap/unwrap(giftWrap:recipient:)`` attests that
+        /// `senderPublicKey` sealed `event`, so don't treat a value built here from untrusted input
+        /// as authenticated.
+        /// - Parameters:
+        ///   - senderPublicKey: The public key of the seal's author.
+        ///   - event: The rumor.
+        public init(senderPublicKey: PublicKey, event: Event) {
+            self.senderPublicKey = senderPublicKey
+            self.event = event
+        }
     }
 
     /// Authors `template` as an unsigned rumor under `signer`'s public key and gift-wraps it for
