@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`Bolt11Invoice.paymentHashHex` and `descriptionHashHex`** give the invoice's hashes as the
+  lowercase hex NIP-47 uses, so a decoded invoice can be looked up with
+  `lookupInvoice(.paymentHash(_:))` without converting the bytes by hand.
 - **`UserMetadata.internetIdentifier`** parses `nip05` into an `InternetIdentifier`, or is `nil` when
   it is absent or malformed.
 - **`RelaySubscription` is the common protocol of the subscription sequences**: `SubscriptionSequence`,
