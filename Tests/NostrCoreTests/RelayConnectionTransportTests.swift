@@ -99,26 +99,6 @@ struct RelayConnectionTransportTests {
         throw RelayConnection.Error.timedOut
     }
 
-    /// Repeats `deliver` until `condition` holds, bounded like ``pollUntil(_:)``.
-    ///
-    /// ``RelayConnectionTransport/events()`` attaches to each relay's message stream on its own
-    /// unstructured task, so a frame delivered immediately afterwards can reach the relay's
-    /// receive loop before the attachment and be dropped — a relay connection does not replay.
-    /// Re-delivering until the event is observed removes that race. A repeat is harmless: the
-    /// transport already merges duplicate copies of one event arriving from several relays, and
-    /// these tests assert on the set of event ids seen.
-    private func deliverRepeatedly(
-        _ deliver: @Sendable () throws -> Void,
-        until condition: @Sendable () -> Bool
-    ) async throws {
-        for _ in 0..<200 {
-            if condition() { return }
-            try deliver()
-            try await Task.sleep(for: .milliseconds(5))
-        }
-        throw RelayConnection.Error.timedOut
-    }
-
     /// The first frame the transport put on `mock` whose message type is `type` (`"REQ"`,
     /// `"CLOSE"`, `"EVENT"`), decoded from JSON so tests assert on the wire format rather than
     /// on substrings.
@@ -253,15 +233,10 @@ struct RelayConnectionTransportTests {
             }
         }
 
-        let relayOne = try #require(dispenser.socket(at: 0))
-        let relayTwo = try #require(dispenser.socket(at: 1))
-        try await deliverRepeatedly(
-            {
-                relayOne.deliver(.string(try Self.eventFrame(eventID: Self.eventID)))
-                relayTwo.deliver(.string(try Self.eventFrame(eventID: Self.otherEventID)))
-            },
-            until: { received.ids == [Self.eventID, Self.otherEventID] }
-        )
+        // Delivered once: events() has attached to both relays, so neither frame can be missed.
+        try #require(dispenser.socket(at: 0)).deliver(.string(Self.eventFrame(eventID: Self.eventID)))
+        try #require(dispenser.socket(at: 1)).deliver(.string(Self.eventFrame(eventID: Self.otherEventID)))
+        try await pollUntil { received.ids == [Self.eventID, Self.otherEventID] }
 
         await transport.disconnect()
     }

@@ -88,7 +88,10 @@ public actor RelayConnectionTransport: RelayTransport {
         guard sent > 0 else { throw .notConnected }
     }
 
-    public func events() -> AsyncStream<Event> {
+    /// A stream of every event received from the relays, attached to each of them by the time this
+    /// returns: nothing a relay delivers afterwards is missed, and a relay that drops afterwards
+    /// counts towards finishing the stream.
+    public func events() async -> AsyncStream<Event> {
         // Tear down any previous stream so its consumer isn't left hanging and its tasks don't leak.
         teardownEventStream()
 
@@ -105,8 +108,14 @@ public actor RelayConnectionTransport: RelayTransport {
 
         activeRelayStreams = relays.count
         for relay in relays {
+            // Taken here rather than in the forwarding task: a relay does not replay, and a stream
+            // taken after a drop stays open for the next session, so attaching late would lose
+            // frames and leave the merged stream unfinished.
+            let messages = await relay.messages()
+            // A newer events() or a disconnect() ran during that hop and already finished `stream`.
+            guard generation == self.generation else { return stream }
             let task = Task { [continuation, weak self] in
-                for await message in await relay.messages() {
+                for await message in messages {
                     if case .event(_, let event) = message {
                         continuation.yield(event)
                     }
