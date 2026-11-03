@@ -22,7 +22,7 @@ struct RemoteSignerSessionTests {
             bunker: RemoteSignerFixtures.bunker(signer: signer, secret: secret),
             clientKeyPair: client,
             transport: transport,
-            config: .init(requestTimeout: requestTimeout))
+            config: .init(requestTimeout: requestTimeout, connectsAutomatically: false))
     }
 
     // MARK: - connect handshake
@@ -32,6 +32,7 @@ struct RemoteSignerSessionTests {
         let config = RemoteSigner.Config()
         #expect(config.requestTimeout == .seconds(30))
         #expect(config.authChallengeTimeout == .seconds(300))
+        #expect(config.connectsAutomatically)
     }
 
     @Test("connect sends a kind-24133 connect request p-tagging the signer")
@@ -284,7 +285,8 @@ struct RemoteSignerSessionTests {
             bunker: RemoteSignerFixtures.bunker(signer: signer),
             clientKeyPair: client,
             transport: transport,
-            config: .init(requestTimeout: .seconds(2), authChallengeTimeout: .seconds(60)))
+            config: .init(
+                requestTimeout: .seconds(2), authChallengeTimeout: .seconds(60), connectsAutomatically: false))
         try await connectHandshake(remote, transport: transport)
 
         let challenges = await remote.authChallenges()

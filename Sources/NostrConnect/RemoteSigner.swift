@@ -12,10 +12,11 @@ public import NostrCore
 /// or ``send(_:params:)`` for a method without one.
 ///
 /// ### Connecting
-/// Call ``connect()`` in either flow. For a `bunker://` session it sends the first `connect`
-/// request, presenting the bunker secret when the token carries one. For a `nostrconnect://`
-/// session the signer initiates instead, so it waits for the signer's first response, whose echoed
-/// secret both authenticates it and reveals its public key.
+/// Commands connect by themselves, so calling ``connect()`` is optional; call it to surface
+/// connection errors up front. For a `bunker://` session it sends the first `connect` request,
+/// presenting the bunker secret when the token carries one. For a `nostrconnect://` session the
+/// signer initiates instead, so it waits for the signer's first response, whose echoed secret both
+/// authenticates it and reveals its public key.
 ///
 /// ### Authentication challenges
 /// A signer may answer a request with an `auth_url` challenge instead of a result, asking the user
@@ -34,14 +35,30 @@ public actor RemoteSigner {
         /// to authorize. Default: 300 seconds.
         public var authChallengeTimeout: Duration
 
+        /// Whether the first command runs ``RemoteSigner/connect()`` when the session has not
+        /// connected yet. Default: `true`.
+        ///
+        /// Set it to `false` to resume a session the signer already authorized under a persisted
+        /// client key pair. A bunker secret is single-use, so a signer may refuse or ignore a second
+        /// `connect` that presents it. A `nostrconnect://` session whose signer is not yet known
+        /// always waits for the signer, since a request has nowhere to go until then.
+        public var connectsAutomatically: Bool
+
         /// Creates a session configuration.
         /// - Parameters:
         ///   - requestTimeout: How long to wait for a response before failing a request.
         ///   - authChallengeTimeout: How long a request may stay pending after an `auth_url`
         ///     challenge.
-        public init(requestTimeout: Duration = .seconds(30), authChallengeTimeout: Duration = .seconds(300)) {
+        ///   - connectsAutomatically: Whether the first command runs ``RemoteSigner/connect()``
+        ///     when the session has not connected yet.
+        public init(
+            requestTimeout: Duration = .seconds(30),
+            authChallengeTimeout: Duration = .seconds(300),
+            connectsAutomatically: Bool = true
+        ) {
             self.requestTimeout = requestTimeout
             self.authChallengeTimeout = authChallengeTimeout
+            self.connectsAutomatically = connectsAutomatically
         }
     }
 
@@ -199,8 +216,10 @@ public actor RemoteSigner {
     /// ``RemoteSignerError/cancelled`` without ending the attempt for the others; the attempt is
     /// abandoned only when every caller waiting on it has been cancelled.
     ///
-    /// The typed commands call this themselves on a `nostrconnect://` session whose signer is not
-    /// yet known; call it explicitly to surface connection errors up front.
+    /// The commands call this themselves on a session that has not connected yet, unless
+    /// ``Config/connectsAutomatically`` is `false`; call it explicitly to surface connection errors
+    /// up front. It is not repeated when the relays reconnect, since the signer's authorization
+    /// outlives the socket, only after ``disconnect()``.
     /// - Throws: ``RemoteSignerError/connectionRejected(message:)`` if a `bunker://` signer declines
     ///   or returns a secret other than the one sent, ``RemoteSignerError/timedOut`` if the signer
     ///   does not answer within ``Config/requestTimeout``, ``RemoteSignerError/notConnected`` if
@@ -474,8 +493,11 @@ public actor RemoteSigner {
     /// Waits for the signer to accept a `nostrconnect://` invitation and pins the session to its
     /// discovered public key. Backs ``connect()`` for that flow; see it for the full contract.
     private func discoverSigner() async throws(RemoteSignerError) {
-        // Already discovered (e.g. a repeat call): nothing to wait for.
-        guard signerPublicKey == nil else { return }
+        // Already discovered (e.g. a repeat call, or after a disconnect): nothing to wait for.
+        guard signerPublicKey == nil else {
+            didConnect = true
+            return
+        }
 
         let signerPublicKey: PublicKey
         if let buffered = bufferedDiscovery {
@@ -583,9 +605,10 @@ public actor RemoteSigner {
     /// wrapper, such as one specific to a particular signer. An `auth_url` challenge keeps the
     /// request pending exactly as it does for a typed command (see ``authChallenges()``).
     ///
-    /// On a `nostrconnect://` session whose signer is not yet known, this first runs ``connect()``
-    /// — or joins the call already in flight — and sends the request once the signer has accepted
-    /// the invitation. Each phase has its own ``Config/requestTimeout``.
+    /// On a session that has not connected yet, this first runs ``connect()`` — or joins the call
+    /// already in flight — and sends the request once the signer has accepted. Each phase has its
+    /// own ``Config/requestTimeout``. ``Config/connectsAutomatically`` turns this off, except on a
+    /// `nostrconnect://` session whose signer is not yet known.
     ///
     /// ```swift
     /// let info = try await signer.send(RemoteSignerMethod(rawValue: "get_session_info"))
@@ -601,10 +624,9 @@ public actor RemoteSigner {
     ///   pending, ``RemoteSignerError/requestEncodingFailed`` if the request cannot be encrypted or
     ///   signed, ``RemoteSignerError/cancelled`` if the calling task is cancelled — before the send,
     ///   nothing is sent — ``RemoteSignerError/transportFailed(_:)`` if the relay cannot be
-    ///   connected to or the request cannot be sent, or what ``connect()`` throws while it waits for
-    ///   a `nostrconnect://` signer.
+    ///   connected to or the request cannot be sent, or what ``connect()`` throws when it runs first.
     public func send(_ method: RemoteSignerMethod, params: [String] = []) async throws(RemoteSignerError) -> String {
-        if signerPublicKey == nil {
+        if signerPublicKey == nil || (config.connectsAutomatically && !didConnect) {
             try await connect()
         }
         let response = try await sendRequest(method: method, params: params)

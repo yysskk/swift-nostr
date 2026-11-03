@@ -24,7 +24,7 @@ struct RemoteSignerCommandsTests {
             bunker: RemoteSignerFixtures.bunker(signer: signer),
             clientKeyPair: client,
             transport: transport,
-            config: .init(requestTimeout: requestTimeout))
+            config: .init(requestTimeout: requestTimeout, connectsAutomatically: false))
         async let connect: Void = remote.connect()
         let sent = try await RemoteSignerFixtures.waitForSentEvents(transport, count: 1)
         let request = try RemoteSignerFixtures.decryptRequest(sent[0], client: client, signer: signer)
