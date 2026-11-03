@@ -474,16 +474,15 @@ public actor RelayConnection {
     /// fails the connection. A cancelled caller learns of it at its next cancellation check.
     ///
     /// - Throws: ``RelayConnection/Error/notConnected`` when the connection is not established or
-    ///   the socket fails the send, the error ``ClientMessage/serialize()`` throws, or
-    ///   ``RelayConnection/Error/timedOut`` when the send does not complete within
-    ///   ``RelayConnectionConfig/sendTimeout``.
+    ///   the socket fails the send, or ``RelayConnection/Error/timedOut`` when the send does not
+    ///   complete within ``RelayConnectionConfig/sendTimeout``.
     public func send(_ message: ClientMessage) async throws {
         guard state == .connected, let task = webSocketTask else {
             throw Error.notConnected
         }
         let generation = socketGeneration
 
-        let text = message.serialize()
+        let text = message.json
 
         // Track subscription state before the frame goes out: the send suspends, and an
         // unsubscribe arriving meanwhile must find the subscription to forget and CLOSE — tracked

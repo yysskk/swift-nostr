@@ -18,8 +18,10 @@ public enum ClientMessage: Sendable, Hashable {
     /// https://github.com/nostr-protocol/nips/blob/master/45.md
     case count(subscriptionID: SubscriptionID, filters: [Filter])
 
-    /// Serializes the message to JSON array format
-    public func serialize() -> String {
+    /// The message as the JSON array text a relay receives, such as `["CLOSE","sub1"]`.
+    ///
+    /// This is the outgoing counterpart of ``RelayMessage/init(json:)``.
+    public var json: String {
         let array: [Any]
 
         switch self {
