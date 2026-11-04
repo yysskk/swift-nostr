@@ -125,9 +125,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Hashable`, so `status == .failed(.timedOut)` no longer matches a `.notConnected` failure. To test
   for a case regardless of its payload, match it: `if case .rejected = status`.
   `PublishResult.failedRelays` holds both rejected and failed relays, as before.
-- **`PublishRelayStatus.cancelled` reports a cancelled relay publish** (breaking for exhaustive
-  switches): a `CancellationError` from a relay's publish was reported as `.failed(.notConnected)`,
-  so it looked like a relay that was never connected. `PublishResult.failedRelays` includes it.
 - **`Mnemonic` redacts its phrase when printed**: `description`, `debugDescription`, and reflection
   (`dump`, `print`, string interpolation) show `Mnemonic(<redacted>)` instead of the words, like
   `PrivateKey` and `ConversationKey`. Read `words` or `phrase` to export the phrase.
@@ -276,6 +273,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     which take a `ConversationKey` instead of `Data`. A wrong-length key is now rejected when the
     `ConversationKey` is created, so these no longer throw `invalidConversationKey`.
   - `EventSigner.nip44Encrypt(_:to:)` and `nip44Decrypt(_:from:)` throw `NIP44Payload.Error`.
+  - `NIP44Payload.Error.invalidNonce` is removed: every public `encrypt` generates its own nonce, so
+    no caller could receive it.
 - **The NIP-47 typed commands share one shape** (breaking):
   - Every single-response command takes its request's fields as labeled parameters, with the same
     labels and defaults as the request's initializer, as `payInvoice(_:amount:)` already did:
