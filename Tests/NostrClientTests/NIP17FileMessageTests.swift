@@ -147,6 +147,31 @@ struct NIP17FileMessageTests {
         #expect(selfFile.attachment == attachment)
     }
 
+    @Test("a file message rebuilt from its parts equals the parsed one")
+    func fileRebuiltFromPartsEqualsParsed() async throws {
+        let recipient = KeyPair()
+        let encrypted = EncryptedFile.encrypt(Data("hello".utf8))
+        let url = try #require(URL(string: "https://files.example.com/abc"))
+        let attachment = FileAttachment(url: url, mimeType: "text/plain", encryption: encrypted)
+
+        let builder = DirectMessageBuilder(signer: EventSigner(keyPair: KeyPair()))
+        let result = try await builder.createFileMessageWithSelfCopy(
+            attachment, to: recipient.publicKey, expiration: 1_900_000_000)
+
+        let parser = DirectMessageParser(signer: EventSigner(keyPair: recipient))
+        let file = try #require(await parser.open(result.recipientGiftWrap).file)
+        let rebuilt = DirectMessageFile(
+            rumorID: file.rumorID,
+            senderPublicKey: file.senderPublicKey,
+            recipientPublicKey: file.recipientPublicKey,
+            attachment: file.attachment,
+            createdAt: file.createdAt,
+            expiresAt: file.expiresAt)
+
+        #expect(file.expiresAt == 1_900_000_000)
+        #expect(rebuilt == file)
+    }
+
     @Test("a hand-built file message without the optional tags opens with them nil")
     func fileWithoutOptionalTags() async throws {
         let sender = KeyPair()

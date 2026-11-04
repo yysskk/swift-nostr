@@ -37,6 +37,25 @@ struct WalletConnectionRoundTripTests {
         #expect(payment.feesPaid == 10)
     }
 
+    @Test("fetchNodeInfo sends get_info and returns the node information")
+    func fetchNodeInfoRoundTrip() async throws {
+        let (connection, transport, client, wallet) = try makeConnection()
+
+        async let result = connection.fetchNodeInfo()
+
+        let request = try await NWCFixtures.waitForSentEvents(transport, count: 1)[0]
+        let json = try NWCFixtures.decryptRequest(request, client: client, wallet: wallet)
+        #expect(json.contains("get_info"))
+        let response = try NWCFixtures.response(
+            resultJSON: #"{"result_type":"get_info","result":{"alias":"node","methods":["pay_invoice"]}}"#,
+            requestID: request.id, client: client, wallet: wallet)
+        await transport.emit(response)
+
+        let info = try await result
+        #expect(info.alias == "node")
+        #expect(info.methods == [.payInvoice])
+    }
+
     @Test("the default configuration waits 30 seconds and negotiates encryption")
     func configDefaults() {
         let config = WalletConnection.Config()
