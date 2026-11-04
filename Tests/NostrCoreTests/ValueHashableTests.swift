@@ -62,6 +62,17 @@ struct ValueHashableTests {
         #expect(sample.setCount == 2)
     }
 
+    @Test("conversation keys compare and hash by their bytes")
+    func conversationKeyEqualityIsByValue() throws {
+        let key = try ConversationKey(data: Data(repeating: 0x01, count: 32))
+        let sameBytes = try ConversationKey(data: Data(repeating: 0x01, count: 32))
+        let other = try ConversationKey(data: Data(repeating: 0x02, count: 32))
+
+        #expect(key == sameBytes)
+        #expect(key != other)
+        #expect(Set([key, sameBytes, other]).count == 2)
+    }
+
     @Test("mnemonics compare by phrase, including across initializers")
     func mnemonicEqualityIsByValue() throws {
         let phrase = Self.phrase
