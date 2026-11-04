@@ -8,7 +8,7 @@ import NostrCore
 /// A NIP-05 internet identifier, such as `alice@example.com`, which a domain maps to a public key.
 /// https://github.com/nostr-protocol/nips/blob/master/05.md
 ///
-/// Creating one validates the string; ``verify()`` then asks the domain which key the name maps to:
+/// Creating one validates the string; ``verify(urlSession:)`` then asks the domain which key the name maps to:
 ///
 /// ```swift
 /// guard let identifier = InternetIdentifier("alice@example.com") else { return }
@@ -17,7 +17,7 @@ import NostrCore
 /// ```
 ///
 /// The separator is the *last* `@`, and the local part (``name``) must use the `a-z0-9-_.` NIP-05
-/// allows (uppercase included, since ``verify()`` looks the name up both as written and
+/// allows (uppercase included, since ``verify(urlSession:)`` looks the name up both as written and
 /// lowercased). A string carrying more than one `@` is therefore rejected rather than resolved:
 /// `alice@evil.com@example.com` would otherwise name a different server than a reader expects.
 /// A domain alone, such as `example.com`, is the root identifier `_@example.com`.
@@ -90,13 +90,14 @@ public struct InternetIdentifier: Sendable, Hashable {
     /// The server's `names` entry must be a canonical hex public key (64 lowercase hex digits, as
     /// NIP-05 requires); any other value names no key, so it is reported as
     /// ``VerificationError/publicKeyNotFound``.
+    /// - Parameter urlSession: The URL session to use (defaults to `.shared`).
     /// - Returns: The public key and the relays the server recommends for it.
     /// - Throws: ``VerificationError/networkError(_:)``, ``VerificationError/invalidResponse``, or
     ///   ``VerificationError/publicKeyNotFound``.
-    public func verify() async throws(VerificationError) -> VerificationResult {
+    public func verify(urlSession: URLSession = .shared) async throws(VerificationError) -> VerificationResult {
         let data: Data
         do {
-            let (body, urlResponse) = try await URLSession.shared.data(from: wellKnownURL)
+            let (body, urlResponse) = try await urlSession.data(from: wellKnownURL)
 
             guard let httpResponse = urlResponse as? HTTPURLResponse,
                 (200...299).contains(httpResponse.statusCode)
@@ -115,12 +116,17 @@ public struct InternetIdentifier: Sendable, Hashable {
 
     /// Verifies that the identifier maps to `expectedPublicKey`, as when checking the `nip05` a
     /// profile claims.
-    /// - Parameter expectedPublicKey: The key the identifier must resolve to.
+    /// - Parameters:
+    ///   - expectedPublicKey: The key the identifier must resolve to.
+    ///   - urlSession: The URL session to use (defaults to `.shared`).
     /// - Returns: The verification result.
-    /// - Throws: Anything ``verify()`` throws, or ``VerificationError/publicKeyMismatch`` when the
-    ///   identifier resolves to a different key.
-    public func verify(expectedPublicKey: PublicKey) async throws(VerificationError) -> VerificationResult {
-        let result = try await verify()
+    /// - Throws: Anything ``verify(urlSession:)`` throws, or ``VerificationError/publicKeyMismatch``
+    ///   when the identifier resolves to a different key.
+    public func verify(
+        expectedPublicKey: PublicKey,
+        urlSession: URLSession = .shared
+    ) async throws(VerificationError) -> VerificationResult {
+        let result = try await verify(urlSession: urlSession)
 
         guard result.publicKey == expectedPublicKey else {
             throw VerificationError.publicKeyMismatch
@@ -196,7 +202,7 @@ extension InternetIdentifier: CustomStringConvertible, LosslessStringConvertible
     }
 
     /// NIP-05 restricts the local part to `a-z0-9-_.`; uppercase is tolerated here because
-    /// ``verify()`` looks the name up both as written and lowercased.
+    /// ``verify(urlSession:)`` looks the name up both as written and lowercased.
     private static func isValidName(_ name: String) -> Bool {
         !name.isEmpty
             && name.allSatisfy { character in

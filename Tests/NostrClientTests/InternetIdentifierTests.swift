@@ -280,4 +280,67 @@ struct InternetIdentifierTests {
             try aliceIdentifier.result(in: Data("[]".utf8))
         }
     }
+
+    // MARK: - Verification
+
+    @Test("verify asks the identifier's well-known URL and returns the key and relays")
+    func verifyReturnsKeyAndRelays() async throws {
+        let relay = "wss://relay.example.com"
+        let data = try nostrJSON(names: ["alice": alice.hex], relays: [alice.hex: [relay]])
+
+        let invocation = try await withMockURLSession(response: .success(status: 200, body: data)) { session in
+            try await aliceIdentifier.verify(urlSession: session)
+        }
+
+        #expect(invocation.request?.url == aliceIdentifier.wellKnownURL)
+        #expect(invocation.returnValue.identifier == aliceIdentifier)
+        #expect(invocation.returnValue.publicKey == alice)
+        #expect(invocation.returnValue.relays == [try RelayURL(string: relay)])
+    }
+
+    @Test("verify reports a non-2xx status as an invalid response")
+    func verifyRejectsErrorStatus() async throws {
+        try await withMockURLSession(response: .success(status: 404, body: Data())) { session in
+            await #expect(throws: InternetIdentifier.VerificationError.invalidResponse) {
+                try await aliceIdentifier.verify(urlSession: session)
+            }
+        }
+    }
+
+    @Test("verify reports a transport failure as a network error")
+    func verifyWrapsTransportFailure() async throws {
+        let failure = URLError(.cannotConnectToHost)
+
+        try await withMockURLSession(response: .failure(failure)) { session in
+            await #expect {
+                try await aliceIdentifier.verify(urlSession: session)
+            } throws: { error in
+                guard case .networkError = error as? InternetIdentifier.VerificationError else { return false }
+                return true
+            }
+        }
+    }
+
+    @Test("verify with the expected key returns the result")
+    func verifyExpectedKeyMatches() async throws {
+        let data = try nostrJSON(names: ["alice": alice.hex])
+
+        let invocation = try await withMockURLSession(response: .success(status: 200, body: data)) { session in
+            try await aliceIdentifier.verify(expectedPublicKey: alice, urlSession: session)
+        }
+
+        #expect(invocation.returnValue.publicKey == alice)
+    }
+
+    @Test("verify with another key throws publicKeyMismatch")
+    func verifyExpectedKeyMismatch() async throws {
+        let other = PublicKey.fixture("bob")
+        let data = try nostrJSON(names: ["alice": other.hex])
+
+        try await withMockURLSession(response: .success(status: 200, body: data)) { session in
+            await #expect(throws: InternetIdentifier.VerificationError.publicKeyMismatch) {
+                try await aliceIdentifier.verify(expectedPublicKey: alice, urlSession: session)
+            }
+        }
+    }
 }

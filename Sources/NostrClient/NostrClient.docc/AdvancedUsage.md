@@ -263,7 +263,7 @@ if let claimed = metadata.internetIdentifier {
 ```
 
 A `nostr.json` entry that is not a canonical hex key (64 lowercase hex digits) names no key, so
-``InternetIdentifier/verify()`` throws ``InternetIdentifier/VerificationError/publicKeyNotFound``.
+``InternetIdentifier/verify(urlSession:)`` throws ``InternetIdentifier/VerificationError/publicKeyNotFound``.
 
 ## NIP-19 Entities
 

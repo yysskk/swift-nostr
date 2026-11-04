@@ -103,7 +103,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`InternetIdentifier` is a value type** (breaking): `InternetIdentifier("alice@example.com")`
   validates the string once and returns `nil` if it is malformed, and the value is `Hashable`,
   `Codable` (as its string), and `LosslessStringConvertible`, with `name`, `domain` (lowercased), and
-  `wellKnownURL`. Verification moves onto the value:
+  `wellKnownURL`. Verification moves onto the value, where both `verify` forms take a `urlSession:`
+  (`.shared` by default), like `RelayInformation.fetch(from:urlSession:)`:
 
   | Old | New |
   | --- | --- |
