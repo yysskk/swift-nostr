@@ -63,6 +63,7 @@ extension RelayConnectionState {
             self.init(operation: operation, reason: error.localizedDescription)
         }
 
+        /// A description of the failed operation and its ``reason``.
         public var errorDescription: String? {
             switch operation {
             case .connect:

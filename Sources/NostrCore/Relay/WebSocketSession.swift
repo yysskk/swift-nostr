@@ -58,7 +58,7 @@ public enum WebSocketCloseCode: Int, Sendable {
 ///
 /// ```swift
 /// final class PlatformWebSocket: WebSocketSession, @unchecked Sendable {
-///     private let socket: PlatformSocket  // the platform's own WebSocket client
+///     private let socket = PlatformSocket()  // the platform's own WebSocket client
 ///
 ///     func open() { socket.connect() }
 ///
@@ -71,7 +71,7 @@ public enum WebSocketCloseCode: Int, Sendable {
 ///     func receive() async throws -> WebSocketMessage { /* … */ }
 ///
 ///     func ping() async throws {
-///         try await withCheckedThrowingContinuation { continuation in
+///         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
 ///             socket.ping { error in  // called once, when the pong arrives or the ping fails
 ///                 if let error {
 ///                     continuation.resume(throwing: error)

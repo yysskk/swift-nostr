@@ -199,6 +199,8 @@ public struct LNURLInvoiceResponse: Decodable, Sendable, Hashable {
     /// The bolt11 Lightning invoice to pay (the LNURL `pr` field).
     public let invoice: String
 
+    /// Creates a response carrying `invoice`.
+    /// - Parameter invoice: The bolt11 Lightning invoice to pay.
     public init(invoice: String) {
         self.invoice = invoice
     }

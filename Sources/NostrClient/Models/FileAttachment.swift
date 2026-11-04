@@ -36,6 +36,16 @@ public struct FileAttachment: Sendable, Hashable {
     public var blurhash: String?
 
     /// Creates an attachment from its individual fields.
+    /// - Parameters:
+    ///   - url: The URL of the encrypted file.
+    ///   - mimeType: The file's MIME type before encryption.
+    ///   - decryptionKey: The AES-GCM key.
+    ///   - decryptionNonce: The AES-GCM nonce.
+    ///   - encryptedSHA256: The lowercase hex SHA-256 of the encrypted file.
+    ///   - originalSHA256: The lowercase hex SHA-256 of the original file.
+    ///   - size: The encrypted file's size in bytes.
+    ///   - dimensions: Pixel dimensions as "<width>x<height>".
+    ///   - blurhash: A blurhash placeholder for progressive display.
     public init(
         url: URL,
         mimeType: String? = nil,

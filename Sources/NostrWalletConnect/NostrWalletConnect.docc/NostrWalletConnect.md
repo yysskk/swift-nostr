@@ -65,6 +65,9 @@ print(payment.preimage)
 ### Results
 
 - ``PaymentResult``
+- ``MultiPayResults``
+- ``MultiPayOutcome``
+- ``UnmatchedMultiPayResponse``
 - ``GetBalanceResult``
 - ``GetInfoResult``
 - ``ListTransactionsResult``

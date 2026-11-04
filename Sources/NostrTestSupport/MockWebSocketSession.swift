@@ -35,12 +35,14 @@ public final class MockWebSocketSession: WebSocketSession, @unchecked Sendable {
 
     // MARK: - WebSocketSession
 
+    /// Records that the handshake was started.
     public func open() {
         lock.lock()
         opened = true
         lock.unlock()
     }
 
+    /// Records the close and fails every pending `receive()`.
     public func close(code: WebSocketCloseCode, reason: String?) {
         lock.lock()
         closed = true
@@ -53,6 +55,7 @@ public final class MockWebSocketSession: WebSocketSession, @unchecked Sendable {
         }
     }
 
+    /// Captures `message` in the sent frames.
     public func send(_ message: WebSocketMessage) async throws {
         // `withLock` is the async-safe scoped form; the lock is never held across a suspension.
         lock.withLock {
@@ -60,6 +63,7 @@ public final class MockWebSocketSession: WebSocketSession, @unchecked Sendable {
         }
     }
 
+    /// Returns the next delivered frame or failure, suspending until one arrives.
     public func receive() async throws -> WebSocketMessage {
         try await withCheckedThrowingContinuation { continuation in
             lock.lock()
@@ -74,6 +78,7 @@ public final class MockWebSocketSession: WebSocketSession, @unchecked Sendable {
         }
     }
 
+    /// Answers per the initializer's `pingError`, `defersPing`, and `immediatePings`.
     public func ping() async throws {
         let answersNow: Bool = lock.withLock {
             guard immediatePingsLeft > 0 else { return false }

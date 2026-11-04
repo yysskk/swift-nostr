@@ -40,6 +40,7 @@ public struct NostrMessagesAPI: NostrMessaging {
     }
 
     /// Unwraps a received gift wrap into the message, reaction, or file message it carries.
+    /// - Parameter giftWrap: The gift-wrapped event.
     public func open(_ giftWrap: Event) async throws -> DirectMessagePayload {
         try await client.withSigner { signer, _ in
             try await DirectMessageParser(signer: signer).open(giftWrap)

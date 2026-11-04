@@ -19,8 +19,8 @@ public enum DirectMessagePayload: Sendable, Hashable {
 extension DirectMessagePayload {
     /// An error reading a NIP-17 payload out of an unwrapped gift wrap.
     public enum Error: Swift.Error, LocalizedError, Sendable, Equatable {
-        /// The rumor is not the kind being read — a message (14), reaction (7), or file message
-        /// (15) — or, when reading any payload, none of them (payload: the rumor's kind).
+        /// The rumor is not a message (14), reaction (7), or file message (15) (payload: the rumor's
+        /// kind).
         case unexpectedKind(Event.Kind)
         /// The rumor's `p` tag is not a canonical hex public key, so it names no recipient.
         case invalidRecipient

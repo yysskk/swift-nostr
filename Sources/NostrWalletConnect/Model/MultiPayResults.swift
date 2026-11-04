@@ -35,6 +35,10 @@ public struct UnmatchedMultiPayResponse: Sendable, Hashable {
     /// The payment result, or the error the wallet reported.
     public let result: Result<PaymentResult, WalletConnectError>
 
+    /// Creates an unmatched response.
+    /// - Parameters:
+    ///   - dTag: The `d` tag the wallet correlated the response by, if it sent one.
+    ///   - result: The payment result, or the error the wallet reported.
     public init(dTag: String?, result: Result<PaymentResult, WalletConnectError>) {
         self.dTag = dTag
         self.result = result
@@ -58,6 +62,10 @@ public struct MultiPayResults: Sendable, Hashable {
     /// Usually empty. When it is not, the payments it describes still happened.
     public let unmatched: [UnmatchedMultiPayResponse]
 
+    /// Creates the results of a `multi_pay_*` request.
+    /// - Parameters:
+    ///   - outcomes: One outcome per requested item, in the order requested.
+    ///   - unmatched: Responses that could not be tied to a requested item.
     public init(outcomes: [MultiPayOutcome], unmatched: [UnmatchedMultiPayResponse] = []) {
         self.outcomes = outcomes
         self.unmatched = unmatched

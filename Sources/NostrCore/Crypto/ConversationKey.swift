@@ -29,6 +29,7 @@ public struct ConversationKey: Sendable {
     ///
     /// The bytes must be uniformly random secret material: either a key derived by NIP-44, or 32
     /// bytes from a CSPRNG.
+    /// - Parameter data: The 32 key bytes.
     /// - Throws: ``NIP44Payload/Error/invalidConversationKey`` if `data` is not 32 bytes.
     public init(data: Data) throws(NIP44Payload.Error) {
         guard data.count == Self.byteCount else {
@@ -108,6 +109,7 @@ extension ConversationKey: Hashable {
         zip(lhs.data, rhs.data).reduce(UInt8(0)) { $0 | ($1.0 ^ $1.1) } == 0
     }
 
+    /// Hashes the key's bytes.
     public func hash(into hasher: inout Hasher) {
         hasher.combine(data)
     }

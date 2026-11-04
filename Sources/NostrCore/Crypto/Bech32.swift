@@ -243,6 +243,7 @@ public enum Bech32Error: Error, LocalizedError, Sendable, Equatable {
     /// The data does not regroup into whole bytes with canonical, all-zero padding.
     case invalidPadding
 
+    /// A description of why the string could not be decoded.
     public var errorDescription: String? {
         switch self {
         case .invalidHumanReadablePart:
