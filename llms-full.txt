@@ -1,6 +1,6 @@
 # swift-nostr: Complete Documentation
 
-> swift-nostr is a modern Swift toolkit for Nostr protocol. It vends four libraries: `NostrCore` (protocol primitives, signing, NIP-44 encryption, NIP-19 encoding, and relay transport), the high-level `NostrClient` (multi-relay pools, NIP-65 outbox routing, and NIP-17 private direct messages), `NostrWalletConnect` (NIP-47 wallet payments), and `NostrConnect` (NIP-46 remote signing via `bunker://`). All types are `Sendable` for Swift concurrency. MIT licensed.
+> swift-nostr is a modern Swift toolkit for Nostr protocol. It vends four libraries: `NostrCore` (protocol primitives, signing, NIP-44 encryption, NIP-19 encoding, and relay transport), the high-level `NostrClient` (multi-relay pools, NIP-65 outbox routing, and NIP-17 private direct messages), `NostrWalletConnect` (NIP-47 wallet payments), and `NostrConnect` (NIP-46 remote signing via `bunker://` and `nostrconnect://`). All types are `Sendable` for Swift concurrency. MIT licensed.
 
 ## Installation
 
@@ -96,7 +96,7 @@ stored or passed to a view model.
 
 - `client.identity` -- signer setup, `publicKey` (`PublicKey?`; `.npub` for display), `sign(_:)`, NIP-44 `nip44Encrypt(_:to:)`/`nip44Decrypt(_:from:)`, NIP-42 authentication
 - `client.relays` -- `add`, `remove`, `connect`, `disconnect`, pool inspection, and `pool: RelayPool`
-- `client.events` -- the `publish*` helpers, `publish(_:)`, `fetch`, `count`, NIP-23 long-form content
+- `client.events` -- the `publish*` helpers, `publish(_:)`, `fetch`, `countEvents`, NIP-23 long-form content
 - `client.subscriptions` -- `subscribe(filters:)` (feeds are `Filter` presets) and `unsubscribe`
 - `client.routing` -- NIP-65 relay lists (behind `RelayRoute.outbox`), NIP-17 DM relay lists
 - `client.messages` -- NIP-17 private direct messages
@@ -155,7 +155,7 @@ and `subscribe(filters:route:bufferingPolicy:)` (with its short form) are `throw
 and `connectDirectMessageInboxRelays()` is `throws(NostrClient.Error)`.
 The rest stay untyped: they forward the signer's errors, or mix pool, relay, and cancellation errors.
 
-`NostrClient` itself exposes only its initializers and these namespaces.
+`NostrClient` itself exposes only its initializer, its read-only `config`, and these namespaces.
 
 ### Extending the Client
 
@@ -598,7 +598,7 @@ let published = try await client.events.publishTextNote(content: "hi")
 published.event          // Event
 published.result         // PublishResult (statuses: [RelayURL: PublishRelayStatus])
 published.event.id       // EventID
-published.result.acceptedRelays / .failedRelays / .pendingRelays  // Set<RelayURL>
+published.result.acceptedRelays  // Set<RelayURL>; also .failedRelays and .pendingRelays
 published.result.status(for: try RelayURL(string: "wss://Relay.Example.com/"))  // any spelling; nil if not targeted
 ```
 
@@ -631,7 +631,7 @@ EventTemplate.groupJoinRequest(groupID: "abcdef")           // NIP-29 group fact
 var note = EventTemplate.textNote("expiring")
 note.tags.append(.expiration(.now.advanced(by: .seconds(3600))))
 note.createdAt = Timestamp(rawValue: 1_700_000_000)
-let event = signer.sign(note)                            // EventSigner: synchronous
+let signed = signer.sign(note)                           // EventSigner: synchronous
 let remote = try await bunker.sign(.textNote("gm"))         // any NostrSigning: async
 let unsigned = UnsignedEvent(note, publicKey: pk)            // the template under an explicit key
 ```
@@ -896,8 +896,8 @@ every byte in constant time. The initializers throw `KeyPair.Error` (the cases a
 
 ```swift
 let key = try PrivateKey(hex: "...")      // 64 hex digits, either case
-let key = try PrivateKey(data: data)      // 32 bytes
-let key = try PrivateKey(nsec: "nsec1...")
+let fromData = try PrivateKey(data: data)  // 32 bytes
+let fromNsec = try PrivateKey(nsec: "nsec1...")
 key.hex; key.data; key.nsec               // export deliberately
 ```
 
@@ -921,8 +921,8 @@ npub or note `invalidBech32(Bech32Error)` or `unexpectedPrefix(String)` -- the f
 
 ```swift
 let pk = try PublicKey(hex: "...")
-let pk = try PublicKey(npub: "npub1...")
-let pk = try PublicKey(data: data)
+let fromNpub = try PublicKey(npub: "npub1...")
+let fromData = try PublicKey(data: data)
 let id = try EventID(note: "note1...")
 let sig = try Signature(hex: "...")
 let parsed = EventID(someString)   // nil unless canonical hex
@@ -1023,7 +1023,7 @@ let costly = try parsed.decrypt(password: "hunter2", maximumLogN: 22)  // opt in
 
 ```swift
 let encrypted = try keyPair.encryptedPrivateKey(password: "hunter2")
-let keyPair = try KeyPair(ncryptsec: "ncryptsec1...", password: "hunter2")  // validates the key; optional maximumLogN:
+let decrypted = try KeyPair(ncryptsec: "ncryptsec1...", password: "hunter2")  // validates the key; optional maximumLogN:
 ```
 
 ## EventSigner
@@ -1034,8 +1034,8 @@ Handles signing and verification of Nostr events (struct: Sendable).
 
 ```swift
 let signer = EventSigner(keyPair: keyPair)
-let signer = EventSigner(privateKey: privateKey)
-let signer = try EventSigner(nsec: "nsec1...")
+let fromKey = EventSigner(privateKey: privateKey)
+let fromNsec = try EventSigner(nsec: "nsec1...")
 ```
 
 ### Properties
@@ -1132,8 +1132,8 @@ redacted (`Mnemonic(<redacted>)`); read `words` or `phrase` to export it.
 
 ```swift
 let mnemonic = Mnemonic.generate(wordCount: .twelve)  // does not throw
-let mnemonic = try Mnemonic(phrase: "word1 word2 ...")
-let mnemonic = try Mnemonic(entropy: entropy)       // 16-32 bytes of BIP-39 entropy
+let parsed = try Mnemonic(phrase: "word1 word2 ...")
+let fromEntropy = try Mnemonic(entropy: entropy)  // 16-32 bytes of BIP-39 entropy
 let seed = mnemonic.seed(passphrase: "optional")  // 64-byte seed
 let keyPair = try KeyPair(mnemonic: mnemonic, passphrase: "optional", account: 0)  // NIP-06 key
 ```
@@ -1217,6 +1217,10 @@ is not kind 1059 or its seal not kind 13), `invalidSealSignature`, `authorMismat
 another author than the seal), or `invalidRumorID` (the rumor's id is not its hash) — besides the
 seal's `Event.VerificationError` and what the recipient's signer throws when a layer does not open.
 
+`unwrap` returns a `GiftWrap.UnwrappedMessage` (struct: Sendable, Hashable): `senderPublicKey` and
+`event`. `init(senderPublicKey:event:)` rebuilds a stored message or a test fixture and checks nothing;
+only `unwrap` attests the sender.
+
 ## DirectMessage
 
 NIP-17 Private Direct Message (struct: Sendable, Identifiable, Hashable).
@@ -1237,6 +1241,23 @@ NIP-17 Private Direct Message (struct: Sendable, Identifiable, Hashable).
 `recipientPublicKey`, and `attachment: FileAttachment` (`url`, `mimeType`, `decryptionKey`, `decryptionNonce`,
 `encryptedSHA256`, `originalSHA256`, `size`, `dimensions`, `blurhash`; `decrypt(_:)` opens the downloaded
 blob); both also have `createdAt: Timestamp` and `expiresAt: Timestamp?`. A reaction whose `e` or `p` tag is missing or malformed fails to parse.
+
+## FileAttachment
+
+A NIP-17 kind-15 encrypted file (struct: Sendable, Hashable), the value a file message both sends and
+receives. `EncryptedFile.encrypt(_:)` encrypts the bytes with AES-256-GCM;
+`init(url:mimeType:encryption:size:dimensions:blurhash:)` takes the key, nonce, and hashes from the result.
+
+```swift
+let encrypted = EncryptedFile.encrypt(imageData)
+let url = try await upload(encrypted.ciphertext)  // your transport
+let attachment = FileAttachment(url: url, mimeType: "image/jpeg", encryption: encrypted)
+try await client.messages.sendFile(attachment, to: recipient)
+
+// Receiving: a DirectMessageFile carries the same value.
+let blob = try await download(file.attachment.url)  // your transport
+let data = try file.attachment.decrypt(blob)        // throws EncryptedFile.Error
+```
 
 ## DirectMessageBuilder
 
@@ -1663,7 +1684,7 @@ print(info.limitation?.authRequired)
 print(info.limitation?.createdAtLowerLimit)  // Duration? -- how far in the past created_at may be
 
 // From an existing RelayConnection
-let info = try await connection.fetchInformation()
+let connectionInfo = try await connection.fetchInformation()
 
 // URL scheme conversion helper (wss->https, ws->http)
 let httpURL = RelayInformation.informationURL(from: relay)  // URL
@@ -1684,7 +1705,7 @@ OpenTimestamps attestation support for NIP-03 (struct: Sendable, Hashable).
 
 ```swift
 let ots = OpenTimestamps(base64EncodedOTS: "...")
-let ots = OpenTimestamps(otsFileData: data)
+let fromFile = OpenTimestamps(otsFileData: data)
 let tag = ots.tag                   // ["ots", base64data]
 let raw = ots.rawData               // Data?
 
@@ -1694,7 +1715,7 @@ note.openTimestamps = ots
 let signed = signer.sign(note)
 
 // Event extensions
-let ots = event.openTimestamps                  // OpenTimestamps?
+let received = event.openTimestamps             // OpenTimestamps?
 let has = event.hasOpenTimestampsAttestation    // Bool
 ```
 
@@ -1879,7 +1900,7 @@ let injected = RelayConnectionTransport(
 
 ## Bech32Error
 
-Why a bech32 string could not be decoded (enum: Error, Sendable, Equatable), carried by the
+Why a bech32 string could not be decoded (enum: Error, LocalizedError, Sendable, Equatable), carried by the
 `invalidBech32(_:)` case of `PublicKey.Error`, `EventID.Error`, `KeyPair.Error`, `LNURL.Error`, and
 `NIP19Entity.Error`. Cases: `invalidHumanReadablePart`, `mixedCase`, `missingSeparator`, `invalidLength`,
 `invalidCharacter(Character)`, `invalidChecksum`, `invalidPadding`. Bech32 itself is reached through the
@@ -2042,6 +2063,69 @@ for await challenge in await signer.authChallenges() {
   tests, or the default transport with a `webSocketFactory:` for a platform-native socket
 - `RemoteSignerError` — `invalidURI(reason:)`, `notConnected`, `requestEncodingFailed`, `responseDecodingFailed`, `timedOut`, `cancelled`, `transportFailed(RelayConnection.Error)`, `connectionRejected(message:)`, `signerError(message:)`, `responseValidationFailed`; every `RemoteSigner` and URI method is `throws(RemoteSignerError)`
 
+## WalletConnection
+
+NIP-47 session over a relay transport (actor, `NostrWalletConnect` library). Sends encrypted commands
+to a remote wallet and awaits the matching responses; every amount is in millisatoshis. Commands
+connect on demand, and `connect()` surfaces connection errors up front.
+
+```swift
+import NostrWalletConnect
+
+// Transport defaults to a RelayConnectionTransport over the URI's relays.
+let uri = try WalletConnectURI(string: "nostr+walletconnect://...")
+let connection = WalletConnection(uri: uri)
+
+// Session behavior.
+let config = WalletConnection.Config(
+    requestTimeout: .seconds(30),   // wait for a response before failing
+    preferredEncryption: nil)       // nil negotiates from the wallet's info event
+let tuned = WalletConnection(uri: uri, config: config)
+
+// The wallet's kind-13194 info event, cached; concurrent calls share one fetch.
+let capabilities = try await connection.fetchCapabilities()  // WalletCapabilities
+if capabilities.supports(.payInvoice) {
+    let payment = try await connection.payInvoice("lnbc...")  // PaymentResult
+    print(payment.preimage, payment.feesPaid ?? 0)
+}
+
+// Typed commands take the same labels and defaults as their request's initializer.
+let keysend = try await connection.payKeysend(amount: 10_000, nodePublicKey: "<node-public-key-hex>")
+let created = try await connection.makeInvoice(amount: 21_000, description: "coffee", expiry: .seconds(3600))
+let history = try await connection.listTransactions(limit: 50, type: .outgoing)
+let balance = try await connection.fetchBalance()
+let node = try await connection.fetchNodeInfo()  // get_info; the Lightning node behind the wallet
+
+// Look up by payment hash or BOLT-11 string; a decoded invoice gives the hash as lowercase hex.
+if let hash = Bolt11Invoice("lnbc...")?.paymentHashHex {
+    let status = try await connection.lookupInvoice(.paymentHash(hash))
+    print(status.state == .settled)
+}
+
+// One outcome per item, in order; a response that matches no item is in `unmatched`.
+let results = try await connection.multiPayInvoice([.init(id: "rent", invoice: "lnbc1...")])
+print(results.outcomes, results.unmatched)
+
+// Any other single-response command.
+let sent = try await connection.send(GetBalanceRequest())
+
+// notifications() only registers the stream; connect() or any command starts receiving.
+let notifications = await connection.notifications()
+try await connection.connect()
+for await notification in notifications {
+    print(notification.type, notification.transaction?.amount ?? 0)
+}
+```
+
+`payZap(lnurlPay:amount:zapRequest:lnurl:urlSession:)` fetches a recipient's invoice and pays it in one
+call, returning a `ZapResult` (`invoice`, `preimage`, `feesPaid`).
+
+- `WalletConnectURI(string:)` — parses the `nostr+walletconnect://` string: `walletPublicKey`, `relays`, `secret`, `lud16`; `clientKeyPair`, `clientSigner`, and `clientPublicKey` derive from `secret`; `stringValue` percent-encodes the query
+- `WalletCapabilities` — `methods`, `encryptions`, `notifications`, `negotiatedEncryption`, `supports(_:)`; `init(methods:encryptions:notifications:)` builds one for tests or previews
+- `PaymentResult` — `preimage`, `feesPaid`; the `Response` of `PayInvoiceRequest` and `PayKeysendRequest`, and the success value of `MultiPayOutcome`
+- `LookupInvoiceRequest.Key` — `.paymentHash(_:)` or `.invoice(_:)`
+- `WalletConnectError` — `invalidURI(reason:)`, `notConnected`, `requestEncodingFailed`, `responseDecodingFailed`, `timedOut`, `cancelled`, `transportFailed(RelayConnection.Error)`, `missingResult`, `unexpectedResultType(expected:received:)`, `unsupportedEncryption(_:)`, `walletError(code:message:)`; every command is `throws(WalletConnectError)`
+
 ## Errors
 
 Every domain throws its own error type (each an enum conforming to `Error`, `LocalizedError`,
@@ -2072,13 +2156,17 @@ set; extensions built on the capability protocols throw it too.
 - NIP-40: Expiration timestamp (disappearing messages)
 - NIP-42: Client authentication (automatic challenge response, auth-required retry)
 - NIP-44: Versioned encryption v2 (ECDH + HKDF + ChaCha20 + HMAC-SHA256)
+- NIP-45: Event counts (COUNT)
 - NIP-46: Nostr Connect (remote signing; bunker:// and client-initiated nostrconnect:// flows, auth_url challenges, typed commands — `NostrConnect` library)
 - NIP-47: Nostr Wallet Connect (full command set, NIP-44/NIP-04 encryption, notifications — `NostrWalletConnect` library)
+- NIP-49: Private key encryption (ncryptsec)
 - NIP-50: Search capability
 - NIP-51: Lists (standard lists 10000/10001/10003 + parameterized 30000-series sets; public tags + NIP-44-self-encrypted private items; kind-10009 simple group list)
+- NIP-56: Reporting (kind 1984)
 - NIP-57: Lightning Zaps (zap request kind 9734, LNURL helpers, bolt11 decoding, kind-9735 receipt validation)
 - NIP-59: Gift wrap (rumor > seal > gift wrap with randomized timestamps)
 - NIP-65: Relay list metadata (outbox model with gossip routing)
+- NIP-98: HTTP Auth (kind-27235 authorization events, header encoding, server-side validation)
 
 ## Links
 

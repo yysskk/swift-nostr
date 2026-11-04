@@ -252,6 +252,8 @@ try await signer.connect()                                  // returns once the 
 let remotePublicKey = await signer.remoteSignerPublicKey    // the signer's PublicKey, set by connect()
 ```
 
+To resume a `bunker://` session with a persisted client key pair, whose single-use secret was already spent, set `RemoteSigner.Config.connectsAutomatically` to `false`.
+
 `ping`, NIP-44/NIP-04 encrypt and decrypt, `switch_relays`, and `logout` are available too, along with an `authChallenges()` stream for `auth_url` approvals. `fetchPreferredRelays()` asks the signer for its preferred relays (`switch_relays`); reconnecting on them is up to the caller. `RemoteSignerMethod` is an open set, so `send(_:params:)` calls a method without a typed wrapper and returns its raw `result`.
 
 A `RemoteSigner` can also drive a `NostrClient`: `client.identity.setSigner(_:)` accepts any `NostrSigning`, and every feature runs through that abstraction — `identity.sign(_:)`, `events.publish(_:)`, the convenience `publish*` helpers, NIP-17 direct messages, NIP-51 private list items, and NIP-42 authentication all work with a remote signer exactly as they do with a local key.
@@ -322,6 +324,10 @@ Private groups require NIP-42 AUTH, which the client answers automatically once 
 
 Each of these is covered in depth, with worked examples, in the [documentation](https://yysskk.github.io/swift-nostr/documentation/nostrclient):
 
+- **Subscriptions** — every subscription sequence conforms to `RelaySubscription`, so `[any RelaySubscription]` tracks and closes subscriptions of different element types together.
+- **Encrypted file messages (NIP-17)** — encrypt with `EncryptedFile`, describe the upload with `FileAttachment`, and send it with `client.messages.sendFile(_:to:)`.
+- **Encryption (NIP-44)** — `NIP44Payload` encrypts with a key pair or a `ConversationKey`, such as one shared by a group.
+- **Internet identifiers (NIP-05)** — parse `name@domain` with `InternetIdentifier` and check it with `verify()`; `UserMetadata.internetIdentifier` parses a profile's `nip05`.
 - **Lightning Zaps (NIP-57)** — resolve an LNURL-pay endpoint, sign a zap request, fetch the bolt11 invoice, and verify the kind-9735 receipt.
 - **Outbox model (NIP-65)** — publish your read/write relay list and route reads/writes to each user's declared relays by passing `route: .outbox` to a publish, fetch, or subscription.
 - **Client authentication (NIP-42)** — AUTH challenges are answered automatically once a signer is set, with auth-required publish retry; an opt-in manual mode is available.

@@ -59,7 +59,7 @@ come from protocol extensions, so a stub implements just the primitives and a ca
 `any NostrMessaging` is as short as one through `client.messages`. The same protocols are how you
 add NIP helpers and namespaces of your own; see <doc:ExtendingTheClient>.
 
-`NostrClient` itself exposes only its initializers and these namespaces.
+`NostrClient` itself exposes only its initializer, its read-only ``NostrClient/config``, and these namespaces.
 
 ## Topics
 

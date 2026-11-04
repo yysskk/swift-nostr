@@ -53,6 +53,11 @@ public actor RelayPool {
     ///
     /// Relay URLs compare by their canonical form, so re-adding the same relay under a different
     /// spelling returns the existing connection (its `config` is ignored).
+    /// - Parameters:
+    ///   - url: The relay to add.
+    ///   - config: The relay's connection configuration; `nil` uses
+    ///     ``RelayPoolConfig/defaultRelayConfig``.
+    /// - Returns: The relay's connection.
     @discardableResult
     public func add(_ url: RelayURL, config: RelayConnectionConfig? = nil) async -> RelayConnection {
         if let existing = relays[url] {
@@ -86,6 +91,7 @@ public actor RelayPool {
     ///
     /// The entry is removed before the disconnect suspends, so a concurrent `add(_:config:)` of the
     /// same relay cannot receive a connection that is about to be torn down.
+    /// - Parameter url: The relay to remove.
     public func remove(_ url: RelayURL) async {
         guard let connection = relays.removeValue(forKey: url) else { return }
         await connection.disconnect()
@@ -562,6 +568,7 @@ public actor RelayPool {
 // MARK: - Convenience Methods
 extension RelayPool {
     /// Adds multiple relays, each with the pool's default connection configuration.
+    /// - Parameter urls: The relays to add.
     public func add(_ urls: some Sequence<RelayURL>) async {
         for url in urls {
             await add(url)

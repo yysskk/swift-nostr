@@ -48,6 +48,7 @@ public struct Mnemonic: Sendable {
     }
 
     /// Generates a new random mnemonic with the specified word count
+    /// - Parameter wordCount: The length of the mnemonic.
     public static func generate(wordCount: WordCount = .twelve) -> Mnemonic {
         let entropy = SecureRandom.generateBytes(count: wordCount.entropyByteCount)
         return Mnemonic(validatedEntropy: entropy, wordCount: wordCount)
@@ -225,6 +226,7 @@ extension Mnemonic: Hashable {
         return difference == 0
     }
 
+    /// Hashes the phrase's words.
     public func hash(into hasher: inout Hasher) {
         hasher.combine(words)
     }

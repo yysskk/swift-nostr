@@ -24,6 +24,7 @@ public struct NIP44Payload: Sendable, Hashable {
     // MARK: - Initializers
 
     /// Wraps an existing base64-encoded payload, such as an event's `content`, for decryption.
+    /// - Parameter base64: The base64-encoded payload.
     public init(base64: String) {
         self.base64 = base64
     }
@@ -405,6 +406,7 @@ extension NIP44Payload {
         /// The decrypted padding is not the canonical NIP-44 layout.
         case invalidPadding
 
+        /// A description of the failure.
         public var errorDescription: String? {
             switch self {
             case .invalidConversationKey:

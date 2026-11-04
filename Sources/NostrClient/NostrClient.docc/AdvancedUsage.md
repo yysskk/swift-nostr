@@ -234,8 +234,8 @@ let restored = try KeyPair(
 )
 
 // Work with Mnemonic directly
-let mnemonic = Mnemonic.generate(wordCount: .twelve)
-let account1 = try KeyPair(mnemonic: mnemonic, passphrase: "optional passphrase", account: 1)
+let twelveWords = Mnemonic.generate(wordCount: .twelve)
+let account1 = try KeyPair(mnemonic: twelveWords, passphrase: "optional passphrase", account: 1)
 let privateKey = account1.privateKey
 ```
 

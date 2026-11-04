@@ -63,6 +63,7 @@ public struct TLVRecord: Codable, Sendable, Hashable {
 
 /// A `pay_invoice` request: pays a BOLT-11 invoice.
 public struct PayInvoiceRequest: WalletConnectRequest, Codable, Hashable {
+    /// The result type of this request.
     public typealias Response = PaymentResult
 
     public static let method: WalletConnectMethod = .payInvoice
@@ -105,6 +106,7 @@ struct MultiPayInvoiceParams: Encodable, Sendable {
 
 /// A `pay_keysend` request: sends a spontaneous payment to a Lightning node.
 public struct PayKeysendRequest: WalletConnectRequest, Codable, Hashable {
+    /// The result type of this request.
     public typealias Response = PaymentResult
 
     public static let method: WalletConnectMethod = .payKeysend
@@ -173,6 +175,7 @@ struct MultiPayKeysendParams: Encodable, Sendable {
 
 /// A `make_invoice` request: creates an invoice.
 public struct MakeInvoiceRequest: WalletConnectRequest, Codable, Hashable {
+    /// The result type of this request.
     public typealias Response = MakeInvoiceResult
 
     public static let method: WalletConnectMethod = .makeInvoice
@@ -245,6 +248,7 @@ public struct MakeInvoiceRequest: WalletConnectRequest, Codable, Hashable {
 /// The params carry either `payment_hash` or `invoice`, never both and never neither; the stored
 /// ``key`` makes any other shape unrepresentable, and decoding rejects one.
 public struct LookupInvoiceRequest: WalletConnectRequest, Codable, Hashable {
+    /// The result type of this request.
     public typealias Response = LookupInvoiceResult
 
     public static let method: WalletConnectMethod = .lookupInvoice
@@ -338,6 +342,7 @@ public struct TransactionType: RawRepresentable, Codable, Sendable, Hashable, Cu
 
 /// A `list_transactions` request: lists transactions.
 public struct ListTransactionsRequest: WalletConnectRequest, Codable, Hashable {
+    /// The result type of this request.
     public typealias Response = ListTransactionsResult
 
     public static let method: WalletConnectMethod = .listTransactions
@@ -373,6 +378,7 @@ public struct ListTransactionsRequest: WalletConnectRequest, Codable, Hashable {
 
 /// A `get_balance` request: reads the wallet balance. Its `params` are empty (`{}`).
 public struct GetBalanceRequest: WalletConnectRequest, Codable, Hashable {
+    /// The result type of this request.
     public typealias Response = GetBalanceResult
 
     public static let method: WalletConnectMethod = .getBalance
@@ -383,6 +389,7 @@ public struct GetBalanceRequest: WalletConnectRequest, Codable, Hashable {
 /// A `get_info` request: reads the wallet's Lightning node information. Its `params` are empty
 /// (`{}`).
 public struct GetInfoRequest: WalletConnectRequest, Codable, Hashable {
+    /// The result type of this request.
     public typealias Response = GetInfoResult
 
     public static let method: WalletConnectMethod = .getInfo
