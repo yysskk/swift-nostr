@@ -110,7 +110,7 @@ public struct NIP44Payload: Sendable, Hashable {
     ///   - nonce: The 32-byte nonce.
     /// - Returns: The `version || nonce || ciphertext || mac` payload.
     /// - Throws: ``NIP44Payload/Error/invalidPlaintextLength(_:)`` if `message` is not 1 to 65535
-    ///   bytes of UTF-8, or ``NIP44Payload/Error/invalidNonce`` if `nonce` is not 32 bytes.
+    ///   bytes of UTF-8.
     static func encrypt(
         _ message: String,
         with conversationKey: ConversationKey,
@@ -128,9 +128,7 @@ public struct NIP44Payload: Sendable, Hashable {
         // HKDF accepts inputs of any length, so a wrong-length nonce would expand into a payload
         // that is well-formed and undecryptable by anyone — a failure that surfaces only on the
         // recipient's side, if at all. The key's length is guaranteed by ``ConversationKey``.
-        guard nonce.count == nonceByteCount else {
-            throw .invalidNonce
-        }
+        precondition(nonce.count == nonceByteCount, "A NIP-44 nonce must be 32 bytes")
 
         let plaintextData = Data(message.utf8)
 
@@ -391,8 +389,6 @@ extension NIP44Payload {
         case invalidConversationKey
         /// The plaintext is not 1 to 65535 bytes of UTF-8 (payload: its byte count).
         case invalidPlaintextLength(Int)
-        /// The nonce is not 32 bytes.
-        case invalidNonce
         /// The peer's public key is not a point on secp256k1, so no conversation key can be derived.
         case invalidPublicKey
         /// The payload is not valid base64, its length is out of range, or it does not decrypt to
@@ -413,8 +409,6 @@ extension NIP44Payload {
                 return "A NIP-44 conversation key must be 32 bytes"
             case .invalidPlaintextLength(let count):
                 return "A NIP-44 plaintext must be 1 to 65535 bytes, got \(count)"
-            case .invalidNonce:
-                return "A NIP-44 nonce must be 32 bytes"
             case .invalidPublicKey:
                 return "The public key is not a point on secp256k1"
             case .malformedPayload:

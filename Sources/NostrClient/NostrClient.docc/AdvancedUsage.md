@@ -803,9 +803,7 @@ let poolConfig = RelayPoolConfig(defaultPublishStrategy: .allSettled)
 
 Publishing returns a ``PublishResult`` with the per-relay outcome, enabling
 delivery indicators and selective retries. With `.firstAck`, relays that had
-not settled when the call returned are reported as pending. A relay whose publish was cancelled is
-reported as ``PublishRelayStatus/cancelled`` and counts among the failed relays, not as a relay that
-was never connected:
+not settled when the call returned are reported as pending:
 
 ```swift
 let result = try await client.events.publish(event)
