@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-11-04
+
+A consistency release. Names follow the NIPs and their peers — `followList`, `deletionRequest`,
+`zapReceipt`, `NIP44Payload` — and each operation has one spelling: one `setSigner`, one `connect()`
+for both NIP-46 flows, one `open(_:)` for reading a gift wrap, one initializer per relay layer, and
+one labeled shape for the NIP-47 commands. Loose settings and parameters group into values
+(`NostrClient.Config`, `ReconnectPolicy`, `RelayPoolConfig.Deduplication`, `FileAttachment`), while
+`InternetIdentifier`, `ConversationKey`, `Mnemonic.WordCount`, and `RelayConnectionState.Failure`
+replace raw strings, bytes, and integers. Value types are `Hashable` across the package,
+`RelaySubscription` is the common protocol of the subscription sequences, `WebSocketSession` is a
+plain async API, and the hex, Bech32, and key-derivation helpers are no longer public. Cancelling a
+send no longer drops the relay connection.
+Upgrading from 0.9.0 requires source changes throughout; see **Changed**.
+
 ### Added
 
 - **`GiftWrap.UnwrappedMessage` has a public initializer**, so an app can rebuild a stored message or
@@ -28,7 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`NostrIdentityProviding.removeSigner()` clears the client's signer**: `publicKey` becomes nil,
   operations that need a signer throw `NostrClient.Error.signerNotSet`, and NIP-42 AUTH challenges
   are no longer answered automatically until a signer is set again. Removing when none is set does
-  nothing.
+  nothing. It is a protocol requirement, so a custom conformer must implement it.
 - **`ReconnectPolicy` groups the reconnection settings**: `maximumAttempts` (`nil` keeps trying),
   `initialDelay`, `maximumDelay`, and `backoffMultiplier`, with the same clamping as before and
   `ReconnectPolicy.minimumDelay` as the 100 ms floor. `RelayConnectionConfig.reconnect` holds one,
@@ -47,20 +61,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`NostrClient.Config` groups the client's settings**: `relayPool` (`RelayPoolConfig.default`
   unless set), `gossipPolicy` (`.addAndConnect`), and the new `maximumGossipRelaysPerResolve` (8), with
   `NostrClient.Config.default`. The client exposes the configuration it was created with as the
-  read-only `NostrClient.config`.
-- **The gossip relay limit is configurable**: `NostrClient.Config.maximumGossipRelaysPerResolve`
-  bounds how many relays one gossip resolution (an outbox publish or read, or one recipient's NIP-17
-  DM inbox) may add to the pool and connect; it was fixed at 8. Relays already in the pool are always
-  used and never count against it. Zero or a negative value adds none, so gossip routing uses only
-  pooled relays, as under `GossipRelayPolicy.requirePresent`.
+  read-only `NostrClient.config`. `maximumGossipRelaysPerResolve` bounds how many relays one gossip
+  resolution (an outbox publish or read, or one recipient's NIP-17 DM inbox) may add to the pool and
+  connect; it was fixed at 8. Relays already in the pool are always used and never count against it.
+  Zero or a negative value adds none, so gossip routing uses only pooled relays, as under
+  `GossipRelayPolicy.requirePresent`.
 - **More value types are `Hashable`**, so they can be compared, deduplicated in a `Set`, or used as
   dictionary keys like their peers:
   - NostrCore: `UnsignedEvent`, `ClientMessage`, `RelayMessage`, `NIP44Payload`,
     `RelayConnectionConfig`, `RelayConnectionState`, `WebSocketMessage`, `RelayConnection.Error`, and
     `Mnemonic`, which compares its phrase in constant time like `PrivateKey` and `ConversationKey`.
   - NostrClient: `PublishRelayStatus`, `PublishResult`, `PublishedEvent`, `SendDirectMessageResult`,
-    `GiftWrappedMessage`, `GiftWrap.UnwrappedMessage`, `SubscriptionEvent`, `UserMetadata`,
-    `PublishStrategy`, `RelayPoolConfig`, and `NostrClient.Config`.
+    `GiftWrap.UnwrappedMessage`, `SubscriptionEvent`, `UserMetadata`, `PublishStrategy`, and
+    `RelayPoolConfig`.
   - NostrWalletConnect: `WalletConnectError`, `MultiPayOutcome`, `UnmatchedMultiPayResponse`,
     `MultiPayResults`, and `WalletConnection.Config`.
   - NostrConnect: `RemoteSigner.Config`.
@@ -1783,7 +1796,8 @@ remote signing, a spec-compliance fix to NIP-44 encryption, and expanded test co
 
 - Initial release: NIP-01 events, filters, subscriptions, and single-relay support.
 
-[Unreleased]: https://github.com/yysskk/swift-nostr/compare/0.9.0...HEAD
+[Unreleased]: https://github.com/yysskk/swift-nostr/compare/0.10.0...HEAD
+[0.10.0]: https://github.com/yysskk/swift-nostr/compare/0.9.0...0.10.0
 [0.9.0]: https://github.com/yysskk/swift-nostr/compare/0.8.0...0.9.0
 [0.8.0]: https://github.com/yysskk/swift-nostr/compare/0.7.0...0.8.0
 [0.7.0]: https://github.com/yysskk/swift-nostr/compare/0.6.0...0.7.0
